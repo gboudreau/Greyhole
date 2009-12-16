@@ -1,0 +1,8 @@
+To Do
+=====
+
+- Get people to beta test Greyhole.
+
+- Need to detect gone hard drives faster, and fix symlinks ASAP.
+  We should probably still wait for the daily fsck to re-create missing file 
+  copies, in case the hard drive re-appears soon after it disappeared.
