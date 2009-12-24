@@ -97,8 +97,9 @@ function parse_config() {
 	$graveyard = '/' . trim($graveyard, '/');
 	
 	$df_command = "df -k";
-	foreach ($storage_pool_directories as $target_drive) {
+	foreach ($storage_pool_directories as $key => $target_drive) {
 		$df_command .= " " . quoted_form($target_drive);
+		$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
 	}
 	$df_command .= " | awk '{print \$(NF),\$(NF-2)}'";
 }
