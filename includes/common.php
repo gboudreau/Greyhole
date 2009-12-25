@@ -82,6 +82,9 @@ function parse_config() {
 					if (strpos($name, 'num_copies') === 0) {
 						$share = substr($name, 11, strlen($name)-12);
 						$shares_options[$share]['num_copies'] = (int) $value;
+					} else if (strpos($name, 'delete_moves_to_attic') === 0) {
+						$share = substr($name, 22, strlen($name)-23);
+						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || stripos(trim($value), 'yes') !== FALSE || stripos(trim($value), 'true') !== FALSE;
 					} else {
 						global ${$name};
 						if (is_numeric(trim($regs[2]))) {

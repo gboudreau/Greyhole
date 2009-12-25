@@ -1228,7 +1228,7 @@ function initialize_fsck_report() {
 }
 
 function get_fsck_report() {
-	global $fsck_report, $delete_moves_to_attic, $storage_pool_directories, $gone_ok_drives;
+	global $fsck_report, $storage_pool_directories, $gone_ok_drives;
 	
 	$report = "Daily fsck report
 -----------------	
@@ -1266,12 +1266,7 @@ Attics size:\n";
 	if ($fsck_report['too_many_copies'] > 0) {
 		$fsck_report['too_many_files'] = array_unique($fsck_report['too_many_files']);
 		
-		$report .= "  Found " . $fsck_report['too_many_copies'] . " files for which there was too many file copies.";
-		if ($delete_moves_to_attic) {
-			$report .= " The following files should have been deleted, but were moved into the attic instead (because \$delete_moves_to_attic = TRUE):\n";
-		} else {
-			$report .= " Deleted files:\n";
-		}
+		$report .= "  Found " . $fsck_report['too_many_copies'] . " files for which there was too many file copies. Deleted (or in attic) files:\n";
 		$report .= "    " . implode("\n    ", $fsck_report['too_many_files']) . "\n\n";
 	}
 	
@@ -1296,12 +1291,7 @@ Attics size:\n";
 	}
 	
 	if (count($fsck_report['temp_files']) > 0) {
-		$report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions.";
-		if ($delete_moves_to_attic) {
-			$report .= " The following temporary files should have been deleted, but were moved into the attic instead (because \$delete_moves_to_attic = TRUE):\n";
-		} else {
-			$report .= " The following temporary files were deleted:\n";
-		}
+		$report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the attic):\n";
 		$report .= "    " . implode("\n    ", $fsck_report['temp_files']) . "\n\n";
 	}
 	
@@ -1317,7 +1307,6 @@ Attics size:\n";
 }
 
 function gh_recycle($real_path) {
-	global $delete_moves_to_attic;
 	$is_symlink = FALSE;
 	clearstatcache();
 	if (is_link($real_path)) {
@@ -1325,16 +1314,32 @@ function gh_recycle($real_path) {
 	} else if (!file_exists($real_path)) {
 		return TRUE;
 	}
-	if ($delete_moves_to_attic && !$is_symlink) {
-		// Move to attic
-		global $storage_pool_directories;
-		foreach ($storage_pool_directories as $dir) {
-			if (strpos($real_path, $dir) === 0) {
-				$attic_path = "$dir/.gh_attic";
-				$full_path = trim(str_replace($dir, '', $real_path), '/');
-				break;
+
+	$should_move_to_attic = FALSE;
+	if (!$is_symlink) {
+		global $storage_pool_directories, $delete_moves_to_attic, $shares_options;
+		if (strpos($real_path, $landing_zone) === 0) {
+			$full_path = trim(str_replace($landing_zone, '', $real_path), '/');
+		} else {
+			foreach ($storage_pool_directories as $dir) {
+				if (strpos($real_path, $dir) === 0) {
+					$attic_path = "$dir/.gh_attic";
+					$full_path = trim(str_replace($dir, '', $real_path), '/');
+					break;
+				}
 			}
 		}
+		$share = substr($full_path, 0, strpos($full_path, '/'));
+		
+		if (isset($shares_options[$share]['delete_moves_to_attic'])) {
+			$should_move_to_attic = $shares_options[$share]['delete_moves_to_attic'];
+		} else {
+			$should_move_to_attic = $delete_moves_to_attic;
+		}
+	}
+	
+	if ($should_move_to_attic) {
+		// Move to attic
 		if (!isset($attic_path)) {
 			gh_log(WARN, "  Warning! Can't find attic for $real_path. Will delete this file.");
 			if (@unlink($real_path)) {
@@ -1349,8 +1354,7 @@ function gh_recycle($real_path) {
 		$target_path = clean_dir("$attic_path/$full_path");
 
 		list($path, $filename) = explode_full_path($target_path);
-		$root_path = "$attic_path/" . substr($full_path, 0, strpos($full_path, '/'));
-		gh_mkdir($path, $root_path);
+		gh_mkdir($path, "$attic_path/$share");
 
 		if (@rename($real_path, $target_path)) {
 			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
