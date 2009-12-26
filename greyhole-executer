@@ -140,7 +140,7 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $landing_zone, $graveyard, $email_to;
+	global $log_level, $fsck_report, $landing_zone, $graveyard, $email_to, $sleep_before_task;
 
 	$query = "SELECT id, action, share, full_path, additional_info FROM tasks WHERE complete = 'yes' ORDER BY id ASC LIMIT 1";
 	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query tasks: " . mysql_error());
@@ -152,6 +152,12 @@ function execute_next_task() {
 	}
 	$task = mysql_fetch_object($result);
 	mysql_free_result($result);
+	
+	if (($key = array_search($task->id, $sleep_before_task)) !== FALSE) {
+		gh_log(DEBUG, "Only locked files operations pending... Sleeping.");
+		sleep($log_level == DEBUG ? 10 : 600);
+		$sleep_before_task = array();
+	}
 	
 	gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " $task->share/$task->additional_info" : ''));
 
@@ -185,6 +191,9 @@ function execute_next_task() {
 		case 'rmdir':
 			gh_rmdir($task->share, $task->full_path);
 			break;
+	}
+	if ($task->action != 'write' && $task->action != 'rename') {
+		$sleep_before_task = array();
 	}
 	$query = sprintf("INSERT INTO tasks_completed (SELECT * FROM tasks WHERE id = %d)", $task->id);
 	mysql_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . mysql_error());
@@ -225,7 +234,7 @@ function gh_unlink($share, $full_path, $task_id) {
 }
 
 function gh_rename($share, $full_path, $target_full_path, $task_id) {
-	global $landing_zone, $storage_pool_directories, $graveyard, $log_level;
+	global $landing_zone, $storage_pool_directories, $graveyard, $log_level, $sleep_before_task;
 	
 	if (is_dir("$landing_zone/$share/$full_path") || is_dir("$graveyard/$share/$full_path") || is_dir("$landing_zone/$share/$target_full_path")) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$share/$full_path -> $landing_zone/$share/$target_full_path");
@@ -262,7 +271,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				$task_id
 			);
 			mysql_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . mysql_error());
-			sleep(10);
+			$sleep_before_task[] = mysql_insert_id();
 			return;
 		}
 
@@ -294,6 +303,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
 		}
 	}
+	$sleep_before_task = array();
 }
 
 function gh_file_exists($real_path, $log_message) {
@@ -327,7 +337,7 @@ function file_is_locked($real_fullpath) {
 }
 
 function gh_write($share, $full_path, $task_id) {
-	global $storage_pool_directories, $landing_zone, $log_level;
+	global $storage_pool_directories, $landing_zone, $log_level, $sleep_before_task;
 	
 	if (!gh_file_exists("$landing_zone/$share/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) { return; }
 	
@@ -387,9 +397,10 @@ function gh_write($share, $full_path, $task_id) {
 				$task_id
 			);
 			mysql_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . mysql_error());
-			sleep(10);
+			$sleep_before_task[] = mysql_insert_id();
 			return;
 		}
+		$sleep_before_task = array();
 	}
 	
 	$tombstones = create_tombstones($share, $full_path, $num_copies_required, $filesize, $existing_tombstones);
