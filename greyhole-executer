@@ -354,22 +354,31 @@ function gh_write($share, $full_path, $task_id) {
 			gh_log(DEBUG, " - " . number_format($filesize) . " bytes", FALSE);
 		}
 		gh_log(INFO, "");
+		gh_log(DEBUG, "  Will use source file: $source_file");
 
 		$existing_tombstones = get_tombstones($share, $path, $filename, FALSE, TRUE);
 		
 		// Remove old copies (but not the one that was updated!)
 		$keys_to_remove = array();
 		foreach ($existing_tombstones as $key => $tombstone) {
+			$tombstone->path = clean_dir($tombstone->path);
 			if ($tombstone->path == $source_file) {
 				$tombstone->is_linked = TRUE;
 				$tombstone->state = 'OK';
-				$file_tombstones[$key] = $tombstone;
 			} else {
-				gh_recycle($tombstone->path);
+				gh_log(DEBUG, "  Will remove copy at $tombstone->path");
 				$keys_to_remove[] = $key;
 			}
+			$file_tombstones[$key] = $tombstone;
+		}
+		if (count($keys_to_remove) >= $num_copies_required) {
+			// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
+			$key = array_shift($keys_to_remove);
+			$source_file = $existing_tombstones[$key]->path;
+			gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
 		}
 		foreach ($keys_to_remove as $key) {
+			gh_recycle($existing_tombstones[$key]->path);
 			unset($existing_tombstones[$key]);
 		}
 		if (count($existing_tombstones) == 0) {
