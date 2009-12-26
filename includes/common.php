@@ -35,6 +35,7 @@ foreach($constarray['user'] as $key => $val) {
 $last_df_time = 0;
 $last_dfs = array();
 $is_new_line = TRUE;
+$sleep_before_task = array();
 
 function parse_config() {
 	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command;

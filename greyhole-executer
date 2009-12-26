@@ -1328,7 +1328,7 @@ function gh_recycle($real_path) {
 
 	$should_move_to_attic = FALSE;
 	if (!$is_symlink) {
-		global $storage_pool_directories, $delete_moves_to_attic, $shares_options;
+		global $storage_pool_directories, $delete_moves_to_attic, $shares_options, $landing_zone;
 		if (strpos($real_path, $landing_zone) === 0) {
 			$full_path = trim(str_replace($landing_zone, '', $real_path), '/');
 		} else {
