@@ -54,7 +54,7 @@ case "$1" in
 		if [ "$PID" = "" ]; then
 			echo Starting Greyhole...
 			cd "$APP_DIR"
-			nohup ionice -c 2 -n 7 "$APP_DIR/greyhole-executer" --daemon &
+			nohup nice -n 5 ionice -c 2 -n 7 "$APP_DIR/greyhole-executer" --daemon &
 			echo Done
 		else
 			echo "Greyhole is already running (PID $PID)."
