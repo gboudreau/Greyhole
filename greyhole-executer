@@ -254,6 +254,14 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				gh_log(DEBUG, "  Changing tombstone: $old_path -> $tombstone->path");
 				$file_tombstones[$new_key] = $tombstone;
 				$keys_to_remove[] = $key;
+
+				// is_linked = is the target of the existing symlink
+				if ($tombstone->is_linked) {
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$share/$target_full_path/$file_path to point to $tombstone->path");
+					if (gh_recycle("$landing_zone/$share/$target_full_path/$file_path")) {
+ 						symlink($tombstone->path, "$landing_zone/$share/$target_full_path/$file_path");
+					}
+				}
 			}
 			foreach ($keys_to_remove as $key) {
 				unset($file_tombstones[$key]);
@@ -265,7 +273,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		gh_log(INFO, "File renamed: $landing_zone/$share/$full_path -> $landing_zone/$share/$target_full_path");
 
 		// Check if another process locked this file before we work on it.
-		if (file_is_locked("$landing_zone/$share/$target_full_path") !== FALSE) {
+		if (file_is_locked($share, $target_full_path) !== FALSE) {
 			gh_log(DEBUG, "  File $landing_zone/$share/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
 				$task_id
@@ -328,7 +336,22 @@ function get_num_copies($share) {
 	return $num_copies;
 }
 
-function file_is_locked($real_fullpath) {
+function file_is_locked($share, $full_path) {
+	global $landing_zone;
+	$real_fullpath = "$landing_zone/$share/$full_path";
+	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath));
+	if (strpos($result, $real_fullpath) !== FALSE) {
+		return $result;
+	}
+	$query = sprintf("SELECT * FROM tasks WHERE complete = 'no' AND action = 'write' AND share = '%s' AND full_path = '%s' LIMIT 1",
+		$share,
+		mysql_escape_string($full_path)
+	);
+	$result = mysql_query($query) or gh_log(CRITICAL, "Error querying tasks for locked files: " . mysql_error());
+	return mysql_num_rows($result) > 0;
+}
+
+function real_file_is_locked($real_fullpath) {
 	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath));
 	if (strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
@@ -399,7 +422,7 @@ function gh_write($share, $full_path, $task_id) {
 	// Only need to check for locking if we have something to do!
 	if ($num_copies_required > 1 || count($existing_tombstones) == 0) {
 		// Check if another process locked this file before we work on it.
-		if (($locked_by = file_is_locked("$landing_zone/$share/$full_path")) !== FALSE) {
+		if (($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
 			gh_log(DEBUG, "  File is locked by another process. Will wait until it's unlocked to work on it.");
 			#gh_log(DEBUG, "  Locked by: $locked_by");
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
@@ -426,6 +449,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 	global $landing_zone;
 	list($path, $filename) = explode_full_path($full_path);
 
+	$link_next = FALSE;
 	foreach ($tombstones as $key => $tombstone) {
 		if (!gh_file_exists("$landing_zone/$share/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
 		
@@ -454,13 +478,29 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 
 		$temp_path = get_temp_filename($tombstone->path);
 		if (!is_link("$landing_zone/$share/$full_path") && is_file("$landing_zone/$share/$full_path")) {
-			rename("$landing_zone/$share/$full_path", $temp_path);
+			$it_worked = rename("$landing_zone/$share/$full_path", $temp_path);
 		} else {
-			copy("$landing_zone/$share/$full_path", $temp_path);
+			$it_worked = copy("$landing_zone/$share/$full_path", $temp_path);
 		}
-		rename($temp_path, $tombstone->path);
-		gh_chperm($tombstone->path);
+		if ($it_worked) {
+			rename($temp_path, $tombstone->path);
+			gh_chperm($tombstone->path);
+		} else {
+			gh_log(WARN, "    Failed file copy. Skipping.");
+			if ($tombstone->is_linked) {
+				$tombstone->is_linked = FALSE;
+				$link_next = TRUE;
+			}
+			$tombstone->state = 'Gone';
+			$tombstones[$key] = $tombstone;
+			continue;
+		}
 
+		if ($link_next && !$tombstone->is_linked) {
+			$tombstone->is_linked = TRUE;
+			$tombstones[$key] = $tombstone;
+			$link_next = FALSE;
+		}
 		if ($tombstone->is_linked) {
 			gh_log(DEBUG, "    Creating symlink in share pointing to the above file copy.");
 			symlink($tombstone->path, "$landing_zone/$share/$path/.gh_$filename");
@@ -471,10 +511,10 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			}
 		}
 
-		#gh_log(DEBUG, "  Copy size: " . filesize($tombstone->path) . " bytes");
-
-		$tombstone->state = 'OK';
-		$tombstones[$key] = $tombstone;
+		if (gh_file_exists($tombstone->path, '  Copy at $real_path doesn\'t exist. Will not mark it OK!')) {
+			$tombstone->state = 'OK';
+			$tombstones[$key] = $tombstone;
+		}
 		save_tombstones($share, $path, $filename, array_values($tombstones));
 	}
 }
@@ -559,6 +599,28 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 	global $landing_zone, $graveyard;
 	$tombstones = array();
 	
+	// Find new files (files with no tombstones yet)
+	$handle = @opendir("$landing_zone/$share/$path");
+	if ($handle) {
+		while (($filename = readdir($handle)) !== FALSE) {
+			if ($filename != '.' && $filename != '..') {
+				if (is_dir("$landing_zone/$share/$path/$filename")) {
+					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $filename => $file_tombstones) {
+						$tombstones[$filename] = $file_tombstones;
+					}
+				} else if (is_file("$landing_zone/$share/$path/$filename") && !is_link("$landing_zone/$share/$path/$filename")) {
+					// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
+					gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
+					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
+						mysql_escape_string($share),
+						mysql_escape_string(clean_dir("$path/$filename"))
+					);
+					mysql_query($query) or gh_log(CRITICAL, "Can't insert write task: " . mysql_error());
+				}
+			}
+		}
+	}
+
 	$handle = @opendir("$graveyard/$share/$path");
 	if (!$handle) {
 		gh_log(WARN, "Got 0 tombstones ($graveyard/$share/$path does't exists).");
@@ -1187,12 +1249,16 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 		}
 		save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 	} else if (count($file_copies_inodes) > $num_copies_required) {
-		gh_log(INFO, "  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will remove some.");
+		gh_log(INFO, "  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will try to remove some.");
+		if (file_is_locked($share, $file_path) !== FALSE) {
+			gh_log(INFO, "  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
+			return;
+		}
 		$fsck_report['too_many_copies']++;
 		$keys_to_remove = array();
 		while (count($file_copies_inodes) > $num_copies_required) {
 			foreach ($file_tombstones as $key => $tombstone) {
-				if ($tombstone->state == 'OK') {
+				if ($tombstone->state == 'OK' && real_file_is_locked($tombstone->path) === FALSE) {
 					$fsck_report['too_many_files'][] = $tombstone->path;
 					unset($file_copies_inodes[fileinode($tombstone->path)]);
 					gh_recycle($tombstone->path);
@@ -1382,7 +1448,7 @@ function gh_recycle($real_path) {
 		}
 	} else {
 		if (@unlink($real_path)) {
-			if ($is_symlink) {
+			if (!$is_symlink) {
 				gh_log(DEBUG, "  Deleted copy at $real_path");
 			}
 			return TRUE;
