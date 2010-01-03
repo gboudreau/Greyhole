@@ -296,6 +296,12 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				$old_path = $tombstone->path;
 				$tombstone->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $tombstone->path);
 				gh_log(DEBUG, "  Renaming copy at $old_path to $tombstone->path");
+
+				// Make sure the target directory exists
+				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+				$root_path = str_replace(clean_dir("/$share/$target_full_path"), '', $tombstone->path);
+				gh_mkdir($tombstone_dir_path, "$root_path/$share");
+
 				rename($old_path, $tombstone->path);
 
 				// is_linked = is the target of the existing symlink
