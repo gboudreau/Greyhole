@@ -33,6 +33,7 @@ for ($i=1; $i<$argc; $i++) {
 		case '--fsck':
 		case '--prerotate':
 		case '--postrotate':
+		case '--stats':
 		$action = substr($argv[$i], 2);
 		break;
 
@@ -63,12 +64,49 @@ function print_usage() {
 	echo "Invalid command line options.\n";
 	echo "Usage: Start the daemon:        greyhole-executer --daemon\n";
 	echo "       Schedule a fsck:         greyhole-executer --fsck [--email-report] [--dir <path>]\n";
+	echo "       Display statistics:      greyhole-executer --stats\n";
+	echo "\n";
 	echo "       Pre-rotate task:         greyhole-executer --prerotate\n";
 	echo "       Post-rotate task:        greyhole-executer --postrotate\n";
+	echo "\n";
 	echo "     When <path>, one of your storage pool directories, is unavailable:\n";
 	echo "       <path> will return soon: greyhole-executer --gone-ok <path>\n";
 	echo "       <path> is gone for good: greyhole-executer --gone <path>\n";
 	exit(1);
+}
+
+if ($action == 'stats') {
+	echo "\nGreyhole Statistics\n===================\n\n";
+
+	$dfs = get_free_space_in_storage_pool_dirs();
+	echo "Storage Pool\n";
+	echo "                Total -  Used =  Free -  Min = Avail + Attic = Possible\n";
+	foreach ($storage_pool_directories as $target_drive) {
+		echo "  $target_drive: ";
+		if (!isset($dfs[$target_drive])) {
+			echo "N/A\n";
+			continue;
+		}
+
+		$df_command = "df -k " . quoted_form($target_drive) . " | awk '{print \$(NF-4),\$(NF-3)}'";
+		unset($responses);
+		exec($df_command, $responses);
+		$response = explode(' ', $responses[1]);
+		$total_space = (float) array_shift($response);
+		$used_space = (float) array_shift($response);
+
+		$free_space = $dfs[$target_drive];
+		$minimum_free_space = (float) (isset($minimum_free_space_pool_directories[$target_drive]) ? $minimum_free_space_pool_directories[$target_drive]*1024*1024 : 0.0);
+		$available_space = (float) $free_space - $minimum_free_space;
+
+		$attic_path = clean_dir("$target_drive/.gh_attic");
+		$attic_size = trim(exec("du -sk " . quoted_form($attic_path) . " | awk '{print $1}'"));
+		$potential_available_space = (float) $available_space + $attic_size;
+
+		echo sprintf('%4.0f', $total_space/1024/1024) . "G - " . sprintf('%4.0f', $used_space/1024/1024) . "G = " . sprintf('%4.0f', $free_space/1024/1024) . "G - " . sprintf('%3.0f', $minimum_free_space/1024/1024) . "G = " . sprintf('%4.0f', $available_space/1024/1024) . "G + " . sprintf('%4.0f', $attic_size/1024/1024) . "G = " . sprintf('%4.0f', $potential_available_space/1024/1024) . "G\n";
+	}
+	echo "\n";
+	exit(0);
 }
 
 if ($action == 'gone') {
@@ -874,7 +912,6 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 function get_free_space_in_storage_pool_dirs() {
 	global $storage_pool_directories, $df_command, $last_df_time, $last_dfs, $df_cache_time;
 	if ($last_df_time > time() - $df_cache_time) {
-		#gh_log(DEBUG, "  Using cached df information.");
 		return $last_dfs;
 	}
 	$dfs = array();
@@ -889,7 +926,7 @@ function get_free_space_in_storage_pool_dirs() {
 	return $dfs;
 }
 
-function order_target_drives($filesize_kb) {
+function order_target_drives($filesize_kb, $include_full_drives=FALSE) {
 	global $storage_pool_directories, $minimum_free_space_pool_directories, $dir_selection_algorithm, $last_OOS_notification;
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
@@ -993,7 +1030,12 @@ You probably want to do something about this!
 		}
 		gh_log(DEBUG, $log);
 	}
-	return array_merge($sorted_target_drives, $last_resort_sorted_target_drives);
+	
+	$drives = array_merge($sorted_target_drives, $last_resort_sorted_target_drives);
+	if ($include_full_drives) {
+		$drives = array_merge($drives, $full_drives);
+	}
+	return $drives;
 }
 
 function gh_fsck($path) {
