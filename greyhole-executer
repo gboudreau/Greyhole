@@ -170,6 +170,7 @@ if ($action == 'fsck') {
 }
 
 gh_log(INFO, "Greyhole daemon started.");
+parse_samba_log();
 simplify_tasks();
 while (TRUE) {
 	parse_samba_log();
@@ -262,7 +263,11 @@ function gh_unlink($share, $full_path, $task_id) {
 
 	$existing_tombstones = get_tombstones($share, $path, $filename, TRUE);
 	foreach ($existing_tombstones as $tombstone) {
-		gh_recycle($tombstone->path);
+		if (!$tombstone->is_linked && $tombstone->path != readlink("$landing_zone/$share/$full_path")) {
+			gh_recycle($tombstone->path);
+		} else {
+			gh_log(DEBUG, "  Won't remove copy at $tombstone->path; that is the share copy, so that means this file was re-created...");
+		}
 	}
 	remove_tombstones($share, $path, $filename);
 	if (is_link("$landing_zone/$share/$full_path") && !file_exists(readlink("$landing_zone/$share/$full_path"))) {
@@ -1200,15 +1205,17 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 		}
 		
 		// Check that all file copies have the same size
-		foreach ($file_copies_inodes as $real_full_path) {
+		foreach ($file_copies_inodes as $key => $real_full_path) {
 			if (array_search($real_full_path, array_keys($file_copies_inodes)) !== FALSE) {
 				// That file isn't available atm, but it's OK.
 				continue;
 			}
 			$file_size = filesize($real_full_path);
-			if ($file_size != $expected_file_size) {
+			if ($file_size != $expected_file_size && real_file_is_locked($real_full_path) === FALSE && real_file_is_locked($original_file_path) === FALSE) {
 				gh_log(WARN, "  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.");
 				$fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
+				// Will not count that copy as a valid copy!
+				unset($file_copies_inodes[$key]);
 			}
 		}
 	}
@@ -1298,16 +1305,24 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 		save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 	} else if (count($file_copies_inodes) > $num_copies_required) {
 		gh_log(INFO, "  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will try to remove some.");
-		if (file_is_locked($share, $file_path) !== FALSE) {
+		if (file_is_locked($share, "$file_path/$filename") !== FALSE) {
 			gh_log(INFO, "  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
 			return;
 		}
 		$fsck_report['too_many_copies']++;
 		$keys_to_remove = array();
+		
+		$local_target_drives = array_values(order_target_drives(0, TRUE));
 		while (count($file_copies_inodes) > $num_copies_required) {
-			foreach ($file_tombstones as $key => $tombstone) {
+			$target_drive = array_pop($local_target_drives);
+			$key = clean_dir("$target_drive/$share/$file_path/$filename");
+			gh_log(DEBUG, "  Looking for copy at $key");
+			if (isset($file_tombstones[$key])) {
+				unset($local_target_drives[$i]);
+				$tombstone = $file_tombstones[$key];
 				if ($tombstone->state == 'OK' && real_file_is_locked($tombstone->path) === FALSE) {
 					$fsck_report['too_many_files'][] = $tombstone->path;
+					gh_log(DEBUG, "  Removing copy at $tombstone->path");
 					unset($file_copies_inodes[fileinode($tombstone->path)]);
 					gh_recycle($tombstone->path);
 					$keys_to_remove[] = $key;
