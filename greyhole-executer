@@ -263,11 +263,7 @@ function gh_unlink($share, $full_path, $task_id) {
 
 	$existing_tombstones = get_tombstones($share, $path, $filename, TRUE);
 	foreach ($existing_tombstones as $tombstone) {
-		if (!$tombstone->is_linked && $tombstone->path != readlink("$landing_zone/$share/$full_path")) {
-			gh_recycle($tombstone->path);
-		} else {
-			gh_log(DEBUG, "  Won't remove copy at $tombstone->path; that is the share copy, so that means this file was re-created...");
-		}
+		gh_recycle($tombstone->path);
 	}
 	remove_tombstones($share, $path, $filename);
 	if (is_link("$landing_zone/$share/$full_path") && !file_exists(readlink("$landing_zone/$share/$full_path"))) {
@@ -279,7 +275,7 @@ function gh_unlink($share, $full_path, $task_id) {
 function gh_rename($share, $full_path, $target_full_path, $task_id) {
 	global $landing_zone, $storage_pool_directories, $graveyard, $log_level, $sleep_before_task;
 	
-	if (is_dir("$landing_zone/$share/$full_path") || is_dir("$graveyard/$share/$full_path") || is_dir("$landing_zone/$share/$target_full_path")) {
+	if (is_dir("$graveyard/$share/$full_path") || is_dir("$landing_zone/$share/$target_full_path")) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$share/$full_path -> $landing_zone/$share/$target_full_path");
 		foreach ($storage_pool_directories as $target_drive) {
 			if (is_dir("$target_drive/$share/$full_path")) {
