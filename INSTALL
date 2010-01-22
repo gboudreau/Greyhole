@@ -28,12 +28,10 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	rpm -ivh samba-3.4.4-52.fc12.src.rpm
 	cd rpmbuild/SOURCES
 	tar zxf samba-3.4.4.tar.gz
-	cd samba-3.4.4/source3/modules
-	cp /usr/local/greyhole/samba-module/vfs_greyhole.c .
-	cd ..
+	cd samba-3.4.4/source3/
+	cp /usr/local/greyhole/samba-module/vfs_greyhole.c modules/
 	./configure
-	cp /usr/local/greyhole/samba-module/Makefile.patch .
-	patch -p1 < Makefile.patch
+	patch -p1 < /usr/local/greyhole/samba-module/Makefile.patch
 	make
 	if [ `uname -i | grep 64 | wc -l` == 1 ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 	sudo service smb restart
@@ -45,8 +43,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	wget http://www.pommepause.com/blog/wp-content/uploads/2009/12/vfs_greyhole.c
 	cd ..
 	./configure --cache-file=./config.cache --with-fhs --enable-shared --enable-static --disable-pie --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib --with-privatedir=/etc/samba --with-piddir=/var/run/samba --localstatedir=/var --with-rootsbindir=/sbin --with-pammodulesdir=/lib/security --with-pam --with-syslog --with-utmp --with-readline --with-pam_smbpass --with-libsmbclient --with-winbind --with-shared-modules=idmap_rid,idmap_ad --with-automount --with-ldap --with-ads --with-dnsupdate --with-cifsmount --with-acl-support --with-quotas
-	wget http://www.pommepause.com/blog/wp-content/uploads/2009/12/Makefile.patch
-	patch -p1 < Makefile.patch
+	patch -p1 < /usr/local/greyhole/samba-module/Makefile.patch
 	make
 	sudo make install
 	sudo /etc/init.d/samba restart
