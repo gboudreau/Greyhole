@@ -77,12 +77,11 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 		    guest ok = no
 		    printable = no
 			dfree command = /usr/local/greyhole/smb_dfree
-		    vfs objects = greyhole:share_name
+		    vfs objects = greyhole
 
 	Notes:
 		/path/to/ will be the value of your Landing Zone in Greyhole configuration file (later).
 		All your shares needs to be subdirectories of that folder, and have no space in their names.
-		Make sure the string after the colon on the 'vfs objects' line is the same as the share directory name under /path/to/.
 
 	Fedora: sudo service smb restart
 	Ubuntu: sudo /etc/init.d/samba restart

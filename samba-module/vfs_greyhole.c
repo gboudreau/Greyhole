@@ -69,7 +69,7 @@ static int greyhole_mkdir(vfs_handle_struct *handle, const char *path, mode_t mo
 	result = SMB_VFS_NEXT_MKDIR(handle, path, mode);
 
 	DEBUG(0, ("vfs_greyhole: mkdir|%s|%s|%s%s\n",
-	       handle->param, path,
+	       lp_servicename(handle->conn->params->service), path,
 	       (result < 0) ? "failed: " : "",
 	       (result < 0) ? strerror(errno) : ""));
 
@@ -83,7 +83,7 @@ static int greyhole_rmdir(vfs_handle_struct *handle, const char *path)
 	result = SMB_VFS_NEXT_RMDIR(handle, path);
 
 	DEBUG(0, ("vfs_greyhole: rmdir|%s|%s|%s%s\n",
-               handle->param, path,
+               lp_servicename(handle->conn->params->service), path,
 	       (result < 0) ? "failed: " : "",
 	       (result < 0) ? strerror(errno) : ""));
 
@@ -98,7 +98,7 @@ static int greyhole_open(vfs_handle_struct *handle, const char *fname, files_str
 
 	if ((flags & O_WRONLY) || (flags & O_RDWR)) {
 		DEBUG(0, ("vfs_greyhole: open|%s|%s|%d|%s%s%s\n",
-		       handle->param, fname, result,
+		       lp_servicename(handle->conn->params->service), fname, result,
 		       "for writing ",
 	       (result < 0) ? "failed: " : "",
 	       (result < 0) ? strerror(errno) : ""));
@@ -114,7 +114,7 @@ static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)
 	result = SMB_VFS_NEXT_CLOSE(handle, fsp);
 
 	DEBUG(0, ("vfs_greyhole: close|%s|%d|%s%s\n",
-	       handle->param, fsp->fh->fd,
+	       lp_servicename(handle->conn->params->service), fsp->fh->fd,
 	       (result < 0) ? "failed: " : "",
 	       (result < 0) ? strerror(errno) : ""));
 
@@ -128,7 +128,7 @@ static int greyhole_rename(vfs_handle_struct *handle, const char *oldname, const
 	result = SMB_VFS_NEXT_RENAME(handle, oldname, newname);
 
 	DEBUG(0, ("vfs_greyhole: rename|%s|%s|%s|%s%s\n",
-	       handle->param, oldname, newname,
+	       lp_servicename(handle->conn->params->service), oldname, newname,
 	       (result < 0) ? "failed: " : "",
 	       (result < 0) ? strerror(errno) : ""));
 
@@ -142,7 +142,7 @@ static int greyhole_unlink(vfs_handle_struct *handle, const char *path)
 	result = SMB_VFS_NEXT_UNLINK(handle, path);
 
 	DEBUG(0, ("vfs_greyhole: unlink|%s|%s|%s%s\n",
-	       handle->param, path,
+	       lp_servicename(handle->conn->params->service), path,
 	       (result < 0) ? "failed: " : "",
 	       (result < 0) ? strerror(errno) : ""));
 
