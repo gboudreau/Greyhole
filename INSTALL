@@ -73,7 +73,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 		    writable = yes
 		    guest ok = no
 		    printable = no
-			dfree command = /usr/local/greyhole/smb_dfree
+			dfree command = /usr/local/greyhole/greyhole-dfree
 		    vfs objects = greyhole
 
 	Notes:
@@ -100,8 +100,8 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 
 8. Make sure Samba can use our custom dfree command:
 
-	sudo chown root /usr/local/greyhole/smb_dfree
-	sudo chmod 755 /usr/local/greyhole/smb_dfree
+	sudo chown root /usr/local/greyhole/greyhole-dfree
+	sudo chmod 755 /usr/local/greyhole/greyhole-dfree
 
 9. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
 
