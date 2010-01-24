@@ -1,4 +1,13 @@
 #!/bin/sh
+#
+### BEGIN INIT INFO
+# Provides:          greyhole
+# Required-Start:    $network $local_fs $remote_fs mysqld
+# Required-Stop:     $network $local_fs $remote_fs mysqld
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: start Greyhole executer/balancer
+### END INIT INFO
 
 # Copyright 2009 Guillaume Boudreau
 # 
@@ -17,68 +26,90 @@
 # You should have received a copy of the GNU General Public License
 # along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
-
-### BEGIN INIT INFO
-# Provides:          greyhole
-# Required-Start:    $network $local_fs $remote_fs mysqld
-# Required-Stop:     $network $local_fs $remote_fs mysqld
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: start Greyhole executer/balancer
-### END INIT INFO
-
-# Where the application was installed
-APP_DIR="/usr/local/greyhole"
-
-if [ -f /lib/lsb/init-functions ]; then
-	. /lib/lsb/init-functions
+if [ -f /etc/rc.d/init.d/functions ]; then
+	. /etc/rc.d/init.d/functions
 fi
 
-# Allow status as non-root.
-if [ "$1" = status ]; then
-        PID=`ps auxwww | grep "greyhole-executer --daemon" | grep -v grep | awk '{print $2}'`
-        if [ "$PID" = "" ]; then
-                echo "Greyhole isn't running."
-        else
-                echo "Greyhole is running (PID $PID)."
-        fi
-        exit $?
-fi
+DAEMON="greyhole-executer"
+PIDFILE="/var/run/greyhole.pid"
+LOCKFILE="/var/lock/subsys/greyhole"
 
-# Check that we can write to it... so non-root users stop here
-[ -w /etc/samba/smb.conf ] || exit 4
+status () {
+	if [ -f $PIDFILE ]; then
+		echo "Greyhole is running."
+	else
+		echo "Greyhole isn't running."
+	fi
+	exit $?
+}
+
+daemon_start () {
+	ionice -c 2 -n 7 $DAEMON --daemon &
+	RETVAL=$?
+	return $RETVAL
+}
+
+start () {
+	if [ -f $LOCKFILE ]; then
+		return 0
+	fi
+	echo -n $"Starting Greyhole ... "
+	daemon +5 --check $DAEMON $0 daemon_start
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+		touch $LOCKFILE
+		pidof $DAEMON > $PIDFILE
+		success $"$base startup"
+	else
+		failure $"$base startup"
+	fi
+	echo
+	return $RETVAL
+}
+
+stop () {
+	echo -n $"Shutting down Greyhole: "
+	killproc $DAEMON
+	RETVAL=$?
+	[ $RETVAL -eq 0 ] && success $"$base shutdown" || failure $"$base shutdown"
+	[ $RETVAL -eq 0 ] && rm -f $LOCKFILE $PIDFILE
+	echo
+	return $ret
+}
+
+restart () {
+	stop
+	sleep 2
+	start
+}
+
+condrestart () {
+    [ -e $LOCKFILE ] && restart || :
+}
 
 case "$1" in
+	status)
+		status
+		;;
 	start)
-		PID=`ps auxwww | grep "greyhole-executer --daemon" | grep -v grep | awk '{print $2}'`
-		if [ "$PID" = "" ]; then
-			echo Starting Greyhole...
-			cd "$APP_DIR"
-			nohup nice -n 5 ionice -c 2 -n 7 "$APP_DIR/greyhole-executer" --daemon &
-			echo Done
-		else
-			echo "Greyhole is already running (PID $PID)."
-		fi
+		start
+		;;
+	daemon_start)
+		daemon_start
 		;;
 	stop)
-		PID=`ps auxwww | grep "greyhole-executer --daemon" | grep -v grep | awk '{print $2}'`
-		if [ "$PID" != "" ]; then
-			echo Stopping Greyhole...
-			kill $PID
-			echo Done
-		else
-			echo "Greyhole isn't running."
-		fi
+		stop
 		;;
 	restart)
-		$0 stop
-		sleep 2
-		$0 start
+		restart
+		;;
+	condrestart)
+		condrestart
 		;;
 	*)
-		echo "Usage: /etc/init.d/greyhole {start|stop|restart|status}"
+		echo $"Usage: $0 {start|stop|status|condrestart|restart}"
 		exit 1
 		;;
 esac
 
-exit 0
+exit $?

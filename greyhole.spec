@@ -27,6 +27,7 @@ mkdir -p $RPM_BUILD_ROOT%{_bindir}
 install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}%{_initrddir}/greyhole
 install -m 0755 -D -p greyhole-executer ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
+install -m 0644 -D -p logrotate.example /etc/logrotate.d/greyhole
 
 %clean
 rm -rf $RPM_BUILD_ROOT

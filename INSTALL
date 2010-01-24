@@ -6,17 +6,22 @@ If you know what you're doing, you should have no problem installing on any othe
 
 Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS server & client there... so I switched to FC12. I still have the install notes I used for Ubuntu; feel free to use that if you want.
 
-1. Install Greyhole into /usr/local/greyhole/:
+1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC:
+
+	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc
+	Ubuntu: sudo apt-get install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential
+
+2. Install Greyhole:
 	(Or any other directory of your choice; just substitute your path for the rest of the installation instructions.)
 
 	Get the latest version from http://code.google.com/p/greyhole/downloads/list
 	tar zxf greyhole-*.tar.gz
-	mv greyhole-* /usr/local/greyhole
-
-2. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC:
-
-	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc
-	Ubuntu: sudo apt-get install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential
+	cd greyhole-*
+	GREYHOLE_INSTALL_DIR=`pwd`
+	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
+	install -m 0755 -D -p greyhole-executer /usr/bin
+	install -m 0755 -D -p greyhole-dfree /usr/bin
+	install -m 0644 -D -p logrotate.example /etc/logrotate.d/greyhole
 
 3. Samba, before 3.4.3, has a bug when trying to delete symbolic links (which Greyhole use extensively); we need Samba 3.4.3 or more.
    Plus, we need to compile our own VFS module.
@@ -29,9 +34,9 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	cd rpmbuild/SOURCES
 	tar zxf samba-3.4.4.tar.gz
 	cd samba-3.4.4/source3/
-	cp /usr/local/greyhole/samba-module/vfs_greyhole.c modules/
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
 	./configure
-	patch -p1 < /usr/local/greyhole/samba-module/Makefile.patch
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 	make
 	if [ `uname -i | grep 64 | wc -l` == 1 ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 	sudo service smb restart
@@ -43,7 +48,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	wget http://www.pommepause.com/blog/wp-content/uploads/2009/12/vfs_greyhole.c
 	cd ..
 	./configure --cache-file=./config.cache --with-fhs --enable-shared --enable-static --disable-pie --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib --with-privatedir=/etc/samba --with-piddir=/var/run/samba --localstatedir=/var --with-rootsbindir=/sbin --with-pammodulesdir=/lib/security --with-pam --with-syslog --with-utmp --with-readline --with-pam_smbpass --with-libsmbclient --with-winbind --with-shared-modules=idmap_rid,idmap_ad --with-automount --with-ldap --with-ads --with-dnsupdate --with-cifsmount --with-acl-support --with-quotas
-	patch -p1 < /usr/local/greyhole/samba-module/Makefile.patch
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 	make
 	sudo make install
 	sudo /etc/init.d/samba restart
@@ -73,7 +78,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 		    writable = yes
 		    guest ok = no
 		    printable = no
-			dfree command = /usr/local/greyhole/greyhole-dfree
+		    dfree command = /usr/bin/greyhole-dfree
 		    vfs objects = greyhole
 
 	Notes:
@@ -83,27 +88,18 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	Fedora: sudo service smb restart
 	Ubuntu: sudo /etc/init.d/samba restart
 
-5. Remove any old samba.log you might have; that will only contain invalid entries that Greyhole won't understand:
-
-	sudo rm /var/log/samba/samba.log
-
-6. Setup the MySQL database:
+5. Setup the MySQL database:
 
 	mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
-	mysql -u greyhole_user -p89y63jdwe greyhole < /usr/local/greyhole/mysql.sql
+	mysql -u greyhole_user -p89y63jdwe greyhole < ${GREYHOLE_INSTALL_DIR}/mysql.sql
 
-7. Cutomize the Greyhole configuration file:
+6. Cutomize the Greyhole configuration file:
 
 	sudo cp /url/local/greyhole/greyhole.example.conf /etc/greyhole.conf
 	
 	Cutomize /etc/greyhole.conf as needed.
 
-8. Make sure Samba can use our custom dfree command:
-
-	sudo chown root /usr/local/greyhole/greyhole-dfree
-	sudo chmod 755 /usr/local/greyhole/greyhole-dfree
-
-9. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
+7. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
 
 	touch <dir>/.greyhole_uses_this
 
@@ -112,44 +108,36 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	Those files will be used to differentiate an empty mount from a now-gone mount.
 	i.e. Greyhole will output a warning if this file is not in the root directory where it is about to try to save a file, and it won't use that directory. This will prevent Greyhole from filling the / partition when a partition is unmounted!
 
-10. Schedule a daily fsck. Add this in the root crontab (or cron.d / cron.daily if you prefer):
+8. Schedule a daily fsck. Add this in the root crontab (or cron.d / cron.daily if you prefer):
 
-	0 0 * * *       /usr/local/greyhole/greyhole-executer --fsck --email-report > /dev/null
+	0 0 * * *       /usr/bin/greyhole-executer --fsck --email-report > /dev/null
 
 	fsck should take about 10 minutes per 50,000 files (depends on how many storage pool directories you have).
 	If you use the --email-report option, make sure your PHP can send emails. Gust configure sendmail or postfix to be able to send email from the command line and you should be fine.
 
-11. Add Greyhole to services that start on boot:
-
-	sudo ln -s /usr/local/greyhole/initd_script.sh /etc/init.d/greyhole
+9. Add Greyhole to services that start on boot:
 
 	Fedora: sudo chkconfig --add greyhole; sudo chkconfig greyhole on
 	Ubuntu: sudo update-rc.d greyhole defaults 98 20
 
-12. Setup logrotate for /var/log/greyhole.log:
-
-	sudo cp /usr/local/greyhole/logrotate.example /etc/logrotate.d/greyhole
-	
-	Customize /etc/logrotate.d/greyhole as needed.
-
-13. Setup logrotate for the Samba log; edit /etc/logrotate.d/samba:
+10. Setup logrotate for the Samba log; edit /etc/logrotate.d/samba:
 
 	prerotate
-		/usr/local/greyhole/greyhole-executer --prerotate
+		/usr/bin/greyhole-executer --prerotate
 	endscript
 	...
 	postrotate
-		/usr/local/greyhole/greyhole-executer --postrotate > /dev/null || true
+		/usr/bin/greyhole-executer --postrotate > /dev/null || true
 	endscript
 
-14. Work around problems with the CIFS client; edit /etc/rc.local:
+11. Work around problems with the CIFS client; edit /etc/rc.local:
 
 	# cifs client workaround
 	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
 	modprobe cifs
 	echo 0 > /proc/fs/cifs/OplockEnabled
 
-15. Start the Greyhole service:
+12. Start the Greyhole service:
 
 	Fedora: sudo service greyhole start
 	Ubuntu: sudo /etc/init.d/greyhole start
