@@ -834,7 +834,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	while ($line = fgets($fp)) {
 		if (strpos($line, '  vfs_greyhole:') === 0) {
 			$line = trim(substr($line, 16));
-			$line = explode('|', $line);
+			$line = explode('*', $line);
 			$action = array_shift($line);
 			$share = array_shift($line);
 			if ($action == 'mkdir') {
@@ -867,7 +867,6 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 					$fd = array_shift($line);
 					break;
 			}
-
 			if ($action == 'close') {
 				$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
 					mysql_escape_string($share),
