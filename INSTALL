@@ -65,12 +65,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	Edit /etc/samba/smb.conf
 	Change or add the following values in the [global] section:
 
-		log file = /var/log/samba/samba.log
-		max log size = 0
-		syslog = 0
-		follow symlinks = yes
-		wide links = yes
-		log level = 0 vfs:2
+		unix extensions = no
 
 	For each of your shares, add a 'dfree command' and 'vfs objects' lines, as seen below.
 
