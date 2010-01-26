@@ -832,8 +832,8 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 
 	$new_tasks = 0;
 	while ($line = fgets($fp)) {
-		if (strpos($line, '  vfs_greyhole:') === 0) {
-			$line = trim(substr($line, 16));
+		if (($p = strpos($line, ' smbd_greyhole:')) !== FALSE) {
+			$line = trim(substr($line, $p+16));
 			$line = explode('*', $line);
 			$action = array_shift($line);
 			$share = array_shift($line);

@@ -8,7 +8,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 
 1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC:
 
-	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc
+	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc rsyslog
 	Ubuntu: sudo apt-get install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential
 
 2. Install Greyhole:
@@ -21,9 +21,16 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
 	install -m 0755 -D -p greyhole-executer /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
-	install -m 0644 -D -p logrotate.example /etc/logrotate.d/greyhole
+	install -m 0644 -D -p logrotate.greyhole $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/greyhole
+	install -m 0644 -D -p logrotate.smb_greyhole $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/smb_greyhole
 
-3. Samba, before 3.4.3, has a bug when trying to delete symbolic links (which Greyhole use extensively); we need Samba 3.4.3 or more.
+3. Configure syslog:
+	Edit /etc/rsyslog.conf. Add the following in the ## RULES ## section:
+		# Greyhole
+		local6.*	/var/log/smb_greyhole.log
+	Note that if local6 is already used for another log, you should pick an unused localX facility (with X between 0 & 7). You'll then need to specify that facility in smb.conf, for each of your shares, using "greyhole:facility".
+
+4. Samba, before 3.4.3, has a bug when trying to delete symbolic links (which Greyhole use extensively); we need Samba 3.4.3 or more.
    Plus, we need to compile our own VFS module.
    If you already run version 3.4.3 or higher, you'll just need to compile vfs_greyhole.c, and install it.
 
@@ -53,7 +60,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	sudo make install
 	sudo /etc/init.d/samba restart
 
-4. Setup Samba:
+5. Setup Samba:
 
 	Edit /etc/samba/smb.conf
 	Change or add the following values in the [global] section:
@@ -81,25 +88,30 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 		    dfree command = /usr/bin/greyhole-dfree
 		    vfs objects = greyhole
 
-	Notes:
+	Note 1:
 		/path/to/ will be the value of your Landing Zone in Greyhole configuration file (later).
 		All your shares needs to be subdirectories of that folder, and have no space in their names.
+
+	Note 2:
+		If you used a facility other than local6 in rsyslog.conf, you'll need to specify it for each of your share, using a line like this:
+			greyhole:facility = LOCAL5
+		Note that the LOCAL part needs to be in CAPS.
 
 	Fedora: sudo service smb restart
 	Ubuntu: sudo /etc/init.d/samba restart
 
-5. Setup the MySQL database:
+6. Setup the MySQL database:
 
 	mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
 	mysql -u greyhole_user -p89y63jdwe greyhole < ${GREYHOLE_INSTALL_DIR}/mysql.sql
 
-6. Cutomize the Greyhole configuration file:
+7. Cutomize the Greyhole configuration file:
 
 	sudo cp /url/local/greyhole/greyhole.example.conf /etc/greyhole.conf
 	
 	Cutomize /etc/greyhole.conf as needed.
 
-7. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
+8. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
 
 	touch <dir>/.greyhole_uses_this
 
@@ -108,27 +120,17 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	Those files will be used to differentiate an empty mount from a now-gone mount.
 	i.e. Greyhole will output a warning if this file is not in the root directory where it is about to try to save a file, and it won't use that directory. This will prevent Greyhole from filling the / partition when a partition is unmounted!
 
-8. Schedule a daily fsck. Add this in the root crontab (or cron.d / cron.daily if you prefer):
+9. Schedule a daily fsck. Add this in the root crontab (or cron.d / cron.daily if you prefer):
 
 	0 0 * * *       /usr/bin/greyhole-executer --fsck --email-report > /dev/null
 
 	fsck should take about 10 minutes per 50,000 files (depends on how many storage pool directories you have).
 	If you use the --email-report option, make sure your PHP can send emails. Gust configure sendmail or postfix to be able to send email from the command line and you should be fine.
 
-9. Add Greyhole to services that start on boot:
+10. Add Greyhole to services that start on boot:
 
 	Fedora: sudo chkconfig --add greyhole; sudo chkconfig greyhole on
 	Ubuntu: sudo update-rc.d greyhole defaults 98 20
-
-10. Setup logrotate for the Samba log; edit /etc/logrotate.d/samba:
-
-	prerotate
-		/usr/bin/greyhole-executer --prerotate
-	endscript
-	...
-	postrotate
-		/usr/bin/greyhole-executer --postrotate > /dev/null || true
-	endscript
 
 11. Work around problems with the CIFS client; edit /etc/rc.local:
 

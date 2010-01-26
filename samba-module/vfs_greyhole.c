@@ -31,6 +31,7 @@ static int vfs_greyhole_debug_level = DBGC_VFS;
 
 /* Function prototypes */
 
+static int greyhole_connect(vfs_handle_struct *handle, const char *svc, const char *user);
 static int greyhole_mkdir(vfs_handle_struct *handle, const char *path, mode_t mode);
 static int greyhole_rmdir(vfs_handle_struct *handle, const char *path);
 static int greyhole_open(vfs_handle_struct *handle, const char *fname, files_struct *fsp, int flags, mode_t mode);
@@ -41,6 +42,10 @@ static int greyhole_unlink(vfs_handle_struct *handle, const char *path);
 /* VFS operations */
 
 static vfs_op_tuple greyhole_op_tuples[] = {
+
+	/* Disk operations */
+
+	{SMB_VFS_OP(greyhole_connect),		SMB_VFS_OP_CONNECT,	SMB_VFS_LAYER_LOGGER},
     
 	/* Directory operations */
 
@@ -59,8 +64,44 @@ static vfs_op_tuple greyhole_op_tuples[] = {
 	{SMB_VFS_OP(NULL), 			SMB_VFS_OP_NOOP, 	SMB_VFS_LAYER_NOOP}
 };
 
+static int greyhole_syslog_facility(vfs_handle_struct *handle)
+{
+	static const struct enum_list enum_log_facilities[] = {
+		{ LOG_USER, "USER" },
+		{ LOG_LOCAL0, "LOCAL0" },
+		{ LOG_LOCAL1, "LOCAL1" },
+		{ LOG_LOCAL2, "LOCAL2" },
+		{ LOG_LOCAL3, "LOCAL3" },
+		{ LOG_LOCAL4, "LOCAL4" },
+		{ LOG_LOCAL5, "LOCAL5" },
+		{ LOG_LOCAL6, "LOCAL6" },
+		{ LOG_LOCAL7, "LOCAL7" }
+	};
+
+	int facility;
+
+	facility = lp_parm_enum(SNUM(handle->conn), "greyhole", "facility", enum_log_facilities, LOG_LOCAL6);
+
+	return facility;
+}
+
 /* Implementation of vfs_ops.  Pass everything on to the default
    operation but log event first. */
+
+static int greyhole_connect(vfs_handle_struct *handle, const char *svc, const char *user)
+{
+	int result;
+
+	if (!handle) {
+		return -1;
+	}
+
+	openlog("smbd_greyhole", 0, greyhole_syslog_facility(handle));
+
+	result = SMB_VFS_NEXT_CONNECT(handle, svc, user);
+
+	return result;
+}
 
 static int greyhole_mkdir(vfs_handle_struct *handle, const char *path, mode_t mode)
 {
@@ -68,10 +109,10 @@ static int greyhole_mkdir(vfs_handle_struct *handle, const char *path, mode_t mo
 
 	result = SMB_VFS_NEXT_MKDIR(handle, path, mode);
 
-	DEBUG(0, ("vfs_greyhole: mkdir*%s*%s*%s%s\n",
+	syslog(LOG_NOTICE, "mkdir*%s*%s*%s%s\n",
 	       lp_servicename(handle->conn->params->service), path,
 	       (result < 0) ? "failed: " : "",
-	       (result < 0) ? strerror(errno) : ""));
+	       (result < 0) ? strerror(errno) : "");
 
 	return result;
 }
@@ -82,11 +123,11 @@ static int greyhole_rmdir(vfs_handle_struct *handle, const char *path)
 
 	result = SMB_VFS_NEXT_RMDIR(handle, path);
 
-	DEBUG(0, ("vfs_greyhole: rmdir*%s*%s*%s%s\n",
+	syslog(LOG_NOTICE, "rmdir*%s*%s*%s%s\n",
                lp_servicename(handle->conn->params->service), path,
 	       (result < 0) ? "failed: " : "",
-	       (result < 0) ? strerror(errno) : ""));
-
+	       (result < 0) ? strerror(errno) : "");
+	
 	return result;
 }
 
@@ -97,11 +138,11 @@ static int greyhole_open(vfs_handle_struct *handle, const char *fname, files_str
 	result = SMB_VFS_NEXT_OPEN(handle, fname, fsp, flags, mode);
 
 	if ((flags & O_WRONLY) || (flags & O_RDWR)) {
-		DEBUG(0, ("vfs_greyhole: open*%s*%s*%d*%s%s%s\n",
+		syslog(LOG_NOTICE, "open*%s*%s*%d*%s%s%s\n",
 		       lp_servicename(handle->conn->params->service), fname, result,
 		       "for writing ",
 	       (result < 0) ? "failed: " : "",
-	       (result < 0) ? strerror(errno) : ""));
+	       (result < 0) ? strerror(errno) : "");
 	}
 
 	return result;
@@ -113,10 +154,10 @@ static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)
 
 	result = SMB_VFS_NEXT_CLOSE(handle, fsp);
 
-	DEBUG(0, ("vfs_greyhole: close*%s*%d*%s%s\n",
+	syslog(LOG_NOTICE, "close*%s*%d*%s%s\n",
 	       lp_servicename(handle->conn->params->service), fsp->fh->fd,
 	       (result < 0) ? "failed: " : "",
-	       (result < 0) ? strerror(errno) : ""));
+	       (result < 0) ? strerror(errno) : "");
 
 	return result;
 }
@@ -127,10 +168,10 @@ static int greyhole_rename(vfs_handle_struct *handle, const char *oldname, const
 
 	result = SMB_VFS_NEXT_RENAME(handle, oldname, newname);
 
-	DEBUG(0, ("vfs_greyhole: rename*%s*%s*%s*%s%s\n",
+	syslog(LOG_NOTICE, "rename*%s*%s*%s*%s%s\n",
 	       lp_servicename(handle->conn->params->service), oldname, newname,
 	       (result < 0) ? "failed: " : "",
-	       (result < 0) ? strerror(errno) : ""));
+	       (result < 0) ? strerror(errno) : "");
 
 	return result;
 }
@@ -141,10 +182,10 @@ static int greyhole_unlink(vfs_handle_struct *handle, const char *path)
 
 	result = SMB_VFS_NEXT_UNLINK(handle, path);
 
-	DEBUG(0, ("vfs_greyhole: unlink*%s*%s*%s%s\n",
+	syslog(LOG_NOTICE, "unlink*%s*%s*%s%s\n",
 	       lp_servicename(handle->conn->params->service), path,
 	       (result < 0) ? "failed: " : "",
-	       (result < 0) ? strerror(errno) : ""));
+	       (result < 0) ? strerror(errno) : "");
 
 	return result;
 }

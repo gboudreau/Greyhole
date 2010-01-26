@@ -7,7 +7,7 @@ Source:         http://greyhole.googlecode.com/files/greyhole-%{version}.tar.gz
 License:        GPL
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch:      noarch
-Requires:       samba php php-mysql mysql-server
+Requires:       samba php php-mysql mysql-server rsyslog
 
 %description
 Greyhole is a drive extender technology for Samba
@@ -27,7 +27,8 @@ mkdir -p $RPM_BUILD_ROOT%{_bindir}
 install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}%{_initrddir}/greyhole
 install -m 0755 -D -p greyhole-executer ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
-install -m 0644 -D -p logrotate.example /etc/logrotate.d/greyhole
+install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
+install -m 0644 -D -p logrotate.smb_greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/smb_greyhole
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -53,6 +54,7 @@ fi
 %defattr(-,root,root,-)
 %{_initrddir}/greyhole
 %{_bindir}/
+%{_sysconfdir}/
 
 %changelog
 * Wed Jan 22 2010 Carlos Puchol
