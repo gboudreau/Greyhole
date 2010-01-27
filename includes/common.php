@@ -98,14 +98,16 @@ function parse_config() {
 		}
 	}
 	$landing_zone = '/' . trim($landing_zone, '/');
-	$graveyard = '/' . trim($graveyard, '/');
+	if (isset($graveyard)) {
+		$graveyard = '/' . trim($graveyard, '/');
+	}
 	
 	$df_command = "df -k";
 	foreach ($storage_pool_directories as $key => $target_drive) {
 		$df_command .= " " . quoted_form($target_drive);
 		$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
 	}
-	$df_command .= " | awk '{print \$(NF),\$(NF-2)}'";
+	$df_command .= " 2>&1 | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
 }
 
 function quoted_form($path) {
