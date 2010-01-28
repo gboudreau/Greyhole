@@ -160,7 +160,8 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 	global $ignored_warnings;
 	if (!isset($ignored_warnings)) {
 		$ignored_warnings = array();
-		$source = explode("\n", file_get_contents(substr(__FILE__, 0, strrpos(__FILE__, '/')-8).'greyhole-executer'));
+		$bin_dir = exec("rpm --eval='%_bindir'");
+		$source = explode("\n", file_get_contents($bin_dir . '/greyhole-executer'));
 		for ($i=0; $i<count($source); $i++) {
 			if (preg_match("/@([^\(]+)/", $source[$i], $regs)) {
 				$ignored_warnings[$i+1][] = $regs[1];
