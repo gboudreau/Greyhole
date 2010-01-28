@@ -291,8 +291,15 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$share/$full_path -> $landing_zone/$share/$target_full_path");
 		foreach ($storage_pool_directories as $target_drive) {
 			if (is_dir("$target_drive/$share/$full_path")) {
+				# Make sure the parent directory of target_full_path exists, before we try moving something there...
+				list($path, $dirname) = explode_full_path("$target_drive/$share/$target_full_path");
+				gh_mkdir($path, "$target_drive/$share");
+
 				rename("$target_drive/$share/$full_path", "$target_drive/$share/$target_full_path");
 			}
+
+			list($path, $dirname) = explode_full_path("$target_drive/.gh_graveyard/$share/$target_full_path");
+			gh_mkdir($path, "$target_drive/.gh_graveyard/$share");
 			@rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
 		}
 		$existing_tombstones = get_tombstones($share, $target_full_path);
@@ -909,6 +916,12 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 				case 'close':
 					$fd = array_shift($line);
 					break;
+				default:
+					$action = FALSE;
+					continue;
+			}
+			if ($action === FALSE) {
+				continue;
 			}
 			if ($action == 'close') {
 				$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
@@ -1370,7 +1383,6 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 				$key = clean_dir("$target_drive/$share/$file_path/$filename");
 				gh_log(DEBUG, "  Looking for copy at $key");
 				if (isset($file_tombstones[$key])) {
-					unset($local_target_drives[$i]);
 					$tombstone = $file_tombstones[$key];
 					if ($tombstone->state == 'OK' && real_file_is_locked($tombstone->path) === FALSE) {
 						$fsck_report['too_many_files'][] = $tombstone->path;
