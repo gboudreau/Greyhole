@@ -22,13 +22,20 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	install -m 0755 -D -p greyhole-executer /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
 	install -m 0644 -D -p logrotate.greyhole $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/greyhole
-	install -m 0644 -D -p logrotate.smb_greyhole $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/smb_greyhole
 
-3. Configure syslog:
-	Edit /etc/rsyslog.conf. Add the following in the ## RULES ## section:
-		# Greyhole
-		local6.*	/var/log/smb_greyhole.log
-	Note that if local6 is already used for another log, you should pick an unused localX facility (with X between 0 & 7). You'll then need to specify that facility in smb.conf, for each of your shares, using "greyhole:facility".
+3. Edit /etc/logrotate.d/syslog:
+	What we want is add prerotate and posrotate instructions for /var/log/messages. So add one command in the postrotate block, and add a prerotate block. When more logs than just /var/log/messages are rotated together, the sharedscripts option needs to be there.
+
+/var/log/messages /var/log/secure /var/log/maillog /var/log/spooler /var/log/boot.log /var/log/cron {
+	sharedscripts
+	prerotate
+		/usr/bin/greyhole-executer --prerotate
+	endscript
+	postrotate
+		/usr/bin/greyhole-executer --postrotate > /dev/null || true
+		/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+	endscript
+}
 
 4. Samba, before 3.4.3, has a bug when trying to delete symbolic links (which Greyhole use extensively); we need Samba 3.4.3 or more.
    Plus, we need to compile our own VFS module.
@@ -86,11 +93,6 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	Note 1:
 		/path/to/ will be the value of your Landing Zone in Greyhole configuration file (later).
 		All your shares needs to be subdirectories of that folder, and have no space in their names.
-
-	Note 2:
-		If you used a facility other than local6 in rsyslog.conf, you'll need to specify it for each of your share, using a line like this:
-			greyhole:facility = LOCAL5
-		Note that the LOCAL part needs to be in CAPS.
 
 	Fedora: sudo service smb restart
 	Ubuntu: sudo /etc/init.d/samba restart
