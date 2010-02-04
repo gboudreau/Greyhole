@@ -104,7 +104,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 
 7. Cutomize the Greyhole configuration file:
 
-	sudo cp /url/local/greyhole/greyhole.example.conf /etc/greyhole.conf
+	sudo cp ${GREYHOLE_INSTALL_DIR}/greyhole.example.conf /etc/greyhole.conf
 	
 	Cutomize /etc/greyhole.conf as needed.
 
