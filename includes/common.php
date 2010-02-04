@@ -35,7 +35,7 @@ $log_level_names = array(
 $action = 'initialize';
 
 set_error_handler("gh_error_handler");
-	
+
 $constarray = get_defined_constants(true);
 foreach($constarray['user'] as $key => $val) {
     eval(sprintf('$_CONSTANTS[\'%s\'] = ' . (is_int($val) || is_float($val) ? '%s' : "'%s'") . ';', addslashes($key), addslashes($val)));

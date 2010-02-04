@@ -266,6 +266,11 @@ function gh_unlink($share, $full_path, $task_id) {
 	
 	gh_log(INFO, "File deleted: $landing_zone/$share/$full_path");
 
+	if (gh_file_exists("$landing_zone/$share/$full_path")) {
+		gh_log(DEBUG, "  File still exists in landing zone; a new file replaced the one deleted here. Skipping.");
+		return;
+	}
+
 	list($path, $filename) = explode_full_path($full_path);
 
 	$existing_tombstones = get_tombstones($share, $path, $filename, TRUE);
@@ -273,10 +278,6 @@ function gh_unlink($share, $full_path, $task_id) {
 		gh_recycle($tombstone->path);
 	}
 	remove_tombstones($share, $path, $filename);
-	if (is_link("$landing_zone/$share/$full_path") && !file_exists(readlink("$landing_zone/$share/$full_path"))) {
-		gh_log(INFO, "  Removing link to now gone file.");
-		unlink("$landing_zone/$share/$full_path");
-	}
 }
 
 function is_a_graveyard_dir($share, $full_path) {
@@ -377,16 +378,23 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			}
 			remove_tombstones($share, $path, $filename);
 			save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
+
+			if (is_link("$landing_zone/$share/$full_path") && !file_exists(readlink("$landing_zone/$share/$full_path"))) {
+				gh_log(DEBUG, "  Removing deprecated symlink at $landing_zone/$share/$full_path");
+				unlink("$landing_zone/$share/$full_path");
+			}
 		}
 	}
 	$sleep_before_task = array();
 }
 
-function gh_file_exists($real_path, $log_message) {
+function gh_file_exists($real_path, $log_message=null) {
 	clearstatcache();
 	if (!file_exists($real_path)) {
-		eval('$log_message = "' . str_replace('"', '\"', $log_message) . '";');
-		gh_log(DEBUG, $log_message);
+		if ($log_message != null) {
+			eval('$log_message = "' . str_replace('"', '\"', $log_message) . '";');
+			gh_log(DEBUG, $log_message);
+		}
 		return FALSE;
 	}
 	return TRUE;
