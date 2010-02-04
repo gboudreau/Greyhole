@@ -18,11 +18,21 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-define('DEBUG', 3);
-define('INFO',  2);
-define('WARN',  1);
-define('ERROR', 0);
-define('CRITICAL', -1);
+define('DEBUG', 7);
+define('INFO',  6);
+define('WARN',  4);
+define('ERROR', 3);
+define('CRITICAL', 2);
+
+$log_level_names = array(
+	DEBUG => 'debug',
+	INFO => 'info',
+	WARN => 'warning',
+	ERROR => 'err',
+	CRITICAL => 'crit'
+);
+
+$action = 'initialize';
 
 set_error_handler("gh_error_handler");
 	
@@ -134,15 +144,17 @@ function explode_full_path($full_path) {
 }
 
 function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
-	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage;
+	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action;
 	if ($local_log_level > $log_level) {
 		return;
 	}
 
-	$log_text = sprintf('%s%s%s%s', 
-		$is_new_line ? "[" . date("Y-m-d H:i:s") . "] " : '',
-		$is_new_line && $log_memory_usage ? "[" . memory_get_usage() . "] " : '',
+	$log_text = sprintf('%s%s%s%s%s%s', 
+		$is_new_line ? date("M ") . sprintf('%2d', (int) date("d")) . date(" H:i:s ") : '',
+		$is_new_line ? "$local_log_level " : '',
+		$is_new_line ? $action . ': ' : '',
 		$text,
+		$add_line_feed && $log_memory_usage ? " [" . memory_get_usage() . "]" : '',
 		$add_line_feed ? "\n": ''
 	);
 	$is_new_line = $add_line_feed;

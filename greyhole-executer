@@ -174,16 +174,18 @@ parse_samba_log();
 simplify_tasks();
 while (TRUE) {
 	parse_samba_log();
+	$action = 'check_pool';
 	check_storage_pool_dirs();
 	execute_next_task();
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $landing_zone, $email_to, $sleep_before_task;
+	global $log_level, $fsck_report, $landing_zone, $email_to, $sleep_before_task, $action;
 
 	$query = "SELECT id, action, share, full_path, additional_info FROM tasks WHERE complete = 'yes' ORDER BY id ASC LIMIT 1";
 	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query tasks: " . mysql_error());
 	if (mysql_num_rows($result) < 1) {
+		$action = 'sleep';
 		gh_log(DEBUG, "Nothing to do... Sleeping.");
 		sleep($log_level == DEBUG ? 10 : 600);
 		mysql_free_result($result);
@@ -193,11 +195,13 @@ function execute_next_task() {
 	mysql_free_result($result);
 	
 	if (($key = array_search($task->id, $sleep_before_task)) !== FALSE) {
+		$action = $sleep;
 		gh_log(DEBUG, "Only locked files operations pending... Sleeping.");
 		sleep($log_level == DEBUG ? 10 : 600);
 		$sleep_before_task = array();
 	}
 	
+	$action = $task->action;
 	gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " $task->share/$task->additional_info" : ''));
 
 	switch ($task->action) {
@@ -824,6 +828,9 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 }
 
 function simplify_tasks() {
+	global $action;
+	$action = 'simplify_tasks';
+	
 	gh_log(DEBUG, "Simplifying pending tasks.");
 	
 	// Delete duplicate writes/renames
@@ -859,7 +866,8 @@ function simplify_tasks() {
 }
 
 function parse_samba_log($simplify_after_parse=TRUE) {
-	global $samba_log_file;
+	global $samba_log_file, $action;
+	$action = 'parse_logs';
 
 	$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_read_log_smbd_line');
 	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_read_log_smbd_line': " . mysql_error());
@@ -885,25 +893,25 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 		if (($p = strpos($line, ' smbd_greyhole:')) !== FALSE) {
 			$line = trim(substr($line, $p+16));
 			$line = explode('*', $line);
-			$action = array_shift($line);
+			$act = array_shift($line);
 			$share = array_shift($line);
-			if ($action == 'mkdir') {
+			if ($act == 'mkdir') {
 				// Nothing to do with those
 				continue;
 			}
 			$result = array_pop($line);
 			if (strpos($result, 'failed') === 0) {
-				gh_log(DEBUG, "Failed $action in $share/$line[0]. Skipping.");
+				gh_log(DEBUG, "Failed $act in $share/$line[0]. Skipping.");
 				continue;
 			}
 			unset($fullpath);
 			unset($fullpath_target);
 			unset($fd);
-			switch ($action) {
+			switch ($act) {
 				case 'open':
 					$fullpath = array_shift($line);
 					$fd = array_shift($line);
-					$action = 'write';
+					$act = 'write';
 					break;
 				case 'rmdir':
 				case 'unlink':
@@ -917,13 +925,13 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 					$fd = array_shift($line);
 					break;
 				default:
-					$action = FALSE;
+					$act = FALSE;
 					continue;
 			}
-			if ($action === FALSE) {
+			if ($act === FALSE) {
 				continue;
 			}
-			if ($action == 'close') {
+			if ($act == 'close') {
 				$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
 					mysql_escape_string($share),
 					$fd
@@ -934,11 +942,11 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 				}
 				$new_tasks++;
 				$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) VALUES ('%s', '%s', %s, %s, '%s')",
-					$action,
+					$act,
 					mysql_escape_string($share),
 					isset($fullpath) ? "'".mysql_escape_string(clean_dir($fullpath))."'" : 'NULL',
 					isset($fullpath_target) ? "'".mysql_escape_string(clean_dir($fullpath_target))."'" : (isset($fd) ? "'$fd'" : 'NULL'),
-					$action == 'write' ? 'no' : 'yes'
+					$act == 'write' ? 'no' : 'yes'
 				);
 			}
 
