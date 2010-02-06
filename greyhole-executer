@@ -353,6 +353,16 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 
 		if (count($existing_tombstones) == 0) {
 			// New file
+
+			// There might be old tombstones... for example, when a delete task was skipped.
+			// Let's remove the file copies if there are any leftovers; correct copies will be re-created in gh_write()
+			if (!is_link("$landing_zone/$share/$target_full_path")) {
+				$existing_tombstones = get_tombstones($share, $target_path, $target_filename);
+				foreach ($existing_tombstones as $i => $tombstone) {
+					gh_recycle($tombstone->path);
+				}
+			}
+			
 			gh_write($share, $target_full_path, $task_id);
 		} else {
 			foreach ($existing_tombstones as $i => $tombstone) {
