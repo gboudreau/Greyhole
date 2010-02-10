@@ -1,0 +1,48 @@
+#!/bin/sh
+# Copyright 2010 Guillaume Boudreau
+# 
+# This file is part of Greyhole.
+# 
+# Greyhole is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# Greyhole is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
+
+if [ $# -gt 2 -o $# -lt 1 ]; then
+	echo "Usage: $0 directory [files_suffix]"
+	exit
+fi
+
+DIR=$1
+
+SUFFIX=""
+if [ $# -gt 1 ]; then
+	SUFFIX="-$2"
+fi
+
+for POOL_DIR in `grep storage_pool_directory ${DIR}/greyhole.conf${SUFFIX} | grep -v "[ \t]*#" | awk '{print $3}' | awk -F',' '{print $1}'`; do
+	if [ ! -x $POOL_DIR ]; then
+		echo "Error: Missing pool directory: $POOL_DIR"
+		exit
+	fi
+	if [ ! -f $POOL_DIR/.greyhole_uses_this ]; then
+		touch $POOL_DIR/.greyhole_uses_this
+	fi
+done
+exit
+
+cp /etc/greyhole.conf /etc/greyhole.conf.bak
+mv ${DIR}/greyhole.conf${SUFFIX} /etc/greyhole.conf
+service greyhole restart
+
+cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
+mv ${DIR}/smb.conf${SUFFIX} /etc/samba/smb.conf
+service smb reload

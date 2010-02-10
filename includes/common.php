@@ -34,6 +34,8 @@ $log_level_names = array(
 
 $action = 'initialize';
 
+date_default_timezone_set(date_default_timezone_get());
+
 set_error_handler("gh_error_handler");
 
 $constarray = get_defined_constants(true);
@@ -47,10 +49,12 @@ $last_dfs = array();
 $is_new_line = TRUE;
 $sleep_before_task = array();
 
-function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command;
-
+if (!isset($config_file)) {
 	$config_file = '/etc/greyhole.conf';
+}
+
+function parse_config() {
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file;
 
 	$config_text = file_get_contents($config_file);
 	foreach (explode("\n", $config_text) as $line) {
@@ -112,12 +116,14 @@ function parse_config() {
 		$graveyard = '/' . trim($graveyard, '/');
 	}
 	
-	$df_command = "df -k";
-	foreach ($storage_pool_directories as $key => $target_drive) {
-		$df_command .= " " . quoted_form($target_drive);
-		$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
+	if (is_array($storage_pool_directories) && count($storage_pool_directories) > 0) {
+		$df_command = "df -k";
+		foreach ($storage_pool_directories as $key => $target_drive) {
+			$df_command .= " " . quoted_form($target_drive);
+			$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
+		}
+		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
 	}
-	$df_command .= " 2>&1 | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
 }
 
 function quoted_form($path) {
@@ -159,9 +165,13 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 	);
 	$is_new_line = $add_line_feed;
 
-	$fp = fopen($greyhole_log_file, 'a') or die("Can't open log file '$greyhole_log_file' for writing.");
-	fwrite($fp, $log_text);
-	fclose($fp);
+	$fp = fopen($greyhole_log_file, 'a');
+	if ($fp) {
+		fwrite($fp, $log_text);
+		fclose($fp);
+	} else {
+		error_log($log_text);
+	}
 	
 	if ($local_log_level === CRITICAL) {
 		exit(1);

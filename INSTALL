@@ -8,11 +8,10 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 
 1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC:
 
-	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc rsyslog
+	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc rsyslog yum-utils
 	Ubuntu: sudo apt-get install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential
 
-2. Install Greyhole:
-	(Or any other directory of your choice; just substitute your path for the rest of the installation instructions.)
+2. Install Greyhole (as root):
 
 	Get the latest version from http://code.google.com/p/greyhole/downloads/list
 	tar zxf greyhole-*.tar.gz
@@ -21,10 +20,12 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
 	install -m 0755 -D -p greyhole-executer /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
-	install -m 0644 -D -p logrotate.greyhole $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d/greyhole
+	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
+	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole-fsck
+	if [ `uname -i | grep 64 | wc -l` == 1 ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole_i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
 3. Edit /etc/logrotate.d/syslog:
-	What we want is add prerotate and posrotate instructions for /var/log/messages. So add one command in the postrotate block, and add a prerotate block. When more logs than just /var/log/messages are rotated together, the sharedscripts option needs to be there.
+	What we want is add prerotate and postrotate instructions for /var/log/messages. So add one command in the postrotate block, and add a prerotate block. When more logs than just /var/log/messages are rotated together, the sharedscripts option needs to be there.
 
 /var/log/messages /var/log/secure /var/log/maillog /var/log/spooler /var/log/boot.log /var/log/cron {
 	sharedscripts
@@ -37,17 +38,14 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	endscript
 }
 
-4. Samba, before 3.4.3, has a bug when trying to delete symbolic links (which Greyhole use extensively); we need Samba 3.4.3 or more.
-   Plus, we need to compile our own VFS module.
-   If you already run version 3.4.3 or higher, you'll just need to compile vfs_greyhole.c, and install it.
+4. We need to compile our own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
 	Fedora:
-	sudo yum install samba-common samba --enablerepo=updates-testing
-	wget ftp://rpmfind.net/linux/fedora/updates/testing/12/SRPMS/samba-3.4.4-52.fc12.src.rpm
-	rpm -ivh samba-3.4.4-52.fc12.src.rpm
+	yumdownloader --source samba
+	rpm -ivh samba-3.*.fc12.src.rpm
 	cd rpmbuild/SOURCES
-	tar zxf samba-3.4.4.tar.gz
-	cd samba-3.4.4/source3/
+	tar zxf samba-3.*.tar.gz
+	cd samba-3.*/source3/
 	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
 	./configure
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
@@ -117,26 +115,19 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	Those files will be used to differentiate an empty mount from a now-gone mount.
 	i.e. Greyhole will output a warning if this file is not in the root directory where it is about to try to save a file, and it won't use that directory. This will prevent Greyhole from filling the / partition when a partition is unmounted!
 
-9. Schedule a daily fsck. Add this in the root crontab (or cron.d / cron.daily if you prefer):
-
-	0 0 * * *       /usr/bin/greyhole-executer --fsck --email-report > /dev/null
-
-	fsck should take about 10 minutes per 50,000 files (depends on how many storage pool directories you have).
-	If you use the --email-report option, make sure your PHP can send emails. Gust configure sendmail or postfix to be able to send email from the command line and you should be fine.
-
-10. Add Greyhole to services that start on boot:
+9. Add Greyhole to services that start on boot:
 
 	Fedora: sudo chkconfig --add greyhole; sudo chkconfig greyhole on
 	Ubuntu: sudo update-rc.d greyhole defaults 98 20
 
-11. Work around problems with the CIFS client; edit /etc/rc.local:
+10. Work around problems with the CIFS client; edit /etc/rc.local:
 
 	# cifs client workaround
 	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
 	modprobe cifs
 	echo 0 > /proc/fs/cifs/OplockEnabled
 
-12. Start the Greyhole service:
+11. Start the Greyhole service:
 
 	Fedora: sudo service greyhole start
 	Ubuntu: sudo /etc/init.d/greyhole start
