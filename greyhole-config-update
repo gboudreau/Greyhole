@@ -21,6 +21,12 @@ if [ $# -gt 2 -o $# -lt 1 ]; then
 	exit
 fi
 
+if [ $UID != 0 ]; then
+	echo "You need to be root to execute this command."
+	echo "You can become root using the following command: su -"
+	exit
+fi
+
 DIR=$1
 
 SUFFIX=""
@@ -37,12 +43,21 @@ for POOL_DIR in `grep storage_pool_directory ${DIR}/greyhole.conf${SUFFIX} | gre
 		touch $POOL_DIR/.greyhole_uses_this
 	fi
 done
-exit
 
 cp /etc/greyhole.conf /etc/greyhole.conf.bak
-mv ${DIR}/greyhole.conf${SUFFIX} /etc/greyhole.conf
+cp ${DIR}/greyhole.conf${SUFFIX} /etc/greyhole.conf
 service greyhole restart
 
 cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
-mv ${DIR}/smb.conf${SUFFIX} /etc/samba/smb.conf
+cp ${DIR}/smb.conf${SUFFIX} /etc/samba/smb.conf
 service smb reload
+
+if [ -f /var/hda/platform/html/config/database.yml ]; then
+	# Amahi 'shares' database update
+	DATABASE=`grep -A 10 "production:" /var/hda/platform/html/config/database.yml | grep "database:" | awk '{print $2}'`
+	USERNAME=`grep -A 10 "production:" /var/hda/platform/html/config/database.yml | grep "username:" | awk '{print $2}'`
+	PASSWORD=`grep -A 10 "production:" /var/hda/platform/html/config/database.yml | grep "password:" | awk '{print $2}'`
+	for GREYHOLE_SHARE in `grep "^\[\|vfs objects.*greyhole" ${DIR}/smb.conf${SUFFIX} | grep -B 1 "vfs objects.*greyhole" | grep "^\[" | awk -F'[' '{print $2}' | awk -F']' '{print $1}'`; do
+		mysql -u $USERNAME -p$PASSWORD -e "UPDATE shares SET extras = CONCAT(extras, '\ndfree command = /usr/bin/greyhole-dfree\nvfs objects = greyhole') WHERE comment = '$GREYHOLE_SHARE' AND extras NOT LIKE '%greyhole-dfree%'" $DATABASE
+	done
+fi

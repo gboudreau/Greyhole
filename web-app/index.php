@@ -529,27 +529,10 @@ function change_smb_conf($action, $share) {
 	$buffer = '';
 	foreach ($config_file_content as $line) {
 		if (substr(trim($line), 0, 1) == '[' && preg_match('/\[([^\]]+)\]/', trim($line), $regs)) {
-			if (isset($share_name)) {
+			if (isset($share_name) && $share_name == $share) {
 				// Previous share is $share_name
-				if ($share_name == $share) {
-					if ($action == 'add') {
-						if ($found_vfs === FALSE) {
-							$config_file_template .= "\tvfs objects = greyhole\n";
-						} else {
-							$config_file_template .= "\tvfs objects = $found_vfs greyhole\n";
-						}
-						$config_file_template .= "\tdfree command = /usr/bin/greyhole-dfree\n";
-					} else if ($action == 'remove') {
-						if ($found_vfs !== FALSE) {
-							$found_vfs = trim(str_replace('greyhole', '', $found_vfs));
-							if (strlen($found_vfs) > 0) {
-								$config_file_template .= "\tvfs objects = $found_vfs\n";
-							}
-						}
-					}
-					$config_file_template .= $buffer;
-					$buffer = '';
-				}
+				$config_file_template .= add_remove_gh_options($action, $found_vfs) . $buffer;
+				$buffer = '';
 			}
 			$share_name = $regs[1];
 		}
@@ -572,6 +555,29 @@ function change_smb_conf($action, $share) {
 		$config_file_template .= $buffer . $line . "\n";
 		$buffer = '';
 	}
+	if (isset($share_name) && $share_name == $share) {
+		$config_file_template .= add_remove_gh_options($action, $found_vfs) . $buffer;
+	}
 
 	file_put_contents($smb_config_file, trim($config_file_template)."\n");
+}
+
+function add_remove_gh_options($action, $found_vfs) {
+	$config_file_template = '';
+	if ($action == 'add') {
+		if ($found_vfs === FALSE) {
+			$config_file_template .= "\tvfs objects = greyhole\n";
+		} else {
+			$config_file_template .= "\tvfs objects = $found_vfs greyhole\n";
+		}
+		$config_file_template .= "\tdfree command = /usr/bin/greyhole-dfree\n";
+	} else if ($action == 'remove') {
+		if ($found_vfs !== FALSE) {
+			$found_vfs = trim(str_replace('greyhole', '', $found_vfs));
+			if (strlen($found_vfs) > 0) {
+				$config_file_template = "\tvfs objects = $found_vfs\n";
+			}
+		}
+	}
+	return $config_file_template;
 }
