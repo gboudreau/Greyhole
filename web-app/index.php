@@ -169,7 +169,7 @@ if (isset($_GET['part'])) {
 			</td>
 			<?php if ($part->path == '/' && count($partitions) > 0): ?>
 				<td rowspan="<?php echo count($partitions) ?>" style="max-width:500px" valign="top">
-					<div class="root_partition padded_cell"><span class="i18n-root_fs_warning">Note: Including the root partition in your storage pool could cause your server to behave heretically, if you ever fill your pool to capacity. Use with caution.</span></div>
+					<div class="root_partition padded_cell"><span class="i18n-root_fs_warning">Note: Including the root partition in your storage pool could cause your server to behave erratically, if you ever fill your pool to capacity. Use with caution.</span></div>
 				</td>
 			<?php endif; ?>
 		</tr>
