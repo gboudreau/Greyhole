@@ -53,8 +53,12 @@ if (!isset($config_file)) {
 	$config_file = '/etc/greyhole.conf';
 }
 
+if (!isset($smb_config_file)) {
+	$smb_config_file = '/etc/samba/smb.conf';
+}
+
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file;
 
 	$config_text = file_get_contents($config_file);
 	foreach (explode("\n", $config_text) as $line) {
@@ -68,13 +72,6 @@ function parse_config() {
 				case 'log_level':
 					global ${$name};
 					${$name} = $_CONSTANTS[$value];
-					break;
-				case 'files_permissions':
-				case 'folders_permissions':
-					$shares_options[$name] = (int) base_convert(trim($value), 8, 10);
-					break;
-				case 'files_owner':
-					$shares_options[$name] = explode(':', trim($value));
 					break;
 				case 'delete_moves_to_attic':
 				case 'log_memory_usage':
@@ -111,7 +108,6 @@ function parse_config() {
 			}
 		}
 	}
-	$landing_zone = '/' . trim($landing_zone, '/');
 	if (isset($graveyard)) {
 		$graveyard = '/' . trim($graveyard, '/');
 	}
@@ -123,6 +119,27 @@ function parse_config() {
 			$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
 		}
 		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
+	}
+
+	$config_text = file_get_contents($smb_config_file);
+	foreach (explode("\n", $config_text) as $line) {
+		$line = trim($line);
+		if (strlen($line) == 0) { continue; }
+		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
+			$share_name = $regs[1];
+		}
+		if (isset($share_name) && !isset($shares_options[$share_name])) { continue; }
+		if (isset($share_name) && preg_match('/path[ \t]*=[ \t]*(.+)$/', $line, $regs)) {
+			$shares_options[$share_name]['landing_zone'] = $regs[1];
+			$shares_options[$share_name]['name'] = $share_name;
+		}
+	}
+	
+	foreach ($shares_options as $share_name => $share_options) {
+		if (!isset($share_options['landing_zone'])) {
+			global $config_file, $smb_config_file;
+			gh_log(CRITICAL, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
+		}
 	}
 }
 

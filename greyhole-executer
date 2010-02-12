@@ -154,18 +154,21 @@ if ($action == 'fsck') {
 	$pos = array_search('fsck', $argv);
 	$full_path = '';
 	if (isset($options['dir'])) {
-		$full_path = '/' . $options['dir'];
-	}
-	if (!is_dir($landing_zone . $full_path)) {
-		echo $landing_zone . $full_path . " is not a directory. Exiting.\n";
-		exit(1);
+		$full_path = $options['dir'];
+		if (!is_dir($full_path)) {
+			echo "$full_path is not a directory. Exiting.\n";
+			exit(1);
+		}
 	}
 	$query = sprintf("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '%s', %s, 'yes')",
 		mysql_escape_string($full_path),
 		(isset($options['email-report']) ? "'daily'" : "NULL")
 	);
 	mysql_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . mysql_error());
-	echo "fsck of " . $landing_zone . $full_path . " has been scheduled. It will start after all currently pending tasks have been completed.\n";
+	if ($full_path == '') {
+		$full_path = 'all shares';
+	}
+	echo "fsck of $full_path has been scheduled. It will start after all currently pending tasks have been completed.\n";
 	exit(0);
 }
 
@@ -180,7 +183,7 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $landing_zone, $email_to, $sleep_before_task, $action;
+	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action;
 
 	$query = "SELECT id, action, share, full_path, additional_info FROM tasks WHERE complete = 'yes' ORDER BY id ASC LIMIT 1";
 	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query tasks: " . mysql_error());
@@ -195,7 +198,7 @@ function execute_next_task() {
 	mysql_free_result($result);
 	
 	if (($key = array_search($task->id, $sleep_before_task)) !== FALSE) {
-		$action = $sleep;
+		$action = 'sleep';
 		gh_log(DEBUG, "Only locked files operations pending... Sleeping.");
 		sleep($log_level == DEBUG ? 10 : 600);
 		$sleep_before_task = array();
@@ -206,14 +209,31 @@ function execute_next_task() {
 
 	switch ($task->action) {
 		case 'fsck':
-			gh_log(INFO, "Starting fsck for " . $landing_zone . $task->share);
+			gh_log(INFO, "Starting fsck for $task->share");
 			initialize_fsck_report();
 			clearstatcache();
-			gh_fsck($landing_zone . $task->share);
-			foreach (get_graveyards() as $graveyard) {
-				gh_fsck_graveyard($graveyard, $task->share);
+			if ($task->share == '') {
+				foreach ($shares_options as $share_name => $share_options) {
+					gh_fsck($share_options['landing_zone'], $share_name);
+				}
+				foreach (get_graveyards() as $graveyard) {
+					foreach ($shares_options as $share_name => $share_options) {
+						gh_fsck_graveyard($graveyard, "/$share_name", $share_name);
+					}
+				}
+			} else {
+				$share_options = get_share_options_from_full_path($task->share);
+				if ($share_options !== FALSE) {
+					$share = $share_options['name'];
+					gh_fsck($task->share, $share);
+					$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
+					gh_log(DEBUG, "Starting graveyards fsck for $subdir");
+					foreach (get_graveyards() as $graveyard) {
+						gh_fsck_graveyard($graveyard, $subdir, $share);
+					}
+				}
 			}
-			gh_log(INFO, "fsck for " . $landing_zone . $task->share . " completed.");
+			gh_log(INFO, "fsck for $task->share completed.");
 			if ($task->additional_info == 'daily') {
 				// Email report for daily fsck
 				$fsck_report = get_fsck_report();
@@ -248,8 +268,10 @@ function execute_next_task() {
 }
 
 function gh_rmdir($share, $full_path) {
-	global $storage_pool_directories, $landing_zone;
-	gh_log(INFO, "Directory deleted: $landing_zone/$share/$full_path");
+	global $storage_pool_directories;
+	$landing_zone = get_share_landing_zone($share);
+	
+	gh_log(INFO, "Directory deleted: $landing_zone/$full_path");
 	foreach ($storage_pool_directories as $target_drive) {
 		if (@rmdir("$target_drive/$share/$full_path/")) {
 			gh_log(DEBUG, "  Removed copy at $target_drive/$share/$full_path");
@@ -262,11 +284,11 @@ function gh_rmdir($share, $full_path) {
 }
 
 function gh_unlink($share, $full_path, $task_id) {
-	global $landing_zone;
+	$landing_zone = get_share_landing_zone($share);
 	
-	gh_log(INFO, "File deleted: $landing_zone/$share/$full_path");
+	gh_log(INFO, "File deleted: $landing_zone/$full_path");
 
-	if (gh_file_exists("$landing_zone/$share/$full_path")) {
+	if (gh_file_exists("$landing_zone/$full_path")) {
 		gh_log(DEBUG, "  File still exists in landing zone; a new file replaced the one deleted here. Skipping.");
 		return;
 	}
@@ -290,21 +312,24 @@ function is_a_graveyard_dir($share, $full_path) {
 }
 
 function gh_rename($share, $full_path, $target_full_path, $task_id) {
-	global $landing_zone, $storage_pool_directories, $log_level, $sleep_before_task;
+	global $storage_pool_directories, $log_level, $sleep_before_task;
+	$landing_zone = get_share_landing_zone($share);
 	
-	if (is_dir("$landing_zone/$share/$target_full_path") || is_a_graveyard_dir($share, $full_path)) {
-		gh_log(INFO, "Directory renamed: $landing_zone/$share/$full_path -> $landing_zone/$share/$target_full_path");
+	if (is_dir("$landing_zone/$target_full_path") || is_a_graveyard_dir($share, $full_path)) {
+		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 		foreach ($storage_pool_directories as $target_drive) {
+			list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
+
 			if (is_dir("$target_drive/$share/$full_path")) {
 				# Make sure the parent directory of target_full_path exists, before we try moving something there...
 				list($path, $dirname) = explode_full_path("$target_drive/$share/$target_full_path");
-				gh_mkdir($path, "$target_drive/$share");
+				gh_mkdir($path, "$target_drive/$share", $original_path);
 
 				rename("$target_drive/$share/$full_path", "$target_drive/$share/$target_full_path");
 			}
 
 			list($path, $dirname) = explode_full_path("$target_drive/.gh_graveyard/$share/$target_full_path");
-			gh_mkdir($path, "$target_drive/.gh_graveyard/$share");
+			gh_mkdir($path, "$target_drive/.gh_graveyard/$share", $original_path);
 			@rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
 		}
 		$existing_tombstones = get_tombstones($share, $target_full_path);
@@ -320,9 +345,10 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 
 				// is_linked = is the target of the existing symlink
 				if ($tombstone->is_linked) {
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$share/$target_full_path/$file_path to point to $tombstone->path");
-					if (gh_recycle("$landing_zone/$share/$target_full_path/$file_path")) {
- 						symlink($tombstone->path, "$landing_zone/$share/$target_full_path/$file_path");
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
+					if (gh_recycle("$landing_zone/$target_full_path/$file_path")) {
+ 						@symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
+						// Creating this symlink can fail if the parent dir was removed
 					}
 				}
 			}
@@ -333,11 +359,11 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			save_tombstones($share, $path, $filename, $file_tombstones);
 		}
 	} else {
-		gh_log(INFO, "File renamed: $landing_zone/$share/$full_path -> $landing_zone/$share/$target_full_path");
+		gh_log(INFO, "File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
 		// Check if another process locked this file before we work on it.
 		if (file_is_locked($share, $target_full_path) !== FALSE) {
-			gh_log(DEBUG, "  File $landing_zone/$share/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
+			gh_log(DEBUG, "  File $landing_zone/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
 				$task_id
 			);
@@ -356,7 +382,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 
 			// There might be old tombstones... for example, when a delete task was skipped.
 			// Let's remove the file copies if there are any leftovers; correct copies will be re-created in gh_write()
-			if (!is_link("$landing_zone/$share/$target_full_path")) {
+			if (!is_link("$landing_zone/$target_full_path")) {
 				$existing_tombstones = get_tombstones($share, $target_path, $target_filename);
 				foreach ($existing_tombstones as $i => $tombstone) {
 					gh_recycle($tombstone->path);
@@ -373,15 +399,17 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				// Make sure the target directory exists
 				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
 				$root_path = str_replace(clean_dir("/$share/$target_full_path"), '', $tombstone->path);
-				gh_mkdir($tombstone_dir_path, "$root_path/$share");
+				list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
+				gh_mkdir($tombstone_dir_path, "$root_path/$share", $original_path);
 
 				rename($old_path, $tombstone->path);
 
 				// is_linked = is the target of the existing symlink
 				if ($tombstone->is_linked) {
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$share/$target_full_path to point to $tombstone->path");
-					if (gh_recycle("$landing_zone/$share/$target_full_path")) {
- 						symlink($tombstone->path, "$landing_zone/$share/$target_full_path");
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
+					if (gh_recycle("$landing_zone/$target_full_path")) {
+ 						@symlink($tombstone->path, "$landing_zone/$target_full_path");
+						// Creating this symlink can fail if the parent dir was removed
 					}
 				}
 				$existing_tombstones[$i] = $tombstone;
@@ -389,9 +417,9 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			remove_tombstones($share, $path, $filename);
 			save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
 
-			if (is_link("$landing_zone/$share/$full_path") && !file_exists(readlink("$landing_zone/$share/$full_path"))) {
-				gh_log(DEBUG, "  Removing deprecated symlink at $landing_zone/$share/$full_path");
-				unlink("$landing_zone/$share/$full_path");
+			if (is_link("$landing_zone/$full_path") && !file_exists(readlink("$landing_zone/$full_path"))) {
+				gh_log(DEBUG, "  Removing deprecated symlink at $landing_zone/$full_path");
+				unlink("$landing_zone/$full_path");
 			}
 		}
 	}
@@ -412,6 +440,10 @@ function gh_file_exists($real_path, $log_message=null) {
 
 function get_num_copies($share) {
 	global $shares_options, $storage_pool_directories;
+	if (!isset($shares_options[$share]['num_copies'])) {
+		global $config_file;
+		gh_log(CRITICAL, "Found a share ($share_name) with no 'num_copies' value defined in $config_file. You need to edit $config_file to fix this, then restart Greyhole.");
+	}
 	$num_copies = $shares_options[$share]['num_copies'];
 	if ($num_copies < 1) {
 		$num_copies = 1;
@@ -423,8 +455,9 @@ function get_num_copies($share) {
 }
 
 function file_is_locked($share, $full_path) {
-	global $landing_zone;
-	$real_fullpath = "$landing_zone/$share/$full_path";
+	$landing_zone = get_share_landing_zone($share);
+	
+	$real_fullpath = "$landing_zone/$full_path";
 	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath));
 	if (strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
@@ -446,16 +479,18 @@ function real_file_is_locked($real_fullpath) {
 }
 
 function gh_write($share, $full_path, $task_id) {
-	global $storage_pool_directories, $landing_zone, $log_level, $sleep_before_task;
+	global $storage_pool_directories, $log_level, $sleep_before_task;
 	
-	if (!gh_file_exists("$landing_zone/$share/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) { return; }
+	$landing_zone = get_share_landing_zone($share);
+	
+	if (!gh_file_exists("$landing_zone/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) { return; }
 	
 	$num_copies_required = get_num_copies($share);
 
 	list($path, $filename) = explode_full_path($full_path);
 
-	if (is_link("$landing_zone/$share/$full_path")) {
-		$source_file = clean_dir(readlink("$landing_zone/$share/$full_path"));
+	if (is_link("$landing_zone/$full_path")) {
+		$source_file = clean_dir(readlink("$landing_zone/$full_path"));
 		gh_log(INFO, "File changed: $share/$full_path", FALSE);
 		if ($log_level === DEBUG) {
 			clearstatcache();
@@ -494,7 +529,7 @@ function gh_write($share, $full_path, $task_id) {
 			$existing_tombstones[$source_file] = (object) array('path' => $source_file, 'is_linked' => TRUE, 'state' => 'OK');
 		}
 	} else {
-		$source_file = clean_dir("$landing_zone/$share/$full_path");
+		$source_file = clean_dir("$landing_zone/$full_path");
 		gh_log(INFO, "File created: $share/$full_path", FALSE);
 		if ($log_level === DEBUG) {
 			clearstatcache();
@@ -532,12 +567,13 @@ function is_greyhole_owned_dir($path) {
 }
 
 function create_copies_from_tombstones($tombstones, $share, $full_path, $source_file) {
-	global $landing_zone;
+	$landing_zone = get_share_landing_zone($share);
+	
 	list($path, $filename) = explode_full_path($full_path);
 
 	$link_next = FALSE;
 	foreach ($tombstones as $key => $tombstone) {
-		if (!gh_file_exists("$landing_zone/$share/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
+		if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
 		
 		if ($tombstone->path == $source_file && $tombstone->state == 'OK') {
 			gh_log(DEBUG, "  File copy at $tombstone->path is already up to date.");
@@ -555,22 +591,24 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		}
 
 		list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-		
-		if (!gh_mkdir($tombstone_dir_path, "$root_path/$share")) {
+
+		list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$full_path");
+		if (!gh_mkdir($tombstone_dir_path, "$root_path/$share", $original_path)) {
 			$tombstone->state = 'Gone';
 			$tombstones[$key] = $tombstone;
 			continue;
 		}
 
 		$temp_path = get_temp_filename($tombstone->path);
-		if (!is_link("$landing_zone/$share/$full_path") && is_file("$landing_zone/$share/$full_path")) {
-			$it_worked = rename("$landing_zone/$share/$full_path", $temp_path);
+		$file_infos = gh_get_file_infos("$landing_zone/$full_path");
+		if (!is_link("$landing_zone/$full_path") && is_file("$landing_zone/$full_path")) {
+			$it_worked = rename("$landing_zone/$full_path", $temp_path);
 		} else {
-			$it_worked = copy("$landing_zone/$share/$full_path", $temp_path);
+			$it_worked = copy("$landing_zone/$full_path", $temp_path);
 		}
 		if ($it_worked) {
 			rename($temp_path, $tombstone->path);
-			gh_chperm($tombstone->path);
+			gh_chperm($tombstone->path, $file_infos);
 		} else {
 			gh_log(WARN, "    Failed file copy. Skipping.");
 			if ($tombstone->is_linked) {
@@ -589,11 +627,11 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		}
 		if ($tombstone->is_linked) {
 			gh_log(DEBUG, "    Creating symlink in share pointing to the above file copy.");
-			symlink($tombstone->path, "$landing_zone/$share/$path/.gh_$filename");
-			if (!file_exists("$landing_zone/$share/$full_path") || gh_recycle("$landing_zone/$share/$full_path")) {
-				rename("$landing_zone/$share/$path/.gh_$filename", "$landing_zone/$share/$path/$filename");
+			symlink($tombstone->path, "$landing_zone/$path/.gh_$filename");
+			if (!file_exists("$landing_zone/$full_path") || gh_recycle("$landing_zone/$full_path")) {
+				rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
 			} else {
-				unlink("$landing_zone/$share/$path/.gh_$filename");
+				unlink("$landing_zone/$path/.gh_$filename");
 			}
 		}
 
@@ -605,37 +643,39 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 	}
 }
 
-function gh_chperm($real_file_path) {
-	global $shares_options;
-	chmod($real_file_path, $shares_options['files_permissions']);
-	chown($real_file_path, $shares_options['files_owner'][0]);
-	chgrp($real_file_path, $shares_options['files_owner'][1]);
+function gh_chperm($real_file_path, $file_infos) {
+	chmod($real_file_path, $file_infos->fileperms);
+	chown($real_file_path, $file_infos->fileowner);
+	chgrp($real_file_path, $file_infos->filegroup);
 }
 
-function gh_mkdir($directory, $root_path) {
-	global $shares_options;
+function gh_mkdir($directory, $root_path, $original_directory) {
 	$root_path = '/' . trim($root_path, '/');
 	if (!is_dir($directory)) {
+		$dir_infos = gh_get_file_infos($original_directory);
 		// Try simple mkdir; will work only if parent dir already exists
-		if (!@mkdir($directory, $shares_options['folders_permissions'])) {
+		if (!@mkdir($directory, $dir_infos->fileperms)) {
 			// Try recursive mkdir
-			if (!mkdir($directory, $shares_options['folders_permissions'], TRUE)) {
+			if (!mkdir($directory, $dir_infos->fileperms, TRUE)) {
 				gh_log(WARN, "  Failed to create directory $directory");
 				return FALSE;
 			}
 			// Need to chown/chgrp parent dirs too
-			global $storage_pool_directories, $landing_zone;
 			$parent_directory = $directory;
+			$original_parent_directory = $original_directory;
 			$i = 0;
 			while ($parent_directory != $root_path && $i++ < 255) {
-				chown($parent_directory, $shares_options['files_owner'][0]);
-				chgrp($parent_directory, $shares_options['files_owner'][1]);
+				$dir_infos = gh_get_file_infos($original_parent_directory);
+				chmod($parent_directory, $dir_infos->fileperms);
+				chown($parent_directory, $dir_infos->fileowner);
+				chgrp($parent_directory, $dir_infos->filegroup);
 				list($parent_directory, $directory_name) = explode_full_path($parent_directory);
+				list($original_parent_directory, $directory_name) = explode_full_path($original_parent_directory);
 			}
 		} else {
 			// Simple mkdir worked
-			chown($directory, $shares_options['files_owner'][0]);
-			chgrp($directory, $shares_options['files_owner'][1]);
+			chown($directory, $dir_infos->fileowner);
+			chgrp($directory, $dir_infos->filegroup);
 		}
 	}
 	return TRUE;
@@ -692,19 +732,20 @@ function get_tombstone_data_filename($share, $path, $filename) {
 }
 
 function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $prefix='') {
-	global $landing_zone;
+	$landing_zone = get_share_landing_zone($share);
+	
 	$tombstones = array();
 	
 	// Find new files (files with no tombstones yet)
-	$handle = @opendir("$landing_zone/$share/$path");
+	$handle = @opendir("$landing_zone/$path");
 	if ($handle) {
 		while (($filename = readdir($handle)) !== FALSE) {
 			if ($filename != '.' && $filename != '..') {
-				if (is_dir("$landing_zone/$share/$path/$filename")) {
+				if (is_dir("$landing_zone/$path/$filename")) {
 					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $filename => $file_tombstones) {
 						$tombstones[$filename] = $file_tombstones;
 					}
-				} else if (is_file("$landing_zone/$share/$path/$filename") && !is_link("$landing_zone/$share/$path/$filename")) {
+				} else if (is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
 					// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
 					gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
@@ -732,7 +773,7 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 				} else {
 					// Found a file
 					$tombstones[$prefix.$filename] = get_tombstones($share, $path, $filename, $load_nok_tombstones, $quiet);
-					if (count($tombstones[$prefix.$filename]) == 0 && is_file("$landing_zone/$share/$path/$filename") && !is_link("$landing_zone/$share/$path/$filename")) {
+					if (count($tombstones[$prefix.$filename]) == 0 && is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
 						// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
 						gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 						$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
@@ -830,7 +871,7 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 		foreach ($tombstones as $tombstone) {
 			if (strpos($tombstone->path, $target_drive) === 0) {
 				$data_filepath = "$graveyard/$share/$path";
-				gh_mkdir($data_filepath, "$graveyard/$share");
+				gh_mkdir($data_filepath, "$graveyard/$share", get_share_landing_zone($share) . "/$path");
 				file_put_contents("$data_filepath/$filename", serialize($tombstones));
 				gh_log(DEBUG, "    Saved tombstones in $data_filepath/$filename");
 				break;
@@ -1120,30 +1161,36 @@ You probably want to do something about this!
 	return $drives;
 }
 
-function gh_fsck($path) {
-	global $landing_zone, $storage_pool_directories, $fsck_report;
+function gh_fsck($path, $share) {
+	global $storage_pool_directories, $fsck_report;
+	
 	gh_log(DEBUG, "Entering $path");
+	$fsck_report['landing_zone']['num_dirs']++;
 
 	$list = array();
 	$handle = opendir($path);
+	if ($handle === FALSE) {
+		gh_log(ERROR, "  Couldn't open $path to list content. Skipping...");
+		return;
+	}
 	while (($filename = readdir($handle)) !== FALSE) {
 		if ($filename != '.' && $filename != '..') {
 			$full_path = "$path/$filename";
 			$file_type = @filetype($full_path);
 			if ($file_type == 'dir') {
-				$fsck_report['landing_zone']['num_dirs']++;
-				gh_fsck($full_path);
+				gh_fsck($full_path, $share);
 			} else {
 				$fsck_report['landing_zone']['num_files']++;
-				gh_fsck_file($path, $filename, $file_type, 'landing_zone');
+				gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share);
 			}
 		}
 	}
 	closedir($handle);
 }
 
-function gh_fsck_graveyard($root, $path) {
-	global $landing_zone, $fsck_report;
+function gh_fsck_graveyard($root, $path, $share) {
+	global $fsck_report;
+	
 	gh_log(DEBUG, "Entering graveyard $root$path");
 	if (!is_dir("$root$path")) {
 		gh_log(DEBUG, "  Not a directory... Aborting.");
@@ -1155,16 +1202,22 @@ function gh_fsck_graveyard($root, $path) {
 		if ($filename != '.' && $filename != '..') {
 			if (@is_dir("$root$path/$filename")) {
 				$fsck_report['graveyard']['num_dirs']++;
-				gh_fsck_graveyard($root, "$path/$filename");
+				gh_fsck_graveyard($root, "$path/$filename", $share);
 			} else {
 				// Found a tombstone
 				$fsck_report['graveyard']['num_files']++;
-				$local_path = $landing_zone . $path;
+				
+				$path_parts = explode('/', $path);
+				array_shift($path_parts);
+				$share = array_shift($path_parts);
+				$landing_zone = get_share_landing_zone($share);
+				$local_path = $landing_zone . '/' . implode('/', $path_parts);
+				
 				// If file exists in landing zone, we already fsck-ed it in gh_fsck(); let's not repeat ourselves, shall we?
 				if (!file_exists("$local_path/$filename")) {
-					gh_fsck_file($local_path, $filename, FALSE, 'graveyard');
+					gh_fsck_file($local_path, $filename, FALSE, 'graveyard', $share);
 				#} else {
-					#gh_log(DEBUG, "File $local_path/$filename was already checked.");
+				#	gh_log(DEBUG, "File $local_path/$filename was already checked.");
 				}
 			}
 		}
@@ -1172,14 +1225,13 @@ function gh_fsck_graveyard($root, $path) {
 	closedir($handle);
 }
 
-function gh_fsck_file($path, $filename, $file_type, $source) {
-	global $storage_pool_directories, $landing_zone, $fsck_report, $shares_options;
+function gh_fsck_file($path, $filename, $file_type, $source, $share) {
+	global $storage_pool_directories, $fsck_report;
+
+	$landing_zone = get_share_landing_zone($share);
 
 	$file_path = substr($path, strlen($landing_zone)+1);
-	$file_path = explode('/', $file_path);
-	$share = array_shift($file_path);
-	$file_path = implode('/', $file_path);
-	
+
 	if ($file_type == 'file') {
 		// Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
 		gh_log(DEBUG, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
@@ -1315,10 +1367,10 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 			}
 			foreach ($file_tombstones as $key => $tombstone) {
 				if ($tombstone->is_linked) {
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$share/$file_path/$filename to point to $tombstone->path");
-					gh_recycle("$landing_zone/$share/$file_path/$filename");
-					gh_mkdir("$landing_zone/$share/$file_path", "$landing_zone/$share");
-					symlink($tombstone->path, "$landing_zone/$share/$file_path/$filename");
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
+					gh_recycle("$landing_zone/$file_path/$filename");
+					gh_mkdir("$landing_zone/$file_path", "$landing_zone", null);
+					symlink($tombstone->path, "$landing_zone/$file_path/$filename");
 					break;
 				}
 			}
@@ -1330,7 +1382,7 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 		}
 	} else if (count($file_copies_inodes) == 0) {
 		gh_log(WARN, '  WARNING! No copies of this file are available. Deleting from share.');
-		gh_recycle("$landing_zone/$share/$file_path/$filename");
+		gh_recycle("$landing_zone/$file_path/$filename");
 		if ($source == 'graveyard') {
 			$fsck_report['not_in_landing']--;
 		}
@@ -1352,7 +1404,8 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
 				if ($tombstone->state != 'Gone') {
 					$root_path = str_replace(clean_dir("/$share/$file_path"), '', $tombstone_dir_path);
-					if (!gh_mkdir($tombstone_dir_path, "$root_path/$share")) {
+					list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$file_path");
+					if (!gh_mkdir($tombstone_dir_path, "$root_path/$share", $original_path)) {
 						$tombstone->state = 'Gone';
 						$file_tombstones[$key] = $tombstone;
 						continue;
@@ -1368,7 +1421,7 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 					$temp_path = get_temp_filename($tombstone->path);
 					copy($source_real_path, $temp_path);
 					rename($temp_path, $tombstone->path);
-					gh_chperm($tombstone->path);
+					gh_chperm($tombstone->path, gh_get_file_infos($source_real_path));
 					$tombstone->state = 'OK';
 					$file_tombstones[$key] = $tombstone;
 				}
@@ -1379,10 +1432,10 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 					$file_tombstones[$key] = $tombstone;
 					continue;
 				}
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$share/$file_path/$filename to point to $tombstone->path");
-				gh_recycle("$landing_zone/$share/$file_path/$filename");
-				gh_mkdir("$landing_zone/$share/$file_path", "$landing_zone/$share");
-				symlink($tombstone->path, "$landing_zone/$share/$file_path/$filename");
+				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
+				gh_recycle("$landing_zone/$file_path/$filename");
+				gh_mkdir("$landing_zone/$file_path", "$landing_zone", null);
+				symlink($tombstone->path, "$landing_zone/$file_path/$filename");
 				$symlink_created = TRUE;
 			}
 		}
@@ -1435,10 +1488,10 @@ function gh_fsck_file($path, $filename, $file_type, $source) {
 			}
 			if (!$found_linked_tombstone) {
 				$tombstone = reset($file_tombstones);
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$share/$file_path/$filename to point to $tombstone->path");
-				gh_recycle("$landing_zone/$share/$file_path/$filename");
-				gh_mkdir("$landing_zone/$share/$file_path", "$landing_zone/$share");
-				symlink($tombstone->path, "$landing_zone/$share/$file_path/$filename");
+				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
+				gh_recycle("$landing_zone/$file_path/$filename");
+				gh_mkdir("$landing_zone/$file_path", "$landing_zone", null);
+				symlink($tombstone->path, "$landing_zone/$file_path/$filename");
 				reset($file_tombstones)->is_linked = TRUE;
 			}
 
@@ -1557,9 +1610,11 @@ function gh_recycle($real_path) {
 
 	$should_move_to_attic = FALSE;
 	if (!$is_symlink) {
-		global $storage_pool_directories, $delete_moves_to_attic, $shares_options, $landing_zone;
-		if (strpos($real_path, $landing_zone) === 0) {
-			$full_path = trim(str_replace($landing_zone, '', $real_path), '/');
+		global $storage_pool_directories, $delete_moves_to_attic, $shares_options;
+		
+		$share_options = get_share_options_from_full_path($real_path);
+		if ($share_options !== FALSE) {
+			$full_path = trim($share_options['name'] . "/" . str_replace($share_options['landing_zone'], '', $real_path), '/');
 		} else {
 			foreach ($storage_pool_directories as $dir) {
 				if (strpos($real_path, $dir) === 0) {
@@ -1569,6 +1624,7 @@ function gh_recycle($real_path) {
 				}
 			}
 		}
+
 		$share = substr($full_path, 0, strpos($full_path, '/'));
 		
 		if (isset($shares_options[$share]['delete_moves_to_attic'])) {
@@ -1594,7 +1650,10 @@ function gh_recycle($real_path) {
 		$target_path = clean_dir("$attic_path/$full_path");
 
 		list($path, $filename) = explode_full_path($target_path);
-		gh_mkdir($path, "$attic_path/$share");
+		
+		list($original_path, $filename) = explode_full_path(get_share_landing_zone($share) . "/$full_path");
+		
+		gh_mkdir($path, "$attic_path/$share", $original_path);
 
 		if (@rename($real_path, $target_path)) {
 			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
@@ -1669,19 +1728,24 @@ You'll receive a report email once that fsck run completes.
 	}
 	
 	if ($needs_fsck !== FALSE) {
-		global $landing_zone;
+		global $shares_options;
 		if ($needs_fsck === 1) {
-			gh_log(INFO, "Starting fsck for $landing_zone - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
+			gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
 		} else {
-			gh_log(INFO, "Starting fsck for $landing_zone - caused by missing drive that came back online.");
+			gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
 		}
 		initialize_fsck_report();
 		clearstatcache();
-		gh_fsck($landing_zone);
-		foreach (get_graveyards() as $graveyard) {
-			gh_fsck_graveyard($graveyard, '');
+
+		foreach ($shares_options as $share_name => $share_options) {
+			gh_fsck($share_options['landing_zone'], $share_name);
 		}
-		gh_log(INFO, "fsck for $landing_zone completed.");
+		foreach (get_graveyards() as $graveyard) {
+			foreach ($shares_options as $share_name => $share_options) {
+				gh_fsck_graveyard($graveyard, "/$share_name", $share_name);
+			}
+		}
+		gh_log(INFO, "fsck for all shares completed.");
 
 		$fsck_report = get_fsck_report();
 		gh_log(DEBUG, "Sending fsck report to $email_to");
@@ -1793,5 +1857,47 @@ function get_graveyards() {
 		}
 	}
 	return $graveyards;
+}
+
+function get_share_options_from_full_path($full_path) {
+	global $shares_options;
+	$landing_zone = '';
+	$share = FALSE;
+	foreach ($shares_options as $share_name => $share_options) {
+		if (strpos($full_path, $share_options['landing_zone']) === 0 && strlen($share_options['landing_zone']) > strlen($landing_zone)) {
+			$landing_zone = $share_options['landing_zone'];
+			$share = $share_options;
+		}
+	}
+	return $share;
+}
+
+function get_share_landing_zone($share) {
+	global $shares_options;
+	if (isset($shares_options[$share]['landing_zone'])) {
+		return $shares_options[$share]['landing_zone'];
+	} else {
+		global $config_file, $smb_config_file;
+		gh_log(CRITICAL, "Found a share ($share) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
+	}
+}
+
+function gh_get_file_infos($real_path) {
+	if ($real_path == null || !file_exists($real_path)) {
+		return (object) array(
+			'fileowner' => 0,
+			'filegroup' => 0,
+			'fileperms' => (int) base_convert("0755", 8, 10)
+		);
+	}
+	return (object) array(
+		'fileowner' => (int) fileowner($real_path),
+		'filegroup' => (int) filegroup($real_path),
+		'fileperms' => (int) base_convert(substr(decoct(fileperms($real_path)), -4), 8, 10)
+	);
+}
+
+function gh_get_dir_perms($directory) {
+	return (int) base_convert(substr(decoct(fileperms($directory)), -4), 8, 10);
 }
 ?>
