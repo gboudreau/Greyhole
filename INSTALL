@@ -21,7 +21,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	install -m 0755 -D -p greyhole-executer /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
-	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole-fsck
+	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	if [ `uname -i | grep 64 | wc -l` == 1 ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole_i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
 3. Edit /etc/logrotate.d/syslog:
