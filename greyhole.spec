@@ -30,7 +30,7 @@ install -m 0750 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
 install -m 0644 -D -p mysql.sql ${RPM_BUILD_ROOT}/var/hda/apps/greyhole/mysql.sql
 install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/greyhole.conf.rpmnew
-install -m 0644 -D -p greyhole.cron.d {RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/greyhole-fsck
+install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/greyhole
 %ifarch x86_64
 	install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 %else
