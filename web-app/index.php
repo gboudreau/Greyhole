@@ -26,12 +26,15 @@ if (isset($_GET['done'])) {
 	exit();
 }
 
+if (count($_GET) == 0) {
+	copy('/etc/greyhole.conf', $config_file);
+	copy('/etc/samba/smb.conf', $smb_config_file);
+}
+
 include('includes/common.php');
 parse_config();
 
 if (count($_GET) == 0) {
-	copy('/etc/greyhole.conf', $config_file);
-	copy('/etc/samba/smb.conf', $smb_config_file);
 	$partitions = get_partitions();
 	$shares = get_shares();
 	save_config();
@@ -102,10 +105,6 @@ if (isset($_GET['a'])) {
 			break;
 	}
 	save_config();
-}
-
-if (!isset($_GET['callback'])) {
-	$_GET['callback'] = 'showHideSharesOptions';
 }
 
 if (isset($_GET['share'])) {
@@ -179,6 +178,9 @@ if (isset($_GET['part'])) {
 	</tbody>
 </table>
 <script type="text/javascript">
+function reloadPage() {
+	window.location.href = 'index.php?edit=1';
+}
 function showHideSharesOptions() {
 	var i = 0;
 	var partSelected = false;
@@ -322,13 +324,18 @@ function disk_stats($path) {
 
 function render_share_html($share) {
 	global $base_url, $storage_pool_directories;
+	if (isset($_GET['callback'])) {
+		$callback = $_GET['callback'];
+	} else {
+		$callback = 'showHideSharesOptions';
+	}
 	$id = 'greyhole_' . $share->id;
 	?>
 	<span id="<?php echo $id ?>">
 		<input type="checkbox" 
 			id="greyhole_<?php echo $share->id ?>_enabled" 
 			<?php echo ($share->num_copies > 0 ? 'checked="checked"' : '') ?>
-			onclick="clickedEl=this.id;Element.show('spinner-greyhole-<?php echo $share->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?share=<?php echo urlencode($share->name) ?>&amp;a=toggle', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-greyhole-<?php echo $share->id ?>');<?php if (isset($_GET['callback'])) { echo $_GET['callback'] . '();'; } ?>}, parameters:Form.serialize('<?php echo $id ?>')}); return false;"/>
+			onclick="clickedEl=this.id;Element.show('spinner-greyhole-<?php echo $share->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?share=<?php echo urlencode($share->name) ?>&amp;a=toggle', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-greyhole-<?php echo $share->id ?>');<?php echo $callback . '();' ?>}, parameters:Form.serialize('<?php echo $id ?>')}); return false;"/>
 		<span class="i18n-greyhole_enabled">Share Managed by Greyhole</span>
 		<img alt="Working" class="theme-image" id="spinner-greyhole-<?php echo $share->id ?>" src="<?php echo $base_url ?>images/working.gif?<?php echo time() ?>" style="display: none;" title="Working">
 
@@ -337,7 +344,7 @@ function render_share_html($share) {
 		<input type="checkbox" 
 			id="greyhole_repl_<?php echo $share->id ?>_enabled" 
 			<?php echo ($share->num_copies > 1 ? 'checked="checked"' : '') ?>
-			onclick="clickedEl=this.id;Element.show('spinner-greyhole-repl-<?php echo $share->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?share=<?php echo urlencode($share->name) ?>&amp;a=toggle_replication', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-greyhole-repl-<?php echo $share->id ?>');<?php if (isset($_GET['callback'])) { echo $_GET['callback'] . '();'; } ?>}, parameters:Form.serialize('<?php echo $id ?>')}); return false;"/>
+			onclick="clickedEl=this.id;Element.show('spinner-greyhole-repl-<?php echo $share->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?share=<?php echo urlencode($share->name) ?>&amp;a=toggle_replication', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-greyhole-repl-<?php echo $share->id ?>');<?php echo $callback . '();' ?>}, parameters:Form.serialize('<?php echo $id ?>')}); return false;"/>
 		<span class="i18n-greyhole_replication">Replication Enabled</span>
 		<img alt="Working" class="theme-image" id="spinner-greyhole-repl-<?php echo $share->id ?>" src="<?php echo $base_url ?>images/working.gif?<?php echo time() ?>" style="display: none;" title="Working">
 	<?php endif; ?>
@@ -348,7 +355,7 @@ function render_share_html($share) {
 		
 		<select id="greyhole_num_copies_<?php echo $share->id ?>"
 			name="greyhole_num_copies"
-			onchange="clickedEl=this.id;Element.show('spinner-greyhole-numcopies-<?php echo $share->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?share=<?php echo urlencode($share->name) ?>&amp;a=update_num_copies', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-greyhole-numcopies-<?php echo $share->id ?>');<?php if (isset($_GET['callback'])) { echo $_GET['callback'] . '();'; } ?>}, parameters:'n=' + this.value})">
+			onchange="clickedEl=this.id;Element.show('spinner-greyhole-numcopies-<?php echo $share->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?share=<?php echo urlencode($share->name) ?>&amp;a=update_num_copies', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-greyhole-numcopies-<?php echo $share->id ?>');<?php echo $callback . '();' ?>}, parameters:'n=' + this.value})">
 			<?php
 			for ($i=2; $i<=count($storage_pool_directories); $i++) {
 				?><option value="<?php echo $i ?>"<?php echo ($share->num_copies == $i ? ' selected="selected"' : '') ?>><?php echo $i ?></option><?php
@@ -364,13 +371,18 @@ function render_share_html($share) {
 
 function render_part_html($part) {
 	global $base_url;
+	if (isset($_GET['callback'])) {
+		$callback = $_GET['callback'];
+	} else {
+		$callback = 'reloadPage';
+	}
 	$id = 'greyhole_part_' . $part->id;
 	?>
 	<span id="<?php echo $id ?>">
 		<input type="checkbox" 
 			id="greyhole_part_<?php echo $part->id ?>_enabled" 
 			<?php echo ($part->in_pool ? 'checked="checked"' : '') ?>
-			onclick="clickedEl=this.id;Element.show('spinner-part-<?php echo $part->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?part=<?php echo urlencode($part->path) ?>&amp;a=toggle_pool_part', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-part-<?php echo $part->id ?>');<?php if (isset($_GET['callback'])) { echo $_GET['callback'] . '();'; } ?>}, parameters:Form.serialize('<?php echo $id ?>')}); return false;"/>
+			onclick="clickedEl=this.id;Element.show('spinner-part-<?php echo $part->id ?>'); new Ajax.Updater('<?php echo $id ?>', '<?php echo $base_url ?>index.php?part=<?php echo urlencode($part->path) ?>&amp;a=toggle_pool_part', {asynchronous:true, evalScripts:true, onSuccess:function(request){Element.hide('spinner-part-<?php echo $part->id ?>');<?php echo $callback . '();' ?>}, parameters:Form.serialize('<?php echo $id ?>')}); return false;"/>
 	</span>
 	<?php
 }
