@@ -23,7 +23,7 @@ fi
 
 if [ $UID != 0 ]; then
 	echo "You need to be root to execute this command."
-	echo "You can become root using the following command: su -"
+	echo "You can use sudo, or become root using the following command: su -"
 	exit
 fi
 
@@ -46,11 +46,11 @@ done
 
 cp /etc/greyhole.conf /etc/greyhole.conf.bak
 cp ${DIR}/greyhole.conf${SUFFIX} /etc/greyhole.conf
-service greyhole restart
+/sbin/service greyhole restart
 
 cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
 cp ${DIR}/smb.conf${SUFFIX} /etc/samba/smb.conf
-service smb reload
+/sbin/service smb reload
 
 if [ -f /var/hda/platform/html/config/database.yml ]; then
 	# Amahi 'shares' database update

@@ -44,7 +44,7 @@ status () {
 }
 
 daemon_start () {
-	ionice -c 2 -n 7 $DAEMON --daemon &
+	ionice -c 2 -n 7 $DAEMON --daemon > /dev/null &
 	RETVAL=$?
 	return $RETVAL
 }
@@ -79,7 +79,7 @@ stop () {
 
 restart () {
 	stop
-	sleep 2
+	sleep 1
 	start
 }
 

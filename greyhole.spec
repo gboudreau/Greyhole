@@ -36,6 +36,9 @@ install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/gre
 %else
 	install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 %endif
+if [ -e /var/cache/hdactl.cache -a "`grep yes /var/cache/hdactl.cache | wc -l`" = "1" ]; then
+	install -m 0755 -D -p amahi-greyhole-conf-gateway ${RPM_BUILD_ROOT}%{_bindir}
+fi
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -96,5 +99,7 @@ fi
 /var/hda/apps/greyhole/mysql.sql
 
 %changelog
+* Mon Feb 22 2010 Guillaume Boudreau
+- major update in all sections; more automated installation
 * Wed Jan 22 2010 Carlos Puchol
 - initial version of Greyhole spec
