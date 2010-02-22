@@ -58,7 +58,7 @@ if (!isset($smb_config_file)) {
 }
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files;
 
 	$config_text = file_get_contents($config_file);
 	foreach (explode("\n", $config_text) as $line) {
@@ -89,6 +89,13 @@ function parse_config() {
 					foreach ($shares as $share) {
 						$shares_options[$share]['wait_for_exclusive_file_access'] = TRUE;
 					}
+					break;
+				case 'sticky_files':
+					$last_sticky_files_dir = trim($value, '/');
+					$sticky_files[$last_sticky_files_dir] = array();
+					break;
+				case 'stick_into':
+					$sticky_files[$last_sticky_files_dir][] = '/' . trim($value, '/');
 					break;
 				default:
 					if (strpos($name, 'num_copies') === 0) {

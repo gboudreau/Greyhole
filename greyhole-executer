@@ -585,6 +585,13 @@ function gh_write($share, $full_path, $task_id) {
 	}
 	
 	$tombstones = create_tombstones($share, $full_path, $num_copies_required, $filesize, $existing_tombstones);
+
+	// Use the 1st tombstone for the symlink; it might be on a sticky drive.
+	$i = 0;
+	foreach ($tombstones as $tombstone) {
+		$tombstone->is_linked = ($i++ == 0);
+	}
+
 	save_tombstones($share, $path, $filename, $tombstones);
 
 	create_copies_from_tombstones($tombstones, $share, $full_path, $source_file);
@@ -730,7 +737,7 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 
 	// Select drives that have enough free space for this file
 	if ($num_ok < $num_copies_required) {
-		$local_target_drives = order_target_drives($filesize/1024);
+		$local_target_drives = order_target_drives($filesize/1024, FALSE, $share, $path);
 	}
 	while ($num_ok < $num_copies_required && count($local_target_drives) > 0) {
 		$target_drive = array_shift($local_target_drives);
@@ -738,7 +745,10 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 		if (isset($tombstones[$clean_target_full_path])) {
 			continue;
 		}
+		// Prepend new target drives, to make sure sticky directories will be used first
+		$tombstones = array_reverse($tombstones);
 		$tombstones[$clean_target_full_path] = (object) array('path' => $clean_target_full_path, 'is_linked' => count($tombstones) == 0, 'state' => 'Pending');
+		$tombstones = array_reverse($tombstones);
 		$num_ok++;
 	}
 	return $tombstones;
@@ -1077,8 +1087,8 @@ function get_free_space_in_storage_pool_dirs() {
 	return $dfs;
 }
 
-function order_target_drives($filesize_kb, $include_full_drives=FALSE) {
-	global $storage_pool_directories, $minimum_free_space_pool_directories, $dir_selection_algorithm, $last_OOS_notification;
+function order_target_drives($filesize_kb, $include_full_drives, $share, $path) {
+	global $storage_pool_directories, $minimum_free_space_pool_directories, $dir_selection_algorithm, $last_OOS_notification, $sticky_files;
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
 	$full_drives = array();
@@ -1186,6 +1196,45 @@ You probably want to do something about this!
 	if ($include_full_drives) {
 		$drives = array_merge($drives, $full_drives);
 	}
+
+	if (isset($sticky_files)) {
+		foreach ($sticky_files as $share_dir => $stick_into) {
+			if (strpos("$share/$path", $share_dir) === 0) {
+				if (count($stick_into) == 0) {
+					// Stick files into any drives
+					$query = sprintf("SELECT value FROM settings WHERE name = 'stick_into-%s'",
+						mysql_escape_string($share_dir)
+					);
+					$result = mysql_query($query) or gh_log(CRITICAL, "Can't query settings for stick_target-$share_dir: " . mysql_error());
+					if (mysql_num_rows($result) == 1) {
+						$row = mysql_fetch_object($result);
+						$stick_into = unserialize($row->value);
+					} else {
+						$value = serialize($drives);
+						$query = sprintf("INSERT INTO settings (name, value) VALUES ('stick_into-%s', '%s')",
+							mysql_escape_string($share_dir),
+							mysql_escape_string($value)
+						);
+						mysql_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$share_dir: " . mysql_error());
+						return $drives;
+					}
+				} else {
+					// Stick files into specific drives: $stick_into
+				}
+				
+				// Make sure the drives we want to use are not yet full
+				$priority_drives = array();
+				foreach ($stick_into as $stick_into_dir) {
+					if (array_search($stick_into_dir, $full_drives) === FALSE) {
+						unset($drives[array_search($stick_into_dir, $drives)]);
+						$priority_drives[] = $stick_into_dir;
+					}
+				}
+				$drives = array_merge($priority_drives, $drives);
+			}
+		}
+	}
+
 	return $drives;
 }
 
@@ -1484,7 +1533,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			$fsck_report['too_many_copies']++;
 			$keys_to_remove = array();
 		
-			$local_target_drives = array_values(order_target_drives(0, TRUE));
+			$local_target_drives = array_values(order_target_drives(0, TRUE, $share, $file_path));
 			while (count($file_copies_inodes) > $num_copies_required) {
 				$target_drive = array_pop($local_target_drives);
 				$key = clean_dir("$target_drive/$share/$file_path/$filename");
