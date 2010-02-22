@@ -100,11 +100,11 @@ if ($action == 'stats') {
 
 	$dfs = get_free_space_in_storage_pool_dirs();
 	echo "Storage Pool\n";
-	echo "                Total -  Used =  Free -  Min = Avail + Attic = Possible\n";
+	echo "                Total -  Used =  Free + Attic = Possible\n";
 	foreach ($storage_pool_directories as $target_drive) {
 		echo "  $target_drive: ";
 		if (!isset($dfs[$target_drive])) {
-			echo "  N/A -   N/A =   N/A -  N/A =   N/A +   N/A =   N/A\n";
+			echo "  N/A -   N/A =   N/A +   N/A =   N/A\n";
 			continue;
 		}
 
@@ -116,14 +116,17 @@ if ($action == 'stats') {
 		$used_space = (float) array_shift($response);
 
 		$free_space = $dfs[$target_drive];
-		$minimum_free_space = (float) (isset($minimum_free_space_pool_directories[$target_drive]) ? $minimum_free_space_pool_directories[$target_drive]*1024*1024 : 0.0);
-		$available_space = (float) $free_space - $minimum_free_space;
 
 		$attic_path = clean_dir("$target_drive/.gh_attic");
-		$attic_size = trim(exec("du -sk " . quoted_form($attic_path) . " | awk '{print $1}'"));
-		$potential_available_space = (float) $available_space + $attic_size;
+		if (!file_exists($attic_path)) {
+			$attic_size = 0;
+		} else {
+			$attic_size = trim(exec("du -sk " . quoted_form($attic_path) . " | awk '{print $1}'"));
+		}
 
-		echo sprintf('%4.0f', $total_space/1024/1024) . "G - " . sprintf('%4.0f', $used_space/1024/1024) . "G = " . sprintf('%4.0f', $free_space/1024/1024) . "G - " . sprintf('%3.0f', $minimum_free_space/1024/1024) . "G = " . sprintf('%4.0f', $available_space/1024/1024) . "G + " . sprintf('%4.0f', $attic_size/1024/1024) . "G = " . sprintf('%4.0f', $potential_available_space/1024/1024) . "G\n";
+		$potential_available_space = (float) $free_space + $attic_size;
+
+		echo sprintf('%4.0f', $total_space/1024/1024) . "G - " . sprintf('%4.0f', $used_space/1024/1024) . "G = " . sprintf('%4.0f', $free_space/1024/1024) . "G + " . sprintf('%4.0f', $attic_size/1024/1024) . "G = " . sprintf('%4.0f', $potential_available_space/1024/1024) . "G\n";
 	}
 	echo "\n";
 	exit(0);
