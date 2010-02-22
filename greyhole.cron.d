@@ -2,7 +2,7 @@
 0 0 * * *	root	/usr/bin/greyhole-executer --fsck --email-report > /dev/null
 
 # Daily restart; clears caches etc. to keep memory usage in check
-0 0 * * *	root	service greyhole restart
+59 23 * * *	root	/sbin/service greyhole restart > /dev/null
 
 # cifs client workaround
 # Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
