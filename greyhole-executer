@@ -485,7 +485,7 @@ function file_is_locked($share, $full_path) {
 	$landing_zone = get_share_landing_zone($share);
 	
 	$real_fullpath = "$landing_zone/$full_path";
-	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath));
+	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath) . " 2> /dev/null");
 	if (strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
 	}
@@ -498,7 +498,7 @@ function file_is_locked($share, $full_path) {
 }
 
 function real_file_is_locked($real_fullpath) {
-	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath));
+	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath) . " 2> /dev/null");
 	if (strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
 	}
@@ -551,11 +551,10 @@ function gh_write($share, $full_path, $task_id) {
 			gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
 		}
 		foreach ($keys_to_remove as $key) {
-			gh_recycle($existing_tombstones[$key]->path);
+			if ($existing_tombstones[$key]->path != $source_file) {
+				gh_recycle($existing_tombstones[$key]->path);
+			}
 			unset($existing_tombstones[$key]);
-		}
-		if (count($existing_tombstones) == 0) {
-			$existing_tombstones[$source_file] = (object) array('path' => $source_file, 'is_linked' => TRUE, 'state' => 'OK');
 		}
 	} else {
 		$source_file = clean_dir("$landing_zone/$full_path");
