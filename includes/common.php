@@ -235,4 +235,30 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 	// Don't execute PHP internal error handler
 	return TRUE;
 }
+
+function bytes_to_human($bytes, $html=TRUE) {
+	$units = 'B';
+	if ($bytes > 1024) {
+		$bytes /= 1024;
+		$units = 'KB';
+	}
+	if ($bytes > 1024) {
+		$bytes /= 1024;
+		$units = 'MB';
+	}
+	if ($bytes > 1024) {
+		$bytes /= 1024;
+		$units = 'GB';
+	}
+	if ($bytes > 1024) {
+		$bytes /= 1024;
+		$units = 'TB';
+	}
+	$decimals = ($bytes > 100 ? 0 : ($bytes > 10 ? 1 : 2));
+	if ($html) {
+		return number_format($bytes, $decimals) . " <span class=\"i18n-$units\">$units</span>";
+	} else {
+		return number_format($bytes, $decimals) . $units;
+	}
+}
 ?>

@@ -437,28 +437,6 @@ function render_footer() {
 	<?php
 }
 
-function bytes_to_human($bytes) {
-	$units = 'B';
-	if ($bytes > 1024) {
-		$bytes /= 1024;
-		$units = 'KB';
-	}
-	if ($bytes > 1024) {
-		$bytes /= 1024;
-		$units = 'MB';
-	}
-	if ($bytes > 1024) {
-		$bytes /= 1024;
-		$units = 'GB';
-	}
-	if ($bytes > 1024) {
-		$bytes /= 1024;
-		$units = 'TB';
-	}
-	$decimals = ($bytes > 100 ? 0 : ($bytes > 10 ? 1 : 2));
-	return number_format($bytes, $decimals) . " <span class=\"i18n-$units\">$units</span>";
-}
-
 function save_config() {
 	global $config_file;
 	$config_file_content = explode("\n", file_get_contents($config_file));

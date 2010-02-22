@@ -34,6 +34,7 @@ for ($i=1; $i<$argc; $i++) {
 		case '--prerotate':
 		case '--postrotate':
 		case '--stats':
+		case '--empty-attic':
 		$action = substr($argv[$i], 2);
 		break;
 
@@ -65,6 +66,7 @@ function print_usage() {
 	echo "Usage: Start the daemon:        greyhole-executer --daemon\n";
 	echo "       Schedule a fsck:         greyhole-executer --fsck [--email-report] [--dir <path>]\n";
 	echo "       Display statistics:      greyhole-executer --stats\n";
+	echo "       Empty attic:             greyhole-executer --empty-attic\n";
 	echo "\n";
 	echo "       Pre-rotate task:         greyhole-executer --prerotate\n";
 	echo "       Post-rotate task:        greyhole-executer --postrotate\n";
@@ -75,6 +77,24 @@ function print_usage() {
 	exit(1);
 }
 
+if ($action == 'empty-attic') {
+	if (exec("whoami") != 'root') {
+		echo "You need to execute this as root.\n";
+		exit(1);
+	}
+	foreach ($storage_pool_directories as $target_drive) {
+		$attic_path = clean_dir("$target_drive/.gh_attic");
+		if (!file_exists($attic_path)) {
+			echo "Attic in $target_drive is empty. Nothing to do.\n";
+		} else {
+			$attic_size = trim(exec("du -sk " . quoted_form($attic_path) . " | awk '{print $1}'"));
+			echo "Attic in $target_drive is " . bytes_to_human($attic_size*1024, FALSE) . ". Emptying... ";
+			exec("rm -rf " . quoted_form($attic_path));
+			echo "Done\n";
+		}
+	}
+	exit(0);
+}
 if ($action == 'stats') {
 	echo "\nGreyhole Statistics\n===================\n\n";
 
