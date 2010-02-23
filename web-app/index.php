@@ -18,28 +18,34 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-$config_file = 'files/greyhole.conf-' . md5('salt'.@$_SERVER['REMOTE_ADDR']);
-$smb_config_file = 'files/smb.conf-' . md5('salt'.@$_SERVER['REMOTE_ADDR']);
+$user_id = 'salt';
+if (isset($_SERVER['REMOTE_ADDR'])) {
+	$user_id .= $_SERVER['REMOTE_ADDR'];
+}
+
+$config_file = 'files/greyhole.conf-' . md5($user_id);
+$smb_config_file = 'files/smb.conf-' . md5($user_id);
 
 if (isset($_GET['done'])) {
 	render_apply_changes_page();
 	exit();
 }
 
-if (count($_GET) == 0 && (!isset($argc) || @$argv[1] == '--init-session')) {
+if (count($_GET) == 0 && (!isset($argc) || ($argc >= 2 && $argv[1] == '--init-session'))) {
 	copy('/etc/greyhole.conf', $config_file);
 	copy('/etc/samba/smb.conf', $smb_config_file);
 }
 
+$log_to_stdout = (isset($argc));
 include('includes/common.php');
 parse_config();
 
 if (isset($argc)) {
-	if ($argc == 1) {
+	if ($argc < 2) {
 		show_command_line_usage();
 		exit(0);
 	}
-	if (@$argv[1] == '--init-session') {
+	if ($argv[1] == '--init-session') {
 		echo "# New working copy of config files created.\n";
 		echo "# Current configuration follows.\n";
 		echo "partitions: # in_pool?\n";
@@ -53,19 +59,19 @@ if (isset($argc)) {
 			echo "  - $share->name: $share->num_copies\n";
 		}
 		exit(0);
-	} else if (@$argv[1] == '--get_part_options') {
+	} else if ($argv[1] == '--get_part_options') {
 		$partitions = get_partitions();
 		foreach ($partitions as $part) {
 			echo "- $part->path: " . ($part->in_pool ? 'true' : 'false') . "\n";
 		}
 		exit(0);
-	} else if (@$argv[1] == '--get_share_options') {
+	} else if ($argv[1] == '--get_share_options') {
 		$shares = get_shares();
 		foreach ($shares as $share) {
 			echo "- $share->name: $share->num_copies\n";
 		}
 		exit(0);
-	} else if (@$argv[1] == '--set_share_option') {
+	} else if ($argv[1] == '--set_share_option') {
 		if (exec("whoami") != 'root') {
 			echo "You need to be root to execute this command.\n";
 			echo "You can use sudo, or become root using the following command: su -\n";
@@ -87,9 +93,9 @@ if (isset($argc)) {
 		save_config();
 
 		$dir = getcwd() . '/files';
-		exec("/usr/bin/greyhole-config-update " . quoted_form($dir) . " " . md5('salt'));
+		exec("/usr/bin/greyhole-config-update " . quoted_form($dir) . " " . md5($user_id));
 		exit(0);
-	} else if (@$argv[1] == '--set_part_option') {
+	} else if ($argv[1] == '--set_part_option') {
 		if (exec("whoami") != 'root') {
 			echo "You need to be root to execute this command.\n";
 			echo "You can use sudo, or become root using the following command: su -\n";
@@ -118,7 +124,7 @@ if (isset($argc)) {
 		save_config();
 
 		$dir = getcwd() . '/files';
-		exec("/usr/bin/greyhole-config-update " . quoted_form($dir) . " " . md5('salt'));
+		exec("/usr/bin/greyhole-config-update " . quoted_form($dir) . " " . md5($user_id));
 		exit(0);
 	} else {
 		show_command_line_usage();
@@ -477,12 +483,13 @@ function render_part_html($part) {
 }
 
 function render_apply_changes_page() {
+	global $user_id;
 	$dir = str_replace('index.php', 'files', $_SERVER['SCRIPT_FILENAME']);
 	render_header('Greyhole Configuration - Apply your changes');
 	?>
 	<span style="color:red">Your changes have not yet been applied.</span><br/>
 	You'll need to execute the following command in a terminal or using SSH, logged as <em>root</em> on your server:
-	<pre>/usr/bin/greyhole-config-update '<?php echo $dir ?>' <?php echo md5('salt'.@$_SERVER['REMOTE_ADDR']) ?></pre>
+	<pre>/usr/bin/greyhole-config-update '<?php echo $dir ?>' <?php echo md5($user_id) ?></pre>
 	<?php
 	render_footer();
 }
@@ -535,14 +542,14 @@ function save_config() {
 	$found_shares_options = FALSE;
 	$found_pool_options = FALSE;
 	foreach ($config_file_content as $line) {
-		if (strpos(trim($line), 'num_copies[') === 0 || strpos(trim($line), '#num_copies[') === 0) {
+		if (strpos(trim($line), 'num_copies[') === 0 || strpos(trim($line), '#num_copies[') !== FALSE) {
 			if (!$found_shares_options) {
 				$found_shares_options = TRUE;
 				$config_file_template .= '$shares_options' . "\n";
 			}
 			continue;
 		}
-		if (strpos(trim($line), 'storage_pool_directory') === 0 || strpos(trim($line), '#storage_pool_directory') === 0) {
+		if (strpos(trim($line), 'storage_pool_directory') === 0 || strpos(trim($line), '#storage_pool_directory') !== FALSE) {
 			if (!$found_pool_options) {
 				$found_pool_options = TRUE;
 				$config_file_template .= '$pool_options' . "\n";

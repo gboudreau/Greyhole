@@ -60,6 +60,7 @@ if (!isset($smb_config_file)) {
 function parse_config() {
 	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files;
 
+	$shares_options = array();
 	$config_text = file_get_contents($config_file);
 	foreach (explode("\n", $config_text) as $line) {
 		if (preg_match("/^[ \t]*([^ \t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
@@ -174,7 +175,7 @@ function explode_full_path($full_path) {
 }
 
 function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
-	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action;
+	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action, $log_to_stdout;
 	if ($local_log_level > $log_level) {
 		return;
 	}
@@ -189,12 +190,16 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 	);
 	$is_new_line = $add_line_feed;
 
-	$fp = fopen($greyhole_log_file, 'a');
-	if ($fp) {
-		fwrite($fp, $log_text);
-		fclose($fp);
+	if (isset($log_to_stdout)) {
+		echo $log_text;
 	} else {
-		error_log($log_text);
+		$fp = fopen($greyhole_log_file, 'a');
+		if ($fp) {
+			fwrite($fp, $log_text);
+			fclose($fp);
+		} else {
+			error_log($log_text);
+		}
 	}
 	
 	if ($local_log_level === CRITICAL) {
