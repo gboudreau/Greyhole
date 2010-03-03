@@ -37,7 +37,7 @@ install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/gre
 	install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 %endif
 if [ -e /var/cache/hdactl.cache -a "`grep yes /var/cache/hdactl.cache | wc -l`" = "1" ]; then
-	install -m 0755 -D -p amahi-greyhole-conf-gateway ${RPM_BUILD_ROOT}%{_bindir}
+	install -m 0755 -D -p hda-greyhole-conf-gateway ${RPM_BUILD_ROOT}%{_bindir}
 fi
 
 %clean
