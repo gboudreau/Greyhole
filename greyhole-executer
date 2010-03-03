@@ -1109,9 +1109,27 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	fseek($fp, $f_seek_point);
 
 	$new_tasks = 0;
+	$last_line = FALSE;
+	$act = FALSE;
 	while ($line = fgets($fp)) {
 		if (($p = strpos($line, ' smbd_greyhole:')) !== FALSE) {
 			$line = trim(substr($line, $p+16));
+
+			// Prevent insertion of unneeded duplicates
+			if ($line === $last_line) {
+				continue;
+			}
+			$last_line = $line;
+
+			// Close logs are only processed when no more duplicates are found, so we'll execute this now that a non-duplicate line was found.
+			if ($act === 'close') {
+				$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
+					mysql_escape_string($share),
+					$fd
+				);
+				mysql_query($query) or gh_log(CRITICAL, "Error updating tasks: " . mysql_error() . "; Query: $query");
+			}
+
 			$line = explode('*', $line);
 			$act = array_shift($line);
 			$share = array_shift($line);
@@ -1151,12 +1169,9 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			if ($act === FALSE) {
 				continue;
 			}
-			if ($act == 'close') {
-				$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
-					mysql_escape_string($share),
-					$fd
-				);
-			} else {
+
+			// Close logs are only processed when no more duplicates are found, so we won't execute it just yet; we'll process it the next time we find a non-duplicate line.
+			if ($act != 'close') {
 				if (isset($fd) && $fd == -1) {
 					continue;
 				}
@@ -1175,6 +1190,15 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	}
 	$f_seek_point = ftell($fp);
 	fclose($fp);
+
+	// Close logs are only processed when no more duplicates are found, so we'll execute this now that we're done parsing the current log.
+	if ($act == 'close') {
+		$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
+			mysql_escape_string($share),
+			$fd
+		);
+		mysql_query($query) or gh_log(CRITICAL, "Error updating tasks: " . mysql_error() . "; Query: $query");
+	}
 	
 	$query = sprintf("UPDATE settings SET value = '%d' WHERE name = '%s'", $f_seek_point, 'last_read_log_smbd_line');
 	mysql_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . mysql_error());
