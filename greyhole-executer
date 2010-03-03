@@ -327,6 +327,7 @@ function execute_next_task() {
 	$action = $task->action;
 	gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 
+	$result = 0;
 	switch ($task->action) {
 		case 'fsck':
 			gh_log(INFO, "Starting fsck for $task->share");
@@ -365,7 +366,7 @@ function execute_next_task() {
 		case 'mkdir':
 			break;
 		case 'write':
-			gh_write($task->share, $task->full_path, $task->id);
+			$result = gh_write($task->share, $task->full_path, $task->id);
 			break;
 		case 'rename':
 			gh_rename($task->share, $task->full_path, $task->additional_info, $task->id);
@@ -380,11 +381,13 @@ function execute_next_task() {
 	if ($task->action != 'write' && $task->action != 'rename') {
 		$sleep_before_task = array();
 	}
-	$query = sprintf("INSERT INTO tasks_completed (SELECT * FROM tasks WHERE id = %d)", $task->id);
-	mysql_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . mysql_error());
+	if ($result === 0) {
+		$query = sprintf("INSERT INTO tasks_completed (SELECT * FROM tasks WHERE id = %d)", $task->id);
+		mysql_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . mysql_error());
 
-	$query = sprintf("DELETE FROM tasks WHERE id = %d", $task->id);
-	mysql_query($query) or gh_log(CRITICAL, "Can't delete from tasks: " . mysql_error());
+		$query = sprintf("DELETE FROM tasks WHERE id = %d", $task->id);
+		mysql_query($query) or gh_log(CRITICAL, "Can't delete from tasks: " . mysql_error());
+	}
 }
 
 function gh_rmdir($share, $full_path) {
@@ -609,7 +612,13 @@ function gh_write($share, $full_path, $task_id) {
 	
 	$landing_zone = get_share_landing_zone($share);
 	
-	if (!gh_file_exists("$landing_zone/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) { return; }
+	if (!gh_file_exists("$landing_zone/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) {
+		if (!gh_file_exists($landing_zone, '  Share "'.$share.'" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {
+			$sleep_before_task[] = $task_id;
+			return 1;
+		}
+		return 0;
+	}
 	
 	$num_copies_required = get_num_copies($share);
 
@@ -682,13 +691,8 @@ function gh_write($share, $full_path, $task_id) {
 		// Check if another process locked this file before we work on it.
 		if (($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
 			gh_log(DEBUG, "  File is locked by another process. Will wait until it's unlocked to work on it.");
-			#gh_log(DEBUG, "  Locked by: $locked_by");
-			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
-				$task_id
-			);
-			mysql_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . mysql_error());
-			$sleep_before_task[] = mysql_insert_id();
-			return;
+			$sleep_before_task[] = $task_id;
+			return 1;
 		}
 		$sleep_before_task = array();
 	}
@@ -704,6 +708,8 @@ function gh_write($share, $full_path, $task_id) {
 	save_tombstones($share, $path, $filename, $tombstones);
 
 	create_copies_from_tombstones($tombstones, $share, $full_path, $source_file);
+
+	return 0;
 }
 
 function is_greyhole_owned_dir($path) {
