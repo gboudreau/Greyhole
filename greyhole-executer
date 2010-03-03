@@ -233,7 +233,7 @@ function execute_next_task() {
 	switch ($task->action) {
 		case 'fsck':
 			gh_log(INFO, "Starting fsck for $task->share");
-			initialize_fsck_report();
+			initialize_fsck_report($task->share == '' ? 'All shares' : $task->share);
 			clearstatcache();
 			if ($task->share == '') {
 				foreach ($shares_options as $share_name => $share_options) {
@@ -256,7 +256,7 @@ function execute_next_task() {
 					}
 				}
 			}
-			gh_log(INFO, "fsck for $task->share completed.");
+			gh_log(INFO, "fsck for " . ($task->share == '' ? 'All shares' : $task->share) . " completed.");
 			if ($task->additional_info == 'daily') {
 				// Email report for daily fsck
 				$fsck_report = get_fsck_report();
@@ -1577,9 +1577,11 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 	}
 }
 
-function initialize_fsck_report() {
+function initialize_fsck_report($what) {
 	global $fsck_report;
 	$fsck_report = array();
+	$fsck_report['start'] = time();
+	$fsck_report['what'] = $what;
 	$fsck_report['graveyard'] = array();
 	$fsck_report['graveyard']['num_dirs'] = 0;
 	$fsck_report['graveyard']['num_files'] = 0;
@@ -1600,18 +1602,27 @@ function initialize_fsck_report() {
 function get_fsck_report() {
 	global $fsck_report, $storage_pool_directories, $gone_ok_drives;
 	
-	$report = "Daily fsck report
------------------	
+	$fsck_report['end'] = time();
+	
+	$displayable_duration = duration_to_human($fsck_report['end'] - $fsck_report['start']);
+	
+	$report = "fsck report
+-----------
+Scanned directory: " . $fsck_report['what'] . "
+
+Started:  " . date('Y-m-d H:i:s', $fsck_report['start']) . "
+Ended:    " . date('Y-m-d H:i:s', $fsck_report['end']) . "
+Duration: $displayable_duration
 
 Graveyard:
-  Found " . $fsck_report['graveyard']['num_dirs'] . " directories
-  Found " . $fsck_report['graveyard']['num_files'] . " files
+  Found " . number_format($fsck_report['graveyard']['num_dirs']) . " directories
+  Found " . number_format($fsck_report['graveyard']['num_files']) . " files
 
 Landing Zone (shares):
-  Found " . $fsck_report['landing_zone']['num_dirs'] . " directories
-  Found " . $fsck_report['landing_zone']['num_files'] . " files
+  Found " . number_format($fsck_report['landing_zone']['num_dirs']) . " directories
+  Found " . number_format($fsck_report['landing_zone']['num_files']) . " files
 
-Attics size:\n";
+Attic size:\n";
 
 	foreach ($storage_pool_directories as $dir) {
 		$attic_path = clean_dir("$dir/.gh_attic");
@@ -1622,57 +1633,67 @@ Attics size:\n";
 		}
 	}
 
-	$report .= "\nProblems:\n";
+	// Errors
+	if (empty($fsck_report['no_copies_found_files']) && count($fsck_report['wrong_file_size']) == 0) {
+		$report .= "\nNo problems found.\n";
+	} else {
+		$report .= "\nProblems:\n";
 
-	if (!empty($fsck_report['no_copies_found_files'])) {
-		ksort($fsck_report['no_copies_found_files']);
-		$report .= "  Found " . count($fsck_report['no_copies_found_files']) . " files in the graveyard for which no file copies were found.
+		if (!empty($fsck_report['no_copies_found_files'])) {
+			ksort($fsck_report['no_copies_found_files']);
+			$report .= "  Found " . count($fsck_report['no_copies_found_files']) . " files in the graveyard for which no file copies were found.
     Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.
     If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the graveyard.
   Files with no copies:\n";
-		$report .= "    " . implode("\n    ", array_keys($fsck_report['no_copies_found_files'])) . "\n\n";
-	}
-
-	if ($fsck_report['too_many_copies'] > 0) {
-		$fsck_report['too_many_files'] = array_unique($fsck_report['too_many_files']);
-		
-		$report .= "  Found " . $fsck_report['too_many_copies'] . " files for which there was too many file copies. Deleted (or in attic) files:\n";
-		$report .= "    " . implode("\n    ", $fsck_report['too_many_files']) . "\n\n";
-	}
-	
-	if (count($fsck_report['wrong_file_size']) > 0) {
-		$report .= "  Found " . count($fsck_report['wrong_file_size']) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. You should manually remove the invalid copies, and re-run fsck to re-create valid copies.\n";
-		foreach ($fsck_report['wrong_file_size'] as $real_file_path => $info_array) {
-			$report .= "    $real_file_path is " . number_format($info_array[0]) . " bytes; should be " . number_format($info_array[1]) . " bytes.\n";
+			$report .= "    " . implode("\n    ", array_keys($fsck_report['no_copies_found_files'])) . "\n\n";
 		}
-		$report .= "\n";
+
+		if (count($fsck_report['wrong_file_size']) > 0) {
+			$report .= "  Found " . count($fsck_report['wrong_file_size']) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. You should manually remove the invalid copies.\n";
+			foreach ($fsck_report['wrong_file_size'] as $real_file_path => $info_array) {
+				$report .= "    $real_file_path is " . number_format($info_array[0]) . " bytes; should be " . number_format($info_array[1]) . " bytes.\n";
+			}
+			$report .= "\n";
+		}
 	}
 
-	$report .= "Notices:\n";
+	// Warnings
+	if ($fsck_report['too_many_copies'] == 0 && $fsck_report['symlink_target_moved'] == 0 && $fsck_report['not_in_landing'] == 0 && count($fsck_report['temp_files']) == 0 && $fsck_report['gone_ok'] == 0) {
+		// Nothing to say...
+	} else {
+		$report .= "Notices:\n";
 
-	if ($fsck_report['symlink_target_moved'] > 0) {
-		$report .= "  Found " . $fsck_report['symlink_target_moved'] . " files in the Landing Zone that were pointing to a now gone copy.
+		if ($fsck_report['too_many_copies'] > 0) {
+			$fsck_report['too_many_files'] = array_unique($fsck_report['too_many_files']);
+		
+			$report .= "  Found " . $fsck_report['too_many_copies'] . " files for which there was too many file copies. Deleted (or moved in attic) files:\n";
+			$report .= "    " . implode("\n    ", $fsck_report['too_many_files']) . "\n\n";
+		}
+
+		if ($fsck_report['symlink_target_moved'] > 0) {
+			$report .= "  Found " . $fsck_report['symlink_target_moved'] . " files in the Landing Zone that were pointing to a now gone copy.
     Those symlinks were updated to point to the new location of those file copies.\n\n";
-	}
+		}
 
-	if ($fsck_report['not_in_landing'] > 0) {
-		$report .= "  Found " . $fsck_report['not_in_landing'] . " files that were not in the Landing Zone.
+		if ($fsck_report['not_in_landing'] > 0) {
+			$report .= "  Found " . $fsck_report['not_in_landing'] . " files that were not in the Landing Zone.
     Symlinks were created in the Landing Zone to point to those files.\n\n";
-	}
+		}
 	
-	if (count($fsck_report['temp_files']) > 0) {
-		$report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the attic):\n";
-		$report .= "    " . implode("\n    ", $fsck_report['temp_files']) . "\n\n";
-	}
+		if (count($fsck_report['temp_files']) > 0) {
+			$report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the attic):\n";
+			$report .= "    " . implode("\n    ", $fsck_report['temp_files']) . "\n\n";
+		}
 	
-	if ($fsck_report['gone_ok'] > 0) {
-		$report .= "  Found " . $fsck_report['gone_ok'] . " missing files that are in a storage pool directory marked Gone-OK.
+		if ($fsck_report['gone_ok'] > 0) {
+			$report .= "  Found " . $fsck_report['gone_ok'] . " missing files that are in a storage pool directory marked Gone-OK.
   If this directory is gone for good, you should execute the following command, and remove the directory from your configuration file:
     sudo greyhole-executer --gone <path>
   where <path> is one of:\n";
-    	$report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
+	    	$report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
+		}
 	}
-	
+
 	return $report;
 }
 

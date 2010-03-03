@@ -273,4 +273,20 @@ function bytes_to_human($bytes, $html=TRUE) {
 		return number_format($bytes, $decimals) . $units;
 	}
 }
+
+function duration_to_human($seconds) {
+	$displayable_duration = '';
+	if ($seconds > 60*60) {
+		$hours = floor($seconds / (60*60));
+		$displayable_duration .= $hours . 'h ';
+		$seconds -= $hours * (60*60);
+	}
+	if ($seconds > 60) {
+		$minutes = floor($seconds / 60);
+		$displayable_duration .= $minutes . 'm ';
+		$seconds -= $minutes * 60;
+	}
+	$displayable_duration .= $seconds . 's';
+	return $displayable_duration;
+}
 ?>
