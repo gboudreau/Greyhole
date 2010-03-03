@@ -761,11 +761,6 @@ function get_tombstone_data_filename($share, $path, $filename) {
 			return $f;
 		}
 	}
-	unset($graveyard);
-	global $graveyard;
-	if (isset($graveyard) && file_exists("$graveyard/$share/$path/$filename")) {
-		return "$graveyard/$share/$path/$filename";
-	}
 	return FALSE;
 }
 
@@ -915,12 +910,6 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 				break;
 			}
 		}
-	}
-	
-	unset($graveyard);
-	global $graveyard;
-	if (isset($graveyard) && @unlink("$graveyard/$share/$path/$filename")) {
-		gh_log(DEBUG, "    Removed old tombstones in $graveyard/$share/$path/$filename");
 	}
 }
 
@@ -1453,10 +1442,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			}
 			save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 		}
-		global $graveyard;
-		if (isset($graveyard) && strpos(get_tombstone_data_filename($share, $file_path, $filename), $graveyard) === 0) {
-			save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
-		}
+		save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 	} else if (count($file_copies_inodes) == 0) {
 		gh_log(WARN, '  WARNING! No copies of this file are available. Deleting from share.');
 		gh_recycle("$landing_zone/$file_path/$filename");

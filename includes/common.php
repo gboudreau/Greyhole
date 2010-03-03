@@ -116,9 +116,6 @@ function parse_config() {
 			}
 		}
 	}
-	if (isset($graveyard)) {
-		$graveyard = '/' . trim($graveyard, '/');
-	}
 	
 	if (is_array($storage_pool_directories) && count($storage_pool_directories) > 0) {
 		$df_command = "df -k";
