@@ -45,11 +45,19 @@ for ($i=1; $i<$argc; $i++) {
 		case '--gone':
 		case '--gone-ok':
 		$action = substr($argv[$i], 2);
-		// Fall through --dir to fetch the path to the Gone-But-OK drive
+		// Fall through --dir to fetch the path to the Gone/Gone-But-OK drive
 
 		case '--dir':
 		$options['dir'] = $argv[$i+1];
 		$i++;
+		break;
+
+		case '--debug':
+		$action = 'debug';
+		if (isset($argv[$i+1])) {
+			$options['debug_filename'] = $argv[$i+1];
+			$i++;
+		}
 		break;
 		
 		default:
@@ -67,6 +75,7 @@ function print_usage() {
 	echo "       Schedule a fsck:         greyhole-executer --fsck [--email-report] [--dir <path>]\n";
 	echo "       Display statistics:      greyhole-executer --stats\n";
 	echo "       Empty attic:             greyhole-executer --empty-attic\n";
+	echo "       Debug file operations:   greyhole-executer --debug <filename>\n";
 	echo "\n";
 	echo "       Pre-rotate task:         greyhole-executer --prerotate\n";
 	echo "       Post-rotate task:        greyhole-executer --postrotate\n";
@@ -77,6 +86,94 @@ function print_usage() {
 	exit(1);
 }
 
+if ($action == 'debug') {
+	if (!isset($options['debug_filename'])) {
+		print_usage();
+	}
+	$filename = $options['debug_filename'];
+
+	echo "Debugging file operations for file named \"$filename\"\n";
+
+	echo "\nFrom DB\n=======\n";
+	$debug_tasks = array();
+	$query = sprintf("SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE full_path LIKE '%%%s%%' ORDER BY id ASC",
+		mysql_escape_string($filename)
+	);
+	$result = mysql_query($query) or die("Can't query tasks_completed with query: $query - Error: " . mysql_error());
+	while ($row = mysql_fetch_object($result)) {
+		$debug_tasks[$row->id] = $row;
+	}
+
+	// Renames
+	$query = sprintf("SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info LIKE '%%%s%%' ORDER BY id ASC",
+		mysql_escape_string($filename)
+	);
+	do {
+		$result = mysql_query($query) or die("Can't query tasks_completed for renames with query: $query - Error: " . mysql_error());
+		while ($row = mysql_fetch_object($result)) {
+			$debug_tasks[$row->id] = $row;
+			$query = sprintf("SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info = '%s' ORDER BY id ASC",
+				mysql_escape_string($row->full_path)
+			);
+		}
+	} while (mysql_num_rows($result) > 0);
+	
+	ksort($debug_tasks);
+	$to_grep = array();
+	foreach ($debug_tasks as $task) {
+		echo "  [$task->event_date] Task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : '') . "\n";
+		$to_grep["$task->share/$task->full_path"] = 1;
+		if ($task->action == 'rename') {
+			$to_grep["$task->share/$task->additional_info"] = 1;
+		}
+	}
+
+	echo "\nFrom logs\n=========\n";
+	$to_grep = array_keys($to_grep);
+	$to_grep = implode("|", $to_grep);
+	$commands = array();
+	$commands[] = "zgrep -E -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log-*";
+	$commands[] = "grep -E -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log";
+	foreach ($commands as $command) {
+		exec($command, $result);
+	}
+	foreach ($result as $rline) {
+		echo preg_replace('@^/var/log/greyhole.log[0-9\.gz-]*:@', '', $rline) . "\n";
+	}
+	
+	echo "\nFrom filesystem\n===============\n";
+
+	$last_task = array_pop($debug_tasks);
+	$share = $last_task->share;
+	if ($last_task->action == 'rename') {
+		$full_path = $last_task->additional_info;
+	} else {
+		$full_path = $last_task->full_path;
+	}
+	list($path, $filename) = explode_full_path($full_path);
+	echo "Landing Zone:\n";
+	echo "  "; passthru("ls -l " . quoted_form(get_share_landing_zone($share) . "/" . $full_path));
+
+	echo "\nGraveyard:\n";
+	foreach ($storage_pool_directories as $target_drive) {
+		$graveyard = clean_dir("$target_drive/.gh_graveyard");
+		if (file_exists("$graveyard/$share/$full_path")) {
+			echo "  "; passthru("ls -l " . quoted_form("$graveyard/$share/$full_path"));
+			$data = var_export(unserialize(file_get_contents("$graveyard/$share/$full_path")), TRUE);
+			$data = str_replace("\n", "\n    ", $data);
+			echo "    $data\n";
+		}
+	}
+
+	echo "\nFile copies:\n";
+	foreach ($storage_pool_directories as $target_drive) {
+		if (file_exists("$target_drive/$share/$full_path")) {
+			echo "  "; passthru("ls -l " . quoted_form("$target_drive/$share/$full_path"));
+		}
+	}
+
+	exit(0);
+}
 if ($action == 'empty-attic') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
@@ -228,7 +325,7 @@ function execute_next_task() {
 	}
 	
 	$action = $task->action;
-	gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " $task->share/$task->additional_info" : ''));
+	gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 
 	switch ($task->action) {
 		case 'fsck':
@@ -926,7 +1023,7 @@ function simplify_tasks() {
 		$ids = explode(',', $row->ids);
 		sort($ids);
 		array_pop($ids);
-		gh_log(DEBUG, "  Removing " . count($ids) . " duplicate pending tasks for $row->share/" . (!empty($row->full_path) ? $row->full_path : '') . (!empty($row->additional_info) ? $row->additional_info : ''));
+		gh_log(DEBUG, "  Removing " . count($ids) . " duplicate pending tasks for $row->share/" . (!empty($row->full_path) ? $row->full_path : '') . (!empty($row->additional_info) ? " -> $row->additional_info" : ''));
 		
 		$ids = implode(',', $ids);
 		if ($ids[0] == ',') {
