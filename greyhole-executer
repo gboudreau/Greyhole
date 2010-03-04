@@ -449,22 +449,24 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				gh_mkdir($path, "$target_drive/$share", $original_path);
 
 				rename("$target_drive/$share/$full_path", "$target_drive/$share/$target_full_path");
+				gh_log(DEBUG, "  Directory moved: $target_drive/$share/$full_path -> $target_drive/$share/$target_full_path");
 			}
 
 			list($path, $dirname) = explode_full_path("$target_drive/.gh_graveyard/$share/$target_full_path");
 			gh_mkdir($path, "$target_drive/.gh_graveyard/$share", $original_path);
-			@rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
+			$result = @rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
+			if ($result) {
+				gh_log(DEBUG, "  Graveyard directory moved: $target_drive/.gh_graveyard/$share/$full_path -> $target_drive/.gh_graveyard/$share/$target_full_path");
+			}
 		}
 		$existing_tombstones = get_tombstones($share, $target_full_path);
 		foreach ($existing_tombstones as $file_path => $file_tombstones) {
-			$keys_to_remove = array();
+			$new_file_tombstones = array();
 			foreach ($file_tombstones as $key => $tombstone) {
 				$old_path = $tombstone->path;
 				$tombstone->path = str_replace("/$share/$full_path/", "/$share/$target_full_path/", $tombstone->path);
-				$new_key = str_replace("/$share/$full_path/", "/$share/$target_full_path/", $key);
 				gh_log(DEBUG, "  Changing tombstone: $old_path -> $tombstone->path");
-				$file_tombstones[$new_key] = $tombstone;
-				$keys_to_remove[] = $key;
+				$new_file_tombstones[$tombstone->path] = $tombstone;
 
 				// is_linked = is the target of the existing symlink
 				if ($tombstone->is_linked) {
@@ -475,11 +477,8 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 					}
 				}
 			}
-			foreach ($keys_to_remove as $key) {
-				unset($file_tombstones[$key]);
-			}
 			list($path, $filename) = explode_full_path("$target_full_path/$file_path");
-			save_tombstones($share, $path, $filename, $file_tombstones);
+			save_tombstones($share, $path, $filename, $new_file_tombstones);
 		}
 	} else {
 		gh_log(INFO, "File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
@@ -539,7 +538,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 						}
 					}
 				} else {
-					gh_log(WARNING, "    Warning! An error occured while renaming file copy $old_path to $tombstone->path.");
+					gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $tombstone->path.");
 				}
 				$existing_tombstones[$i] = $tombstone;
 			}
@@ -913,8 +912,8 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 	foreach (get_graveyards() as $graveyard) {
 		$handle = @opendir("$graveyard/$share/$path");
 		if (!$handle) {
-			gh_log(WARN, "Got 0 tombstones ($graveyard/$share/$path does't exists).");
-			return $tombstones;
+			#gh_log(DEBUG, "Got 0 tombstones ($graveyard/$share/$path does't exists).");
+			continue;
 		}
 		while (($filename = readdir($handle)) !== FALSE) {
 			if ($filename != '.' && $filename != '..') {
