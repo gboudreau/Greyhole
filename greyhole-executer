@@ -132,8 +132,8 @@ if ($action == 'debug') {
 	$to_grep = array_keys($to_grep);
 	$to_grep = implode("|", $to_grep);
 	$commands = array();
-	$commands[] = "zgrep -E -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log-*";
-	$commands[] = "grep -E -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log";
+	$commands[] = "zgrep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log-*";
+	$commands[] = "grep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log";
 	foreach ($commands as $command) {
 		exec($command, $result);
 	}
@@ -969,9 +969,9 @@ function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALS
 	}
 
 	// Fix wrong 'is_linked' flags
+	$share_file = get_share_landing_zone($share) . "/$path/$filename";
 	$share_file_link_to = FALSE;
 	if (is_link($share_file)) {
-		$share_file = get_share_landing_zone($share) . "/$path/$filename";
 		$share_file_link_to = readlink($share_file);
 	}
 	foreach ($tombstones as $key => $tombstone) {
@@ -1469,7 +1469,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		gh_log(DEBUG, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 		$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
 			mysql_escape_string($share),
-			mysql_escape_string(clean_dir("$file_path/$filename"))
+			mysql_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
 		);
 		mysql_query($query) or gh_log(CRITICAL, "Can't insert write task: " . mysql_error());
 		return;
@@ -1480,8 +1480,20 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			$file_type = FALSE;
 		}
 		if ($file_type === FALSE) {
-			gh_log(INFO, "$path/$filename is missing from the share directory. Will try to re-create it, if copies are available.");
-			$fsck_report['not_in_landing']++;
+			// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
+			parse_samba_log(); global $action; $action = 'fsck';
+			$query = sprintf("SELECT * FROM tasks WHERE action = 'unlink' AND share = '%s' AND full_path = '%s' AND complete = 'yes' LIMIT 1",
+				mysql_escape_string($share),
+				mysql_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+			);
+			$result = mysql_query($query) or gh_log(CRITICAL, "Can't select future unlink tasks: " . mysql_error());
+			if (mysql_num_rows($result) == 0) {
+				gh_log(INFO, "$path/$filename is missing from the share directory. Will try to re-create it, if copies are available.");
+				$fsck_report['not_in_landing']++;
+			} else {
+				// Newly deleted file; let's not do anything with it now.
+				return;
+			}
 		}
 	}
 
