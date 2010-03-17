@@ -308,4 +308,29 @@ foreach (range(1,4) as $i) { $j = 1;
 	print_result('file delete - while fsck runs', $ok);
 	wait();
 }
+
+foreach (range(1,16) as $i) { $j = 1;
+	mkdir('dir1');
+	mkdir('dir2');
+	file_put_contents('dir1/file1', 'a');
+	wait($j++, $i);
+
+	rename('dir1', 'dir3');
+	wait($j++, $i);
+	$ok = file_get_contents('dir3/file1') == 'a';
+	wait();
+	rename('dir3', 'dir2/dir3');
+	wait($j++, $i);
+
+	$ok &= file_get_contents('dir2/dir3/file1') == 'a';
+	wait();
+	unlink('dir2/dir3/file1');
+	$ok &= !file_exists('dir2/dir3/file1');
+	rmdir('dir2/dir3');
+	$ok &= !file_exists('dir2/dir3');
+	rmdir('dir2');
+	$ok &= !file_exists('dir2');
+	print_result('directory rename', $ok);
+	wait();
+}
 ?>
