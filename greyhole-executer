@@ -1624,8 +1624,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 					break;
 				}
 			}
+			save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 		}
-		save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 	} else if (count($file_copies_inodes) == 0) {
 		gh_log(WARN, '  WARNING! No copies of this file are available. Deleting from share.');
 		gh_recycle("$landing_zone/$file_path/$filename");
