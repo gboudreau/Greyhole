@@ -36,6 +36,9 @@ fi
 
 for POOL_DIR in `grep storage_pool_directory ${DIR}/greyhole.conf${SUFFIX} | grep -v "[ \t]*#" | awk '{print $3}' | awk -F',' '{print $1}'`; do
 	if [ ! -x $POOL_DIR ]; then
+		mkdir $POOL_DIR
+	fi
+	if [ ! -x $POOL_DIR ]; then
 		echo "Error: Missing pool directory: $POOL_DIR"
 		exit
 	fi
