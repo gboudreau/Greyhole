@@ -512,10 +512,15 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		}
 
 		if (count($existing_tombstones) == 0) {
+			// Any NOK tombstones that need to be removed?
+			$all_existing_tombstones = get_tombstones($share, $path, $filename, TRUE, FALSE, FALSE);
+			if (count($all_existing_tombstones) > 0) {
+				remove_tombstones($share, $path, $filename);
+			}
 			// New file
 			gh_write($share, $target_full_path, $task_id);
 		} else {
-			foreach ($existing_tombstones as $i => $tombstone) {
+			foreach ($existing_tombstones as $key => $tombstone) {
 				$old_path = $tombstone->path;
 				$tombstone->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $old_path);
 				gh_log(DEBUG, "  Renaming copy at $old_path to $tombstone->path");
@@ -540,7 +545,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				} else {
 					gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $tombstone->path.");
 				}
-				$existing_tombstones[$i] = $tombstone;
+				$existing_tombstones[$key] = $tombstone;
 			}
 			remove_tombstones($share, $path, $filename);
 			save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
