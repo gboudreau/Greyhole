@@ -39,6 +39,7 @@ for ($i=1; $i<$argc; $i++) {
 		break;
 
 		case '--email-report':
+		case '--disk-usage-report':
 		$options[substr($argv[$i], 2)] = TRUE;
 		break;
 		
@@ -73,7 +74,7 @@ if ($action == 'unknown') {
 function print_usage() {
 	echo "Invalid command line options.\n";
 	echo "Usage: Start the daemon:        greyhole-executer --daemon\n";
-	echo "       Schedule a fsck:         greyhole-executer --fsck [--email-report] [--dir <path>]\n";
+	echo "       Schedule a fsck:         greyhole-executer --fsck [--email-report] [--dir <path>] [--disk-usage-report]\n";
 	echo "       Display statistics:      greyhole-executer --stats\n";
 	echo "       Empty attic:             greyhole-executer --empty-attic\n";
 	echo "       Debug file operations:   greyhole-executer --debug <filename>\n";
@@ -322,9 +323,16 @@ if ($action == 'fsck') {
 			exit(1);
 		}
 	}
+	$fsck_options = array();
+	if (isset($options['email-report'])) {
+		$fsck_options[] = 'email';
+	}
+	if (isset($options['disk-usage-report'])) {
+		$fsck_options[] = 'du';
+	}
 	$query = sprintf("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '%s', %s, 'yes')",
 		mysql_escape_string($full_path),
-		(isset($options['email-report']) ? "'daily'" : "NULL")
+		(!empty($fsck_options) ? "'" . implode('|', $fsck_options) . "'" : "NULL")
 	);
 	mysql_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . mysql_error());
 	if ($full_path == '') {
@@ -374,6 +382,10 @@ function execute_next_task() {
 		case 'fsck':
 			gh_log(INFO, "Starting fsck for $task->share");
 			initialize_fsck_report($task->share == '' ? 'All shares' : $task->share);
+			if (strpos($task->additional_info, 'du') !== FALSE) {
+				global $options;
+				$options['disk-usage-report'] = TRUE;
+			}
 			clearstatcache();
 			if ($task->share == '') {
 				foreach ($shares_options as $share_name => $share_options) {
@@ -397,12 +409,25 @@ function execute_next_task() {
 				}
 			}
 			gh_log(INFO, "fsck for " . ($task->share == '' ? 'All shares' : $task->share) . " completed.");
-			if ($task->additional_info == 'daily') {
+			if (strpos($task->additional_info, 'email') !== FALSE) {
 				// Email report for daily fsck
 				$fsck_report = get_fsck_report();
 				$hostname = exec('hostname');
 				gh_log(DEBUG, "Sending fsck report to $email_to");
-				mail($email_to, 'Daily fsck of Greyhole shares on ' . $hostname, $fsck_report);
+				mail($email_to, 'fsck of Greyhole shares on ' . $hostname, $fsck_report);
+			}
+			if (strpos($task->additional_info, 'du') !== FALSE) {
+				// Save disk-usage report to disk
+				$fp = fopen('/tmp/gh-disk-usage.log', 'w');
+				if ($fp) {
+					global $du;
+					foreach ($du as $path => $size) {
+						$chars_count = count_chars($path, 1);
+						fwrite($fp, $chars_count[ord('/')] . " $path $size\n");
+					}
+					fwrite($fp, "# " . serialize($shares_options) . "\n");
+					fclose($fp);
+				}
 			}
 			break;
 		case 'mkdir':
@@ -1644,6 +1669,18 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			$original_file_path = reset($file_tombstones)->path;
 		}
 		
+		if (isset($options['disk-usage-report'])) {
+			global $du;
+			$du_path = '/' . trim(clean_dir("/$share/$file_path"), '/');
+			do {
+				if (!isset($du[$du_path])) {
+					$du[$du_path] = 0;
+				}
+				$du[$du_path] += $expected_file_size;
+				$du_path = substr($du_path, 0, strrpos($du_path, '/'));
+			} while (!empty($du_path));
+		}
+		
 		// Check that all file copies have the same size
 		foreach ($file_copies_inodes as $key => $real_full_path) {
 			if (array_search($real_full_path, array_keys($file_copies_inodes)) !== FALSE) {
@@ -2190,16 +2227,6 @@ function get_share_options_from_full_path($full_path) {
 		}
 	}
 	return $share;
-}
-
-function get_share_landing_zone($share) {
-	global $shares_options;
-	if (isset($shares_options[$share]['landing_zone'])) {
-		return $shares_options[$share]['landing_zone'];
-	} else {
-		global $config_file, $smb_config_file;
-		gh_log(CRITICAL, "Found a share ($share) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
-	}
 }
 
 function gh_get_file_infos($real_path) {

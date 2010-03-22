@@ -141,6 +141,10 @@ function parse_config() {
 	}
 	
 	foreach ($shares_options as $share_name => $share_options) {
+		if ($share_options['num_copies'] > count($storage_pool_directories)) {
+			$share_options['num_copies'] = count($storage_pool_directories);
+			$shares_options[$share_name] = $share_options;
+		}
 		if (!isset($share_options['landing_zone'])) {
 			global $config_file, $smb_config_file;
 			gh_log(CRITICAL, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
@@ -285,5 +289,15 @@ function duration_to_human($seconds) {
 	}
 	$displayable_duration .= $seconds . 's';
 	return $displayable_duration;
+}
+
+function get_share_landing_zone($share) {
+	global $shares_options;
+	if (isset($shares_options[$share]['landing_zone'])) {
+		return $shares_options[$share]['landing_zone'];
+	} else {
+		global $config_file, $smb_config_file;
+		gh_log(CRITICAL, "Found a share ($share) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
+	}
 }
 ?>
