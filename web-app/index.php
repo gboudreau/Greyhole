@@ -31,117 +31,15 @@ if (isset($_GET['done'])) {
 	exit();
 }
 
-if (count($_GET) == 0 && (!isset($argc) || ($argc >= 2 && $argv[1] == '--init-session'))) {
+if (count($_GET) == 0) {
 	copy('/etc/greyhole.conf', $config_file);
 	copy('/etc/samba/smb.conf', $smb_config_file);
 }
 
-$log_to_stdout = (isset($argc));
 include('includes/common.php');
 parse_config();
 
-if (isset($argc)) {
-	if ($argc < 2) {
-		show_command_line_usage();
-		exit(0);
-	}
-	if ($argv[1] == '--init-session') {
-		echo "# New working copy of config files created.\n";
-		echo "# Current configuration follows.\n";
-		echo "partitions: # in_pool?\n";
-		$partitions = get_partitions();
-		foreach ($partitions as $part) {
-			echo "  - $part->path: " . ($part->in_pool ? 'true' : 'false') . "\n";
-		}
-		echo "shares: # num_copies\n";
-		$shares = get_shares();
-		foreach ($shares as $share) {
-			echo "  - $share->name: $share->num_copies\n";
-		}
-		exit(0);
-	} else if ($argv[1] == '--get_part_options') {
-		$partitions = get_partitions();
-		foreach ($partitions as $part) {
-			echo "- $part->path: " . ($part->in_pool ? 'true' : 'false') . "\n";
-		}
-		exit(0);
-	} else if ($argv[1] == '--get_share_options') {
-		$shares = get_shares();
-		foreach ($shares as $share) {
-			echo "- $share->name: $share->num_copies\n";
-		}
-		exit(0);
-	} else if ($argv[1] == '--set_share_option') {
-		if (exec("whoami") != 'root') {
-			echo "You need to be root to execute this command.\n";
-			echo "You can use sudo, or become root using the following command: su -\n";
-			exit(1);
-		}
-		if ($argc != 4 || !is_numeric($argv[3])) {
-			show_command_line_usage();
-			exit(0);
-		}
-		$partitions = get_partitions();
-		$shares = get_shares();
-		if (!isset($shares[$argv[2]])) {
-			echo "Unknown share specified.\n";
-			exit(1);
-		}
-		$share = $shares[$argv[2]];
-		$share->num_copies = (int) $argv[3];
-		set_share_option($share);
-		save_config();
-
-		$dir = getcwd() . '/files';
-		exec("/usr/bin/greyhole-config-update " . quoted_form($dir) . " " . md5($user_id));
-		exit(0);
-	} else if ($argv[1] == '--set_part_option') {
-		if (exec("whoami") != 'root') {
-			echo "You need to be root to execute this command.\n";
-			echo "You can use sudo, or become root using the following command: su -\n";
-			exit(1);
-		}
-		if ($argc != 4 || (strtolower($argv[3]) != 'true' && strtolower($argv[3]) != 'false')) {
-			show_command_line_usage();
-			exit(0);
-		}
-		$argv[2] = '/' . trim($argv[2], '/');
-		$partitions = get_partitions();
-		$shares = get_shares();
-
-		$found = FALSE;
-		foreach ($partitions as $part) {
-			if ($part->path == $argv[2]) {
-				$found = TRUE;
-				break;
-			}
-		}
-		if (!$found) {
-			echo("Unknown partition specified.\n");
-			exit(1);
-		}
-		$part->in_pool = (strtolower($argv[3]) == 'true');
-		save_config();
-
-		$dir = getcwd() . '/files';
-		exec("/usr/bin/greyhole-config-update " . quoted_form($dir) . " " . md5($user_id));
-		exit(0);
-	} else {
-		show_command_line_usage();
-		exit(0);
-	}
-}
-
-function show_command_line_usage() {
-	echo "Usage:
-       amahi-greyhole-conf-gateway --init-session
-       amahi-greyhole-conf-gateway --get_share_options
-       amahi-greyhole-conf-gateway --get_part_options
-       amahi-greyhole-conf-gateway --set_share_option <share_name> <num_copies>
-       amahi-greyhole-conf-gateway --set_part_option <partition> <true|false>\n";
-}
-
-if (count($_GET) == 0 && !isset($argc)) {
+if (count($_GET) == 0) {
 	$partitions = get_partitions();
 	$shares = get_shares();
 	save_config();
