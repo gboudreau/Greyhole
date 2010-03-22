@@ -28,7 +28,7 @@ install -m 0755 -D -p greyhole-executer ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0750 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
-install -m 0644 -D -p mysql.sql ${RPM_BUILD_ROOT}/var/hda/apps/greyhole/mysql.sql
+install -m 0644 -D -p mysql.sql ${RPM_BUILD_ROOT}/usr/local/greyhole/mysql.sql
 install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/greyhole.conf.rpmnew
 install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/greyhole
 %ifarch x86_64
@@ -36,9 +36,6 @@ install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/gre
 %else
 	install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 %endif
-if [ -e /var/cache/hdactl.cache -a "`grep yes /var/cache/hdactl.cache | wc -l`" = "1" ]; then
-	install -m 0755 -D -p hda-greyhole-conf-gateway ${RPM_BUILD_ROOT}%{_bindir}
-fi
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -96,7 +93,7 @@ fi
 %{_bindir}/
 %{_sysconfdir}/
 %{_libdir}
-/var/hda/apps/greyhole/mysql.sql
+/usr/local/greyhole/mysql.sql
 
 %changelog
 * Mon Feb 22 2010 Guillaume Boudreau
