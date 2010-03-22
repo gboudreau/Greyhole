@@ -20,6 +20,20 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 $data_file = '/tmp/gh-disk-usage.log';
 
+if (!file_exists($data_file)) {
+	render_header('Greyhole Disk Usage');
+
+	?>
+	<h1>Greyhole Storage Pool Disk Usage - All Shares</h1>
+	<div>Greyhole disk usage stats are computed during the nightly fsck run.</div>
+	<div>Those stats have not yet been computed.</div>
+	<div>Please wait for fsck to run once.</div>
+	<?php
+
+	render_footer();
+	exit(0);
+}
+
 $base_url = 'http://' . $_SERVER['HTTP_HOST'] . '/';
 
 require_once('includes/common.php');
