@@ -137,6 +137,7 @@ if ($action == 'gone' || $action == 'going') {
 	}
 
 	mark_gone_ok($options['dir'], 'remove');
+	mark_gone_drive_fscked($options['dir'], 'remove');
 	gh_log(INFO, "Storage pool directory " . $options['dir'] . " has been marked Gone");
 	echo "Storage pool directory " . $options['dir'] . " has been marked Gone, which means the missing file copies that are in this directory will be re-created during the next fsck.\n";
 	exit(0);
