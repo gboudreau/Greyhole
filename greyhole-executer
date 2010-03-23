@@ -1355,7 +1355,15 @@ function get_free_space_in_storage_pool_dirs() {
 	array_shift($responses); // header
 	for ($i=0; $i<count($responses); $i++) {
 		$response = explode(' ', $responses[$i]);
-		$dfs[$storage_pool_directories[$i]] = (float) array_pop($response);
+		$free_space = (float) array_pop($response);
+		$mount = implode(' ', $response);
+		$target_dir = '';
+		foreach ($storage_pool_directories as $target_drive) {
+			if (strpos($target_drive, $mount) === 0 && strlen($target_drive) > strlen($target_dir)) {
+				$target_dir = $target_drive;
+			}
+		}
+		$dfs[$target_dir] = $free_space;
 	}
 	$last_df_time = time();
 	$last_dfs = $dfs;
