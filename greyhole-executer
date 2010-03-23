@@ -24,6 +24,7 @@ parse_config();
 
 mysql_connect($db_host, $db_user, $db_pass) or gh_log(CRITICAL, "Can't connect to MySQL.");
 mysql_select_db($db_name);
+mysql_query("SET SESSION group_concat_max_len = 1048576");
 
 $action = 'unknown';
 $options = array();
