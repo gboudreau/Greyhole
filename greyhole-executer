@@ -1163,8 +1163,8 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 		foreach ($tombstones as $tombstone) {
 			if (strpos($tombstone->path, $target_drive) === 0) {
 				gh_mkdir($data_filepath, "$graveyard/$share", get_share_landing_zone($share) . "/$path");
+				gh_log(DEBUG, "    Saving tombstones in $data_filepath/$filename");
 				file_put_contents("$data_filepath/$filename", serialize($tombstones));
-				gh_log(DEBUG, "    Saved tombstones in $data_filepath/$filename");
 				$has_tombstone = TRUE;
 				break;
 			}
@@ -1445,11 +1445,13 @@ You probably want to do something about this!
 	
 	global $log_level;
 	if ($log_level === DEBUG) {
-		$log = "Drives with available space: ";
-		foreach ($sorted_target_drives as $s => $d) {
-			$log .= "$d (" . round($s/1024/1024) . " GB avail) - ";
+		if (count($sorted_target_drives) > 0) {
+			$log = "Drives with available space: ";
+			foreach ($sorted_target_drives as $s => $d) {
+				$log .= "$d (" . round($s/1024/1024) . " GB avail) - ";
+			}
+			$log = substr($log, 0, strlen($log)-2);
 		}
-		$log = substr($log, 0, strlen($log)-2);
 		if (count($last_resort_sorted_target_drives) > 0) {
 			$log .= "; Drives with free space, but no available space: ";
 			foreach ($last_resort_sorted_target_drives as $s => $d) {
