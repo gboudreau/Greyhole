@@ -729,7 +729,7 @@ function gh_write($share, $full_path, $task_id) {
 		gh_log(INFO, "");
 		gh_log(DEBUG, "  Will use source file: $source_file");
 
-		$existing_tombstones = get_tombstones($share, $path, $filename, FALSE, TRUE);
+		$existing_tombstones = get_tombstones($share, $path, $filename);
 		
 		// Remove old copies (but not the one that was updated!)
 		$keys_to_remove = array();
@@ -744,7 +744,10 @@ function gh_write($share, $full_path, $task_id) {
 				gh_log(DEBUG, "  Will remove copy at $tombstone->path");
 				$keys_to_remove[] = $key;
 			}
-			$file_tombstones[$key] = $tombstone;
+			// This will make sure the correct key is used in the $existing_tombstones array...
+			//   This is important because that key is what is used to check if there's already a copy on that drive.
+			unset($existing_tombstones[$key]);
+			$existing_tombstones[$tombstone->path] = $tombstone;
 		}
 		if (!$found_source_file) {
 			// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
