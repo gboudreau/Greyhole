@@ -923,9 +923,15 @@ function gh_mkdir($directory, $root_path, $original_directory) {
 			$i = 0;
 			while ($parent_directory != $root_path && $i++ < 255) {
 				$dir_infos = gh_get_file_infos($original_parent_directory);
-				chmod($parent_directory, $dir_infos->fileperms);
-				chown($parent_directory, $dir_infos->fileowner);
-				chgrp($parent_directory, $dir_infos->filegroup);
+				if (!chmod($parent_directory, $dir_infos->fileperms)) {
+					gh_log(WARN, "  Failed to chmod directory '$parent_directory'");
+				}
+				if (!chown($parent_directory, $dir_infos->fileowner)) {
+					gh_log(WARN, "  Failed to chown directory '$parent_directory'");
+				}
+				if (!chgrp($parent_directory, $dir_infos->filegroup)) {
+					gh_log(WARN, "  Failed to chgrp directory '$parent_directory'");
+				}
 				list($parent_directory, $directory_name) = explode_full_path($parent_directory);
 				list($original_parent_directory, $directory_name) = explode_full_path($original_parent_directory);
 			}
