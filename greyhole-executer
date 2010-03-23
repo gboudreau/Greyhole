@@ -1819,10 +1819,17 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				if ($tombstone->state == 'Pending') {
 					gh_log(DEBUG, "  Copying file to $tombstone->path");
 					$temp_path = get_temp_filename($tombstone->path);
-					copy($source_real_path, $temp_path);
-					rename($temp_path, $tombstone->path);
-					gh_chperm($tombstone->path, gh_get_file_infos($source_real_path));
-					$tombstone->state = 'OK';
+					if (copy($source_real_path, $temp_path)) {
+						rename($temp_path, $tombstone->path);
+						gh_chperm($tombstone->path, gh_get_file_infos($source_real_path));
+						$tombstone->state = 'OK';
+					} else {
+						gh_log(WARN, "    Failed file copy. Skipping.");
+						if ($tombstone->is_linked) {
+							$tombstone->is_linked = FALSE;
+						}
+						$tombstone->state = 'Gone';
+					}
 					$file_tombstones[$key] = $tombstone;
 				}
 			}
