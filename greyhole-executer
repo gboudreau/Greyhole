@@ -1791,6 +1791,17 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		foreach ($file_tombstones as $key => $tombstone) {
 			if ($source_real_path != $tombstone->path) {
 				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+
+				if ($tombstone->state == 'Gone') {
+					foreach ($storage_pool_directories as $target_drive) {
+						if (strpos($tombstone_dir_path, $target_drive) === 0 && is_greyhole_owned_dir($target_drive)) {
+							$tombstone->state = 'Pending';
+							$file_tombstones[$key] = $tombstone;
+							break;
+						}
+					}
+				}
+
 				if ($tombstone->state != 'Gone') {
 					$root_path = str_replace(clean_dir("/$share/$file_path"), '', $tombstone_dir_path);
 					list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$file_path");
