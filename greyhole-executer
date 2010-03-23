@@ -184,6 +184,14 @@ if ($action == 'debug') {
 			$to_grep["$task->share/$task->additional_info"] = 1;
 		}
 	}
+	if (empty($to_grep)) {
+		$to_grep[$filename] = 1;
+		if (strpos($filename, '/') !== FALSE) {
+			$share = trim(substr($filename, 0, strpos(substr($filename, 1), '/')+1), '/');
+			$full_path = trim(substr($filename, strpos(substr($filename, 1), '/')+1), '/');
+			$debug_tasks[] = (object) array('share' => $share, 'full_path' => $full_path);
+		}
+	}
 
 	echo "\nFrom logs\n=========\n";
 	$to_grep = array_keys($to_grep);
