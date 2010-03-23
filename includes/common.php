@@ -124,6 +124,8 @@ function parse_config() {
 			$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
 		}
 		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
+	} else {
+		gh_log(CRITICAL, "You have no storage_pool_directory defined. Greyhole can't run.");
 	}
 
 	$config_text = file_get_contents($smb_config_file);
