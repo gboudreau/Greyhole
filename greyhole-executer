@@ -796,6 +796,12 @@ function gh_write($share, $full_path, $task_id) {
 	
 	$tombstones = create_tombstones($share, $full_path, $num_copies_required, $filesize, $existing_tombstones);
 
+	if (count($tombstones) == 0) {
+		gh_log(WARN, "  No tombstones could be created. Will wait until tombstones can be created to work on this file.");
+		$sleep_before_task[] = $task_id;
+		return 1;
+	}
+
 	// Use the 1st tombstone for the symlink; it might be on a sticky drive.
 	$i = 0;
 	foreach ($tombstones as $tombstone) {
