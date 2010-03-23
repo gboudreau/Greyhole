@@ -90,12 +90,14 @@ function print_usage() {
 	exit(1);
 }
 
-if ($action == 'gone' || $action == 'going') {
+if ($action != 'fsck' && $action != 'stats' && $action != 'debug') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
 		exit(1);
 	}
+}
 
+if ($action == 'gone' || $action == 'going') {
 	global $storage_pool_directories;
 	if (!array_search($options['dir'], $storage_pool_directories)) {
 		echo "Directory " . $options['dir'] . " is not one of your defined storage pool directories.\n";
@@ -230,10 +232,6 @@ if ($action == 'debug') {
 }
 
 if ($action == 'empty-attic') {
-	if (exec("whoami") != 'root') {
-		echo "You need to execute this as root.\n";
-		exit(1);
-	}
 	foreach ($storage_pool_directories as $target_drive) {
 		$attic_path = clean_dir("$target_drive/.gh_attic");
 		if (!file_exists($attic_path)) {
