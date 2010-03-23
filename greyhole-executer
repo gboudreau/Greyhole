@@ -460,6 +460,9 @@ function execute_next_task() {
 function gh_rmdir($share, $full_path) {
 	global $storage_pool_directories;
 	$landing_zone = get_share_landing_zone($share);
+	if (!$landing_zone) {
+		return;
+	}
 	
 	gh_log(INFO, "Directory deleted: $landing_zone/$full_path");
 	foreach ($storage_pool_directories as $target_drive) {
@@ -475,6 +478,9 @@ function gh_rmdir($share, $full_path) {
 
 function gh_unlink($share, $full_path, $task_id) {
 	$landing_zone = get_share_landing_zone($share);
+	if (!$landing_zone) {
+		return;
+	}
 	
 	gh_log(INFO, "File deleted: $landing_zone/$full_path");
 
@@ -504,6 +510,9 @@ function is_a_graveyard_dir($share, $full_path) {
 function gh_rename($share, $full_path, $target_full_path, $task_id) {
 	global $storage_pool_directories, $log_level, $sleep_before_task;
 	$landing_zone = get_share_landing_zone($share);
+	if (!$landing_zone) {
+		return;
+	}
 	
 	if (is_dir("$landing_zone/$target_full_path") || is_a_graveyard_dir($share, $full_path)) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
@@ -656,6 +665,9 @@ function get_num_copies($share) {
 
 function file_is_locked($share, $full_path) {
 	$landing_zone = get_share_landing_zone($share);
+	if (!$landing_zone) {
+		return FALSE;
+	}
 	
 	$real_fullpath = "$landing_zone/$full_path";
 	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath) . " 2> /dev/null");
@@ -682,6 +694,9 @@ function gh_write($share, $full_path, $task_id) {
 	global $storage_pool_directories, $log_level, $sleep_before_task;
 	
 	$landing_zone = get_share_landing_zone($share);
+	if (!$landing_zone) {
+		return 0;
+	}
 	
 	if (!gh_file_exists("$landing_zone/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) {
 		if (!gh_file_exists($landing_zone, '  Share "'.$share.'" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {

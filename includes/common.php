@@ -299,7 +299,8 @@ function get_share_landing_zone($share) {
 		return $shares_options[$share]['landing_zone'];
 	} else {
 		global $config_file, $smb_config_file;
-		gh_log(CRITICAL, "Found a share ($share) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
+		gh_log(WARN, "  Found a share ($share) with no path in $smb_config_file, or missing from your $config_file. Skipping.");
+		return FALSE;
 	}
 }
 ?>
