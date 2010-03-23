@@ -418,7 +418,7 @@ function execute_next_task() {
 			}
 			if (strpos($task->additional_info, 'du') !== FALSE) {
 				// Save disk-usage report to disk
-				$fp = fopen('/tmp/gh-disk-usage.log', 'w');
+				$fp = fopen('/usr/local/greyhole/gh-disk-usage.log', 'w');
 				if ($fp) {
 					global $du;
 					foreach ($du as $path => $size) {

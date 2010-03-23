@@ -1,5 +1,5 @@
 # Daily fsck
-0 0 * * *	root	/usr/bin/greyhole-executer --fsck --email-report > /dev/null
+0 0 * * *	root	/usr/bin/greyhole-executer --fsck --email-report --disk-usage-report > /dev/null
 
 # Daily restart; clears caches etc. to keep memory usage in check
 59 23 * * *	root	/sbin/service greyhole restart > /dev/null

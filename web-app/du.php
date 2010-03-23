@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-$data_file = '/tmp/gh-disk-usage.log';
+$data_file = '/usr/local/greyhole/gh-disk-usage.log';
 
 if (!file_exists($data_file)) {
 	render_header('Greyhole Disk Usage');
