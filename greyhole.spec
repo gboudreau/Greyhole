@@ -66,7 +66,13 @@ echo 0 > /proc/fs/cifs/OplockEnabled
 %preun
 
 if [ "$1" != 0 ]; then
-	/sbin/service greyhole condrestart 2>&1 > /dev/null
+	if [ "`ps aux | grep greyhole-executer | grep -v grep | wc -l`" = "1" ]; then
+		. /etc/rc.d/init.d/functions
+		killproc greyhole-executer 2>&1 > /dev/null
+		/sbin/service greyhole restart 2>&1 > /dev/null
+	else
+		/sbin/service greyhole condrestart 2>&1 > /dev/null
+	fi
 else
 	# not an update, a complete uninstall
 	
