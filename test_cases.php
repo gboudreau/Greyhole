@@ -298,7 +298,7 @@ foreach (range(1,16) as $i) { $j = 1;
 foreach (range(1,4) as $i) { $j = 1;
 	file_put_contents('file1', 'a');
 	wait($j++, $i);
-	exec('/usr/bin/greyhole-executer --fsck --dir /mnt/hdd0/shares/TimeMachine/');
+	exec('/usr/bin/greyhole --fsck --dir /mnt/hdd0/shares/TimeMachine/');
 	unlink('file1');
 	wait($j++, $i);
 

@@ -18,7 +18,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	cd greyhole-*
 	GREYHOLE_INSTALL_DIR=`pwd`
 	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
-	install -m 0755 -D -p greyhole-executer /usr/bin
+	install -m 0755 -D -p greyhole /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
 	install -m 0750 -D -p greyhole-config-update /usr/bin
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
@@ -31,10 +31,10 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 /var/log/messages /var/log/secure /var/log/maillog /var/log/spooler /var/log/boot.log /var/log/cron {
 	sharedscripts
 	prerotate
-		/usr/bin/greyhole-executer --prerotate
+		/usr/bin/greyhole --prerotate
 	endscript
 	postrotate
-		/usr/bin/greyhole-executer --postrotate > /dev/null || true
+		/usr/bin/greyhole --postrotate > /dev/null || true
 		/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
 	endscript
 }

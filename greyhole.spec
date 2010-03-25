@@ -24,7 +24,7 @@ mkdir -p $RPM_BUILD_ROOT%{_initrddir}
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 
 install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}%{_initrddir}/greyhole
-install -m 0755 -D -p greyhole-executer ${RPM_BUILD_ROOT}%{_bindir}
+install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0750 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
@@ -45,7 +45,7 @@ rm -rf $RPM_BUILD_ROOT
 %post
 # Update /etc/logrotate.d/syslog, if needed
 if [ `grep greyhole /etc/logrotate.d/syslog | wc -l` = 0 ]; then
-	sed --in-place -e 's@postrotate@prerotate\n        /usr/bin/greyhole-executer --prerotate\n    endscript\n    postrotate\n        /usr/bin/greyhole-executer --postrotate > /dev/null || true@' /etc/logrotate.d/syslog
+	sed --in-place -e 's@postrotate@prerotate\n        /usr/bin/greyhole --prerotate\n    endscript\n    postrotate\n        /usr/bin/greyhole --postrotate > /dev/null || true@' /etc/logrotate.d/syslog
 	service rsyslog reload > /dev/null
 fi
 

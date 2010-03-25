@@ -6,7 +6,7 @@
 # Required-Stop:     $network $local_fs $remote_fs mysqld smb
 # Default-Start:     3 4 5
 # Default-Stop:      0 1 2 6
-# Short-Description: start Greyhole executer/balancer
+# Short-Description: start Greyhole daemon
 ### END INIT INFO
 
 # Copyright 2009 Guillaume Boudreau
@@ -30,7 +30,7 @@ if [ -f /etc/rc.d/init.d/functions ]; then
 	. /etc/rc.d/init.d/functions
 fi
 
-DAEMON="greyhole-executer"
+DAEMON="greyhole"
 PIDFILE="/var/run/greyhole.pid"
 LOCKFILE="/var/lock/subsys/greyhole"
 
