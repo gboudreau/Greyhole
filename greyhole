@@ -742,7 +742,7 @@ function gh_write($share, $full_path, $task_id) {
 				$found_source_file = TRUE;
 			} else {
 				gh_log(DEBUG, "  Will remove copy at $tombstone->path");
-				$keys_to_remove[] = $key;
+				$keys_to_remove[] = $tombstone->path;
 			}
 			// This will make sure the correct key is used in the $existing_tombstones array...
 			//   This is important because that key is what is used to check if there's already a copy on that drive.
