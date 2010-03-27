@@ -1,6 +1,6 @@
 Name:           greyhole
 Version:        $VERSION
-Release:        1
+Release:        2
 Summary:        Greyhole is a drive pooling technology for Samba
 Group:          System Environment/Daemons
 Source:         http://greyhole.googlecode.com/files/greyhole-%{version}.tar.gz
@@ -63,16 +63,16 @@ echo 0 > /proc/fs/cifs/OplockEnabled
 /sbin/chkconfig --add greyhole
 /sbin/chkconfig greyhole on
 
+if [ "`ps aux | grep greyhole-executer | grep -v grep | wc -l`" = "1" ]; then
+	. /etc/rc.d/init.d/functions
+	killproc greyhole-executer 2>&1 > /dev/null
+	/sbin/service greyhole restart 2>&1 > /dev/null
+fi
+
 %preun
 
 if [ "$1" != 0 ]; then
-	if [ "`ps aux | grep greyhole-executer | grep -v grep | wc -l`" = "1" ]; then
-		. /etc/rc.d/init.d/functions
-		killproc greyhole-executer 2>&1 > /dev/null
-		/sbin/service greyhole restart 2>&1 > /dev/null
-	else
-		/sbin/service greyhole condrestart 2>&1 > /dev/null
-	fi
+	/sbin/service greyhole condrestart 2>&1 > /dev/null
 else
 	# not an update, a complete uninstall
 	

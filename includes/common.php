@@ -196,12 +196,12 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 	if (isset($log_to_stdout)) {
 		echo $log_text;
 	} else {
-		$fp = fopen($greyhole_log_file, 'a');
+		@$fp = fopen($greyhole_log_file, 'a');
 		if ($fp) {
 			fwrite($fp, $log_text);
 			fclose($fp);
 		} else {
-			error_log($log_text);
+			error_log(trim($log_text));
 		}
 	}
 	
@@ -239,6 +239,11 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 				return TRUE;
 			}
 		}
+		if ($errstr == 'fopen(/var/log/greyhole.log): failed to open stream: Permission denied') {
+			// We want to ignore this warning. Happens when regular users try to use greyhole, and greyhole tries to log something.
+			// What would have been logged will be echoed instead.
+			return TRUE;
+		}
 		gh_log(WARN, "PHP Warning [$errno]: $errstr in $errfile on line $errline");
 		break;
 
@@ -253,23 +258,23 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 
 function bytes_to_human($bytes, $html=TRUE) {
 	$units = 'B';
-	if ($bytes > 1024) {
+	if (abs($bytes) > 1024) {
 		$bytes /= 1024;
 		$units = 'KB';
 	}
-	if ($bytes > 1024) {
+	if (abs($bytes) > 1024) {
 		$bytes /= 1024;
 		$units = 'MB';
 	}
-	if ($bytes > 1024) {
+	if (abs($bytes) > 1024) {
 		$bytes /= 1024;
 		$units = 'GB';
 	}
-	if ($bytes > 1024) {
+	if (abs($bytes) > 1024) {
 		$bytes /= 1024;
 		$units = 'TB';
 	}
-	$decimals = ($bytes > 100 ? 0 : ($bytes > 10 ? 1 : 2));
+	$decimals = (abs($bytes) > 100 ? 0 : (abs($bytes) > 10 ? 1 : 2));
 	if ($html) {
 		return number_format($bytes, $decimals) . " <span class=\"i18n-$units\">$units</span>";
 	} else {

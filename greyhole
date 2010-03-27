@@ -32,6 +32,7 @@ for ($i=1; $i<$argc; $i++) {
 	switch ($argv[$i]) {
 		case '--daemon':
 		case '--fsck':
+		case '--balance':
 		case '--prerotate':
 		case '--postrotate':
 		case '--stats':
@@ -74,14 +75,16 @@ if ($action == 'unknown') {
 
 function print_usage() {
 	echo "Invalid command line options.\n";
-	echo "Usage: Start the daemon:        greyhole --daemon\n";
-	echo "       Schedule a fsck:         greyhole --fsck [--email-report] [--dir <path>] [--disk-usage-report]\n";
-	echo "       Display statistics:      greyhole --stats\n";
-	echo "       Empty attic:             greyhole --empty-attic\n";
-	echo "       Debug file operations:   greyhole --debug <filename>\n";
+	echo "Usage: Start the daemon:         greyhole --daemon\n";
+	echo "       Schedule a fsck:          greyhole --fsck [--email-report] [--dir <path>] [--disk-usage-report]\n";
+	echo "       Even available space \n";
+	echo "        on storage pool devices: greyhole --balance\n";
+	echo "       Display statistics:       greyhole --stats\n";
+	echo "       Empty attic:              greyhole --empty-attic\n";
+	echo "       Debug file operations:    greyhole --debug <filename>\n";
 	echo "\n";
-	echo "       Pre-rotate task:         greyhole --prerotate\n";
-	echo "       Post-rotate task:        greyhole --postrotate\n";
+	echo "       Pre-rotate task:          greyhole --prerotate\n";
+	echo "       Post-rotate task:         greyhole --postrotate\n";
 	echo "\n";
 	echo "     When <path>, one of your storage pool directories, is/will become unavailable:\n";
 	echo "       <path> will return soon:      greyhole --wait-for <path>\n";
@@ -90,7 +93,7 @@ function print_usage() {
 	exit(1);
 }
 
-if ($action != 'fsck' && $action != 'stats' && $action != 'debug') {
+if ($action != 'stats' && $action != 'debug') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
 		exit(1);
@@ -133,7 +136,7 @@ if ($action == 'gone' || $action == 'going') {
 		// Schedule fsck for all shares to re-create missing copies on other shares
 		mysql_query("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '', NULL, 'yes')") or gh_log(CRITICAL, "Can't insert fsck task: " . mysql_error());
 		echo "All the files that were only on $going_dir have been copied somewhere else.\n";
-		echo "A fsck of all shares has been scheduled, to recreated other file copies. It will start after all currently pending tasks have been completed.\n";
+		echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.\n";
 	}
 
 	mark_gone_ok($options['dir'], 'remove');
@@ -321,6 +324,14 @@ if ($action == 'postrotate') {
 	exit(0);
 }
 
+if ($action == 'balance') {
+	$query = "INSERT INTO tasks (action, share, complete) VALUES ('balance', '', 'yes')";
+	mysql_query($query) or gh_log(CRITICAL, "Can't insert balance task: " . mysql_error());
+	echo "A balance has been scheduled. It will start after all currently pending tasks have been completed.\n";
+	echo "This operation will try to even the available space on all directories included in your storage pool.\n";
+	exit(0);
+}
+
 if ($action == 'fsck') {
 	$pos = array_search('fsck', $argv);
 	$full_path = '';
@@ -387,6 +398,11 @@ function execute_next_task() {
 
 	$result = 0;
 	switch ($task->action) {
+		case 'balance':
+			gh_log(INFO, "Starting available space balancing");
+			gh_balance();
+			gh_log(INFO, "Available space balancing completed.");
+			break;
 		case 'fsck':
 			gh_log(INFO, "Starting fsck for $task->share");
 			initialize_fsck_report($task->share == '' ? 'All shares' : $task->share);
@@ -1370,7 +1386,7 @@ function get_free_space_in_storage_pool_dirs() {
 	return $dfs;
 }
 
-function order_target_drives($filesize_kb, $include_full_drives, $share, $path) {
+function order_target_drives($filesize_kb, $include_full_drives, $share, $path, $log_prefix='') {
 	global $storage_pool_directories, $minimum_free_space_pool_directories, $dir_selection_algorithm, $last_OOS_notification, $sticky_files;
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
@@ -1390,7 +1406,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path) 
 				while (isset($last_resort_sorted_target_drives[$free_space])) {
 					$free_space -= 0.001;
 				}
-				$last_resort_sorted_target_drives[$free_space] = $target_drive;
+				$last_resort_sorted_target_drives[$available_space] = $target_drive;
 			} else {
 				while (isset($full_drives[$free_space])) {
 					$free_space -= 0.001;
@@ -1454,27 +1470,26 @@ You probably want to do something about this!
 	global $log_level;
 	if ($log_level === DEBUG) {
 		if (count($sorted_target_drives) > 0) {
-			$log = "Drives with available space: ";
+			$log = $log_prefix ."Drives with available space: ";
 			foreach ($sorted_target_drives as $s => $d) {
-				$log .= "$d (" . round($s/1024/1024) . " GB avail) - ";
+				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " avail) - ";
 			}
-			$log = substr($log, 0, strlen($log)-2);
+			gh_log(DEBUG, substr($log, 0, strlen($log)-2));
 		}
 		if (count($last_resort_sorted_target_drives) > 0) {
-			$log .= "; Drives with free space, but no available space: ";
+			$log = $log_prefix ."Drives with enough free space, but no available space: ";
 			foreach ($last_resort_sorted_target_drives as $s => $d) {
-				$log .= "$d (" . round($s/1024/1024) . " GB free) - ";
+				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " free) - ";
 			}
-			$log = substr($log, 0, strlen($log)-2);
+			gh_log(DEBUG, substr($log, 0, strlen($log)-2));
 		}
 		if (count($full_drives) > 0) {
-			$log .= "; Drives full: ";
+			$log = $log_prefix ."Drives full: ";
 			foreach ($full_drives as $s => $d) {
-				$log .= "$d (" . round($s/1024) . " MB free) - ";
+				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " free) - ";
 			}
-			$log = substr($log, 0, strlen($log)-2);
+			gh_log(DEBUG, substr($log, 0, strlen($log)-2));
 		}
-		gh_log(DEBUG, $log);
 	}
 	
 	$drives = array_merge($sorted_target_drives, $last_resort_sorted_target_drives);
@@ -1633,31 +1648,31 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 
 	// Look for this file on all available drives
 	foreach ($storage_pool_directories as $target_drive) {
-		$inode_number = @fileinode("$target_drive/$share/$file_path/$filename");
+		$clean_full_path = clean_dir("$target_drive/$share/$file_path/$filename");
+		$inode_number = @fileinode($clean_full_path);
 		if ($inode_number !== FALSE) {
-			if (is_dir("$target_drive/$share/$file_path/$filename")) {
+			if (is_dir($clean_full_path)) {
 				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
-				@rmdir("$target_drive/$share/$file_path/$filename");
+				@rmdir($clean_full_path);
 				continue;
 			}
 			if (!isset($source_real_path)) {
-				$source_real_path = "$target_drive/$share/$file_path/$filename";
+				$source_real_path = $clean_full_path;
 			}
-			gh_log(DEBUG, "Found $target_drive/$share" . (!empty($file_path) ? "/$file_path" : '') . "/$filename");
 
-			$clean_full_path = clean_dir("$target_drive/$share/$file_path/$filename");
+			gh_log(DEBUG, "Found $clean_full_path");
 
 			if (!is_greyhole_owned_dir($target_drive)) {
 				gh_log(DEBUG, "  Directory $target_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
 				$file_tombstones[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'Gone');
 			} else {
 				$file_tombstones[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'OK');
-				$file_copies_inodes[$inode_number] = "$target_drive/$share/$file_path/$filename";
+				$file_copies_inodes[$inode_number] = $clean_full_path;
 				$num_ok++;
 			}
 			
 			// Temp files leftovers of stopped Greyhole executions
-			$temp_filename = get_temp_filename("$target_drive/$share/$file_path/$filename");
+			$temp_filename = get_temp_filename($clean_full_path);
 			if (file_exists($temp_filename) && is_file($temp_filename)) {
 				gh_log(INFO, "  Found temporary file $temp_filename ... deleting.");
 				$fsck_report['temp_files'][] = $temp_filename;
@@ -1692,7 +1707,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				$num_ok++;
 			}
 		}
-		$file_tombstones[$tombstone->path] = $tombstone;
+		$file_tombstones[clean_dir($tombstone->path)] = $tombstone;
 	}
 
 	if (count($file_copies_inodes) > 0) {
@@ -1712,9 +1727,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			}
 		}
 		if (!$found_linked_tombstone) {
-			reset($file_tombstones)->is_linked = TRUE;
-			$expected_file_size = filesize(reset($file_tombstones)->path);
-			$original_file_path = reset($file_tombstones)->path;
+			$fist_tombstone = reset($file_tombstones);
+			$fist_tombstone->is_linked = TRUE;
+			$expected_file_size = filesize($fist_tombstone->path);
+			$original_file_path = $fist_tombstone->path;
 		}
 		
 		if (isset($options['disk-usage-report'])) {
@@ -1861,28 +1877,32 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				return;
 			}
 			$fsck_report['too_many_copies']++;
-			$keys_to_remove = array();
 		
 			$local_target_drives = array_values(order_target_drives(0, TRUE, $share, $file_path));
-			while (count($file_copies_inodes) > $num_copies_required) {
+			while (count($file_copies_inodes) > $num_copies_required && !empty($local_target_drives)) {
 				$target_drive = array_pop($local_target_drives);
 				$key = clean_dir("$target_drive/$share/$file_path/$filename");
 				gh_log(DEBUG, "  Looking for copy at $key");
-				if (isset($file_tombstones[$key])) {
-					$tombstone = $file_tombstones[$key];
-					if ($tombstone->state == 'OK' && real_file_is_locked($tombstone->path) === FALSE) {
-						$fsck_report['too_many_files'][] = $tombstone->path;
-						gh_log(DEBUG, "  Removing copy at $tombstone->path");
-						unset($file_copies_inodes[fileinode($tombstone->path)]);
-						gh_recycle($tombstone->path);
-						$keys_to_remove[] = $key;
+				if (isset($file_tombstones[$key]) || gh_file_exists($key)) {
+					if (isset($file_tombstones[$key])) {
+						$tombstone = $file_tombstones[$key];
+					}
+					if (gh_file_exists($key) || $tombstone->state == 'OK') {
+						gh_log(DEBUG, "    Found file copy at $key, or tombstone is marked OK.");
+						if (real_file_is_locked($key) !== FALSE) {
+							gh_log(DEBUG, "    File copy is locked. Won't remove it.");
+							continue;
+						}
+						$fsck_report['too_many_files'][] = $key;
+						gh_log(DEBUG, "    Removing copy at $key");
+						unset($file_copies_inodes[fileinode($key)]);
+						gh_recycle($key);
+						if (isset($file_tombstones[$key])) {
+							unset($file_tombstones[$key]);
+						}
 						$num_ok--;
-						break;
 					}
 				}
-			}
-			foreach ($keys_to_remove as $key) {
-				unset($file_tombstones[$key]);
 			}
 
 			// If no tombstone is linked, link the 1st one
@@ -2312,5 +2332,150 @@ function gh_get_file_infos($real_path) {
 
 function gh_get_dir_perms($directory) {
 	return (int) base_convert(substr(decoct(fileperms($directory)), -4), 8, 10);
+}
+
+function gh_balance() {
+	global $storage_pool_directories, $shares_options;
+
+	// Start with the shares for which we keep the less # copies
+	$sorted_shares_options = $shares_options;
+	uasort($sorted_shares_options, 'compare_share_num_copies');
+	foreach ($sorted_shares_options as $share_name => $share_options) {
+		if ($share_options['num_copies'] == count($storage_pool_directories)) {
+			// Files are everywhere; won't be able to use that share to balance available space!
+			continue;
+		}
+
+ 		gh_log(DEBUG, "Balancing share: $share_name");
+		// Move files from the share with the less available space to the share with the most available space.
+		$sorted_pool_drives = sort_storage_dirs_available_space();
+
+		$pool_drives_avail_space = array();
+		foreach ($sorted_pool_drives as $available_space => $drive) {
+			$pool_drives_avail_space[$drive] = $available_space;
+		}
+
+		foreach ($sorted_pool_drives as $source_drive) {
+			gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+
+			// Files candidate to get moved
+			unset($files);
+			exec("find ". quoted_form("$source_drive/$share_name") ." -type f | head -n 100000", $files);
+			gh_log(DEBUG, "Found ". count($files) ." files that can be moved.");
+			
+			// Repeat until all drives' available space is balanced.
+			$file_too_big_counter = 0;
+			$file_everywhere_counter = 0;
+			foreach ($files as $file) {
+				$filesize = filesize($file)/1024; // KB
+
+				$full_path = substr($file, strlen("$source_drive/$share_name/"));
+				list($path, $filename) = explode_full_path($full_path);
+				gh_log(DEBUG, "  Working on file: $full_path (". bytes_to_human($filesize*1024, FALSE) .")");
+
+				$target_drives = order_target_drives($filesize, FALSE, $share_name, $path, '  ');
+
+				unset($target_drive);
+				while (count($target_drives) > 0) {
+					$drive = array_shift($target_drives);
+					if (!file_exists("$drive/$share_name/$full_path")) {
+						$target_drive = $drive;
+						break;
+					}
+				}
+				if (!isset($target_drive)) {
+					// Can't find a drive that doesn't have this file; skipping.
+					continue;
+				}
+
+				if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize) {
+					$file_too_big_counter++;
+					gh_log(DEBUG, "    File too big ($file_too_big_counter/10); moving it wouldn't help balancing available space.");
+					if ($file_too_big_counter >= 10) {
+						// We're done with $source_drive: found 10 files in a row that were too big
+						// Continue with the next drive...
+						gh_log(DEBUG, "    Aborting. Reason: $source_drive now has more or as much available space as all other storage pool directories.");
+						break;
+					}
+					continue;
+				}
+
+				gh_log(DEBUG, "  Target drive: $target_drive (". bytes_to_human($pool_drives_avail_space[$target_drive]*1024, FALSE) ." available)");
+
+				// Make sure the parent directory exists, before we try moving something there...
+				$original_path = clean_dir("$source_drive/$share_name/$path");
+				list($target_path, $filename) = explode_full_path("$target_drive/$share_name/$full_path");
+				gh_mkdir($target_path, "$target_drive/$share_name", $original_path);
+
+				// Move the file
+				$temp_path = get_temp_filename("$target_drive/$share_name/$full_path");
+				$file_infos = gh_get_file_infos($file);
+				gh_log(DEBUG, "  Moving file copy...");
+				$it_worked = rename($file, $temp_path);
+				if ($it_worked) {
+					rename($temp_path, "$target_drive/$share_name/$full_path");
+					gh_chperm("$target_drive/$share_name/$full_path", $file_infos);
+
+					$pool_drives_avail_space[$target_drive] -= $filesize;
+					$pool_drives_avail_space[$source_drive] += $filesize;
+				} else {
+					gh_log(WARN, "    Failed file copy. Skipping.");
+					gh_recycle($temp_path);
+					continue;
+				}
+
+				// Update tombstones
+				$existing_tombstones = get_tombstones($share_name, $path, $filename, FALSE, TRUE, FALSE);
+				foreach ($existing_tombstones as $key => $tombstone) {
+					if ($tombstone->path == $file) {
+						$tombstone->path = "$target_drive/$share_name/$full_path";
+						unset($existing_tombstones[$key]);
+						$tombstone->state = 'OK';
+						if ($tombstone->is_linked) {
+							// Re-create correct symlink
+							$landing_zone = $share_options['landing_zone'];
+							if (is_link("$landing_zone/$full_path")) {
+								gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $tombstone->path");
+								if (gh_recycle("$landing_zone/$full_path")) {
+			 						@symlink($tombstone->path, "$landing_zone/$full_path");
+									// Creating this symlink can fail if the parent dir was removed
+								}
+							}
+						}
+						$existing_tombstones[$tombstone->path] = $tombstone;
+						save_tombstones($share_name, $path, $filename, $existing_tombstones);
+						break;
+					}
+				}
+				
+				gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+			}
+			gh_log(DEBUG, "Done balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+		}
+		gh_log(DEBUG, "Done balancing share: $share_name");
+	}
+}
+
+function compare_share_num_copies($a, $b) {
+	if ($a['num_copies'] == $b['num_copies']) {
+		return 0;
+	}
+	return $a['num_copies'] > $b['num_copies'] ? 1 : -1;
+}
+
+function sort_storage_dirs_available_space() {
+	global $storage_pool_directories, $minimum_free_space_pool_directories;
+	$dfs = get_free_space_in_storage_pool_dirs();
+	foreach ($storage_pool_directories as $target_drive) {
+		if (!isset($dfs[$target_drive])) {
+			continue;
+		}
+		$free_space = $dfs[$target_drive];
+		$minimum_free_space = (float) (isset($minimum_free_space_pool_directories[$target_drive]) ? $minimum_free_space_pool_directories[$target_drive]*1024*1024 : 0.0);
+		$available_space = (float) $free_space - $minimum_free_space;
+		$sorted_target_drives[$available_space] = $target_drive;
+	}
+	ksort($sorted_target_drives);
+	return $sorted_target_drives;
 }
 ?>

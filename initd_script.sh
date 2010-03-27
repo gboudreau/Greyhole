@@ -46,6 +46,10 @@ status () {
 daemon_start () {
 	ionice -c 2 -n 7 $DAEMON --daemon > /dev/null &
 	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+		touch $LOCKFILE
+		ps ax | grep "$DAEMON --daemon" | grep -v grep | awk '{print $1}' > $PIDFILE
+	fi
 	return $RETVAL
 }
 
@@ -57,8 +61,6 @@ start () {
 	daemon +5 --check $DAEMON $0 daemon_start
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ]; then
-		touch $LOCKFILE
-		pidof $DAEMON > $PIDFILE
 		success $"$base startup"
 	else
 		failure $"$base startup"
