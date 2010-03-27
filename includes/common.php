@@ -215,7 +215,7 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 	if (!isset($ignored_warnings)) {
 		$ignored_warnings = array();
 		$bin_dir = exec("rpm --eval='%_bindir'");
-		$source = explode("\n", file_get_contents($bin_dir . '/greyhole-executer'));
+		$source = explode("\n", file_get_contents($bin_dir . '/greyhole'));
 		for ($i=0; $i<count($source); $i++) {
 			if (preg_match("/@([^\(]+)/", $source[$i], $regs)) {
 				$ignored_warnings[$i+1][] = $regs[1];
