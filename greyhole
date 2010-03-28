@@ -740,7 +740,7 @@ function gh_write($share, $full_path, $task_id) {
 		if ($log_level === DEBUG) {
 			clearstatcache();
 			$filesize = filesize($source_file);
-			gh_log(DEBUG, " - " . number_format($filesize) . " bytes", FALSE);
+			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
 		}
 		gh_log(INFO, "");
 		gh_log(DEBUG, "  Will use source file: $source_file");
@@ -783,7 +783,7 @@ function gh_write($share, $full_path, $task_id) {
 		if ($log_level === DEBUG) {
 			clearstatcache();
 			$filesize = filesize($source_file);
-			gh_log(DEBUG, " - " . number_format($filesize) . " bytes", FALSE);
+			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
 		}
 		gh_log(INFO, "");
 
@@ -1485,7 +1485,7 @@ You probably want to do something about this!
 		if (count($last_resort_sorted_target_drives) > 0) {
 			$log = $log_prefix ."Drives with enough free space, but no available space: ";
 			foreach ($last_resort_sorted_target_drives as $s => $d) {
-				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " free) - ";
+				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " avail) - ";
 			}
 			gh_log(DEBUG, substr($log, 0, strlen($log)-2));
 		}
