@@ -1,6 +1,6 @@
 Name:           greyhole
 Version:        $VERSION
-Release:        2
+Release:        1
 Summary:        Greyhole is a drive pooling technology for Samba
 Group:          System Environment/Daemons
 Source:         http://greyhole.googlecode.com/files/greyhole-%{version}.tar.gz
