@@ -58,7 +58,7 @@ if (!isset($smb_config_file)) {
 }
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options;
 
 	$shares_options = array();
 	$config_text = file_get_contents($config_file);
@@ -107,10 +107,10 @@ function parse_config() {
 						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || stripos(trim($value), 'yes') !== FALSE || stripos(trim($value), 'true') !== FALSE;
 					} else {
 						global ${$name};
-						if (is_numeric(trim($regs[2]))) {
-							${$name} = (int) trim($value);
+						if (is_numeric($value)) {
+							${$name} = (int) $value;
 						} else {
-							${$name} = trim($value);
+							${$name} = $value;
 						}
 					}
 			}
@@ -151,6 +151,29 @@ function parse_config() {
 			global $config_file, $smb_config_file;
 			gh_log(CRITICAL, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
 		}
+	}
+	
+	if (!isset($db_engine)) {
+		$db_engine = 'mysql';
+	} else {
+		$db_engine = strtolower($db_engine);
+	}
+
+	global ${"db_use_$db_engine"};
+	${"db_use_$db_engine"} = TRUE;
+
+	$db_options = (object) array(
+		'engine' => $db_engine,
+		'schema' => "/var/share/greyhole/schema-$db_engine.sql"
+	);
+	if ($db_options->engine == 'sqlite') {
+		$db_options->db_path = $db_path;
+		$db_options->dbh = null; // internal handle to use with sqlite
+	} else {
+		$db_options->host = $db_host;
+		$db_options->user = $db_user;
+		$db_options->pass = $db_pass;
+		$db_options->name = $db_name;
 	}
 }
 

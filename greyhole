@@ -20,11 +20,14 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 include('includes/common.php');
+include('includes/sql.php');
 parse_config();
 
-mysql_connect($db_host, $db_user, $db_pass) or gh_log(CRITICAL, "Can't connect to MySQL.");
-mysql_select_db($db_name);
-mysql_query("SET SESSION group_concat_max_len = 1048576");
+db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
+db_select_db();
+if (@$db_use_mysql) {
+	db_query("SET SESSION group_concat_max_len = 1048576");
+}
 
 $action = 'unknown';
 $options = array();
@@ -134,7 +137,7 @@ if ($action == 'gone' || $action == 'going') {
 		exec("/sbin/service greyhole condrestart");
 		
 		// Schedule fsck for all shares to re-create missing copies on other shares
-		mysql_query("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '', NULL, 'yes')") or gh_log(CRITICAL, "Can't insert fsck task: " . mysql_error());
+		db_query("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '', NULL, 'yes')") or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
 		echo "All the files that were only on $going_dir have been copied somewhere else.\n";
 		echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.\n";
 	}
@@ -157,26 +160,26 @@ if ($action == 'debug') {
 	echo "\nFrom DB\n=======\n";
 	$debug_tasks = array();
 	$query = sprintf("SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE full_path LIKE '%%%s%%' ORDER BY id ASC",
-		mysql_escape_string($filename)
+		db_escape_string($filename)
 	);
-	$result = mysql_query($query) or die("Can't query tasks_completed with query: $query - Error: " . mysql_error());
-	while ($row = mysql_fetch_object($result)) {
+	$result = db_query($query) or die("Can't query tasks_completed with query: $query - Error: " . db_error());
+	while ($row = db_fetch_object($result)) {
 		$debug_tasks[$row->id] = $row;
 	}
 
 	// Renames
 	$query = sprintf("SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info LIKE '%%%s%%' ORDER BY id ASC",
-		mysql_escape_string($filename)
+		db_escape_string($filename)
 	);
 	do {
-		$result = mysql_query($query) or die("Can't query tasks_completed for renames with query: $query - Error: " . mysql_error());
-		while ($row = mysql_fetch_object($result)) {
+		$result = db_query($query) or die("Can't query tasks_completed for renames with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
 			$debug_tasks[$row->id] = $row;
 			$query = sprintf("SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info = '%s' ORDER BY id ASC",
-				mysql_escape_string($row->full_path)
+				db_escape_string($row->full_path)
 			);
 		}
-	} while (mysql_num_rows($result) > 0);
+	} while (db_num_rows($result) > 0);
 	
 	ksort($debug_tasks);
 	$to_grep = array();
@@ -318,7 +321,7 @@ repair_tables();
 
 if ($action == 'postrotate') {
 	$query = sprintf("UPDATE settings SET value = '0' WHERE name = '%s'", 'last_read_log_smbd_line');
-	mysql_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . db_error());
 	gh_log(INFO, "Samba log read pointer reset using --postrotate");
 	echo "Samba log read pointer reset to 0.\n";
 	exit(0);
@@ -326,7 +329,7 @@ if ($action == 'postrotate') {
 
 if ($action == 'balance') {
 	$query = "INSERT INTO tasks (action, share, complete) VALUES ('balance', '', 'yes')";
-	mysql_query($query) or gh_log(CRITICAL, "Can't insert balance task: " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't insert balance task: " . db_error());
 	echo "A balance has been scheduled. It will start after all currently pending tasks have been completed.\n";
 	echo "This operation will try to even the available space on all directories included in your storage pool.\n";
 	exit(0);
@@ -350,10 +353,10 @@ if ($action == 'fsck') {
 		$fsck_options[] = 'du';
 	}
 	$query = sprintf("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '%s', %s, 'yes')",
-		mysql_escape_string($full_path),
+		db_escape_string($full_path),
 		(!empty($fsck_options) ? "'" . implode('|', $fsck_options) . "'" : "NULL")
 	);
-	mysql_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
 	if ($full_path == '') {
 		$full_path = 'all shares';
 	}
@@ -375,16 +378,16 @@ function execute_next_task() {
 	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action;
 
 	$query = "SELECT id, action, share, full_path, additional_info FROM tasks WHERE complete = 'yes' ORDER BY id ASC LIMIT 1";
-	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query tasks: " . mysql_error());
-	if (mysql_num_rows($result) < 1) {
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
+	if (db_num_rows($result) < 1) {
 		$action = 'sleep';
 		gh_log(DEBUG, "Nothing to do... Sleeping.");
 		sleep($log_level == DEBUG ? 10 : 600);
-		mysql_free_result($result);
+		db_free_result($result);
 		return;
 	}
-	$task = mysql_fetch_object($result);
-	mysql_free_result($result);
+	$task = db_fetch_object($result);
+	db_free_result($result);
 	
 	if (($key = array_search($task->id, $sleep_before_task)) !== FALSE) {
 		$action = 'sleep';
@@ -472,10 +475,10 @@ function execute_next_task() {
 		$sleep_before_task = array();
 	}
 	$query = sprintf("INSERT INTO tasks_completed (SELECT * FROM tasks WHERE id = %d)", $task->id);
-	mysql_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
 
 	$query = sprintf("DELETE FROM tasks WHERE id = %d", $task->id);
-	mysql_query($query) or gh_log(CRITICAL, "Can't delete from tasks: " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't delete from tasks: " . db_error());
 }
 
 function gh_rmdir($share, $full_path) {
@@ -586,8 +589,8 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
 				$task_id
 			);
-			mysql_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . mysql_error());
-			$sleep_before_task[] = mysql_insert_id();
+			db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
+			$sleep_before_task[] = db_insert_id();
 			return;
 		}
 
@@ -697,10 +700,10 @@ function file_is_locked($share, $full_path) {
 	}
 	$query = sprintf("SELECT * FROM tasks WHERE complete = 'no' AND action = 'write' AND share = '%s' AND full_path = '%s' LIMIT 1",
 		$share,
-		mysql_escape_string($full_path)
+		db_escape_string($full_path)
 	);
-	$result = mysql_query($query) or gh_log(CRITICAL, "Error querying tasks for locked files: " . mysql_error());
-	return mysql_num_rows($result) > 0;
+	$result = db_query($query) or gh_log(CRITICAL, "Error querying tasks for locked files: " . db_error());
+	return db_num_rows($result) > 0;
 }
 
 function real_file_is_locked($real_fullpath) {
@@ -724,8 +727,8 @@ function gh_write($share, $full_path, $task_id) {
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
 				$task_id
 			);
-			mysql_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . mysql_error());
-			$sleep_before_task[] = mysql_insert_id();
+			db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
+			$sleep_before_task[] = db_insert_id();
 		}
 		return;
 	}
@@ -807,8 +810,8 @@ function gh_write($share, $full_path, $task_id) {
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
 				$task_id
 			);
-			mysql_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . mysql_error());
-			$sleep_before_task[] = mysql_insert_id();
+			db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
+			$sleep_before_task[] = db_insert_id();
 			return;
 		}
 		$sleep_before_task = array();
@@ -821,8 +824,8 @@ function gh_write($share, $full_path, $task_id) {
 		$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
 			$task_id
 		);
-		mysql_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . mysql_error());
-		$sleep_before_task[] = mysql_insert_id();
+		db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
+		$sleep_before_task[] = db_insert_id();
 		return;
 	}
 
@@ -1036,10 +1039,10 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 					// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
 					gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
-						mysql_escape_string($share),
-						mysql_escape_string(clean_dir("$path/$filename"))
+						db_escape_string($share),
+						db_escape_string(clean_dir("$path/$filename"))
 					);
-					mysql_query($query) or gh_log(CRITICAL, "Can't insert write task: " . mysql_error());
+					db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
 				}
 			}
 		}
@@ -1064,10 +1067,10 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 						// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
 						gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 						$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
-							mysql_escape_string($share),
-							mysql_escape_string(clean_dir("$path/$filename"))
+							db_escape_string($share),
+							db_escape_string(clean_dir("$path/$filename"))
 						);
-						mysql_query($query) or gh_log(CRITICAL, "Can't insert write task: " . mysql_error());
+						db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
 					}
 				}
 			}
@@ -1205,8 +1208,8 @@ function simplify_tasks() {
 	
 	// Delete duplicate writes/renames
 	$query = "SELECT GROUP_CONCAT(id) ids, action, share, full_path, additional_info FROM tasks WHERE action IN ('write', 'rename') GROUP BY action, share, full_path, additional_info HAVING COUNT(*) > 1";
-	$result = mysql_query($query) or gh_log(CRITICAL, "Can't select duplicate tasks: " . mysql_error());
-	while ($row = mysql_fetch_object($result)) {
+	$result = db_query($query) or gh_log(CRITICAL, "Can't select duplicate tasks: " . db_error());
+	while ($row = db_fetch_object($result)) {
 		$ids = explode(',', $row->ids);
 		sort($ids);
 		array_pop($ids);
@@ -1219,19 +1222,19 @@ function simplify_tasks() {
 		$query = sprintf("DELETE FROM tasks WHERE id IN (%s)",
 			$ids
 		);
-		mysql_query($query) or gh_log(CRITICAL, "Can't delete duplicate tasks: " . mysql_error());
+		db_query($query) or gh_log(CRITICAL, "Can't delete duplicate tasks: " . db_error());
 	}
-	mysql_free_result($result);
+	db_free_result($result);
 	
 	// Remove locked write tasks
 	$query = "SELECT share, full_path FROM tasks WHERE action = 'write' and complete = 'no'";
-	$result = mysql_query($query) or gh_log(CRITICAL, "Can't select locked write tasks: " . mysql_error());
-	while ($row = mysql_fetch_object($result)) {
+	$result = db_query($query) or gh_log(CRITICAL, "Can't select locked write tasks: " . db_error());
+	while ($row = db_fetch_object($result)) {
 		$query = sprintf("DELETE FROM tasks WHERE action = 'write' and complete = 'yes' AND share = '%s' AND full_path = '%s'",
-			mysql_escape_string($row->share),
-			mysql_escape_string($row->full_path)
+			db_escape_string($row->share),
+			db_escape_string($row->full_path)
 		);
-		mysql_query($query) or gh_log(CRITICAL, "Can't delete duplicate of locked write task: " . mysql_error());
+		db_query($query) or gh_log(CRITICAL, "Can't delete duplicate of locked write task: " . db_error());
 	}
 }
 
@@ -1240,12 +1243,12 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	$action = 'parse_logs';
 
 	$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_read_log_smbd_line');
-	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_read_log_smbd_line': " . mysql_error());
-	if (mysql_num_rows($result) != 1) {
-		gh_log(CRITICAL, "Received " . mysql_num_rows($result) . " rows when querying settings for 'last_read_log_smbd_line'; expected one.");
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_read_log_smbd_line': " . db_error());
+	if (db_num_rows($result) != 1) {
+		gh_log(CRITICAL, "Received " . db_num_rows($result) . " rows when querying settings for 'last_read_log_smbd_line'; expected one.");
 	}
-	$row = mysql_fetch_object($result);
-	mysql_free_result($result);
+	$row = db_fetch_object($result);
+	db_free_result($result);
 
 	$f_seek_point = (int) $row->value;
 
@@ -1274,10 +1277,10 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			// Close logs are only processed when no more duplicates are found, so we'll execute this now that a non-duplicate line was found.
 			if ($act === 'close') {
 				$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
-					mysql_escape_string($share),
+					db_escape_string($share),
 					$fd
 				);
-				mysql_query($query) or gh_log(CRITICAL, "Error updating tasks: " . mysql_error() . "; Query: $query");
+				db_query($query) or gh_log(CRITICAL, "Error updating tasks: " . db_error() . "; Query: $query");
 			}
 
 			$line = explode('*', $line);
@@ -1328,14 +1331,14 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 				$new_tasks++;
 				$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) VALUES ('%s', '%s', %s, %s, '%s')",
 					$act,
-					mysql_escape_string($share),
-					isset($fullpath) ? "'".mysql_escape_string(clean_dir($fullpath))."'" : 'NULL',
-					isset($fullpath_target) ? "'".mysql_escape_string(clean_dir($fullpath_target))."'" : (isset($fd) ? "'$fd'" : 'NULL'),
+					db_escape_string($share),
+					isset($fullpath) ? "'".db_escape_string(clean_dir($fullpath))."'" : 'NULL',
+					isset($fullpath_target) ? "'".db_escape_string(clean_dir($fullpath_target))."'" : (isset($fd) ? "'$fd'" : 'NULL'),
 					$act == 'write' ? 'no' : 'yes'
 				);
 			}
 
-			mysql_query($query) or gh_log(CRITICAL, "Error inserting task: " . mysql_error() . "; Query: $query");
+			db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
 		}
 	}
 	$f_seek_point = ftell($fp);
@@ -1344,20 +1347,20 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	// Close logs are only processed when no more duplicates are found, so we'll execute this now that we're done parsing the current log.
 	if ($act == 'close') {
 		$query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
-			mysql_escape_string($share),
+			db_escape_string($share),
 			$fd
 		);
-		mysql_query($query) or gh_log(CRITICAL, "Error updating tasks: " . mysql_error() . "; Query: $query");
+		db_query($query) or gh_log(CRITICAL, "Error updating tasks: " . db_error() . "; Query: $query");
 	}
 	
 	$query = sprintf("UPDATE settings SET value = '%d' WHERE name = '%s'", $f_seek_point, 'last_read_log_smbd_line');
-	mysql_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . db_error());
 	
 	if ($simplify_after_parse && $new_tasks > 0) {
 		$query = "SELECT COUNT(*) num_rows FROM tasks";
-		$result = mysql_query($query) or gh_log(CRITICAL, "Can't get tasks count: " . mysql_error());
-		$row = mysql_fetch_object($result);
-		mysql_free_result($result);
+		$result = db_query($query) or gh_log(CRITICAL, "Can't get tasks count: " . db_error());
+		$row = db_fetch_object($result);
+		db_free_result($result);
 		$num_rows = (int) $row->num_rows;
 		if ($num_rows < 1000 || $num_rows % 5 == 0) { // Runs 1/5 of the times when num_rows > 1000
 			if ($num_rows < 5000 || $num_rows % 100 == 0) { // Runs 1/100 of the times when num_rows > 5000
@@ -1436,12 +1439,12 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 		gh_log(WARN, "  Warning! All storage pool directories are over-capacity!");
 		if (!isset($last_OOS_notification)) {
 			$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_OOS_notification');
-			$result = mysql_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_OOS_notification': " . mysql_error());
-			if (mysql_num_rows($result) != 1) {
-				gh_log(CRITICAL, "Received " . mysql_num_rows($result) . " rows when querying settings for 'last_OOS_notification'; expected one.");
+			$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_OOS_notification': " . db_error());
+			if (db_num_rows($result) != 1) {
+				gh_log(CRITICAL, "Received " . db_num_rows($result) . " rows when querying settings for 'last_OOS_notification'; expected one.");
 			}
-			$row = mysql_fetch_object($result);
-			mysql_free_result($result);
+			$row = db_fetch_object($result);
+			db_free_result($result);
 			$last_OOS_notification = $row->value;
 		}
 		if ($last_OOS_notification < strtotime('-1 day')) {
@@ -1464,7 +1467,7 @@ You probably want to do something about this!
 			
 			$last_OOS_notification = time();
 			$query = sprintf("UPDATE settings SET value = '%s' WHERE name = '%s'", $last_OOS_notification, 'last_OOS_notification');
-			mysql_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_OOS_notification': " . mysql_error());
+			db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_OOS_notification': " . db_error());
 		}
 	}
 
@@ -1509,19 +1512,19 @@ You probably want to do something about this!
 				if (count($stick_into) == 0) {
 					// Stick files into any drives
 					$query = sprintf("SELECT value FROM settings WHERE name = 'stick_into-%s'",
-						mysql_escape_string($share_dir)
+						db_escape_string($share_dir)
 					);
-					$result = mysql_query($query) or gh_log(CRITICAL, "Can't query settings for stick_target-$share_dir: " . mysql_error());
-					if (mysql_num_rows($result) == 1) {
-						$row = mysql_fetch_object($result);
+					$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for stick_target-$share_dir: " . db_error());
+					if (db_num_rows($result) == 1) {
+						$row = db_fetch_object($result);
 						$stick_into = unserialize($row->value);
 					} else {
 						$value = serialize($drives);
 						$query = sprintf("INSERT INTO settings (name, value) VALUES ('stick_into-%s', '%s')",
-							mysql_escape_string($share_dir),
-							mysql_escape_string($value)
+							db_escape_string($share_dir),
+							db_escape_string($value)
 						);
-						mysql_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$share_dir: " . mysql_error());
+						db_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$share_dir: " . db_error());
 						return $drives;
 					}
 				} else {
@@ -1619,10 +1622,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		// Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
 		gh_log(DEBUG, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 		$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
-			mysql_escape_string($share),
-			mysql_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+			db_escape_string($share),
+			db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
 		);
-		mysql_query($query) or gh_log(CRITICAL, "Can't insert write task: " . mysql_error());
+		db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
 		return;
 	} else {
 		if ($file_type == 'link' && !file_exists(readlink("$path/$filename"))) {
@@ -1634,11 +1637,11 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
 			parse_samba_log(); global $action; $action = 'fsck';
 			$query = sprintf("SELECT * FROM tasks WHERE action = 'unlink' AND share = '%s' AND full_path = '%s' AND complete = 'yes' LIMIT 1",
-				mysql_escape_string($share),
-				mysql_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+				db_escape_string($share),
+				db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
 			);
-			$result = mysql_query($query) or gh_log(CRITICAL, "Can't select future unlink tasks: " . mysql_error());
-			if (mysql_num_rows($result) == 0) {
+			$result = db_query($query) or gh_log(CRITICAL, "Can't select future unlink tasks: " . db_error());
+			if (db_num_rows($result) == 0) {
 				gh_log(INFO, "$path/$filename is missing from the share directory. Will try to re-create it, if copies are available.");
 				$fsck_report['not_in_landing']++;
 			} else {
@@ -2120,9 +2123,9 @@ function gh_recycle($real_path) {
 }
 
 function repair_tables() {
-	mysql_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . mysql_error());
-	mysql_query("REPAIR TABLE tasks_completed") or gh_log(CRITICAL, "Can't repair tasks_completed table: " . mysql_error());
-	mysql_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . mysql_error());
+	db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
+	db_query("REPAIR TABLE tasks_completed") or gh_log(CRITICAL, "Can't repair tasks_completed table: " . db_error());
+	db_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . db_error());
 }
 
 function check_storage_pool_dirs() {
@@ -2223,13 +2226,13 @@ function gone_ok($target_drive, $refresh=FALSE) {
 function get_gone_ok_dirs() {
 	global $gone_ok_drives;
 	$query = sprintf("SELECT value FROM settings WHERE name = 'Gone-OK-Drives'");
-	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-OK-Drives: " . mysql_error());
-	if (mysql_num_rows($result) == 1) {
-		$row = mysql_fetch_object($result);
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-OK-Drives: " . db_error());
+	if (db_num_rows($result) == 1) {
+		$row = db_fetch_object($result);
 		$gone_ok_drives = unserialize($row->value);
 	} else {
 		$query = "INSERT INTO `greyhole`.`settings` (`name`, `value`) VALUES ('Gone-OK-Drives', 'a:0:{}')";
-		mysql_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-OK-Drives: " . mysql_error());
+		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-OK-Drives: " . db_error());
 		$gone_ok_drives = array();
 	}
 	return $gone_ok_drives;
@@ -2250,9 +2253,9 @@ function mark_gone_ok($target_drive, $action='add') {
 	}
 
 	$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'Gone-OK-Drives'",
-		mysql_escape_string(serialize($gone_ok_drives))
+		db_escape_string(serialize($gone_ok_drives))
 	);
-	mysql_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-OK-Drives: " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-OK-Drives: " . db_error());
 	return TRUE;
 }
 
@@ -2270,13 +2273,13 @@ function gone_fscked($target_drive, $refresh=FALSE) {
 function get_fsck_gone_drives() {
 	global $fscked_gone_drives;
 	$query = sprintf("SELECT value FROM settings WHERE name = 'Gone-FSCKed-Drives'");
-	$result = mysql_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-FSCKed-Drives: " . mysql_error());
-	if (mysql_num_rows($result) == 1) {
-		$row = mysql_fetch_object($result);
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-FSCKed-Drives: " . db_error());
+	if (db_num_rows($result) == 1) {
+		$row = db_fetch_object($result);
 		$fscked_gone_drives = unserialize($row->value);
 	} else {
 		$query = "INSERT INTO `greyhole`.`settings` (`name`, `value`) VALUES ('Gone-FSCKed-Drives', 'a:0:{}')";
-		mysql_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-FSCKed-Drives: " . mysql_error());
+		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-FSCKed-Drives: " . db_error());
 		$fscked_gone_drives = array();
 	}
 	return $fscked_gone_drives;
@@ -2292,9 +2295,9 @@ function mark_gone_drive_fscked($target_drive, $action='add') {
 	}
 
 	$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'Gone-FSCKed-Drives'",
-		mysql_escape_string(serialize($fscked_gone_drives))
+		db_escape_string(serialize($fscked_gone_drives))
 	);
-	mysql_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-FSCKed-Drives: " . mysql_error());
+	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-FSCKed-Drives: " . db_error());
 }
 
 function get_graveyards() {
@@ -2484,4 +2487,5 @@ function sort_storage_dirs_available_space() {
 	ksort($sorted_target_drives);
 	return $sorted_target_drives;
 }
+
 ?>
