@@ -264,11 +264,19 @@ if ($action == 'empty-attic') {
 if ($action == 'stats') {
 	echo "\nGreyhole Statistics\n===================\n\n";
 
+	$max_drive_strlen = 0;
+	foreach ($storage_pool_directories as $target_drive) {
+		if (strlen($target_drive) > $max_drive_strlen) {
+			$max_drive_strlen = strlen($target_drive);
+		}
+	}
+	$max_drive_strlen++;
+
 	$dfs = get_free_space_in_storage_pool_dirs();
 	echo "Storage Pool\n";
-	echo "                Total -  Used =  Free + Attic = Possible\n";
+	printf("%$max_drive_strlen"."s   Total -  Used =  Free + Attic = Possible\n", '');
 	foreach ($storage_pool_directories as $target_drive) {
-		echo "  $target_drive: ";
+		printf("  %-$max_drive_strlen"."s ", "$target_drive:");
 		if (!isset($dfs[$target_drive])) {
 			echo "  N/A -   N/A =   N/A +   N/A =   N/A\n";
 			continue;
