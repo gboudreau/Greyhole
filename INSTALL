@@ -23,7 +23,7 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 	install -m 0750 -D -p greyhole-config-update /usr/bin
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
-	if [ `uname -i | grep 64 | wc -l` == 1 ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole_i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	if [ `uname -i | grep 64 | wc -l` == 1 ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
 3. Edit /etc/logrotate.d/syslog:
 	What we want is add prerotate and postrotate instructions for /var/log/messages. So add one command in the postrotate block, and add a prerotate block. When more logs than just /var/log/messages are rotated together, the sharedscripts option needs to be there.
@@ -97,6 +97,11 @@ Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS ser
 
 	If using MySQL:
 
+		# Make sure your MySQL server service (mysqld) is running, and runs on boot.
+		Fedora: sudo service mysqld start; sudo chkconfig mysqld on
+		Ubuntu: sudo /etc/init.d/mysqld start; sudo update-rc.d mysqld defaults
+
+		# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
 		mysql -u greyhole_user -p89y63jdwe greyhole < ${GREYHOLE_INSTALL_DIR}/schema-mysql.sql
 
