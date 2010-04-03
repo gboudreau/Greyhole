@@ -954,7 +954,7 @@ function gh_mkdir($directory, $root_path, $original_directory) {
 			$parent_directory = $directory;
 			$original_parent_directory = $original_directory;
 			$i = 0;
-			while ($parent_directory != $root_path && $i++ < 255) {
+			while ($i++ < 255) { # Safety net... The real way to exit this loop is the break on ($parent_directory == $root_path)
 				$dir_infos = gh_get_file_infos($original_parent_directory);
 				if (!chmod($parent_directory, $dir_infos->fileperms)) {
 					gh_log(WARN, "  Failed to chmod directory '$parent_directory'");
@@ -964,6 +964,9 @@ function gh_mkdir($directory, $root_path, $original_directory) {
 				}
 				if (!chgrp($parent_directory, $dir_infos->filegroup)) {
 					gh_log(WARN, "  Failed to chgrp directory '$parent_directory'");
+				}
+				if ($parent_directory == $root_path) {
+					break;
 				}
 				list($parent_directory, $directory_name) = explode_full_path($parent_directory);
 				list($original_parent_directory, $directory_name) = explode_full_path($original_parent_directory);
