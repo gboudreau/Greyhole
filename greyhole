@@ -714,7 +714,7 @@ function file_is_locked($share, $full_path) {
 		return $result;
 	}
 	$query = sprintf("SELECT * FROM tasks WHERE complete = 'no' AND action = 'write' AND share = '%s' AND full_path = '%s' LIMIT 1",
-		$share,
+		db_escape_string($share),
 		db_escape_string($full_path)
 	);
 	$result = db_query($query) or gh_log(CRITICAL, "Error querying tasks for locked files: " . db_error());
@@ -1298,7 +1298,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 					db_escape_string($share),
 					$fd
 				);
-				db_query($query) or gh_log(CRITICAL, "Error updating tasks: " . db_error() . "; Query: $query");
+				db_query($query) or gh_log(CRITICAL, "Error updating tasks (1): " . db_error() . "; Query: $query");
 			}
 
 			$line = explode('*', $line);
@@ -1368,7 +1368,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			db_escape_string($share),
 			$fd
 		);
-		db_query($query) or gh_log(CRITICAL, "Error updating tasks: " . db_error() . "; Query: $query");
+		db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
 	}
 	
 	$query = sprintf("UPDATE settings SET value = '%d' WHERE name = '%s'", $f_seek_point, 'last_read_log_smbd_line');
