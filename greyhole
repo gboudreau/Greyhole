@@ -489,7 +489,7 @@ function execute_next_task() {
 	if ($task->action != 'write' && $task->action != 'rename') {
 		$sleep_before_task = array();
 	}
-	$query = sprintf("INSERT INTO tasks_completed (SELECT * FROM tasks WHERE id = %d)", $task->id);
+	$query = sprintf("INSERT INTO tasks_completed SELECT * FROM tasks WHERE id = %d", $task->id);
 	db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
 
 	$query = sprintf("DELETE FROM tasks WHERE id = %d", $task->id);
@@ -2141,9 +2141,11 @@ function gh_recycle($real_path) {
 }
 
 function repair_tables() {
-	db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
-	db_query("REPAIR TABLE tasks_completed") or gh_log(CRITICAL, "Can't repair tasks_completed table: " . db_error());
-	db_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . db_error());
+	if (@$db_use_mysql) {
+		db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
+		db_query("REPAIR TABLE tasks_completed") or gh_log(CRITICAL, "Can't repair tasks_completed table: " . db_error());
+		db_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . db_error());
+	}
 }
 
 function check_storage_pool_dirs() {
@@ -2249,7 +2251,7 @@ function get_gone_ok_dirs() {
 	if ($row !== FALSE) {
 		$gone_ok_drives = unserialize($row->value);
 	} else {
-		$query = "INSERT INTO `greyhole`.`settings` (`name`, `value`) VALUES ('Gone-OK-Drives', 'a:0:{}')";
+		$query = "INSERT INTO settings (name, value) VALUES ('Gone-OK-Drives', 'a:0:{}')";
 		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-OK-Drives: " . db_error());
 		$gone_ok_drives = array();
 	}
@@ -2296,7 +2298,7 @@ function get_fsck_gone_drives() {
 	if ($row !== FALSE) {
 		$fscked_gone_drives = unserialize($row->value);
 	} else {
-		$query = "INSERT INTO `greyhole`.`settings` (`name`, `value`) VALUES ('Gone-FSCKed-Drives', 'a:0:{}')";
+		$query = "INSERT INTO settings (name, value) VALUES ('Gone-FSCKed-Drives', 'a:0:{}')";
 		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-FSCKed-Drives: " . db_error());
 		$fscked_gone_drives = array();
 	}

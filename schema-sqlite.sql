@@ -4,7 +4,7 @@ INSERT INTO settings (name, value) VALUES ('last_read_log_smbd_line', '0');
 INSERT INTO settings (name, value) VALUES ('last_OOS_notification', '0');
 
 CREATE TABLE tasks (
-id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+id INTEGER PRIMARY KEY AUTOINCREMENT,
 action VARCHAR( 10 ) NOT NULL,
 share TINYTEXT NOT NULL,
 full_path TINYTEXT NULL,
@@ -14,7 +14,7 @@ event_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE tasks_completed (
-id BIGINT UNSIGNED NOT NULL,
+id INTEGER PRIMARY KEY AUTOINCREMENT,
 action VARCHAR( 10 ) NOT NULL,
 share TINYTEXT NOT NULL,
 full_path TINYTEXT NULL,

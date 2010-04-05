@@ -37,9 +37,9 @@ function db_connect() {
 	if ($db_options->engine == 'sqlite') {
 		if (!file_exists($db_options->db_path)) {
 			// create the db automatically if it does not exist
-			system("sqlite $db_options->db_path < $db_options->schema");
+			system("sqlite3 $db_options->db_path < $db_options->schema");
 		}
-		$db_options->dbh = sqlite_open($db_options->db_path);
+		$db_options->dbh = new PDO("sqlite:" . $db_options->db_path);
 		return $db_options->dbh;
 	} else {
 		return mysql_connect($db_options->host, $db_options->user, $db_options->pass);
@@ -58,7 +58,7 @@ function db_select_db() {
 function db_query($query) {
 	global $db_options;
 	if ($db_options->engine == 'sqlite') {
-		return sqlite_query($db_options->dbh, $query);
+		return $db_options->dbh->query($query);
 	} else {
 		return mysql_query($query);
 	}
@@ -67,7 +67,8 @@ function db_query($query) {
 function db_escape_string($string) {
 	global $db_options;
 	if ($db_options->engine == 'sqlite') {
-		return sqlite_escape_string($string);
+		$escaped_string = $db_options->dbh->quote($string);
+		return substr($escaped_string, 1, strlen($escaped_string)-2);
 	} else {
 		return mysql_real_escape_string($string);
 	}
@@ -76,7 +77,7 @@ function db_escape_string($string) {
 function db_fetch_object($result) {
 	global $db_options;
 	if ($db_options->engine == 'sqlite') {
-		return sqlite_fetch_object($result);
+		return $result->fetchObject();
 	} else {
 		return mysql_fetch_object($result);
 	}
@@ -94,7 +95,7 @@ function db_free_result($result) {
 function db_insert_id() {
 	global $db_options;
 	if ($db_options->engine == 'sqlite') {
-		return sqlite_last_insert_rowid();
+		return $db_options->dbh->lastInsertId();
 	} else {
 		return mysql_insert_id();
 	}
@@ -103,7 +104,8 @@ function db_insert_id() {
 function db_error() {
 	global $db_options;
 	if ($db_options->engine == 'sqlite') {
-		return sqlite_error_string(sqlite_last_error());
+		$error = $db_options->dbh->errorInfo();
+		return $error[2];
 	} else {
 		return mysql_error();
 	}
