@@ -82,15 +82,6 @@ function db_fetch_object($result) {
 	}
 }
 
-function db_num_rows($result)  {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
-		return sqlite_num_rows($result);
-	} else {
-		return mysql_num_rows($result);
-	}
-}
-
 function db_free_result($result) {
 	global $db_options;
 	if ($db_options->engine == 'sqlite') {
