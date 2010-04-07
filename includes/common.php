@@ -246,7 +246,7 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 		$bin_dir = exec("rpm --eval='%_bindir'");
 		$source = explode("\n", file_get_contents($bin_dir . '/greyhole'));
 		for ($i=0; $i<count($source); $i++) {
-			if (preg_match("/@([^\(]+)/", $source[$i], $regs)) {
+			if (preg_match("/@([^\(\) ]+)/", $source[$i], $regs)) {
 				$ignored_warnings[$i+1][] = $regs[1];
 			}
 		}
@@ -263,13 +263,24 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 	case E_COMPILE_WARNING:
 	case E_CORE_WARNING:
 	case E_NOTICE:
-		if (isset($ignored_warnings[$errline]) && preg_match("/([^(]+)\(/", $errstr, $regs)) {
-			if (array_search($regs[1], $ignored_warnings[$errline]) !== FALSE) {
-				// We want to ignore this warning.
-				return TRUE;
+		if (isset($ignored_warnings[$errline])) {
+			if (preg_match("/([^(]+)\(/", $errstr, $regs)) {
+				if (array_search($regs[1], $ignored_warnings[$errline]) !== FALSE) {
+					// We want to ignore this warning.
+					return TRUE;
+				}
+				return FALSE;
+			}
+			if (preg_match("/Undefined variable: (.+)/", $errstr, $regs)) {
+				if (array_search('$'.$regs[1], $ignored_warnings[$errline]) !== FALSE) {
+					// We want to ignore this warning.
+					return TRUE;
+				}
+				return FALSE;
 			}
 		}
-		if ($errstr == 'fopen(/var/log/greyhole.log): failed to open stream: Permission denied') {
+		global $greyhole_log_file;
+		if ($errstr == "fopen($greyhole_log_file): failed to open stream: Permission denied") {
 			// We want to ignore this warning. Happens when regular users try to use greyhole, and greyhole tries to log something.
 			// What would have been logged will be echoed instead.
 			return TRUE;
