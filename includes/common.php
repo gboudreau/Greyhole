@@ -262,6 +262,7 @@ function gh_error_handler($errno, $errstr, $errfile, $errline) {
 	case E_WARNING:
 	case E_COMPILE_WARNING:
 	case E_CORE_WARNING:
+	case E_NOTICE:
 		if (isset($ignored_warnings[$errline]) && preg_match("/([^(]+)\(/", $errstr, $regs)) {
 			if (array_search($regs[1], $ignored_warnings[$errline]) !== FALSE) {
 				// We want to ignore this warning.
