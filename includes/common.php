@@ -76,6 +76,7 @@ function parse_config() {
 					break;
 				case 'delete_moves_to_attic':
 				case 'log_memory_usage':
+				case 'balance_modified_files':
 					global ${$name};
 					${$name} = trim($value) === '1' || stripos(trim($value), 'yes') !== FALSE || stripos(trim($value), 'true') !== FALSE;
 					break;
@@ -174,6 +175,11 @@ function parse_config() {
 		$db_options->user = $db_user;
 		$db_options->pass = $db_pass;
 		$db_options->name = $db_name;
+	}
+	
+	if (!isset($balance_modified_files)) {
+		global $balance_modified_files;
+		$balance_modified_files = FALSE;
 	}
 }
 
