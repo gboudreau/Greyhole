@@ -489,10 +489,14 @@ function execute_next_task() {
 	if ($task->action != 'write' && $task->action != 'rename') {
 		$sleep_before_task = array();
 	}
-	$query = sprintf("INSERT INTO tasks_completed SELECT * FROM tasks WHERE id = %d", $task->id);
+	archive_task($task->id);
+}
+
+function archive_task($task_id) {
+	$query = sprintf("INSERT INTO tasks_completed SELECT * FROM tasks WHERE id = %d", $task_id);
 	db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
 
-	$query = sprintf("DELETE FROM tasks WHERE id = %d", $task->id);
+	$query = sprintf("DELETE FROM tasks WHERE id = %d", $task_id);
 	db_query($query) or gh_log(CRITICAL, "Can't delete from tasks: " . db_error());
 }
 
@@ -601,11 +605,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		// Check if another process locked this file before we work on it.
 		if (file_is_locked($share, $target_full_path) !== FALSE) {
 			gh_log(DEBUG, "  File $landing_zone/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
-			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
-				$task_id
-			);
-			db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
-			$sleep_before_task[] = db_insert_id();
+			postpone_task($task_id);
 			return;
 		}
 
@@ -730,7 +730,7 @@ function real_file_is_locked($real_fullpath) {
 }
 
 function gh_write($share, $full_path, $task_id) {
-	global $storage_pool_directories, $log_level, $sleep_before_task, $balance_modified_files;
+	global $storage_pool_directories, $log_level, $balance_modified_files, $sleep_before_task;
 	
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
@@ -739,11 +739,7 @@ function gh_write($share, $full_path, $task_id) {
 	
 	if (!gh_file_exists("$landing_zone/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) {
 		if (!gh_file_exists($landing_zone, '  Share "'.$share.'" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {
-			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
-				$task_id
-			);
-			db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
-			$sleep_before_task[] = db_insert_id();
+			postpone_task($task_id);
 		}
 		return;
 	}
@@ -826,11 +822,7 @@ function gh_write($share, $full_path, $task_id) {
 		// Check if another process locked this file before we work on it.
 		if (($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
 			gh_log(DEBUG, "  File is locked by another process. Will wait until it's unlocked to work on it.");
-			$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
-				$task_id
-			);
-			db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
-			$sleep_before_task[] = db_insert_id();
+			postpone_task($task_id);
 			return;
 		}
 		$sleep_before_task = array();
@@ -840,11 +832,7 @@ function gh_write($share, $full_path, $task_id) {
 
 	if (count($tombstones) == 0) {
 		gh_log(WARN, "  No tombstones could be created. Will wait until tombstones can be created to work on this file.");
-		$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d)",
-			$task_id
-		);
-		db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
-		$sleep_before_task[] = db_insert_id();
+		postpone_task($task_id);
 		return;
 	}
 
@@ -2517,4 +2505,13 @@ function sort_storage_dirs_available_space() {
 	return $sorted_target_drives;
 }
 
+function postpone_task($task_id, $complete='yes') {
+	global $sleep_before_task;
+	$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, '%s' FROM tasks WHERE id = %d)",
+		db_escape_string($complete),
+		$task_id
+	);
+	db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
+	$sleep_before_task[] = db_insert_id();
+}
 ?>
