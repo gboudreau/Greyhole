@@ -9,7 +9,7 @@ action VARCHAR( 10 ) NOT NULL,
 share TINYTEXT NOT NULL,
 full_path TINYTEXT NULL,
 additional_info TINYTEXT NULL,
-complete BOOL NOT NULL,
+complete TINYTEXT NOT NULL,
 event_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -19,6 +19,6 @@ action VARCHAR( 10 ) NOT NULL,
 share TINYTEXT NOT NULL,
 full_path TINYTEXT NULL,
 additional_info TINYTEXT NULL,
-complete BOOL NOT NULL,
+complete TINYTEXT NOT NULL,
 event_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

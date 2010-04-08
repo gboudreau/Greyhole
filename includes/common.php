@@ -58,9 +58,11 @@ if (!isset($smb_config_file)) {
 }
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories;
 
 	$shares_options = array();
+	$storage_pool_directories = array();
+	$frozen_directories = array();
 	$config_text = file_get_contents($config_file);
 	foreach (explode("\n", $config_text) as $line) {
 		if (preg_match("/^[ \t]*([^ \t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
@@ -98,6 +100,9 @@ function parse_config() {
 					break;
 				case 'stick_into':
 					$sticky_files[$last_sticky_files_dir][] = '/' . trim($value, '/');
+					break;
+				case 'frozen_directory':
+					$frozen_directories[] = trim($value, '/');
 					break;
 				default:
 					if (strpos($name, 'num_copies') === 0) {

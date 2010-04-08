@@ -25,6 +25,8 @@ parse_config();
 
 db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
 db_select_db();
+db_migrate();
+
 if (@$db_use_mysql) {
 	db_query("SET SESSION group_concat_max_len = 1048576");
 }
@@ -51,11 +53,14 @@ for ($i=1; $i<$argc; $i++) {
 		case '--wait-for':
 		case '--gone':
 		case '--going':
+		case '--thaw':
 		$action = substr($argv[$i], 2);
 		// Fall through --dir to fetch the path to the Gone/Gone-But-OK drive
 
 		case '--dir':
-		$options['dir'] = $argv[$i+1];
+		if (isset($argv[$i+1])) {
+			$options['dir'] = $argv[$i+1];
+		}
 		$i++;
 		break;
 
@@ -80,11 +85,14 @@ function print_usage() {
 	echo "Invalid command line options.\n";
 	echo "Usage: Start the daemon:         greyhole --daemon\n";
 	echo "       Schedule a fsck:          greyhole --fsck [--email-report] [--dir <path>] [--disk-usage-report]\n";
-	echo "       Even available space \n";
+	echo "       Balance available space \n";
 	echo "        on storage pool devices: greyhole --balance\n";
 	echo "       Display statistics:       greyhole --stats\n";
 	echo "       Empty attic:              greyhole --empty-attic\n";
 	echo "       Debug file operations:    greyhole --debug <filename>\n";
+	echo "\n";
+	echo "       List frozen directories:  greyhole --thaw\n";
+	echo "       Thaw a frozen directory:  greyhole --thaw <share/directory>\n";
 	echo "\n";
 	echo "       Pre-rotate task:          greyhole --prerotate\n";
 	echo "       Post-rotate task:         greyhole --postrotate\n";
@@ -101,6 +109,28 @@ if ($action != 'stats' && $action != 'debug') {
 		echo "You need to execute this as root.\n";
 		exit(1);
 	}
+}
+
+if ($action == 'thaw') {
+	if (!isset($options['dir'])) {
+		echo "Frozen directories:\n";
+		foreach ($frozen_directories as $frozen_directory) {
+			echo "  $frozen_directory\n";
+		}
+		echo "To thaw any of the above directories, use the following command:\n";
+		echo "greyhole --thaw <directory>\n";
+		exit(0);
+	}
+	$path = explode('/', $options['dir']);
+	$share = array_shift($path);
+	$query = sprintf("UPDATE tasks SET complete = 'thawed' WHERE complete = 'frozen' AND share = '%s' AND full_path LIKE '%s%%'",
+		db_escape_string($share),
+		db_escape_string(implode('/', $path))
+	);
+	db_query($query) or die("Can't thaw tasks with query: $query - Error: " . db_error());
+	echo $options['dir'] . " directory has been thawed.\n";
+	echo "All pasts file operations that occured in this directory will now be processed by Greyhole.\n";
+	exit(0);
 }
 
 if ($action == 'gone' || $action == 'going') {
@@ -390,9 +420,9 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action;
+	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories;
 
-	$query = "SELECT id, action, share, full_path, additional_info FROM tasks WHERE complete = 'yes' ORDER BY id ASC LIMIT 1";
+	$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed') ORDER BY id ASC LIMIT 1";
 	$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
 	$task = db_fetch_object($result);
 	if ($task === FALSE) {
@@ -403,6 +433,20 @@ function execute_next_task() {
 		return;
 	}
 	db_free_result($result);
+
+	# Postpone tasks in frozen directories until a --thaw command is received
+	if ($task->complete != 'thawed') {
+		foreach ($frozen_directories as $frozen_directory) {
+			if (strpos("$task->share/$task->full_path", $frozen_directory) === 0) {
+				$action = $task->action;
+				gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+				gh_log(DEBUG, "  This directory is frozen. Will postpone this task until it is thawed.");
+				postpone_task($task->id, 'frozen');
+				archive_task($task->id);
+				return;
+			}
+		}
+	}
 	
 	if (($key = array_search($task->id, $sleep_before_task)) !== FALSE) {
 		$action = 'sleep';

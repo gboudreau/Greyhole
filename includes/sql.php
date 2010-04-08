@@ -110,4 +110,32 @@ function db_error() {
 		return mysql_error();
 	}
 }
+
+function db_migrate() {
+	global $db_options, $db_use_mysql, $db_use_sqlite;
+	// Migration #1
+	if (@$db_use_mysql) {
+		$query = "DESCRIBE tasks";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if ($row->Field == 'complete') {
+				if ($row->Type == "enum('yes','no')") {
+					// migrate
+					db_query("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
+					db_query("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
+				}
+				break;
+			}
+		}
+	} else if (@$db_use_sqlite) {
+		$query = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tasks'";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if (strpos($row->sql, 'complete BOOL NOT NULL') !== FALSE) {
+				// migrate; not supported! @see http://sqlite.org/omitted.html
+				gh_log(CRITICAL, "Your SQLite database is not up to date. Column tasks.complete needs to be a TINYTEXT. Please fix, then retry.");
+			}
+		}
+	}
+}
 ?>
