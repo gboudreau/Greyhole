@@ -2386,7 +2386,8 @@ function gh_balance() {
 	}
 
 	foreach ($sorted_pool_drives as $source_drive) {
-		gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+		$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
+		gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 
 		// Start with the shares for which we keep the most # copies;
 		// That way, if the new drive fails soon, it won't take with it files for which we only have one copy!
@@ -2406,7 +2407,6 @@ function gh_balance() {
 			gh_log(DEBUG, "Found ". count($files) ." files that can be moved.");
 			
 			// Repeat until all drives' available space is balanced.
-			$file_too_big_counter = 0;
 			$file_everywhere_counter = 0;
 			foreach ($files as $file) {
 				$filesize = filesize($file)/1024; // KB
@@ -2430,19 +2430,14 @@ function gh_balance() {
 					continue;
 				}
 
-				if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize) {
-					$file_too_big_counter++;
-					gh_log(DEBUG, "    File too big ($file_too_big_counter/10); moving it wouldn't help balancing available space.");
-					if ($file_too_big_counter >= 10) {
-						// We're done with $source_drive: found 10 files in a row that were too big
-						// Continue with the next drive...
-						gh_log(DEBUG, "    Aborting. Reason: $source_drive now has more or as much available space as all other storage pool directories.");
-						break;
-					}
+				gh_log(DEBUG, "  Target drive: $target_drive (". bytes_to_human($pool_drives_avail_space[$target_drive]*1024, FALSE) ." available)");
+
+				if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize
+						|| $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
+						|| $pool_drives_avail_space[$target_drive] < $target_avail_space) {
+					gh_log(DEBUG, "  Moving this file wouldn't help balancing available space. Skipping.");
 					continue;
 				}
-
-				gh_log(DEBUG, "  Target drive: $target_drive (". bytes_to_human($pool_drives_avail_space[$target_drive]*1024, FALSE) ." available)");
 
 				// Make sure the parent directory exists, before we try moving something there...
 				$original_path = clean_dir("$source_drive/$share_name/$path");
@@ -2490,11 +2485,12 @@ function gh_balance() {
 					}
 				}
 				
-				gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+				$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
+				gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 			}
-			gh_log(DEBUG, "Done balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+			gh_log(DEBUG, "Done balancing share: $share_name");
 		}
-		gh_log(DEBUG, "Done balancing share: $share_name");
+		gh_log(DEBUG, "Done balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
 	}
 }
 
