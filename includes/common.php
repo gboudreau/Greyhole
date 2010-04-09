@@ -170,7 +170,7 @@ function parse_config() {
 
 	$db_options = (object) array(
 		'engine' => $db_engine,
-		'schema' => "/var/share/greyhole/schema-$db_engine.sql"
+		'schema' => "/usr/share/greyhole/schema-$db_engine.sql"
 	);
 	if ($db_options->engine == 'sqlite') {
 		$db_options->db_path = $db_path;

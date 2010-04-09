@@ -2109,7 +2109,7 @@ Attic size:\n";
 		if ($fsck_report['gone_ok'] > 0) {
 			$report .= "  Found " . $fsck_report['gone_ok'] . " missing files that are in a storage pool directory marked Temporarily-Gone.
   If this directory is gone for good, you should execute the following command, and remove the directory from your configuration file:
-    sudo greyhole --gone <path>
+    greyhole --gone <path>
   where <path> is one of:\n";
 	    	$report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
 		}
@@ -2215,7 +2215,7 @@ Here are your options:
 - If the mount is gone, you should either re-mount it manually (if possible), or remove it from your configuration file, if you know it is gone for good.
 
 - If you know this mount will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:
-  sudo greyhole --wait-for ".quoted_form($target_drive)."
+  greyhole --wait-for ".quoted_form($target_drive)."
 
 A fsck will now start, to fix the symlinks found in your shares, when possible.
 You'll receive a report email once that fsck run completes.
