@@ -2200,6 +2200,7 @@ function check_storage_pool_dirs() {
 	foreach ($storage_pool_directories as $target_drive) {
 		if (!is_greyhole_owned_dir($target_drive) && !gone_fscked($target_drive, $i++ == 0)) {
 			$needs_fsck = 1;
+			mark_gone_drive_fscked($target_drive);
 			gh_log(WARN, "Warning! It seems $target_drive is missing it's \".greyhole_uses_this\" file. This either means this mount is currently unmounted, or you forgot to create this file.");
 			$body = "This is an automated email from Greyhole.
 
@@ -2266,9 +2267,6 @@ You'll receive a report email once that fsck run completes.
 		$fsck_report = get_fsck_report();
 		gh_log(DEBUG, "Sending fsck report to $email_to");
 		mail($email_to, 'fsck of Greyhole shares on ' . $hostname, $fsck_report);
-		if ($needs_fsck === 1) {
-			mark_gone_drive_fscked($target_drive);
-		}
 
 		// Refresh $gone_ok_drives to it's real value (from the DB)
 		get_gone_ok_dirs();
