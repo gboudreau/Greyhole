@@ -212,7 +212,7 @@ if ($action == 'debug') {
 
 		# Is there more?
 		$new_query = preg_replace('/SELECT .* FROM/i', 'SELECT COUNT(*) FROM', $query);
-		$result = db_query($query) or die("Can't query tasks_completed for COUNT of renames with query: $new_query - Error: " . db_error());
+		$result = db_query($new_query) or die("Can't query tasks_completed for COUNT of renames with query: $new_query - Error: " . db_error());
 		if (db_fetch_object($result) !== FALSE) {
 			break;
 		}
@@ -2056,7 +2056,7 @@ Attic size:\n";
 
 	// Errors
 	if (empty($fsck_report['no_copies_found_files']) && count($fsck_report['wrong_file_size']) == 0) {
-		$report .= "\nNo problems found.\n";
+		$report .= "\nNo problems found.\n\n";
 	} else {
 		$report .= "\nProblems:\n";
 
@@ -2074,7 +2074,7 @@ Attic size:\n";
 			foreach ($fsck_report['wrong_file_size'] as $real_file_path => $info_array) {
 				$report .= "    $real_file_path is " . number_format($info_array[0]) . " bytes; should be " . number_format($info_array[1]) . " bytes.\n";
 			}
-			$report .= "\n";
+			$report .= "\n\n";
 		}
 	}
 
