@@ -3,7 +3,7 @@ Version:        $VERSION
 Release:        1
 Summary:        Greyhole is a drive pooling technology for Samba
 Group:          System Environment/Daemons
-Source:         http://greyhole.googlecode.com/files/greyhole-%{version}.tar.gz
+Source:         http://greyhole.googlecode.com/files/%{name}-%{version}.tar.gz
 License:        GPL
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Requires:       samba php php-mysql mysql-server rsyslog

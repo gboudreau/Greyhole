@@ -1,4 +1,4 @@
-VERSION=0.6.4
+VERSION=0.6.6
 ARCH=x86_64
 PACKAGE=greyhole
 
@@ -7,9 +7,18 @@ rpm: dist
 	mv ~/rpmbuild/RPMS/$(ARCH)/$(PACKAGE)-$(VERSION)-*.$(ARCH).rpm release/
 	mv ~/rpmbuild/SRPMS/$(PACKAGE)-$(VERSION)-*.src.rpm release/
 
+amahi-rpm: dist
+	(cd release && rm -rf $(PACKAGE)-$(VERSION) hda-$(PACKAGE)-$(VERSION))
+	(cd release && tar -xzf $(PACKAGE)-$(VERSION).tar.gz && mv $(PACKAGE)-$(VERSION) hda-$(PACKAGE)-$(VERSION))
+	(cd release/hda-$(PACKAGE)-$(VERSION)/ && sed -i -e 's/Name:           greyhole/Name:           hda-greyhole/' $(PACKAGE).spec && mv $(PACKAGE).spec hda-$(PACKAGE).spec)
+	(cd release && tar -czf hda-$(PACKAGE)-$(VERSION).tar.gz hda-$(PACKAGE)-$(VERSION))
+	(cd release && rpmbuild -ta --target $(ARCH) hda-$(PACKAGE)-$(VERSION).tar.gz)
+	mv ~/rpmbuild/RPMS/$(ARCH)/hda-$(PACKAGE)-$(VERSION)-*.$(ARCH).rpm release/
+	mv ~/rpmbuild/SRPMS/hda-$(PACKAGE)-$(VERSION)-*.src.rpm release/
+
 dist:
 	(mkdir -p release && cd release && mkdir -p $(PACKAGE)-$(VERSION))
-	rsync -a --exclude make_rpm.sh --exclude release/ * release/$(PACKAGE)-$(VERSION)/
+	rsync -a --exclude .svn/ --exclude make_rpm.sh --exclude release/ * release/$(PACKAGE)-$(VERSION)/
 	(cd release/$(PACKAGE)-$(VERSION)/ && svn log -r 1:HEAD http://greyhole.googlecode.com/svn/trunk/ > CHANGES)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 
