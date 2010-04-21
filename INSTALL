@@ -4,7 +4,10 @@ Greyhole Installation Instructions
 The following instructions are for Fedora 12.
 If you know what you're doing, you should have no problem installing on any other operating system that runs Samba (http://www.samba.org).
 
-Note: I tried using Ubuntu 9.10 first, but had bad experiences with the CIFS server & client there... so I switched to FC12. I still have the install notes I used for Ubuntu; feel free to use that if you want.
+Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
+      See http://www.samba.org/samba/history/samba-3.4.3.html - BUG 6769: Fix symlink unlink. - https://bugzilla.samba.org/show_bug.cgi?id=6769
+      With this bug present, trying to delete files on Greyhole shares will not work!
+      Make sure the Samba version you use includes this fix, or isn't affected by this bug.
 
 1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC:
 
