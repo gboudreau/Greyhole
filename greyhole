@@ -980,12 +980,14 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			gh_chperm($tombstone->path, $file_infos);
 		} else {
 			gh_log(WARN, "    Failed file copy. Skipping.");
+			@unlink($temp_path);
 			if ($tombstone->is_linked) {
 				$tombstone->is_linked = FALSE;
 				$link_next = TRUE;
 			}
 			$tombstone->state = 'Gone';
 			$tombstones[$key] = $tombstone;
+			save_tombstones($share, $path, $filename, array_values($tombstones));
 			continue;
 		}
 
