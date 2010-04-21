@@ -184,6 +184,10 @@ if ($action == 'debug') {
 		print_usage();
 	}
 	$filename = $options['debug_filename'];
+	
+	if (strpos($filename, '/') === FALSE) {
+		$filename = "/$filename";
+	}
 
 	echo "Debugging file operations for file named \"$filename\"\n";
 
