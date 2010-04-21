@@ -629,6 +629,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		$existing_tombstones = get_tombstones($share, $target_full_path, null, FALSE, FALSE, FALSE); // $check_symlink=FALSE to prevent symlinks to be handled at this point; they'll be fixed below.
 		foreach ($existing_tombstones as $file_path => $file_tombstones) {
 			$new_file_tombstones = array();
+			$symlinked = FALSE;
 			foreach ($file_tombstones as $key => $tombstone) {
 				$old_path = $tombstone->path;
 				$tombstone->path = str_replace("/$share/$full_path/", "/$share/$target_full_path/", $tombstone->path);
@@ -637,11 +638,22 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 
 				// is_linked = is the target of the existing symlink
 				if ($tombstone->is_linked) {
+					$symlinked = TRUE;
 					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
 					if (gh_recycle("$landing_zone/$target_full_path/$file_path")) {
  						@symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
 						// Creating this symlink can fail if the parent dir was removed
 					}
+				}
+			}
+			if (!$symlinked && count($file_tombstones) > 0) {
+				// None of the tombstones were is_linked; use the last one for the symlink.
+				$tombstone->is_linked = TRUE;
+				$file_tombstones[$key] = $tombstone;
+				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
+				if (gh_recycle("$landing_zone/$target_full_path/$file_path")) {
+					@symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
+					// Creating this symlink can fail if the parent dir was removed
 				}
 			}
 			list($path, $filename) = explode_full_path("$target_full_path/$file_path");
@@ -683,6 +695,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			// New file
 			gh_write($share, $target_full_path, $task_id);
 		} else {
+			$symlinked = FALSE;
 			foreach ($existing_tombstones as $key => $tombstone) {
 				$old_path = $tombstone->path;
 				$tombstone->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $old_path);
@@ -698,6 +711,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 
 				if ($it_worked) {
 					// is_linked = is the target of the existing symlink
+					$symlinked = TRUE;
 					if ($tombstone->is_linked) {
 						gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
 						if (gh_recycle("$landing_zone/$target_full_path")) {
@@ -709,6 +723,16 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 					gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $tombstone->path.");
 				}
 				$existing_tombstones[$key] = $tombstone;
+			}
+			if (!$symlinked && count($existing_tombstones) > 0) {
+				// None of the tombstones were is_linked; use the last one for the symlink.
+				$tombstone->is_linked = TRUE;
+				$existing_tombstones[$key] = $tombstone;
+				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
+				if (gh_recycle("$landing_zone/$target_full_path")) {
+					@symlink($tombstone->path, "$landing_zone/$target_full_path");
+					// Creating this symlink can fail if the parent dir was removed
+				}
 			}
 			remove_tombstones($share, $path, $filename);
 			save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
