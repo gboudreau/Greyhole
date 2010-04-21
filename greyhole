@@ -1678,7 +1678,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 
 	$landing_zone = get_share_landing_zone($share);
 
-	$file_path = substr($path, strlen($landing_zone)+1);
+	$file_path = trim(substr($path, strlen($landing_zone)+1), '/');
 
 	if ($file_type == 'file') {
 		// Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
@@ -1726,9 +1726,6 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
 				@rmdir($clean_full_path);
 				continue;
-			}
-			if (!isset($source_real_path)) {
-				$source_real_path = $clean_full_path;
 			}
 
 			gh_log(DEBUG, "Found $clean_full_path");
@@ -1824,8 +1821,14 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			}
 			$file_size = filesize($real_full_path);
 			if ($file_size != $expected_file_size && real_file_is_locked($real_full_path) === FALSE && real_file_is_locked($original_file_path) === FALSE) {
-				gh_log(WARN, "  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.");
-				$fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
+				if ($file_size == 0) {
+					// Empty file; just delete it.
+					gh_log(WARN, "  An empty file copy was found: $real_full_path is 0 bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.");
+					unlink($real_full_path);
+				} else {
+					gh_log(WARN, "  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.");
+					$fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
+				}
 				// Will not count that copy as a valid copy!
 				unset($file_copies_inodes[$key]);
 			}
@@ -1856,7 +1859,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			}
 			save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 		}
-	} else if (count($file_copies_inodes) == 0 && !isset($source_real_path)) {
+	} else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
 		gh_log(WARN, '  WARNING! No copies of this file are available. Deleting from share.');
 		gh_recycle("$landing_zone/$file_path/$filename");
 		if ($source == 'graveyard') {
@@ -1868,15 +1871,15 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
 	} else if (count($file_copies_inodes) < $num_copies_required) {
 		// Create new copies
-		gh_log(INFO, "  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $source_real_path");
+		gh_log(INFO, "  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
 		$fsck_report['missing_copies']++;
-		clearstatcache(); $filesize = filesize("$source_real_path");
+		clearstatcache(); $filesize = filesize("$original_file_path");
 		$file_tombstones = create_tombstones($share, "$file_path/$filename", $num_copies_required, $filesize, $file_tombstones);
 
 		// Re-copy the file everywhere, and re-create the symlink
 		$symlink_created = FALSE;
 		foreach ($file_tombstones as $key => $tombstone) {
-			if ($source_real_path != $tombstone->path) {
+			if ($original_file_path != $tombstone->path) {
 				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
 
 				if ($tombstone->state == 'Gone') {
@@ -1906,9 +1909,9 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				if ($tombstone->state == 'Pending') {
 					gh_log(DEBUG, "  Copying file to $tombstone->path");
 					$temp_path = get_temp_filename($tombstone->path);
-					if (copy($source_real_path, $temp_path)) {
+					if (copy($original_file_path, $temp_path)) {
 						rename($temp_path, $tombstone->path);
-						gh_chperm($tombstone->path, gh_get_file_infos($source_real_path));
+						gh_chperm($tombstone->path, gh_get_file_infos($original_file_path));
 						$tombstone->state = 'OK';
 					} else {
 						gh_log(WARN, "    Failed file copy. Skipping.");
