@@ -1798,10 +1798,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			}
 		}
 		if (!$found_linked_tombstone) {
-			$fist_tombstone = reset($file_tombstones);
-			$fist_tombstone->is_linked = TRUE;
-			$expected_file_size = filesize($fist_tombstone->path);
-			$original_file_path = $fist_tombstone->path;
+			$first_tombstone = reset($file_tombstones);
+			$first_tombstone->is_linked = TRUE;
+			$expected_file_size = filesize($first_tombstone->path);
+			$original_file_path = $first_tombstone->path;
 		}
 		
 		if (isset($options['disk-usage-report'])) {
