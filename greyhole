@@ -1345,6 +1345,19 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	global $samba_log_file, $action;
 	$action = 'parse_logs';
 
+	// If we have enough queued tasks (9k+), let's not parse the log at this time, and get some work done.
+	// Once we fall below 9k tasks queued, we'll queue at most 1k new tasks, then get back to work.
+	// This will effectively 'batch' large file operations to make sure the DB doesn't become a problem because of the number of row,
+	//   and this will allow the end-user to see real activity, other that new rows in greyhole.tasks...
+	$query = "SELECT COUNT(*) num_rows FROM tasks";
+	$result = db_query($query) or gh_log(CRITICAL, "Can't get tasks count: " . db_error());
+	$row = db_fetch_object($result);
+	db_free_result($result);
+	$num_rows = (int) $row->num_rows;
+	if ($num_rows >= 9000) {
+		return;
+	}
+
 	$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_read_log_smbd_line');
 	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_read_log_smbd_line': " . db_error());
 	$row = db_fetch_object($result);
@@ -1442,6 +1455,16 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			}
 
 			db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
+			
+			// If we have enough queued tasks (10k), let's stop parsing the log, and get some work done.
+			$query = "SELECT COUNT(*) num_rows FROM tasks";
+			$result = db_query($query) or gh_log(CRITICAL, "Can't get tasks count: " . db_error());
+			$row = db_fetch_object($result);
+			db_free_result($result);
+			$num_rows = (int) $row->num_rows;
+			if ($num_rows >= 10000) {
+				break;
+			}
 		}
 	}
 	$f_seek_point = ftell($fp);
