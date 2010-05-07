@@ -979,15 +979,25 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			rename($temp_path, $tombstone->path);
 			gh_chperm($tombstone->path, $file_infos);
 		} else {
-			gh_log(WARN, "    Failed file copy. Skipping.");
+			gh_log(WARN, "    Failed file copy. Will mark this tombstone 'Gone', and re-process this write task.");
 			@unlink($temp_path);
 			if ($tombstone->is_linked) {
 				$tombstone->is_linked = FALSE;
 				$link_next = TRUE;
 			}
 			$tombstone->state = 'Gone';
+			gh_recycle($tombstone->path);
 			$tombstones[$key] = $tombstone;
 			save_tombstones($share, $path, $filename, array_values($tombstones));
+
+			// Queue a new write task, to replace the now gone copy.
+			// Insert with id = 0 to make sure it's processed right after the current task is complete.
+			$query = sprintf("INSERT INTO tasks (id, action, share, full_path, complete) VALUES (0, 'write', '%s', '%s', 'yes')",
+				db_escape_string($share),
+				db_escape_string(clean_dir("$path/$filename"))
+			);
+			db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
+
 			continue;
 		}
 
