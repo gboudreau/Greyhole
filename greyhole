@@ -1237,30 +1237,31 @@ function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALS
 		}
 	}
 
-	if (!$load_nok_tombstones) {
-		$ok_tombstones = array();
-		foreach ($tombstones as $key => $tombstone) {
-			if ($tombstone->state == 'OK') {
-				$valid_path = FALSE;
-				global $storage_pool_directories;
-				foreach ($storage_pool_directories as $dir) {
-					if (strpos($tombstone->path, $dir) === 0) {
-						$valid_path = TRUE;
-						break;
-					}
-				}
-				if ($valid_path) {
-					$ok_tombstones[$key] = $tombstone;
-				} else {
-					gh_log(INFO, "Found a tombstone pointing to a directory not defined in your storage pool: '$tombstone->path'. Will mark it as Gone.");
-					$tombstone->state = 'Gone';
-					$tombstones[$key] = $tombstone;
-					save_tombstones($share, $path, $filename, array_values($tombstones));
-				}
+	$ok_tombstones = array();
+	foreach ($tombstones as $key => $tombstone) {
+		$valid_path = FALSE;
+		global $storage_pool_directories;
+		foreach ($storage_pool_directories as $dir) {
+			if (strpos($tombstone->path, $dir) === 0) {
+				$valid_path = TRUE;
+				break;
 			}
 		}
-		$tombstones = $ok_tombstones;
+		if ($valid_path && ($load_nok_tombstones || $tombstone->state == 'OK')) {
+			$ok_tombstones[$key] = $tombstone;
+		} else {
+			if (!$valid_path) {
+				gh_log(INFO, "Found a tombstone pointing to a directory not defined in your storage pool: '$tombstone->path'. Will mark it as Gone.");
+				$tombstone->state = 'Gone';
+				$tombstones[$key] = $tombstone;
+				save_tombstones($share, $path, $filename, array_values($tombstones));
+			} else {
+				gh_log(INFO, "Found a tombstone, pointing to '$tombstone->path', with state = '$tombstone->state'. We just want 'OK' tombstones; will not use this tombstone.");
+			}
+		}
 	}
+	$tombstones = $ok_tombstones;
+	
 	if (!$quiet) {
 		gh_log(DEBUG, "Got " . count($tombstones) . " tombstones.");
 	}
