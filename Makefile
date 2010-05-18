@@ -1,4 +1,4 @@
-VERSION=0.6.7
+VERSION=0.6.8
 ARCH=x86_64
 PACKAGE=greyhole
 
@@ -15,6 +15,7 @@ amahi-rpm: dist
 	(cd release && rpmbuild -ta --target $(ARCH) hda-$(PACKAGE)-$(VERSION).tar.gz)
 	mv ~/rpmbuild/RPMS/$(ARCH)/hda-$(PACKAGE)-$(VERSION)-*.$(ARCH).rpm release/
 	mv ~/rpmbuild/SRPMS/hda-$(PACKAGE)-$(VERSION)-*.src.rpm release/
+	(cd release/ && rm -rf hda-$(PACKAGE)-$(VERSION))
 
 dist:
 	(mkdir -p release && cd release && mkdir -p $(PACKAGE)-$(VERSION))
