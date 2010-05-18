@@ -9,7 +9,10 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 Requires:       samba php php-mysql mysql-server rsyslog
 
 %description
-Greyhole is a drive pooling technology for Samba
+Greyhole allows you to create a storage pool, accessible from 
+Samba shares, that offers data redundancy and JBOD concatenation.
+
+%define debug_package %{nil}
 
 %prep
 %setup -q
@@ -20,11 +23,11 @@ Greyhole is a drive pooling technology for Samba
 %install
 rm -rf $RPM_BUILD_ROOT
 
-mkdir -p $RPM_BUILD_ROOT%{_initrddir}
+mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/
 
-install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}%{_initrddir}/greyhole
+install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/rc.d/init.d/greyhole
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0750 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
@@ -36,7 +39,11 @@ install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/gre
 %ifarch x86_64
 	install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 %else
-	install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+	%ifarch %{arm}
+		install -m 0755 -D -p samba-module/bin/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+	%else
+		install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+	%endif
 %endif
 
 %clean
@@ -56,10 +63,12 @@ if [ ! -f /etc/greyhole.conf ]; then
 	mv /etc/greyhole.conf.rpmnew /etc/greyhole.conf
 fi
 
-# cifs client workaround
-# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
-modprobe cifs
-echo 0 > /proc/fs/cifs/OplockEnabled
+if [ -f /proc/fs/cifs/OplockEnabled ]; then
+	# cifs client workaround
+	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
+	modprobe cifs
+	echo 0 > /proc/fs/cifs/OplockEnabled
+fi
 
 # Service install
 /sbin/chkconfig --add greyhole
@@ -97,7 +106,7 @@ fi
 
 %files
 %defattr(-,root,root,-)
-%{_initrddir}/greyhole
+/etc/rc.d/init.d/greyhole
 %{_bindir}/
 %{_sysconfdir}/
 %{_libdir}
