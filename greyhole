@@ -1388,6 +1388,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 
 			// Prevent insertion of unneeded duplicates
 			if ($line === $last_line) {
+				update_last_read_log_smbd_line($fp);
 				continue;
 			}
 			$last_line = $line;
@@ -1406,11 +1407,13 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			$share = array_shift($line);
 			if ($act == 'mkdir') {
 				// Nothing to do with those
+				update_last_read_log_smbd_line($fp);
 				continue;
 			}
 			$result = array_pop($line);
 			if (strpos($result, 'failed') === 0) {
 				gh_log(DEBUG, "Failed $act in $share/$line[0]. Skipping.");
+				update_last_read_log_smbd_line($fp);
 				continue;
 			}
 			unset($fullpath);
@@ -1435,15 +1438,16 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 					break;
 				default:
 					$act = FALSE;
-					continue;
 			}
 			if ($act === FALSE) {
+				update_last_read_log_smbd_line($fp);
 				continue;
 			}
 
 			// Close logs are only processed when no more duplicates are found, so we won't execute it just yet; we'll process it the next time we find a non-duplicate line.
 			if ($act != 'close') {
 				if (isset($fd) && $fd == -1) {
+					update_last_read_log_smbd_line($fp);
 					continue;
 				}
 				$new_tasks++;
@@ -1457,6 +1461,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			}
 
 			db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
+			update_last_read_log_smbd_line($fp);
 			
 			// If we have enough queued tasks (10k), let's stop parsing the log, and get some work done.
 			$query = "SELECT COUNT(*) num_rows FROM tasks";
@@ -1469,7 +1474,6 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			}
 		}
 	}
-	$f_seek_point = ftell($fp);
 	fclose($fp);
 
 	// Close logs are only processed when no more duplicates are found, so we'll execute this now that we're done parsing the current log.
@@ -1480,9 +1484,6 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 		);
 		db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
 	}
-	
-	$query = sprintf("UPDATE settings SET value = '%d' WHERE name = '%s'", $f_seek_point, 'last_read_log_smbd_line');
-	db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . db_error());
 	
 	if ($simplify_after_parse && $new_tasks > 0) {
 		$query = "SELECT COUNT(*) num_rows FROM tasks";
@@ -1496,6 +1497,12 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			}
 		}
 	}
+}
+
+function update_last_read_log_smbd_line($fp) {
+	$f_seek_point = ftell($fp);
+	$query = sprintf("UPDATE settings SET value = '%d' WHERE name = '%s'", $f_seek_point, 'last_read_log_smbd_line');
+	db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . db_error());
 }
 
 function get_free_space_in_storage_pool_dirs() {
