@@ -1217,15 +1217,15 @@ function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALS
 			$share_file_link_to = readlink($share_file);
 		}
 		foreach ($tombstones as $key => $tombstone) {
-			if ($tombstone->state == 'OK') {
-				if ($tombstone->is_linked && $tombstone->path != $share_file_link_to && $share_file_link_to !== FALSE) {
+			if ($tombstone->state == 'OK' && $share_file_link_to !== FALSE) {
+				if ($tombstone->is_linked && $tombstone->path != $share_file_link_to) {
 					if (!$quiet) {
 						gh_log(DEBUG, 'Changing is_linked to FALSE for ' . $tombstone->path);
 					}
 					$tombstone->is_linked = FALSE;
 					$tombstones[$key] = $tombstone;
 					save_tombstones($share, $path, $filename, array_values($tombstones));
-				} else if (!$tombstone->is_linked && $tombstone->path == $share_file_link_to && $share_file_link_to !== FALSE) {
+				} else if (!$tombstone->is_linked && $tombstone->path == $share_file_link_to) {
 					if (!$quiet) {
 						gh_log(DEBUG, 'Changing is_linked to TRUE for ' . $tombstone->path);
 					}
