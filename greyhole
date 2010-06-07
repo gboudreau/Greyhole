@@ -908,10 +908,12 @@ function gh_write($share, $full_path, $task_id) {
 		return;
 	}
 
-	// Use the 1st tombstone for the symlink; it might be on a sticky drive.
-	$i = 0;
-	foreach ($tombstones as $tombstone) {
-		$tombstone->is_linked = ($i++ == 0);
+	if (!is_link("$landing_zone/$full_path")) {
+		// Use the 1st tombstone for the symlink; it might be on a sticky drive.
+		$i = 0;
+		foreach ($tombstones as $tombstone) {
+			$tombstone->is_linked = ($i++ == 0);
+		}
 	}
 
 	save_tombstones($share, $path, $filename, $tombstones);
@@ -1004,8 +1006,8 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		if ($link_next && !$tombstone->is_linked) {
 			$tombstone->is_linked = TRUE;
 			$tombstones[$key] = $tombstone;
-			$link_next = FALSE;
 		}
+		$link_next = FALSE;
 		if ($tombstone->is_linked) {
 			gh_log(DEBUG, "    Creating symlink in share pointing to the above file copy.");
 			symlink($tombstone->path, "$landing_zone/$path/.gh_$filename");
