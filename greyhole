@@ -1644,7 +1644,18 @@ You probably want to do something about this!
 	if (isset($sticky_files)) {
 		foreach ($sticky_files as $share_dir => $stick_into) {
 			if (strpos("$share/$path", $share_dir) === 0) {
-				if (count($stick_into) == 0) {
+				$more_drives_needed = FALSE;
+				if (count($stick_into) > 0) {
+					// Stick files into specific drives: $stick_into
+					// Let's check if those drives are listed in the config file!
+					foreach ($stick_into as $key => $stick_into_dir) {
+						if (array_search($stick_into_dir, $storage_pool_directories) === FALSE) {
+							unset($stick_into[$key]);
+							$more_drives_needed = TRUE;
+						}
+					}
+				}
+				if (count($stick_into) == 0 || $more_drives_needed) {
 					// Stick files into any drives
 					$query = sprintf("SELECT value FROM settings WHERE name = 'stick_into-%s'",
 						db_escape_string($share_dir)
@@ -1652,24 +1663,38 @@ You probably want to do something about this!
 					$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for stick_target-$share_dir: " . db_error());
 					$row = db_fetch_object($result);
 					if ($row !== FALSE) {
-						$stick_into = unserialize($row->value);
+						$stick_into = array_merge($stick_into, unserialize($row->value));
+						// Let's check if those drives are listed in the config file!
+						$update_needed = FALSE;
+						foreach ($stick_into as $key => $stick_into_dir) {
+							if (array_search($stick_into_dir, $storage_pool_directories) === FALSE) {
+								unset($stick_into[$key]);
+								$update_needed = TRUE;
+							}
+						}
+						if ($update_needed) {
+							$value = serialize($stick_into);
+							$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'stick_into-%s'",
+								db_escape_string($value),
+								db_escape_string($share_dir)
+							);
+							db_query($query) or gh_log(CRITICAL, "Can't update settings for stick_into-$share_dir: " . db_error());
+						}
 					} else {
-						$value = serialize($drives);
+						$value = serialize(array_merge($stick_into, $drives));
 						$query = sprintf("INSERT INTO settings (name, value) VALUES ('stick_into-%s', '%s')",
 							db_escape_string($share_dir),
 							db_escape_string($value)
 						);
 						db_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$share_dir: " . db_error());
-						return $drives;
+						return array_merge($stick_into, $drives);
 					}
-				} else {
-					// Stick files into specific drives: $stick_into
 				}
 				
 				// Make sure the drives we want to use are not yet full
 				$priority_drives = array();
 				foreach ($stick_into as $stick_into_dir) {
-					if (array_search($stick_into_dir, $full_drives) === FALSE) {
+					if (array_search($stick_into_dir, $full_drives) === FALSE && array_search($stick_into_dir, $storage_pool_directories) !== FALSE) {
 						unset($drives[array_search($stick_into_dir, $drives)]);
 						$priority_drives[] = $stick_into_dir;
 					}
