@@ -1925,10 +1925,12 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 					unlink($real_full_path);
 				} else {
 					gh_log(WARN, "  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.");
+					gh_recycle($real_full_path);
 					$fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
 				}
 				// Will not count that copy as a valid copy!
 				unset($file_copies_inodes[$key]);
+				unset($file_tombstones[clean_dir($real_full_path)]);
 			}
 		}
 	}
