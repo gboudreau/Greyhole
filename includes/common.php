@@ -131,7 +131,8 @@ function parse_config() {
 		}
 		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
 	} else {
-		gh_log(CRITICAL, "You have no storage_pool_directory defined. Greyhole can't run.");
+		gh_log(WARN, "You have no storage_pool_directory defined. Greyhole can't run.");
+		return FALSE;
 	}
 
 	$config_text = file_get_contents($smb_config_file);
@@ -155,7 +156,8 @@ function parse_config() {
 		}
 		if (!isset($share_options['landing_zone'])) {
 			global $config_file, $smb_config_file;
-			gh_log(CRITICAL, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
+			gh_log(WARN, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
+			return FALSE;
 		}
 	}
 	
@@ -186,6 +188,7 @@ function parse_config() {
 		global $balance_modified_files;
 		$balance_modified_files = FALSE;
 	}
+	return TRUE;
 }
 
 function quoted_form($path) {

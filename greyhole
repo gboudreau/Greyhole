@@ -21,7 +21,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 include('includes/common.php');
 include('includes/sql.php');
-parse_config();
+process_config();
 
 db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
 db_select_db();
@@ -2658,5 +2658,20 @@ function postpone_task($task_id, $complete='yes') {
 	);
 	db_query($query) or gh_log(CRITICAL, "Error inserting postponed task: " . db_error());
 	$sleep_before_task[] = db_insert_id();
+}
+
+// If running on Amahi, loop until the config works.
+// User might configure Greyhole later, and they don't want to show Greyhole 'offline' until then. Users are easy to confused! ;)
+function process_config() {
+	while (!parse_config()) {
+		// Sleep for a while, if running on Amahi.
+		// Otherwise, die.
+		if (file_exists('/usr/bin/hdactl')) {
+			sleep(600); // 10 minutes
+		} else {
+			gh_log(CRITICAL, "Config file parsing failed. Exiting.");
+		}
+	}
+	// Config is OK; go on!
 }
 ?>
