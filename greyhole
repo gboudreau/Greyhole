@@ -1513,17 +1513,18 @@ function get_free_space_in_storage_pool_dirs() {
 	$dfs = array();
 	exec($df_command, $responses);
 	array_shift($responses); // header
-	for ($i=0; $i<count($responses); $i++) {
-		$response = explode(' ', $responses[$i]);
-		$free_space = (float) array_pop($response);
-		$mount = implode(' ', $response);
+	foreach ($storage_pool_directories as $target_drive) {
 		$target_dir = '';
-		foreach ($storage_pool_directories as $target_drive) {
-			if (strpos($target_drive, $mount) === 0 && strlen($target_drive) > strlen($target_dir)) {
-				$target_dir = $target_drive;
+		for ($i=0; $i<count($responses); $i++) {
+			$response = explode(' ', $responses[$i]);
+			$free_space = (float) array_pop($response);
+			$mount = implode(' ', $response);
+			if (strpos($target_drive, $mount) === 0 && strlen($mount) > strlen($target_dir)) {
+				$target_dir = $mount;
+				$target_freespace = $free_space;
 			}
 		}
-		$dfs[$target_dir] = $free_space;
+		$dfs[$target_drive] = $target_freespace;
 	}
 	$last_df_time = time();
 	$last_dfs = $dfs;
@@ -1540,6 +1541,19 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 
 	foreach ($storage_pool_directories as $target_drive) {
 		if (!isset($dfs[$target_drive])) {
+			gh_log(ERROR, "Can't find how much free space is left on $target_drive. This partition will never be used!");
+			gh_log(ERROR, "Please report this using the Issues tab at http://greyhole.pommepause.com. You should include the following information in your ticket:");
+			gh_log(ERROR, "===== Error report starts here =====");
+			gh_log(ERROR, "Unknown free space for partition: $target_drive");
+			global $df_command;
+			gh_log(ERROR, "df_command: $df_command");
+			unset($responses);
+			exec($df_command, $responses);
+			gh_log(ERROR, "Result of df_command: " . var_export($responses, TRUE));
+			unset($responses);
+			exec('df -k 2>&1', $responses);
+			gh_log(ERROR, "Result of df -k: " . var_export($responses, TRUE));
+			gh_log(ERROR, "===== Error report ends here =====");
 			continue;
 		}
 		$free_space = $dfs[$target_drive];
