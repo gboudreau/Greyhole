@@ -9,10 +9,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
       With this bug present, trying to delete files on Greyhole shares will not work!
       Make sure the Samba version you use includes this fix, or isn't affected by this bug.
 
-1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC:
+1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC, etc.:
 
-	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc rsyslog yum-utils php-pear
-	Ubuntu: sudo apt-get install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear
+	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc rsyslog yum-utils php-pear rsync
+	Ubuntu: sudo apt-get install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
 
 2. Install Greyhole (as root):
 
