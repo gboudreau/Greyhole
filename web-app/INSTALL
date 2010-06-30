@@ -1,0 +1,3 @@
+Make sure the "files" folder is writable by the apache user (or whatever user is running your httpd).
+
+If you didn't do that before you tried to access the web-app for the first time, then the current URL is probably index.php?edit=1. Once you fixed the above, you'll need to load index.php, without any parameter (remove the ?edit=1 from the URL).
