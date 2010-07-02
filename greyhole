@@ -2672,7 +2672,7 @@ function sort_storage_dirs_available_space() {
 
 function postpone_task($task_id, $complete='yes') {
 	global $sleep_before_task;
-	$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) (SELECT action, share, full_path, additional_info, '%s' FROM tasks WHERE id = %d)",
+	$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) SELECT action, share, full_path, additional_info, '%s' FROM tasks WHERE id = %d",
 		db_escape_string($complete),
 		$task_id
 	);
