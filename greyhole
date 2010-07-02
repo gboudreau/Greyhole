@@ -781,6 +781,9 @@ function file_is_locked($share, $full_path) {
 	}
 	
 	$real_fullpath = "$landing_zone/$full_path";
+	if (is_link($real_fullpath)) {
+		$real_fullpath = readlink($real_fullpath);
+	}
 	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath) . " 2> /dev/null");
 	if (strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
