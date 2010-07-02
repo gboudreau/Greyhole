@@ -55,7 +55,8 @@ daemon_start () {
 }
 
 start () {
-	if [ -f $LOCKFILE ]; then
+	PID=`cat $PIDFILE`
+	if [ -f $LOCKFILE -a "`ps ax | grep \"^$PID.*greyhole --daemon\" | wc -l`" == "1" ]; then
 		return 0
 	fi
 	echo -n $"Starting Greyhole ... "
