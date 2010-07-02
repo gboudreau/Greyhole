@@ -22,6 +22,7 @@ dist:
 	rsync -a --exclude .svn/ --exclude make_rpm.sh --exclude release/ * release/$(PACKAGE)-$(VERSION)/
 	(cd release/$(PACKAGE)-$(VERSION)/ && svn log -r 1:HEAD http://greyhole.googlecode.com/svn/trunk/ > CHANGES)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
+	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' greyhole)
 
 	# Inject includes/common.php...
 	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "\*/" includes/common.php | head -1 | awk -F':' '{print $$1+2}'` includes/common.php > includes/common.php.1)

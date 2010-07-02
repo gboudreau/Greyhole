@@ -413,7 +413,7 @@ if ($action == 'fsck') {
 	exit(0);
 }
 
-gh_log(INFO, "Greyhole daemon started.");
+gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
 parse_samba_log();
 simplify_tasks();
 while (TRUE) {
