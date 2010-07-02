@@ -55,8 +55,11 @@ daemon_start () {
 }
 
 start () {
-	PID=`cat $PIDFILE`
-	if [ -f $LOCKFILE -a "`ps ax | grep \"^$PID.*greyhole --daemon\" | wc -l`" == "1" ]; then
+	if [ -f $PIDFILE ]; then
+		PID=`cat $PIDFILE`
+	fi
+	if [ -f $LOCKFILE -a -f $PIDFILE -a "`ps ax | grep \"^$PID.*greyhole --daemon\" | wc -l`" == "1" ]; then
+		echo "Greyhole is already running."
 		return 0
 	fi
 	echo -n $"Starting Greyhole ... "
