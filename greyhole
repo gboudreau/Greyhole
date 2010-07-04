@@ -424,19 +424,24 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories;
+	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task;
 
-	$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed') ORDER BY id ASC LIMIT 1";
-	$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
-	$task = db_fetch_object($result);
-	if ($task === FALSE) {
-		$action = 'sleep';
-		gh_log(DEBUG, "Nothing to do... Sleeping.");
-		sleep($log_level == DEBUG ? 10 : 600);
+	if (isset($next_task)) {
+		$task = $next_task;
+		unset($next_task);
+	} else {
+		$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed') ORDER BY id ASC LIMIT 1";
+		$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
+		$task = db_fetch_object($result);
+		if ($task === FALSE) {
+			$action = 'sleep';
+			gh_log(DEBUG, "Nothing to do... Sleeping.");
+			sleep($log_level == DEBUG ? 10 : 600);
+			db_free_result($result);
+			return;
+		}
 		db_free_result($result);
-		return;
 	}
-	db_free_result($result);
 
 	# Postpone tasks in frozen directories until a --thaw command is received
 	if ($task->complete != 'thawed') {
@@ -797,9 +802,9 @@ function file_is_locked($share, $full_path) {
 }
 
 function real_file_is_locked($real_fullpath) {
- 	if (is_link($real_fullpath)) {
- 		$real_fullpath = readlink($real_fullpath);
- 	}
+	if (is_link($real_fullpath)) {
+		$real_fullpath = readlink($real_fullpath);
+	}
 	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath) . " 2> /dev/null");
 	if (strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
@@ -999,13 +1004,14 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			save_tombstones($share, $path, $filename, array_values($tombstones));
 
 			// Queue a new write task, to replace the now gone copy.
-			// Insert with id = 0 to make sure it's processed right after the current task is complete.
-			$query = sprintf("INSERT INTO tasks (id, action, share, full_path, complete) VALUES (0, 'write', '%s', '%s', 'yes')",
-				db_escape_string($share),
-				db_escape_string(clean_dir("$path/$filename"))
+			global $next_task;
+			$next_task = (object) array(
+				'id' => 0,
+				'action' => 'write',
+				'share' => $share, 
+				'full_path' => clean_dir("$path/$filename"),
+				'complete' => 'yes'
 			);
-			db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
-
 			continue;
 		}
 
