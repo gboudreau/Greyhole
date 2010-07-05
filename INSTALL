@@ -8,6 +8,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
       See http://www.samba.org/samba/history/samba-3.4.3.html - BUG 6769: Fix symlink unlink. - https://bugzilla.samba.org/show_bug.cgi?id=6769
       With this bug present, trying to delete files on Greyhole shares will not work!
       Make sure the Samba version you use includes this fix, or isn't affected by this bug.
+      Also, there have been reports that the Debian-bundled version of Samba would sometime show symlinks as 0-bytes files, to clients.
+      If you have such issues, you should compile the latest Samba stable manually and use that.
 
 1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC, etc.:
 
@@ -61,9 +63,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Ubuntu:
 	wget http://samba.org/samba/ftp/stable/samba-3.4.3.tar.gz
 	tar zxf samba-3.4.3.tar.gz && rm samba-3.4.3.tar.gz
-	cd samba-3.4.3/source3/modules
-	wget http://www.pommepause.com/blog/wp-content/uploads/2009/12/vfs_greyhole.c
-	cd ..
+	cd samba-3.4.3/source3
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
 	./configure --cache-file=./config.cache --with-fhs --enable-shared --enable-static --disable-pie --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib --with-privatedir=/etc/samba --with-piddir=/var/run/samba --localstatedir=/var --with-rootsbindir=/sbin --with-pammodulesdir=/lib/security --with-pam --with-syslog --with-utmp --with-readline --with-pam_smbpass --with-libsmbclient --with-winbind --with-shared-modules=idmap_rid,idmap_ad --with-automount --with-ldap --with-ads --with-dnsupdate --with-cifsmount --with-acl-support --with-quotas
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 	make
