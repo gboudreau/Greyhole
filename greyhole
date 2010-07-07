@@ -982,7 +982,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			$it_worked = file_exists($temp_path) && filesize($temp_path) == filesize(readlink("$landing_zone/$full_path"));
 		} else if (is_file("$landing_zone/$full_path")) {
 			exec("rsync " . quoted_form("$landing_zone/$full_path") . " " . quoted_form($temp_path));
-			$it_worked = file_exists($temp_path) && filesize($temp_path) == filesize("$landing_zone/$full_path");
+			$it_worked = file_exists($temp_path) && file_exists("$landing_zone/$full_path") && filesize($temp_path) == filesize("$landing_zone/$full_path");
 			if ($it_worked) {
 				unlink("$landing_zone/$full_path");
 			}
