@@ -992,7 +992,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			rename($temp_path, $tombstone->path);
 			gh_chperm($tombstone->path, $file_infos);
 		} else {
-			gh_log(WARN, "    Failed file copy. Will mark this tombstone 'Gone', and re-process this write task.");
+			gh_log(WARN, "    Failed file copy. Will mark this tombstone 'Gone'.");
 			@unlink($temp_path);
 			if ($tombstone->is_linked) {
 				$tombstone->is_linked = FALSE;
@@ -1003,16 +1003,20 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			$tombstones[$key] = $tombstone;
 			save_tombstones($share, $path, $filename, array_values($tombstones));
 
-			// Queue a new write task, to replace the now gone copy.
-			global $next_task;
-			$next_task = (object) array(
-				'id' => 0,
-				'action' => 'write',
-				'share' => $share, 
-				'full_path' => clean_dir("$path/$filename"),
-				'complete' => 'yes'
-			);
-			continue;
+			if (file_exists("$landing_zone/$full_path")) {
+				gh_log(WARN, "    Failed file copy (cont). Will try to re-process this write task, since the source file seems intact.");
+				// Queue a new write task, to replace the now gone copy.
+				global $next_task;
+				$next_task = (object) array(
+					'id' => 0,
+					'action' => 'write',
+					'share' => $share, 
+					'full_path' => clean_dir($full_path),
+					'complete' => 'yes'
+				);
+				return;
+			}
+		    continue;
 		}
 
 		if ($link_next && !$tombstone->is_linked) {
