@@ -1119,8 +1119,14 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 	while ($num_ok < $num_copies_required && count($local_target_drives) > 0) {
 		$target_drive = array_shift($local_target_drives);
 		$clean_target_full_path = clean_dir("$target_drive/$share/$full_path");
+		// Don't use drives that already have a copy
 		if (isset($tombstones[$clean_target_full_path])) {
 			continue;
+		}
+		foreach ($tombstones as $tombstone) {
+			if ($clean_target_full_path == clean_dir($tombstone->path)) {
+				continue;
+			}
 		}
 		// Prepend new target drives, to make sure sticky directories will be used first
 		$tombstones = array_reverse($tombstones);
