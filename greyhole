@@ -949,7 +949,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 	foreach ($tombstones as $key => $tombstone) {
 		if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
 		
-		if ($tombstone->path == $source_file && $tombstone->state == 'OK') {
+		if ($tombstone->path == $source_file && $tombstone->state == 'OK' && filesize($tombstone->path) == filesize($source_file)) {
 			gh_log(DEBUG, "  File copy at $tombstone->path is already up to date.");
 			continue;
 		}
