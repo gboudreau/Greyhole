@@ -897,6 +897,13 @@ function gh_write($share, $full_path, $task_id) {
 			}
 			remove_tombstones($share, $path, $filename);
 			$existing_tombstones = array();
+			// Maybe there's other file copies, that weren't tombstones, or were NOK tombstones!
+			global $storage_pool_directories;
+			foreach ($storage_pool_directories as $dir) {
+				if (file_exists("$dir/$share/$path/$filename")) {
+					gh_recycle("$dir/$share/$path/$filename");
+				}
+			}
 		}
 	}
 
