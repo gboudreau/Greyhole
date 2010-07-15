@@ -48,6 +48,7 @@ $last_df_time = 0;
 $last_dfs = array();
 $is_new_line = TRUE;
 $sleep_before_task = array();
+$arch = exec('uname -i');
 
 if (!isset($config_file)) {
 	$config_file = '/etc/greyhole.conf';
@@ -192,7 +193,7 @@ function parse_config() {
 }
 
 function quoted_form($path) {
-	return "'" . str_replace("'", "'\\''", $path) . "'";
+	return escapeshellarg($path);
 }
 
 function clean_dir($dir) {
@@ -357,4 +358,46 @@ function get_share_landing_zone($share) {
 		return FALSE;
 	}
 }
+
+function gh_filesize($filename) {
+	global $arch;
+	if ($arch == 'i386') {
+		return (float) exec("stat -c %s ".quoted_form($filename)."");
+	}
+	return filesize($filename);
+}
+
+function gh_fileowner($filename) {
+	global $arch;
+	if ($arch == 'i386') {
+		return (int) exec("stat -c %u ".quoted_form($filename)."");
+	}
+	return fileowner($filename);
+}
+
+function gh_filegroup($filename) {
+	global $arch;
+	if ($arch == 'i386') {
+		return (int) exec("stat -c %g ".quoted_form($filename)."");
+	}
+	return filegroup($filename);
+}
+
+function gh_fileperms($filename) {
+	global $arch;
+	if ($arch == 'i386') {
+		return "0" . exec("stat -c %a ".quoted_form($filename)."");
+	}
+	return substr(decoct(fileperms($filename)), -4);
+}
+
+function gh_is_file($filename) {
+	global $arch;
+	if ($arch == 'i386') {
+		exec('[ -f '.quoted_form($filename).' ]', $tmp, $return);
+		return $return === 0;
+	}
+	return is_file($filename);
+}
+
 ?>

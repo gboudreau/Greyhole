@@ -836,7 +836,7 @@ function gh_write($share, $full_path, $task_id) {
 		gh_log(INFO, "File changed: $share/$full_path", FALSE);
 		if ($log_level === DEBUG) {
 			clearstatcache();
-			$filesize = filesize($source_file);
+			$filesize = gh_filesize($source_file);
 			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
 		}
 		gh_log(INFO, "");
@@ -883,7 +883,7 @@ function gh_write($share, $full_path, $task_id) {
 		gh_log(INFO, "File created: $share/$full_path", FALSE);
 		if ($log_level === DEBUG) {
 			clearstatcache();
-			$filesize = filesize($source_file);
+			$filesize = gh_filesize($source_file);
 			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
 		}
 		gh_log(INFO, "");
@@ -956,7 +956,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 	foreach ($tombstones as $key => $tombstone) {
 		if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
 		
-		if ($tombstone->path == $source_file && $tombstone->state == 'OK' && filesize($tombstone->path) == filesize($source_file)) {
+		if ($tombstone->path == $source_file && $tombstone->state == 'OK' && gh_filesize($tombstone->path) == gh_filesize($source_file)) {
 			gh_log(DEBUG, "  File copy at $tombstone->path is already up to date.");
 			continue;
 		}
@@ -986,10 +986,10 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		$it_worked = FALSE;
 		if (is_link("$landing_zone/$full_path")) {
 			exec("rsync " . quoted_form(readlink("$landing_zone/$full_path")) . " " . quoted_form($temp_path));
-			$it_worked = file_exists($temp_path) && filesize($temp_path) == filesize(readlink("$landing_zone/$full_path"));
-		} else if (is_file("$landing_zone/$full_path")) {
+			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == gh_filesize(readlink("$landing_zone/$full_path"));
+		} else if (gh_is_file("$landing_zone/$full_path")) {
 			exec("rsync " . quoted_form("$landing_zone/$full_path") . " " . quoted_form($temp_path));
-			$it_worked = file_exists($temp_path) && file_exists("$landing_zone/$full_path") && filesize($temp_path) == filesize("$landing_zone/$full_path");
+			$it_worked = file_exists($temp_path) && file_exists("$landing_zone/$full_path") && gh_filesize($temp_path) == gh_filesize("$landing_zone/$full_path");
 			if ($it_worked) {
 				unlink("$landing_zone/$full_path");
 			}
@@ -1168,7 +1168,7 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $filename => $file_tombstones) {
 						$tombstones[$filename] = $file_tombstones;
 					}
-				} else if (is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
+				} else if (gh_is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
 					// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
 					gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
@@ -1196,7 +1196,7 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 				} else {
 					// Found a file
 					$tombstones[$prefix.$filename] = get_tombstones($share, $path, $filename, $load_nok_tombstones, $quiet);
-					if (count($tombstones[$prefix.$filename]) == 0 && is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
+					if (count($tombstones[$prefix.$filename]) == 0 && gh_is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
 						// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
 						gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 						$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
@@ -1400,8 +1400,8 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	$f_seek_point = (int) $row->value;
 
 	clearstatcache();
-	if ($f_seek_point > filesize($samba_log_file)) {
-		gh_log(DEBUG, "Log file size = " . filesize($samba_log_file) . "; forcing seek point to 0.");
+	if ($f_seek_point > gh_filesize($samba_log_file)) {
+		gh_log(DEBUG, "Log file size = " . gh_filesize($samba_log_file) . "; forcing seek point to 0.");
 		$f_seek_point = 0;
 	}
 
@@ -1882,7 +1882,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			
 			// Temp files leftovers of stopped Greyhole executions
 			$temp_filename = get_temp_filename($clean_full_path);
-			if (file_exists($temp_filename) && is_file($temp_filename)) {
+			if (file_exists($temp_filename) && gh_is_file($temp_filename)) {
 				gh_log(INFO, "  Found temporary file $temp_filename ... deleting.");
 				$fsck_report['temp_files'][] = $temp_filename;
 				gh_recycle($temp_filename);
@@ -1926,7 +1926,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			if ($tombstone->is_linked) {
 				if (file_exists($tombstone->path)) {
 					$found_linked_tombstone = TRUE;
-					$expected_file_size = filesize($tombstone->path);
+					$expected_file_size = gh_filesize($tombstone->path);
 					$original_file_path = $tombstone->path;
 					break;
 				} else {
@@ -1938,7 +1938,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		if (!$found_linked_tombstone) {
 			$first_tombstone = reset($file_tombstones);
 			$first_tombstone->is_linked = TRUE;
-			$expected_file_size = filesize($first_tombstone->path);
+			$expected_file_size = gh_filesize($first_tombstone->path);
 			$original_file_path = $first_tombstone->path;
 		}
 		
@@ -1960,7 +1960,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				// That file isn't available atm, but it's OK.
 				continue;
 			}
-			$file_size = filesize($real_full_path);
+			$file_size = gh_filesize($real_full_path);
 			if ($file_size != $expected_file_size && real_file_is_locked($real_full_path) === FALSE && real_file_is_locked($original_file_path) === FALSE) {
 				if ($file_size == 0) {
 					// Empty file; just delete it.
@@ -2025,7 +2025,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		// Create new copies
 		gh_log(INFO, "  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
 		$fsck_report['missing_copies']++;
-		clearstatcache(); $filesize = filesize("$original_file_path");
+		clearstatcache(); $filesize = gh_filesize("$original_file_path");
 		$file_tombstones = create_tombstones($share, "$file_path/$filename", $num_copies_required, $filesize, $file_tombstones);
 
 		// Re-copy the file everywhere, and re-create the symlink
@@ -2546,18 +2546,18 @@ function gh_get_file_infos($real_path) {
 		return (object) array(
 			'fileowner' => 0,
 			'filegroup' => 0,
-			'fileperms' => (int) base_convert("0755", 8, 10)
+			'fileperms' => (int) base_convert("0775", 8, 10)
 		);
 	}
 	return (object) array(
-		'fileowner' => (int) fileowner($real_path),
-		'filegroup' => (int) filegroup($real_path),
-		'fileperms' => (int) base_convert(substr(decoct(fileperms($real_path)), -4), 8, 10)
+		'fileowner' => (int) gh_fileowner($real_path),
+		'filegroup' => (int) gh_filegroup($real_path),
+		'fileperms' => (int) base_convert(gh_fileperms($real_path), 8, 10)
 	);
 }
 
 function gh_get_dir_perms($directory) {
-	return (int) base_convert(substr(decoct(fileperms($directory)), -4), 8, 10);
+	return (int) base_convert(gh_fileperms($directory), 8, 10);
 }
 
 function gh_balance() {
@@ -2594,7 +2594,7 @@ function gh_balance() {
 			// Repeat until all drives' available space is balanced.
 			$file_everywhere_counter = 0;
 			foreach ($files as $file) {
-				$filesize = filesize($file)/1024; // KB
+				$filesize = gh_filesize($file)/1024; // KB
 
 				$full_path = substr($file, strlen("$source_drive/$share_name/"));
 				list($path, $filename) = explode_full_path($full_path);
