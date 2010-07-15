@@ -66,7 +66,7 @@ function parse_config() {
 	$frozen_directories = array();
 	$config_text = file_get_contents($config_file);
 	foreach (explode("\n", $config_text) as $line) {
-		if (preg_match("/^[ \t]*([^ \t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
+		if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
 			$name = trim($regs[1]);
 			$value = trim($regs[2]);
 			if ($name[0] == '#') {
