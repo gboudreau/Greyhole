@@ -1147,7 +1147,7 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 function get_tombstone_data_filename($share, $path, $filename) {
 	foreach (get_graveyards() as $graveyard) {
 		$f = "$graveyard/$share/$path/$filename";
-		if (file_exists($f)) {
+		if (gh_is_file($f)) {
 			return $f;
 		}
 	}
