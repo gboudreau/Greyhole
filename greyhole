@@ -1570,19 +1570,28 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 
 	foreach ($storage_pool_directories as $target_drive) {
 		if (!isset($dfs[$target_drive])) {
-			gh_log(ERROR, "Can't find how much free space is left on $target_drive. This partition will never be used!");
-			gh_log(ERROR, "Please report this using the Issues tab at http://greyhole.pommepause.com. You should include the following information in your ticket:");
-			gh_log(ERROR, "===== Error report starts here =====");
-			gh_log(ERROR, "Unknown free space for partition: $target_drive");
-			global $df_command;
-			gh_log(ERROR, "df_command: $df_command");
-			unset($responses);
-			exec($df_command, $responses);
-			gh_log(ERROR, "Result of df_command: " . var_export($responses, TRUE));
-			unset($responses);
-			exec('df -k 2>&1', $responses);
-			gh_log(ERROR, "Result of df -k: " . var_export($responses, TRUE));
-			gh_log(ERROR, "===== Error report ends here =====");
+			if (!is_dir($target_drive)) {
+				gh_log(ERROR, "The directory at $target_drive doesn't exist. This partition will never be used!");
+				if (file_exists('/usr/bin/hdactl')) {
+					gh_log(ERROR, "You should de-select, then re-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page, to fix this problem.");
+				} else {
+					gh_log(ERROR, "See the INSTALL file for instructions on how to prepare partitions to include in your storage pool.");
+				}
+			} else {
+				gh_log(ERROR, "Can't find how much free space is left on $target_drive. This partition will never be used!");
+				gh_log(ERROR, "Please report this using the Issues tab at http://greyhole.pommepause.com. You should include the following information in your ticket:");
+				gh_log(ERROR, "===== Error report starts here =====");
+				gh_log(ERROR, "Unknown free space for partition: $target_drive");
+				global $df_command;
+				gh_log(ERROR, "df_command: $df_command");
+				unset($responses);
+				exec($df_command, $responses);
+				gh_log(ERROR, "Result of df_command: " . var_export($responses, TRUE));
+				unset($responses);
+				exec('df -k 2>&1', $responses);
+				gh_log(ERROR, "Result of df -k: " . var_export($responses, TRUE));
+				gh_log(ERROR, "===== Error report ends here =====");
+			}
 			continue;
 		}
 		$free_space = $dfs[$target_drive];
