@@ -400,4 +400,12 @@ function gh_is_file($filename) {
 	return is_file($filename);
 }
 
+function gh_fileinode($filename) {
+	global $arch;
+	if ($arch == 'i386') {
+		return (int) exec("stat -c %i ".quoted_form($filename)."");
+	}
+	return fileinode($filename);
+}
+
 ?>

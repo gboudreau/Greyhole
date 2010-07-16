@@ -1870,7 +1870,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 	// Look for this file on all available drives
 	foreach ($storage_pool_directories as $target_drive) {
 		$clean_full_path = clean_dir("$target_drive/$share/$file_path/$filename");
-		$inode_number = @fileinode($clean_full_path);
+		$inode_number = @gh_fileinode($clean_full_path);
 		if ($inode_number !== FALSE) {
 			if (is_dir($clean_full_path)) {
 				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
@@ -1900,7 +1900,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 	}
 
 	foreach (get_tombstones($share, $file_path, $filename, TRUE) as $tombstone) {
-		$inode_number = @fileinode($tombstone->path);
+		$inode_number = @gh_fileinode($tombstone->path);
 		if ($inode_number === FALSE) {
 			$tombstone->state = 'Gone';
 			$tombstone->is_linked = FALSE;
@@ -2130,7 +2130,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 						}
 						$fsck_report['too_many_files'][] = $key;
 						gh_log(DEBUG, "    Removing copy at $key");
-						unset($file_copies_inodes[fileinode($key)]);
+						unset($file_copies_inodes[gh_fileinode($key)]);
 						gh_recycle($key);
 						if (isset($file_tombstones[$key])) {
 							unset($file_tombstones[$key]);
