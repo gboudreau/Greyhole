@@ -362,7 +362,11 @@ function get_share_landing_zone($share) {
 function gh_filesize($filename) {
 	global $arch;
 	if ($arch == 'i386') {
-		return (float) exec("stat -c %s ".quoted_form($filename)."");
+		$result = exec("stat -c %s ".quoted_form($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (float) $result;
 	}
 	return filesize($filename);
 }
@@ -370,7 +374,11 @@ function gh_filesize($filename) {
 function gh_fileowner($filename) {
 	global $arch;
 	if ($arch == 'i386') {
-		return (int) exec("stat -c %u ".quoted_form($filename)."");
+		$result = exec("stat -c %u ".quoted_form($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (int) $result;
 	}
 	return fileowner($filename);
 }
@@ -378,7 +386,11 @@ function gh_fileowner($filename) {
 function gh_filegroup($filename) {
 	global $arch;
 	if ($arch == 'i386') {
-		return (int) exec("stat -c %g ".quoted_form($filename)."");
+		$result = exec("stat -c %g ".quoted_form($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (int) $result;
 	}
 	return filegroup($filename);
 }
@@ -386,7 +398,11 @@ function gh_filegroup($filename) {
 function gh_fileperms($filename) {
 	global $arch;
 	if ($arch == 'i386') {
-		return "0" . exec("stat -c %a ".quoted_form($filename)."");
+		$result = exec("stat -c %a ".quoted_form($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return "0" . $result;
 	}
 	return substr(decoct(fileperms($filename)), -4);
 }
@@ -394,8 +410,8 @@ function gh_fileperms($filename) {
 function gh_is_file($filename) {
 	global $arch;
 	if ($arch == 'i386') {
-		exec('[ -f '.quoted_form($filename).' ]', $tmp, $return);
-		return $return === 0;
+		exec('[ -f '.quoted_form($filename).' ]', $tmp, $result);
+		return $result === 0;
 	}
 	return is_file($filename);
 }
@@ -403,7 +419,11 @@ function gh_is_file($filename) {
 function gh_fileinode($filename) {
 	global $arch;
 	if ($arch == 'i386') {
-		return (int) exec("stat -c %i ".quoted_form($filename)."");
+		$result = exec("stat -c %i ".quoted_form($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (int) $result;
 	}
 	return fileinode($filename);
 }
