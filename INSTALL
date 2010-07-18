@@ -1,8 +1,12 @@
 Greyhole Installation Instructions
 ==================================
 
-The following instructions are for Fedora 12.
-If you know what you're doing, you should have no problem installing on any other operating system that runs Samba (http://www.samba.org).
+The following instructions are for Fedora 12 or Ubuntu 9/10 (see footnote 1 about Ubuntu 10).
+If you know what you're doing, you should have no problem installing on any other Linux variant.
+
+Amahi (http://www.amahi.org) comes with Greyhole pre-installed.
+If you're looking for an easy way to try Greyhole, in a virtual machine or a spare computer, installing Amahi might be the easiest way to get a working Greyhole install.
+More info about Greyhole on Amahi: http://wiki.amahi.org/index.php/Greyhole
 
 Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
       See http://www.samba.org/samba/history/samba-3.4.3.html - BUG 6769: Fix symlink unlink. - https://bugzilla.samba.org/show_bug.cgi?id=6769
@@ -13,8 +17,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC, etc.:
 
-	Fedora: sudo yum install mysql-server php php-mysql samba samba-common patch gcc rsyslog yum-utils php-pear rsync
-	Ubuntu: sudo apt-get install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
+	Fedora: sudo yum -y install mysql-server php php-mysql samba samba-common patch gcc rsyslog yum-utils php-pear rsync
+	Ubuntu: sudo apt-get -y install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
 
 2. Install Greyhole (as root):
 
@@ -28,9 +32,12 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0750 -D -p greyhole-config-update /usr/bin
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
-	if [ `uname -i | grep 64 | wc -l` == 1 ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
-3. Edit /etc/logrotate.d/syslog:
+	Fedora: service smb restart
+	Ubuntu: /etc/init.d/samba restart, or restart smbd
+
+3. Edit /etc/logrotate.d/syslog (or rsyslog):
 	What we want is add prerotate and postrotate instructions for /var/log/messages. So add one command in the postrotate block, and add a prerotate block. When more logs than just /var/log/messages are rotated together, the sharedscripts option needs to be there.
 
 /var/log/messages /var/log/secure /var/log/maillog /var/log/spooler /var/log/boot.log /var/log/cron {
@@ -44,8 +51,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	endscript
 }
 
-4. We need to compile our own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
-   Or you can use the .so files found in the samba-module/bin/ directory that was included with Greyhole.
+4. (Optional) Maybe the greyhole.so file packaged with Greyhole wouldn't work on your system. If that is so, you'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
 	Fedora:
 	yumdownloader --source samba
@@ -53,23 +59,21 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	cd rpmbuild/SOURCES
 	tar zxf samba-3.*.tar.gz
 	cd samba-3.*/source3/
+
+	Ubuntu:
+	wget http://samba.org/samba/ftp/stable/samba-3.4.8.tar.gz
+	tar zxf samba-3.*.tar.gz && rm samba-3.*.tar.gz
+	cd samba-3.*/source3
+
+	Both (Fedora & Ubuntu):
 	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
 	./configure
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 	make
-	if [ `uname -i | grep 64 | wc -l` == 1 ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
-	sudo service smb restart
+	if [ -x /usr/lib64/samba/vfs/ ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
-	Ubuntu:
-	wget http://samba.org/samba/ftp/stable/samba-3.4.3.tar.gz
-	tar zxf samba-3.4.3.tar.gz && rm samba-3.4.3.tar.gz
-	cd samba-3.4.3/source3
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
-	./configure --cache-file=./config.cache --with-fhs --enable-shared --enable-static --disable-pie --prefix=/usr --sysconfdir=/etc --libdir=/usr/lib --with-privatedir=/etc/samba --with-piddir=/var/run/samba --localstatedir=/var --with-rootsbindir=/sbin --with-pammodulesdir=/lib/security --with-pam --with-syslog --with-utmp --with-readline --with-pam_smbpass --with-libsmbclient --with-winbind --with-shared-modules=idmap_rid,idmap_ad --with-automount --with-ldap --with-ads --with-dnsupdate --with-cifsmount --with-acl-support --with-quotas
-	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
-	make
-	sudo make install
-	sudo /etc/init.d/samba restart
+	Fedora: sudo service smb restart
+	Ubuntu: sudo /etc/init.d/samba restart, or sudo restart smbd
 
 5. Setup Samba:
 
@@ -95,7 +99,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 		    vfs objects = greyhole
 
 	Fedora: sudo service smb restart
-	Ubuntu: sudo /etc/init.d/samba restart
+	Ubuntu: sudo /etc/init.d/samba restart, or sudo restart smbd
 
 6. Setup the database:
 
@@ -103,8 +107,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 		# Make sure your MySQL server service (mysqld) is running, and runs on boot.
 		Fedora: sudo service mysqld start; sudo chkconfig mysqld on
-		Ubuntu: sudo /etc/init.d/mysqld start; sudo update-rc.d mysqld defaults
-
+		Ubuntu (9 only): sudo /etc/init.d/mysqld start; sudo update-rc.d mysqld defaults
+		
 		# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
 		mysql -u greyhole_user -p89y63jdwe greyhole < ${GREYHOLE_INSTALL_DIR}/schema-mysql.sql
@@ -133,11 +137,15 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Fedora: sudo chkconfig --add greyhole; sudo chkconfig greyhole on
 	Ubuntu: sudo update-rc.d greyhole defaults 98 20
 
-10. Work around problems with the CIFS client:
+10. Work around problems with the CIFS client (as root):
     Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
 
 	modprobe cifs
 	echo 0 > /proc/fs/cifs/OplockEnabled
+	# Make it permanent, using rc.local
+	sed -ie 's/exit 0//' /etc/rc.local
+	echo "modprobe cifs" >> /etc/rc.local
+	echo "echo 0 > /proc/fs/cifs/OplockEnabled" >> /etc/rc.local
 
 11. Start the Greyhole service:
 
@@ -150,3 +158,11 @@ Check for errors in the Greyhole log file: /var/log/greyhole.log
 
 If you use any application that needs to use files on your shares, you'll need to mount the shares locally, and point those applications to those mounts.
 You should not touch the files in your storage pool directories.
+
+Footnotes:
+
+1- Ubuntu 10 seems to have changed a lot of things in how their init.d scripts work.
+The init.d script included with greyhole doesn't support Ubuntu 10, but should work fine with Ubuntu 9.
+If you'd like to contribute a working Greyhole Upstart or init.d script for Ubuntu 10, please contact me.
+To start greyhole manually:
+  ionice -c 2 -n 7 /usr/bin/greyhole --daemon > /dev/null &
