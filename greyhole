@@ -428,7 +428,7 @@ function execute_next_task() {
 
 	if (isset($next_task)) {
 		$task = $next_task;
-		unset($next_task);
+		$next_task = null;
 	} else {
 		$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed') ORDER BY id ASC LIMIT 1";
 		$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
