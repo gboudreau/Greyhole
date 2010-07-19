@@ -139,13 +139,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 10. Work around problems with the CIFS client (as root):
     Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
+	Note: The cron.d script added above includes an @reboot cron line to make this permanent.
 
 	modprobe cifs
 	echo 0 > /proc/fs/cifs/OplockEnabled
-	# Make it permanent, using rc.local
-	sed -ie 's/exit 0//' /etc/rc.local
-	echo "modprobe cifs" >> /etc/rc.local
-	echo "echo 0 > /proc/fs/cifs/OplockEnabled" >> /etc/rc.local
 
 11. Start the Greyhole service:
 
