@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+define('TEST', 8);
 define('DEBUG', 7);
 define('INFO',  6);
 define('WARN',  4);

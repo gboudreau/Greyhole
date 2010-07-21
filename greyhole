@@ -436,7 +436,7 @@ function execute_next_task() {
 		if ($task === FALSE) {
 			$action = 'sleep';
 			gh_log(DEBUG, "Nothing to do... Sleeping.");
-			sleep($log_level == DEBUG ? 10 : 600);
+			sleep($log_level == DEBUG ? 10 : ($log_level == TEST ? 1 : 600));
 			db_free_result($result);
 			return;
 		}
@@ -460,7 +460,7 @@ function execute_next_task() {
 	if (($key = array_search($task->id, $sleep_before_task)) !== FALSE) {
 		$action = 'sleep';
 		gh_log(DEBUG, "Only locked files operations pending... Sleeping.");
-		sleep($log_level == DEBUG ? 10 : 600);
+		sleep($log_level == DEBUG ? 10 : ($log_level == TEST ? 1 : 600));
 		$sleep_before_task = array();
 	}
 	
@@ -838,9 +838,9 @@ function gh_write($share, $full_path, $task_id) {
 	if (is_link("$landing_zone/$full_path")) {
 		$source_file = clean_dir(readlink("$landing_zone/$full_path"));
 		gh_log(INFO, "File changed: $share/$full_path", FALSE);
-		if ($log_level === DEBUG) {
-			clearstatcache();
-			$filesize = gh_filesize($source_file);
+		clearstatcache();
+		$filesize = gh_filesize($source_file);
+		if ($log_level >= DEBUG) {
 			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
 		}
 		gh_log(INFO, "");
@@ -885,9 +885,9 @@ function gh_write($share, $full_path, $task_id) {
 	} else {
 		$source_file = clean_dir("$landing_zone/$full_path");
 		gh_log(INFO, "File created: $share/$full_path", FALSE);
-		if ($log_level === DEBUG) {
-			clearstatcache();
-			$filesize = gh_filesize($source_file);
+		clearstatcache();
+		$filesize = gh_filesize($source_file);
+		if ($log_level >= DEBUG) {
 			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
 		}
 		gh_log(INFO, "");
@@ -1668,7 +1668,7 @@ You probably want to do something about this!
 	}
 	
 	global $log_level;
-	if ($log_level === DEBUG) {
+	if ($log_level >= DEBUG) {
 		if (count($sorted_target_drives) > 0) {
 			$log = $log_prefix ."Drives with available space: ";
 			foreach ($sorted_target_drives as $s => $d) {
