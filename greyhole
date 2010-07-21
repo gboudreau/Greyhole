@@ -645,7 +645,8 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				if ($tombstone->is_linked) {
 					$symlinked = TRUE;
 					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
-					if (unlink("$landing_zone/$target_full_path/$file_path")) {
+					@unlink("$landing_zone/$target_full_path/$file_path");
+					if (!file_exists("$landing_zone/$target_full_path/$file_path")) {
  						@symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
 						// Creating this symlink can fail if the parent dir was removed
 					}
@@ -656,7 +657,8 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				$tombstone->is_linked = TRUE;
 				$file_tombstones[$key] = $tombstone;
 				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
-				if (unlink("$landing_zone/$target_full_path/$file_path")) {
+				@unlink("$landing_zone/$target_full_path/$file_path");
+				if (!file_exists("$landing_zone/$target_full_path/$file_path")) {
 					@symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
 					// Creating this symlink can fail if the parent dir was removed
 				}
@@ -719,7 +721,8 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 					$symlinked = TRUE;
 					if ($tombstone->is_linked) {
 						gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
-						if (unlink("$landing_zone/$target_full_path")) {
+						@unlink("$landing_zone/$target_full_path");
+						if (!file_exists("$landing_zone/$target_full_path")) {
 	 						@symlink($tombstone->path, "$landing_zone/$target_full_path");
 							// Creating this symlink can fail if the parent dir was removed
 						}
@@ -734,7 +737,8 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				$tombstone->is_linked = TRUE;
 				$existing_tombstones[$key] = $tombstone;
 				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
-				if (unlink("$landing_zone/$target_full_path")) {
+				@unlink("$landing_zone/$target_full_path");
+				if (!file_exists("$landing_zone/$target_full_path")) {
 					@symlink($tombstone->path, "$landing_zone/$target_full_path");
 					// Creating this symlink can fail if the parent dir was removed
 				}
