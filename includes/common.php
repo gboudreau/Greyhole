@@ -145,7 +145,7 @@ function parse_config() {
 		}
 		if (isset($share_name) && !isset($shares_options[$share_name])) { continue; }
 		if (isset($share_name) && preg_match('/path[ \t]*=[ \t]*(.+)$/', $line, $regs)) {
-			$shares_options[$share_name]['landing_zone'] = $regs[1];
+			$shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
 			$shares_options[$share_name]['name'] = $share_name;
 		}
 	}
@@ -159,6 +159,13 @@ function parse_config() {
 			global $config_file, $smb_config_file;
 			gh_log(WARN, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
 			return FALSE;
+		}
+		
+		// Validate that the landing zone is NOT a subdirectory of a storage pool directory!
+		foreach ($storage_pool_directories as $key => $target_drive) {
+			if (strpos($share_options['landing_zone'], $target_drive) === 0) {
+				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pooled directory ($target_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+			}
 		}
 	}
 	
