@@ -2252,7 +2252,7 @@ Attic size:\n";
 		}
 
 		if (count($fsck_report['wrong_file_size']) > 0) {
-			$report .= "  Found " . count($fsck_report['wrong_file_size']) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. You should manually remove the invalid copies.\n";
+			$report .= "  Found " . count($fsck_report['wrong_file_size']) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. The invalid copies have been moved into the attic.\n";
 			foreach ($fsck_report['wrong_file_size'] as $real_file_path => $info_array) {
 				$report .= "    $real_file_path is " . number_format($info_array[0]) . " bytes; should be " . number_format($info_array[1]) . " bytes.\n";
 			}
