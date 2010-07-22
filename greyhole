@@ -893,6 +893,11 @@ function gh_write($share, $full_path, $task_id) {
 		}
 		gh_log(INFO, "");
 
+		if (is_dir($source_file)) {
+			gh_log(INFO, "$share/$full_path is now a directory! Aborting.");
+			return;
+		}
+
 		// There might be old tombstones... for example, when a delete task was skipped.
 		// Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_tombstones()
 		$existing_tombstones = get_tombstones($share, $path, $filename);
