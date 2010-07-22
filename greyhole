@@ -424,7 +424,7 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task;
+	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id;
 
 	if (isset($next_task)) {
 		$task = $next_task;
@@ -442,6 +442,7 @@ function execute_next_task() {
 		}
 		db_free_result($result);
 	}
+	$current_task_id = $task->id;
 
 	# Postpone tasks in frozen directories until a --thaw command is received
 	if ($task->complete != 'thawed') {
@@ -1015,6 +1016,11 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			save_tombstones($share, $path, $filename, array_values($tombstones));
 
 			if (file_exists("$landing_zone/$full_path")) {
+				global $current_task_id;
+				if ($current_task_id === 0) {
+					gh_log(ERROR, "    Failed file copy (cont). We already retried this task. Aborting.");
+					return;
+				}
 				gh_log(WARN, "    Failed file copy (cont). Will try to re-process this write task, since the source file seems intact.");
 				// Queue a new write task, to replace the now gone copy.
 				global $next_task;
