@@ -2343,8 +2343,14 @@ function gh_recycle($real_path) {
 		
 		list($original_path, $filename) = explode_full_path(get_share_landing_zone($share) . "/$full_path");
 		
+		if (@is_file($path)) {
+			unlink($path);
+		}
 		gh_mkdir($path, "$attic_path/$share", $original_path);
 
+		if (@is_dir($target_path)) {
+			exec("rm -rf " . quoted_form($target_path));
+		}
 		if (@rename($real_path, $target_path)) {
 			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
 			return TRUE;
