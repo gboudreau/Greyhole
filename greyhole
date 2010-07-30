@@ -613,6 +613,9 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 	
 	if (is_dir("$landing_zone/$target_full_path") || is_a_graveyard_dir($share, $full_path)) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
+
+		$existing_tombstones = get_tombstones($share, $target_full_path, null, FALSE, FALSE, FALSE); // $check_symlink=FALSE to prevent symlinks to be handled at this point; they'll be fixed below.
+
 		foreach ($storage_pool_directories as $target_drive) {
 			list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
 
@@ -632,7 +635,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				gh_log(DEBUG, "  Graveyard directory moved: $target_drive/.gh_graveyard/$share/$full_path -> $target_drive/.gh_graveyard/$share/$target_full_path");
 			}
 		}
-		$existing_tombstones = get_tombstones($share, $target_full_path, null, FALSE, FALSE, FALSE); // $check_symlink=FALSE to prevent symlinks to be handled at this point; they'll be fixed below.
+
 		foreach ($existing_tombstones as $file_path => $file_tombstones) {
 			$new_file_tombstones = array();
 			$symlinked = FALSE;
@@ -1170,9 +1173,15 @@ function get_tombstone_data_filename($share, $path, $filename) {
 }
 
 function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $prefix='') {
+	if (!$quiet) {
+		gh_log(DEBUG, "Loading tombstones for (dir) $share" . (!empty($path) ? "/$path" : "") . "...");
+	}
+
 	$landing_zone = get_share_landing_zone($share);
 	
 	$tombstones = array();
+	
+	$loaded_tombstones_dir = array();
 	
 	// Find new files (files with no tombstones yet)
 	$handle = @opendir("$landing_zone/$path");
@@ -1180,9 +1189,10 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 		while (($filename = readdir($handle)) !== FALSE) {
 			if ($filename != '.' && $filename != '..') {
 				if (is_dir("$landing_zone/$path/$filename")) {
-					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $filename => $file_tombstones) {
-						$tombstones[$filename] = $file_tombstones;
+					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $full_filename => $file_tombstones) {
+						$tombstones[$full_filename] = $file_tombstones;
 					}
+					$loaded_tombstones_dir["$path/$filename"] = TRUE;
 				} else if (gh_is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
 					// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
 					gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
@@ -1205,11 +1215,20 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 		while (($filename = readdir($handle)) !== FALSE) {
 			if ($filename != '.' && $filename != '..') {
 				if (is_dir("$graveyard/$share/$path/$filename")) {
-					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $filename => $file_tombstones) {
-						$tombstones[$filename] = $file_tombstones;
+					if (isset($loaded_tombstones_dir["$path/$filename"])) {
+						// Already loaded the tombstones in this directory above
+						continue;
+					}
+					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $full_filename => $file_tombstones) {
+						$tombstones[$full_filename] = $file_tombstones;
 					}
 				} else {
 					// Found a file
+					if (isset($tombstones[$prefix.$filename])) {
+						// For which we already have the tombstones...
+						continue;
+					}
+					// Found a new file
 					$tombstones[$prefix.$filename] = get_tombstones($share, $path, $filename, $load_nok_tombstones, $quiet);
 					if (count($tombstones[$prefix.$filename]) == 0 && gh_is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
 						// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
@@ -1230,16 +1249,13 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 }
 
 function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
-	if (!$quiet) {
-		gh_log(DEBUG, "Loading tombstones for " . ($filename === null ? '(dir) ' : '') . "$share" . (!empty($path) ? "/$path" : "") . "" . ($filename!== null ? "/$filename" : "") . "... ", FALSE);
-		if ($filename === null) {
-			gh_log(DEBUG, "");
-		}
-	}
 	if ($filename === null) {
 		// Load all tombstones from the specified directory
 		$tombstones = get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet);
 		return $tombstones;
+	}
+	if (!$quiet) {
+		gh_log(DEBUG, "Loading tombstones for $share" . (!empty($path) ? "/$path" : "") . "/$filename... ", FALSE);
 	}
 	$tombstones_data_file = get_tombstone_data_filename($share, $path, $filename);
 	clearstatcache();
