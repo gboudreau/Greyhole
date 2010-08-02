@@ -1726,8 +1726,8 @@ You probably want to do something about this!
 
 	if (isset($sticky_files)) {
 		foreach ($sticky_files as $share_dir => $stick_into) {
-			if (strpos("$share/$path", $share_dir) === 0) {
-				$more_drives_needed = FALSE;
+			if (gh_wild_strpos("$share/$path", $share_dir) === 0) {
+ 				$more_drives_needed = FALSE;
 				if (count($stick_into) > 0) {
 					// Stick files into specific drives: $stick_into
 					// Let's check if those drives are listed in the config file!
@@ -1739,11 +1739,37 @@ You probably want to do something about this!
 					}
 				}
 				if (count($stick_into) == 0 || $more_drives_needed) {
+					if (strpos($share_dir, '*') !== FALSE) {
+						// Contains a wildcard... In this case, we want each directory that match the wildcard to have it's own setting. Let's find this directory...
+						// For example, if $share_dir == 'Videos/Movies/*/*' and "$share/$path/" == "Videos/Movies/HD/La Vita e Bella/", we want to save a 'stick_into' setting for 'Videos/Movies/HD/La Vita e Bella/'
+						// Files in other subdirectories of Videos/Movies/HD/ could end up in other drives.
+						$needles = explode('*', $share_dir);
+						$sticky_dir = '';
+						$wild_part = "$share/$path/";
+						for ($i=0; $i<count($needles); $i++) {
+							$needle = $needles[$i];
+							if ($i == 0) {
+								$sticky_dir = $needle;
+								$wild_part = @str_replace_first($needle, '', $wild_part);
+							} else {
+								if ($needle == '') {
+									$needle = '/';
+								}
+								$small_wild_part = substr($wild_part, 0, strpos($wild_part, $needle)+strlen($needle));
+								$sticky_dir .= $small_wild_part;
+								$wild_part = str_replace_first($small_wild_part, '', $wild_part);
+							}
+						}
+						$sticky_dir = trim($sticky_dir, '/');
+					} else {
+						$sticky_dir = $share_dir;
+					}
+
 					// Stick files into any drives
 					$query = sprintf("SELECT value FROM settings WHERE name = 'stick_into-%s'",
-						db_escape_string($share_dir)
+						db_escape_string($sticky_dir)
 					);
-					$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for stick_target-$share_dir: " . db_error());
+					$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for stick_target-$sticky_dir: " . db_error());
 					$row = db_fetch_object($result);
 					if ($row !== FALSE) {
 						$stick_into = array_merge($stick_into, unserialize($row->value));
@@ -1759,17 +1785,17 @@ You probably want to do something about this!
 							$value = serialize($stick_into);
 							$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'stick_into-%s'",
 								db_escape_string($value),
-								db_escape_string($share_dir)
+								db_escape_string($sticky_dir)
 							);
-							db_query($query) or gh_log(CRITICAL, "Can't update settings for stick_into-$share_dir: " . db_error());
+							db_query($query) or gh_log(CRITICAL, "Can't update settings for stick_into-$sticky_dir: " . db_error());
 						}
 					} else {
 						$value = serialize(array_merge($stick_into, $drives));
 						$query = sprintf("INSERT INTO settings (name, value) VALUES ('stick_into-%s', '%s')",
-							db_escape_string($share_dir),
+							db_escape_string($sticky_dir),
 							db_escape_string($value)
 						);
-						db_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$share_dir: " . db_error());
+						db_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$sticky_dir: " . db_error());
 						return array_merge($stick_into, $drives);
 					}
 				}
@@ -2798,5 +2824,49 @@ function process_config() {
 		}
 	}
 	// Config is OK; go on!
+}
+
+function gh_wild_strpos($haystack, $needle) { 
+	$is_wild = (strpos($needle, "*") !== FALSE);
+	if (!$is_wild) {
+		return strpos($haystack, $needle);
+	}
+	if (str_replace('*', '', $needle) == $haystack) {
+		return FALSE;
+	}
+	$needles = explode("*", $needle);
+	if ($needle[0] == '*') {
+		$first_index = 0;
+	}
+	foreach ($needles as $needle_part) {
+		if ($needle_part == '') {
+			continue;
+		}
+		$needle_index = strpos($haystack, $needle_part);
+		if (!isset($first_index)) {
+			$first_index = $needle_index;
+		}
+		if ($needle_index === FALSE) {
+			return FALSE;
+		} else {
+			$found = TRUE;
+			$haystack = substr($haystack, $needle_index + strlen($needle_part));
+		}
+	}
+	if ($found) {
+		return $first_index;
+	}
+	return FALSE;
+}
+
+function str_replace_first($search, $replace, $subject) {
+	$firstChar = strpos($subject, $search);
+	if ($firstChar !== FALSE) {
+		$beforeStr = substr($subject, 0, $firstChar);
+		$afterStr = substr($subject, $firstChar + strlen($search));
+		return $beforeStr . $replace . $afterStr;
+	} else {
+		return $subject;
+	}
 }
 ?>
