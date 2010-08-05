@@ -2516,6 +2516,7 @@ You'll receive a report email once that fsck run completes.
 	
 	if ($needs_fsck !== FALSE) {
 		set_graveyard_backup();
+		get_graveyards(FALSE); // FALSE => Resets the graveyards cache
 		global $shares_options;
 		if ($needs_fsck === 1) {
 			gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
@@ -2633,15 +2634,23 @@ function mark_gone_drive_fscked($target_drive, $action='add') {
 	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-FSCKed-Drives: " . db_error());
 }
 
-function get_graveyards() {
-	global $storage_pool_directories;
-	$graveyards = array();
-	foreach ($storage_pool_directories as $target_drive) {
-		if (is_greyhole_owned_dir($target_drive)) {
-			$graveyards[] = "$target_drive/.gh_graveyard";
+function get_graveyards($use_cache=TRUE) {
+	global $storage_pool_directories, $graveyard_backup_directories, $global_graveyards;
+	if (!isset($global_graveyards) || !$use_cache) {
+		$graveyards = array();
+		foreach ($storage_pool_directories as $target_drive) {
+			if (is_greyhole_owned_dir($target_drive)) {
+				$graveyards[] = "$target_drive/.gh_graveyard";
+			}
 		}
+		foreach ($graveyard_backup_directories as $graveyard_backup_directory) {
+			if (is_greyhole_owned_dir(str_replace('/.gh_graveyard_backup', '', $graveyard_backup_directory))) {
+				$graveyards[] = $graveyard_backup_directory;
+			}
+		}
+		$global_graveyards = $graveyards;
 	}
-	return $graveyards;
+	return $global_graveyards;
 }
 
 function get_share_options_from_full_path($full_path) {
