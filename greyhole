@@ -26,6 +26,7 @@ process_config();
 db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
 db_select_db();
 db_migrate();
+set_graveyard_backup();
 
 if (@$db_use_mysql) {
 	db_query("SET SESSION group_concat_max_len = 1048576");
@@ -1346,6 +1347,7 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 	}
 
 	gh_log(DEBUG, "  Saving " . count($tombstones) . " tombstones for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+	$paths_used = array();
 	foreach (get_graveyards() as $graveyard) {
 		$target_drive = str_replace('/.gh_graveyard', '', $graveyard);
 		$data_filepath = "$graveyard/$share/$path";
@@ -1356,12 +1358,26 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 				gh_log(DEBUG, "    Saving tombstones in $data_filepath/$filename");
 				file_put_contents("$data_filepath/$filename", serialize($tombstones));
 				$has_tombstone = TRUE;
+				$paths_used[] = $data_filepath;
 				break;
 			}
 		}
 		if (!$has_tombstone && file_exists("$data_filepath/$filename")) {
 			unlink("$data_filepath/$filename");
 		}
+	}
+	if (count($paths_used) == 1) {
+		// Also save a backup on another drive
+		global $graveyard_backup_directories;
+		if (strpos($paths_used[0], str_replace('.gh_graveyard_backup', '.gh_graveyard', $graveyard_backup_directories[0])) === FALSE) {
+			$graveyard_backup_directory = $graveyard_backup_directories[0];
+		} else {
+			$graveyard_backup_directory = $graveyard_backup_directories[1];
+		}
+		$data_filepath = "$graveyard_backup_directory/$share/$path";
+		gh_log(DEBUG, "    Saving tombstones (backup) in $data_filepath/$filename");
+		gh_mkdir($data_filepath, "$graveyard/$share", get_share_landing_zone($share) . "/$path");
+		file_put_contents("$data_filepath/$filename", serialize($tombstones));
 	}
 }
 
@@ -2499,6 +2515,7 @@ You'll receive a report email once that fsck run completes.
 	}
 	
 	if ($needs_fsck !== FALSE) {
+		set_graveyard_backup();
 		global $shares_options;
 		if ($needs_fsck === 1) {
 			gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
@@ -2867,6 +2884,62 @@ function str_replace_first($search, $replace, $subject) {
 		return $beforeStr . $replace . $afterStr;
 	} else {
 		return $subject;
+	}
+}
+
+function set_graveyard_backup() {
+	global $graveyard_backup_directories, $storage_pool_directories;
+
+	gh_log(DEBUG, "Loading graveyard backup directories...");
+	if (empty($graveyard_backup_directories)) {
+		// In the DB ?
+		$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'graveyard_backup_directory');
+		$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'graveyard_backup_directory': " . db_error());
+		$row = db_fetch_object($result);
+		db_free_result($result);
+		if ($row !== FALSE) {
+			$graveyard_backup_directories = unserialize($row->value);
+			gh_log(DEBUG, "  Found " . count($graveyard_backup_directories) . " directories in the settings table.");
+		}
+	}
+
+	// Verify the directories, if any
+	if (!empty($graveyard_backup_directories)) {
+		foreach ($graveyard_backup_directories as $key => $graveyard_backup_directory) {
+			if (!is_greyhole_owned_dir(str_replace('/.gh_graveyard_backup', '', $graveyard_backup_directory))) {
+				// Directory is now invalid; stop using it.
+				gh_log(DEBUG, "Removing $graveyard_backup_directory from available 'graveyard_backup_directories' - directory isn't a greyhole storage pool directory (anymore?)");
+				unset($graveyard_backup_directories[$key]);
+			} else if (!is_dir($graveyard_backup_directory)) {
+				// Directory is invalid, but needs to be created (was rm'ed?)
+				mkdir($graveyard_backup_directory);
+			}
+		}
+	}
+
+	if (empty($graveyard_backup_directories) || count($graveyard_backup_directories) < 2) {
+		gh_log(DEBUG, "  Missing some directories. Need 2, currently have " . count($graveyard_backup_directories) . ". Will select more...");
+		$graveyard_backup_directories_hash = array();
+		if (count($graveyard_backup_directories) > 0) {
+			$graveyard_backup_directories_hash[array_shift($graveyard_backup_directories)] = TRUE;
+		}
+
+		while (count($graveyard_backup_directories_hash) < 2) {
+			// Let's pick new one
+			$graveyard_backup_directory = clean_dir($storage_pool_directories[array_rand($storage_pool_directories)] . '/.gh_graveyard_backup');
+			$graveyard_backup_directories_hash[$graveyard_backup_directory] = TRUE;
+			if (!is_dir($graveyard_backup_directory)) {
+				mkdir($graveyard_backup_directory);
+			}
+			gh_log(DEBUG, "    Randomly picked $graveyard_backup_directory");
+		}
+		$graveyard_backup_directories = array_keys($graveyard_backup_directories_hash);
+
+		// Got 2 directories now; save them in the DB
+		$query = sprintf("INSERT INTO settings (name, value) VALUES ('graveyard_backup_directory', '%s') ON DUPLICATE KEY UPDATE value = VALUES(value)",
+			db_escape_string(serialize($graveyard_backup_directories))
+		);
+		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for graveyard_backup_directory: " . db_error());
 	}
 }
 ?>
