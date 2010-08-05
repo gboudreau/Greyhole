@@ -34,7 +34,7 @@ install -m 0750 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
 install -m 0644 -D -p schema-mysql.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0644 -D -p schema-sqlite.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
-install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/greyhole.conf.rpmnew
+install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/greyhole.conf
 install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/greyhole
 %ifarch x86_64
 	install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
@@ -56,11 +56,6 @@ rm -rf $RPM_BUILD_ROOT
 if [ `grep greyhole /etc/logrotate.d/syslog | wc -l` = 0 ]; then
 	sed --in-place -e 's@postrotate@prerotate\n        /usr/bin/greyhole --prerotate\n    endscript\n    postrotate\n        /usr/bin/greyhole --postrotate > /dev/null || true@' /etc/logrotate.d/syslog
 	service rsyslog reload > /dev/null
-fi
-
-# Install conf file, if it doesn't exists yet
-if [ ! -f /etc/greyhole.conf ]; then
-	mv /etc/greyhole.conf.rpmnew /etc/greyhole.conf
 fi
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
@@ -106,6 +101,7 @@ fi
 
 %files
 %defattr(-,root,root,-)
+%config(noreplace) %{_sysconfdir}/greyhole.conf
 /etc/rc.d/init.d/greyhole
 %{_bindir}/
 %{_sysconfdir}/
