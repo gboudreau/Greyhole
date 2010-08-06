@@ -1370,7 +1370,7 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 		}
 		$data_filepath = "$graveyard_backup_directory/$share/$path";
 		gh_log(DEBUG, "    Saving tombstones (backup) in $data_filepath/$filename");
-		gh_mkdir($data_filepath, "$graveyard/$share", get_share_landing_zone($share) . "/$path");
+		gh_mkdir($data_filepath, "$graveyard_backup_directory/$share", get_share_landing_zone($share) . "/$path");
 		file_put_contents("$data_filepath/$filename", serialize($tombstones));
 	}
 }
