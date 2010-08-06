@@ -1262,14 +1262,8 @@ function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALS
 	clearstatcache();
 	$tombstones = array();
 	if (file_exists($tombstones_data_file)) {
-		if (($fp = fopen($tombstones_data_file, 'r'))) {
-			$t = '';
-			while (!feof($fp)) {
-				$t .= fread($fp, 1024);
-			}
-			$tombstones = unserialize($t);
-			fclose($fp);
-		}
+		$t = file_get_contents($tombstones_data_file);
+		$tombstones = unserialize($t);
 	}
 
 	if ($check_symlink) {
