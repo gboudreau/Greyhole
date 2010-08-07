@@ -1738,8 +1738,12 @@ You probably want to do something about this!
 	}
 
 	if (isset($sticky_files)) {
+		global $is_sticky;
+		$is_sticky = FALSE;
 		foreach ($sticky_files as $share_dir => $stick_into) {
 			if (gh_wild_strpos("$share/$path", $share_dir) === 0) {
+				$is_sticky = TRUE;
+
  				$more_drives_needed = FALSE;
 				if (count($stick_into) > 0) {
 					// Stick files into specific drives: $stick_into
@@ -1809,7 +1813,6 @@ You probably want to do something about this!
 							db_escape_string($value)
 						);
 						db_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$sticky_dir: " . db_error());
-						return array_merge($stick_into, $drives);
 					}
 				}
 				
@@ -1822,6 +1825,8 @@ You probably want to do something about this!
 					}
 				}
 				$drives = array_merge($priority_drives, $drives);
+				gh_log(DEBUG, $log_prefix . "Reordered drives, per sticky_files config: " . implode(' - ', $drives));
+				break;
 			}
 		}
 	}
@@ -2681,30 +2686,31 @@ function gh_get_dir_perms($directory) {
 }
 
 function gh_balance() {
-	global $storage_pool_directories, $shares_options;
+	global $storage_pool_directories, $shares_options, $is_sticky;
 
-	// Move files from the share with the less available space to the share with the most available space.
-	$sorted_pool_drives = sort_storage_dirs_available_space();
-	$pool_drives_avail_space = array();
-	foreach ($sorted_pool_drives as $available_space => $drive) {
-		$pool_drives_avail_space[$drive] = $available_space;
-	}
+	// Start with shares that have sticky files, so that subsequent shares will be used to try to balance what moving files into stick_into drives could debalance...
+	// Then start with the shares for which we keep the most # copies;
+	// That way, if the new drive fails soon, it won't take with it files for which we only have one copy!
+	$sorted_shares_options = $shares_options;
+	uasort($sorted_shares_options, 'compare_share_balance');
+	foreach ($sorted_shares_options as $share_name => $share_options) {
+		if ($share_options['num_copies'] == count($storage_pool_directories)) {
+			// Files are everywhere; won't be able to use that share to balance available space!
+			continue;
+		}
 
-	foreach ($sorted_pool_drives as $source_drive) {
-		$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
-		gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
+ 		gh_log(DEBUG, "Balancing share: $share_name");
 
-		// Start with the shares for which we keep the most # copies;
-		// That way, if the new drive fails soon, it won't take with it files for which we only have one copy!
-		$sorted_shares_options = $shares_options;
-		uasort($sorted_shares_options, 'compare_share_num_copies');
-		foreach ($sorted_shares_options as $share_name => $share_options) {
-			if ($share_options['num_copies'] == count($storage_pool_directories)) {
-				// Files are everywhere; won't be able to use that share to balance available space!
-				continue;
-			}
+		// Move files from the drive with the less available space to the drive with the most available space.
+		$sorted_pool_drives = sort_storage_dirs_available_space();
+		$pool_drives_avail_space = array();
+		foreach ($sorted_pool_drives as $available_space => $drive) {
+			$pool_drives_avail_space[$drive] = $available_space;
+		}
 
-	 		gh_log(DEBUG, "Balancing share: $share_name");
+		foreach ($sorted_pool_drives as $source_drive) {
+			$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
+			gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 
 			// Files candidate to get moved
 			unset($files);
@@ -2714,6 +2720,12 @@ function gh_balance() {
 			// Repeat until all drives' available space is balanced.
 			$file_everywhere_counter = 0;
 			foreach ($files as $file) {
+				// Let's not try to move locked files!
+				if (real_file_is_locked($file) !== FALSE) {
+					gh_log(DEBUG, "  File $file is locked by another process. Skipping.");
+					continue;
+				}
+
 				$filesize = gh_filesize($file)/1024; // KB
 
 				$full_path = substr($file, strlen("$source_drive/$share_name/"));
@@ -2723,21 +2735,44 @@ function gh_balance() {
 				$target_drives = order_target_drives($filesize, FALSE, $share_name, $path, '  ');
 
 				unset($target_drive);
-				while (count($target_drives) > 0) {
-					$drive = array_shift($target_drives);
-					if (!file_exists("$drive/$share_name/$full_path")) {
-						$target_drive = $drive;
-						break;
+				if ($is_sticky) {
+					$sticky_drives = array_slice($target_drives, 0, get_num_copies($share_name));
+					if (array_search($source_drive, $sticky_drives)) {
+						// Source drive is a stick_into drive; let's not move that file!
+						gh_log(DEBUG, "  Source is sticky. Skipping.");
+						continue;
+					}
+					$already_stuck_copies = 0;
+					foreach ($sticky_drives as $drive) {
+						if (file_exists("$drive/$share_name/$full_path")) {
+							$already_stuck_copies++;
+						} else {
+							$target_drive = $drive;
+						}
+					}
+				} else {
+					while (count($target_drives) > 0) {
+						$drive = array_shift($target_drives);
+						if (!file_exists("$drive/$share_name/$full_path")) {
+							$target_drive = $drive;
+							break;
+						}
 					}
 				}
+				
 				if (!isset($target_drive)) {
 					// Can't find a drive that doesn't have this file; skipping.
+					if ($is_sticky) {
+						gh_log(DEBUG, "  Sticky file is already where it should be. Skipping.");
+					}
 					continue;
 				}
 
 				gh_log(DEBUG, "  Target drive: $target_drive (". bytes_to_human($pool_drives_avail_space[$target_drive]*1024, FALSE) ." available)");
 
-				if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize
+				if ($is_sticky) {
+					gh_log(DEBUG, "  Moving sticky file, even if it won't help balancing available space.");
+				} else if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize
 						|| $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
 						|| $pool_drives_avail_space[$target_drive] < $target_avail_space) {
 					gh_log(DEBUG, "  Moving this file wouldn't help balancing available space. Skipping.");
@@ -2793,17 +2828,35 @@ function gh_balance() {
 				$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
 				gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 			}
-			gh_log(DEBUG, "Done balancing share: $share_name");
+			gh_log(DEBUG, "Done balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
 		}
-		gh_log(DEBUG, "Done balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+		gh_log(DEBUG, "Done balancing share: $share_name");
 	}
 }
 
-function compare_share_num_copies($a, $b) {
-	if ($a['num_copies'] == $b['num_copies']) {
-		return 0;
+function is_share_sticky($share_name) {
+	global $sticky_files;
+	if (isset($sticky_files)) {
+		foreach ($sticky_files as $share_dir => $stick_into) {
+			if (strpos($share_dir, $share_name) === 0) {
+				return TRUE;
+			}
+		}
 	}
-	return $a['num_copies'] > $b['num_copies'] ? -1 : 1;
+	return FALSE;
+}
+
+function compare_share_balance($a, $b) {
+	if (is_share_sticky($a['name']) && !is_share_sticky($b['name'])) {
+		return -1;
+	}
+	if (!is_share_sticky($a['name']) && is_share_sticky($b['name'])) {
+		return 1;
+	}
+	if ($a['num_copies'] != $b['num_copies']) {
+		return $a['num_copies'] > $b['num_copies'] ? -1 : 1;
+	}
+	return strcasecmp($a['name'], $b['name']);
 }
 
 function sort_storage_dirs_available_space() {
