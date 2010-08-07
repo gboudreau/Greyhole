@@ -229,10 +229,9 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 		return;
 	}
 
-	$log_text = sprintf('%s%s%s%s%s%s', 
-		$is_new_line ? date("M ") . sprintf('%2d', (int) date("d")) . date(" H:i:s ") : '',
-		$is_new_line ? "$local_log_level " : '',
-		$is_new_line ? $action . ': ' : '',
+	$date = explode(' ', date("M d H:i:s"));
+	$log_text = sprintf('%s%s%s%s', 
+		$is_new_line ? $date[0] . sprintf(' %2d ', (int) $date[1]) . $date[2] . " $local_log_level $action: " : '',
 		$text,
 		$add_line_feed && $log_memory_usage ? " [" . memory_get_usage() . "]" : '',
 		$add_line_feed ? "\n": ''
