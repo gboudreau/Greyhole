@@ -1415,6 +1415,7 @@ function simplify_tasks() {
 
 function parse_samba_log($simplify_after_parse=TRUE) {
 	global $samba_log_file, $action;
+	$old_action = $action;
 	$action = 'parse_logs';
 
 	// If we have enough queued tasks (9k+), let's not parse the log at this time, and get some work done.
@@ -1427,6 +1428,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	db_free_result($result);
 	$num_rows = (int) $row->num_rows;
 	if ($num_rows >= 9000) {
+		$action = $old_action;
 		return;
 	}
 
@@ -1567,6 +1569,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			}
 		}
 	}
+	$action = $old_action;
 }
 
 function update_last_read_log_smbd_line($fp) {
@@ -1881,8 +1884,6 @@ function gh_fsck_graveyard($root, $path, $share) {
 				// If file exists in landing zone, we already fsck-ed it in gh_fsck(); let's not repeat ourselves, shall we?
 				if (!file_exists("$local_path/$filename")) {
 					gh_fsck_file($local_path, $filename, FALSE, 'graveyard', $share);
-				#} else {
-				#	gh_log(DEBUG, "File $local_path/$filename was already checked.");
 				}
 			}
 		}
@@ -1914,7 +1915,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		}
 		if ($file_type === FALSE) {
 			// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
-			parse_samba_log(); global $action; $action = 'fsck';
+			parse_samba_log();
 			$query = sprintf("SELECT * FROM tasks WHERE action = 'unlink' AND share = '%s' AND full_path = '%s' AND complete = 'yes' LIMIT 1",
 				db_escape_string($share),
 				db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
