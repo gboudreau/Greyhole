@@ -615,7 +615,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 	if (is_dir("$landing_zone/$target_full_path") || is_a_graveyard_dir($share, $full_path)) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
-		$existing_tombstones = get_tombstones($share, $target_full_path, null, FALSE, FALSE, FALSE); // $check_symlink=FALSE to prevent symlinks to be handled at this point; they'll be fixed below.
+		$existing_tombstones = get_tombstones($share, $full_path, null, FALSE, FALSE, FALSE); // $check_symlink=FALSE to prevent symlinks to be handled at this point; they'll be fixed below.
 
 		foreach ($storage_pool_directories as $target_drive) {
 			list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
