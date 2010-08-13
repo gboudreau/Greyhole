@@ -26,7 +26,6 @@ process_config();
 db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
 db_select_db();
 db_migrate();
-set_graveyard_backup();
 
 if (@$db_use_mysql) {
 	db_query("SET SESSION group_concat_max_len = 1048576");
@@ -43,6 +42,7 @@ for ($i=1; $i<$argc; $i++) {
 		case '--postrotate':
 		case '--stats':
 		case '--empty-attic':
+		case '--view-queue':
 		$action = substr($argv[$i], 2);
 		break;
 
@@ -89,6 +89,7 @@ function print_usage() {
 	echo "       Balance available space \n";
 	echo "        on storage pool devices: greyhole --balance\n";
 	echo "       Display statistics:       greyhole --stats\n";
+	echo "       Display work queue:       greyhole --view-queue\n";
 	echo "       Empty attic:              greyhole --empty-attic\n";
 	echo "       Debug file operations:    greyhole --debug <filename>\n";
 	echo "\n";
@@ -105,7 +106,7 @@ function print_usage() {
 	exit(1);
 }
 
-if ($action != 'stats' && $action != 'debug') {
+if ($action != 'stats' && $action != 'view-queue' && $action != 'debug') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
 		exit(1);
@@ -303,6 +304,56 @@ if ($action == 'empty-attic') {
 	exit(0);
 }
 
+if ($action == 'view-queue') {
+	echo "\nGreyhole Work Queue Statistics\n==============================\n\n";
+	
+	$shares_names = array_keys($shares_options);
+	natcasesort($shares_names);
+
+	$max_share_strlen = 0;
+	foreach ($shares_names as $share_name) {
+		if (strlen($share_name) > $max_share_strlen) {
+			$max_share_strlen = strlen($share_name);
+		}
+	}
+
+	echo "This table gives you the number of pending operations queued for the Greyhole daemon, per share.\n\n";
+	printf("%$max_share_strlen"."s  Write   Delete  Rename\n", '');
+	$total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = 0;
+	foreach ($shares_names as $share_name) {
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'write' AND share = '%s'", $share_name)) or die("Can't find # of writes in tasks table: " . db_error());
+		$row = mysql_fetch_object($result);
+		$num_writes_pending = (int) $row->num;
+		$total_num_writes_pending += $num_writes_pending;
+
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'unlink' OR action = 'rmdir') AND share = '%s'", $share_name)) or die("Can't find # of deletes in tasks table: " . db_error());
+		$row = mysql_fetch_object($result);
+		$num_delete_pending = (int) $row->num;
+		$total_num_delete_pending += $num_delete_pending;
+
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'rename' AND share = '%s'", $share_name)) or die("Can't find # of renames in tasks table: " . db_error());
+		$row = mysql_fetch_object($result);
+		$num_rename_pending = (int) $row->num;
+		$total_num_rename_pending += $num_rename_pending;
+
+		echo sprintf("%-$max_share_strlen"."s", $share_name) . "  ";
+		echo sprintf('%-7s', $num_writes_pending) . " ";
+		echo sprintf('%-7s', $num_delete_pending) . " ";
+		echo sprintf('%-7s', $num_rename_pending) . "\n";
+	}
+	for ($i=0; $i<$max_share_strlen; $i++) {
+		echo "=";
+	}
+	echo sprintf("\n%-$max_share_strlen"."s  ", 'Total');
+	echo sprintf('%-6s', $total_num_writes_pending) . "+ ";
+	echo sprintf('%-6s', $total_num_delete_pending) . "+ ";
+	echo sprintf('%-6s', $total_num_rename_pending) . "= ";
+	echo ($total_num_writes_pending + $total_num_delete_pending + $total_num_rename_pending) . "\n";
+
+	echo "\n";
+	exit(0);
+}
+
 if ($action == 'stats') {
 	echo "\nGreyhole Statistics\n===================\n\n";
 
@@ -415,6 +466,7 @@ if ($action == 'fsck') {
 }
 
 gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
+set_graveyard_backup();
 parse_samba_log();
 simplify_tasks();
 while (TRUE) {
