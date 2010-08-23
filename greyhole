@@ -2766,7 +2766,7 @@ function gh_balance() {
 
 			// Files candidate to get moved
 			unset($files);
-			exec("find ". quoted_form("$source_drive/$share_name") ." -type f | head -n 100000", $files);
+			exec("find ". quoted_form("$source_drive/$share_name") ." -type f -size +10M | head -n 100000", $files);
 			gh_log(DEBUG, "Found ". count($files) ." files that can be moved.");
 			
 			// Repeat until all drives' available space is balanced.
