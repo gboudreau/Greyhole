@@ -3045,7 +3045,9 @@ function set_graveyard_backup() {
 		$graveyard_backup_directories = array_keys($graveyard_backup_directories_hash);
 
 		// Got 2 directories now; save them in the DB
-		$query = sprintf("INSERT INTO settings (name, value) VALUES ('graveyard_backup_directory', '%s') ON DUPLICATE KEY UPDATE value = VALUES(value)",
+		$query = "DELETE FROM settings WHERE name = 'graveyard_backup_directory'";
+		db_query($query) or gh_log(CRITICAL, "Can't delete settings for graveyard_backup_directory: " . db_error());
+		$query = sprintf("INSERT INTO settings (name, value) VALUES ('graveyard_backup_directory', '%s')",
 			db_escape_string(serialize($graveyard_backup_directories))
 		);
 		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for graveyard_backup_directory: " . db_error());
