@@ -321,17 +321,17 @@ if ($action == 'view-queue') {
 	printf("%$max_share_strlen"."s  Write   Delete  Rename\n", '');
 	$total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = 0;
 	foreach ($shares_names as $share_name) {
-		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'write' AND share = '%s'", $share_name)) or die("Can't find # of writes in tasks table: " . db_error());
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'write' AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of writes in tasks table: " . db_error());
 		$row = mysql_fetch_object($result);
 		$num_writes_pending = (int) $row->num;
 		$total_num_writes_pending += $num_writes_pending;
 
-		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'unlink' OR action = 'rmdir') AND share = '%s'", $share_name)) or die("Can't find # of deletes in tasks table: " . db_error());
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'unlink' OR action = 'rmdir') AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of deletes in tasks table: " . db_error());
 		$row = mysql_fetch_object($result);
 		$num_delete_pending = (int) $row->num;
 		$total_num_delete_pending += $num_delete_pending;
 
-		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'rename' AND share = '%s'", $share_name)) or die("Can't find # of renames in tasks table: " . db_error());
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'rename' AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of renames in tasks table: " . db_error());
 		$row = mysql_fetch_object($result);
 		$num_rename_pending = (int) $row->num;
 		$total_num_rename_pending += $num_rename_pending;
@@ -1749,7 +1749,7 @@ You probably want to do something about this!
 			mail($email_to, "Greyhole is out of space on $hostname!", $body);
 			
 			$last_OOS_notification = time();
-			$query = sprintf("UPDATE settings SET value = '%s' WHERE name = '%s'", $last_OOS_notification, 'last_OOS_notification');
+			$query = sprintf("UPDATE settings SET value = '%s' WHERE name = '%s'", db_escape_string($last_OOS_notification), 'last_OOS_notification');
 			db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_OOS_notification': " . db_error());
 		}
 	}
@@ -2105,8 +2105,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				// A pending write transaction maybe?
 				parse_samba_log(FALSE);
 				$query = sprintf("SELECT * FROM tasks WHERE action = 'write' AND share = '%s' AND full_path = '%s'",
-					$share,
-					"$file_path/$filename"
+					db_escape_string($share),
+					db_escape_string("$file_path/$filename")
 				);
 				$result = db_query($query) or gh_log(CRITICAL, "Can't select for pending writes" . db_error());
 				if (db_fetch_object($result) !== FALSE) {
@@ -2611,7 +2611,7 @@ function gone_ok($target_drive, $refresh=FALSE) {
 
 function get_gone_ok_dirs() {
 	global $gone_ok_drives;
-	$query = sprintf("SELECT value FROM settings WHERE name = 'Gone-OK-Drives'");
+	$query = "SELECT value FROM settings WHERE name = 'Gone-OK-Drives'";
 	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-OK-Drives: " . db_error());
 	$row = db_fetch_object($result);
 	if ($row !== FALSE) {
@@ -2658,7 +2658,7 @@ function gone_fscked($target_drive, $refresh=FALSE) {
 
 function get_fsck_gone_drives() {
 	global $fscked_gone_drives;
-	$query = sprintf("SELECT value FROM settings WHERE name = 'Gone-FSCKed-Drives'");
+	$query = "SELECT value FROM settings WHERE name = 'Gone-FSCKed-Drives'";
 	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-FSCKed-Drives: " . db_error());
 	$row = db_fetch_object($result);
 	if ($row !== FALSE) {
