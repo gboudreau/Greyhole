@@ -432,7 +432,7 @@ function gh_fileinode($filename) {
 		}
 		return (int) $result;
 	}
-	return fileinode($filename);
+	return @fileinode($filename);
 }
 
 ?>
