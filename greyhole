@@ -137,7 +137,7 @@ if ($action == 'thaw') {
 
 if ($action == 'gone' || $action == 'going') {
 	global $storage_pool_directories;
-	if (!array_search($options['dir'], $storage_pool_directories)) {
+	if (array_search($options['dir'], $storage_pool_directories) === FALSE) {
 		echo "Directory " . $options['dir'] . " is not one of your defined storage pool directories.\n";
 		echo "Please use one of the following with the --$action option:\n  ";
 		echo implode("\n  ", $storage_pool_directories) . "\n";
