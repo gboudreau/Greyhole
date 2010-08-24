@@ -1174,11 +1174,16 @@ function get_temp_filename($full_path) {
 }
 
 function create_tombstones($share, $full_path, $num_copies_required, $filesize, $tombstones=array()) {
+	global $going_dir;
+
 	list($path, $filename) = explode_full_path($full_path);
 	
 	$num_ok = count($tombstones);
 	foreach ($tombstones as $key => $tombstone) {
 		if (!file_exists($tombstone->path)) {
+			$tombstone->state = 'Gone';
+		}
+		if (!empty($going_dir) && strpos($tombstone->path, $going_dir) === 0) {
 			$tombstone->state = 'Gone';
 		}
 		if ($tombstone->state != 'OK' && $tombstone->state != 'Pending') {
