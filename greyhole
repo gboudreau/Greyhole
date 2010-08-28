@@ -1421,15 +1421,17 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 	if (count($paths_used) == 1) {
 		// Also save a backup on another drive
 		global $graveyard_backup_directories;
-		if (strpos($paths_used[0], str_replace('.gh_graveyard_backup', '.gh_graveyard', $graveyard_backup_directories[0])) === FALSE) {
-			$graveyard_backup_directory = $graveyard_backup_directories[0];
-		} else {
-			$graveyard_backup_directory = $graveyard_backup_directories[1];
+		if (count($graveyard_backup_directories) > 0) {
+			if (strpos($paths_used[0], str_replace('.gh_graveyard_backup', '.gh_graveyard', $graveyard_backup_directories[0])) === FALSE) {
+				$graveyard_backup_directory = $graveyard_backup_directories[0];
+			} else {
+				$graveyard_backup_directory = $graveyard_backup_directories[1];
+			}
+			$data_filepath = "$graveyard_backup_directory/$share/$path";
+			gh_log(DEBUG, "    Saving tombstones (backup) in $data_filepath/$filename");
+			gh_mkdir($data_filepath, "$graveyard_backup_directory/$share", get_share_landing_zone($share) . "/$path");
+			file_put_contents("$data_filepath/$filename", serialize($tombstones));
 		}
-		$data_filepath = "$graveyard_backup_directory/$share/$path";
-		gh_log(DEBUG, "    Saving tombstones (backup) in $data_filepath/$filename");
-		gh_mkdir($data_filepath, "$graveyard_backup_directory/$share", get_share_landing_zone($share) . "/$path");
-		file_put_contents("$data_filepath/$filename", serialize($tombstones));
 	}
 }
 
@@ -3035,6 +3037,12 @@ function str_replace_first($search, $replace, $subject) {
 function set_graveyard_backup() {
 	global $graveyard_backup_directories, $storage_pool_directories;
 
+	$num_graveyard_backups_needed = 2;
+	if (count($storage_pool_directories) < 2) {
+		$graveyard_backup_directories = array();
+		return;
+	}
+
 	gh_log(DEBUG, "Loading graveyard backup directories...");
 	if (empty($graveyard_backup_directories)) {
 		// In the DB ?
@@ -3061,15 +3069,15 @@ function set_graveyard_backup() {
 			}
 		}
 	}
-
-	if (empty($graveyard_backup_directories) || count($graveyard_backup_directories) < 2) {
-		gh_log(DEBUG, "  Missing some directories. Need 2, currently have " . count($graveyard_backup_directories) . ". Will select more...");
+	
+	if (empty($graveyard_backup_directories) || count($graveyard_backup_directories) < $num_graveyard_backups_needed) {
+		gh_log(DEBUG, "  Missing some directories. Need $num_graveyar_backups_needed, currently have " . count($graveyard_backup_directories) . ". Will select more...");
 		$graveyard_backup_directories_hash = array();
 		if (count($graveyard_backup_directories) > 0) {
 			$graveyard_backup_directories_hash[array_shift($graveyard_backup_directories)] = TRUE;
 		}
 
-		while (count($graveyard_backup_directories_hash) < 2) {
+		while (count($graveyard_backup_directories_hash) < $num_graveyard_backups_needed) {
 			// Let's pick new one
 			$graveyard_backup_directory = clean_dir($storage_pool_directories[array_rand($storage_pool_directories)] . '/.gh_graveyard_backup');
 			$graveyard_backup_directories_hash[$graveyard_backup_directory] = TRUE;
