@@ -323,17 +323,17 @@ if ($action == 'view-queue') {
 	$total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = 0;
 	foreach ($shares_names as $share_name) {
 		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'write' AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of writes in tasks table: " . db_error());
-		$row = mysql_fetch_object($result);
+		$row = db_fetch_object($result);
 		$num_writes_pending = (int) $row->num;
 		$total_num_writes_pending += $num_writes_pending;
 
 		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'unlink' OR action = 'rmdir') AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of deletes in tasks table: " . db_error());
-		$row = mysql_fetch_object($result);
+		$row = db_fetch_object($result);
 		$num_delete_pending = (int) $row->num;
 		$total_num_delete_pending += $num_delete_pending;
 
 		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'rename' AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of renames in tasks table: " . db_error());
-		$row = mysql_fetch_object($result);
+		$row = db_fetch_object($result);
 		$num_rename_pending = (int) $row->num;
 		$total_num_rename_pending += $num_rename_pending;
 
