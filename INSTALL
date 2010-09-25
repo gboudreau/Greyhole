@@ -33,6 +33,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	
+	Ubuntu (10+); install the Upstart script:
+		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
+		rm /etc/init.d/greyhole
 
 	Fedora: service smb restart
 	Ubuntu: /etc/init.d/samba restart, or restart smbd
@@ -73,7 +77,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	if [ -x /usr/lib64/samba/vfs/ ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
 	Fedora: sudo service smb restart
-	Ubuntu: sudo /etc/init.d/samba restart, or sudo restart smbd
+	Ubuntu (< 10): sudo /etc/init.d/samba restart
+	Ubuntu (10+): sudo restart smbd
 
 5. Setup Samba:
 
@@ -101,7 +106,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 		    vfs objects = greyhole
 
 	Fedora: sudo service smb restart
-	Ubuntu: sudo /etc/init.d/samba restart, or sudo restart smbd
+	Ubuntu (< 10): sudo /etc/init.d/samba restart
+	Ubuntu (10+): sudo restart smbd
 
 6. Setup the database:
 
@@ -109,7 +115,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 		# Make sure your MySQL server service (mysqld) is running, and runs on boot.
 		Fedora: sudo service mysqld start; sudo chkconfig mysqld on
-		Ubuntu (9 only): sudo /etc/init.d/mysqld start; sudo update-rc.d mysqld defaults
+		Ubuntu (< 10): sudo /etc/init.d/mysqld start; sudo update-rc.d mysqld defaults
+		Ubuntu (10+): start mysqld
 		
 		# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
@@ -137,7 +144,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 9. Add Greyhole to services that start on boot:
 
 	Fedora: sudo chkconfig --add greyhole; sudo chkconfig greyhole on
-	Ubuntu: sudo update-rc.d greyhole defaults 98 20
+	Ubuntu (< 10): sudo update-rc.d greyhole defaults 98 20
+	Ubuntu (10+): [nothing to do]
 
 10. Work around problems with the CIFS client (as root):
     Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
@@ -149,7 +157,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 11. Start the Greyhole service:
 
 	Fedora: sudo service greyhole start
-	Ubuntu: sudo /etc/init.d/greyhole start
+	Ubuntu (< 10): sudo /etc/init.d/greyhole start
+	Ubuntu (10+): sudo start greyhole
 
 
 Check for errors in the Greyhole log file: /var/log/greyhole.log
