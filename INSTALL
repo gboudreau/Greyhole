@@ -81,6 +81,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Change or add the following values in the [global] section:
 
 		unix extensions = no
+		follow symlinks = yes
+		wide links = yes
 
 	For each of your shares, add a 'dfree command' and 'vfs objects' lines, as seen below.
 
