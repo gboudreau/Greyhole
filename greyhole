@@ -2240,7 +2240,9 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				if ($tombstone->state == 'Pending') {
 					gh_log(DEBUG, "  Copying file to $tombstone->path");
 					$temp_path = get_temp_filename($tombstone->path);
-					if (copy($original_file_path, $temp_path)) {
+					exec("rsync " . quoted_form($original_file_path) . " " . quoted_form($temp_path));
+					$it_worked = file_exists($temp_path) && file_exists($original_file_path) && gh_filesize($temp_path) == gh_filesize($original_file_path);
+					if ($it_worked) {
 						rename($temp_path, $tombstone->path);
 						gh_chperm($tombstone->path, gh_get_file_infos($original_file_path));
 						$tombstone->state = 'OK';
@@ -3071,7 +3073,7 @@ function set_graveyard_backup() {
 	}
 	
 	if (empty($graveyard_backup_directories) || count($graveyard_backup_directories) < $num_graveyard_backups_needed) {
-		gh_log(DEBUG, "  Missing some directories. Need $num_graveyar_backups_needed, currently have " . count($graveyard_backup_directories) . ". Will select more...");
+		gh_log(DEBUG, "  Missing some directories. Need $num_graveyard_backups_needed, currently have " . count($graveyard_backup_directories) . ". Will select more...");
 		$graveyard_backup_directories_hash = array();
 		if (count($graveyard_backup_directories) > 0) {
 			$graveyard_backup_directories_hash[array_shift($graveyard_backup_directories)] = TRUE;
