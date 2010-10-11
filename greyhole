@@ -103,6 +103,12 @@ function print_usage() {
 	echo "       <path> will return soon:      greyhole --wait-for <path>\n";
 	echo "       <path> is gone for good:      greyhole --gone <path>\n";
 	echo "       <path> will be gone for good: greyhole --going <path>\n";
+	echo "\n";
+	echo "     About the attic: The attic is used like a Recycle Bin, or Trash.\n";
+	echo "       That means you'll need to manually empty it once in a while.\n";
+	echo "       To do so, use the --empty-attic parameter (see above).\n";
+	echo "       Another option is to create a 'Greyhole Attic' Samba share.\n";
+	echo "       More details about that here: http://greyhole.pommepause.com/doc/attic\n";
 	exit(1);
 }
 
@@ -301,6 +307,9 @@ if ($action == 'empty-attic') {
 			exec("rm -rf " . quoted_form($attic_path));
 			echo "Done\n";
 		}
+	}
+	if (isset($attic_share)) {
+		exec("rm -rf " . quoted_form($attic_share['landing_zone']) . '/*');
 	}
 	exit(0);
 }
@@ -609,13 +618,24 @@ function archive_task($task_id) {
 }
 
 function gh_rmdir($share, $full_path) {
-	global $storage_pool_directories;
+	global $storage_pool_directories, $attic_share_names;
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
 		return;
 	}
 	
 	gh_log(INFO, "Directory deleted: $landing_zone/$full_path");
+	
+	if (array_search($share, $attic_share_names) !== FALSE) {
+		// Remove that directory from all attics
+		foreach ($storage_pool_directories as $target_drive) {
+			if (@rmdir("$target_drive/.gh_attic/$full_path")) {
+				gh_log(DEBUG, "  Removed copy from attic at $target_drive/.gh_attic/$full_path");
+			}
+		}
+		return;
+	}
+
 	foreach ($storage_pool_directories as $target_drive) {
 		if (@rmdir("$target_drive/$share/$full_path/")) {
 			gh_log(DEBUG, "  Removed copy at $target_drive/$share/$full_path");
@@ -628,12 +648,42 @@ function gh_rmdir($share, $full_path) {
 }
 
 function gh_unlink($share, $full_path, $task_id) {
+	global $attic_share_names, $attic_share, $storage_pool_directories;
+	
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
 		return;
 	}
 	
 	gh_log(INFO, "File deleted: $landing_zone/$full_path");
+	
+	if (array_search($share, $attic_share_names) !== FALSE) {
+		// Will delete the file in the attic which has no corresponding symlink in the Greyhole Attic share.
+		// That symlink is what was deleted from that share to create the task we're currently working on.
+		$full_path = preg_replace('/ copy [0-9]+$/', '', $full_path);
+		gh_log(DEBUG, "  Looking for corresponding file in attic to delete...");
+		foreach ($storage_pool_directories as $target_drive) {
+			if (file_exists("$target_drive/.gh_attic/$full_path")) {
+				$delete = TRUE;
+				list($path, $filename) = explode_full_path("{$attic_share['landing_zone']}/$full_path");
+				if ($dh = opendir($path)) {
+					while (($file = readdir($dh)) !== FALSE) {
+						if ($file == '.' || $file == '..') { continue; }
+						if (is_link("$path/$file") && readlink("$path/$file") == "$target_drive/.gh_attic/$full_path") {
+							$delete = FALSE;
+							continue;
+						}
+					}
+				}
+				if ($delete) {
+					gh_log(DEBUG, "    Deleting corresponding copy $target_drive/.gh_attic/$full_path");
+					unlink("$target_drive/.gh_attic/$full_path");
+					break;
+				}
+			}
+		}
+		return;
+	}
 
 	if (gh_file_exists("$landing_zone/$full_path")) {
 		gh_log(DEBUG, "  File still exists in landing zone; a new file replaced the one deleted here. Skipping.");
@@ -1474,7 +1524,7 @@ function simplify_tasks() {
 }
 
 function parse_samba_log($simplify_after_parse=TRUE) {
-	global $samba_log_file, $action;
+	global $samba_log_file, $action, $attic_share_names;
 	$old_action = $action;
 	$action = 'parse_logs';
 
@@ -1582,6 +1632,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 					update_last_read_log_smbd_line($fp);
 					continue;
 				}
+				if ($act != 'unlink' && $act != 'rmdir' && array_search($share, $attic_share_names) !== FALSE) { continue; }
 				$new_tasks++;
 				$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) VALUES ('%s', '%s', %s, %s, '%s')",
 					$act,
@@ -2527,12 +2578,17 @@ function gh_recycle($real_path) {
 			unlink($path);
 		}
 		gh_mkdir($path, "$attic_path/$share", $original_path);
+		chmod($path, 0777);
 
 		if (@is_dir($target_path)) {
 			exec("rm -rf " . quoted_form($target_path));
 		}
 		if (@rename($real_path, $target_path)) {
 			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
+			chmod($target_path, 0640); // Make sure only the user and group users will be able to read files in the attic
+			
+			// Create a symlink in the Greyhole Attic share, to allow the user to remove this file using that share
+			create_attic_share_symlink($target_path, $attic_path);
 			return TRUE;
 		}
 	} else {
@@ -3097,6 +3153,35 @@ function set_graveyard_backup() {
 			db_escape_string(serialize($graveyard_backup_directories))
 		);
 		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for graveyard_backup_directory: " . db_error());
+	}
+}
+
+function create_attic_share_symlink($filepath_in_attic, $attic_path) {
+	global $attic_share;
+	if (isset($attic_share)) {
+		$filepath_in_attic = clean_dir($filepath_in_attic);
+		$filepath_in_attic_share = str_replace($attic_path, $attic_share['landing_zone'], $filepath_in_attic);
+		if (file_exists($filepath_in_attic_share)) {
+			$new_filepath = $filepath_in_attic_share;
+			$i = 1;
+			while (file_exists($new_filepath)) {
+				if (readlink($new_filepath) == $filepath_in_attic) {
+					// There's already a symlink to that file in the attic share; let's not make a second one!
+					return;
+				}
+				$new_filepath = "$filepath_in_attic_share copy $i";
+				$i++;
+			}
+			$filepath_in_attic_share = $new_filepath;
+			list($original_path, $filename) = explode_full_path($filepath_in_attic_share);
+		} else {
+			list($original_path, $filename) = explode_full_path($filepath_in_attic);
+			list($path, $filename) = explode_full_path($filepath_in_attic_share);
+			gh_mkdir($path, $attic_share['landing_zone'], $original_path);
+			chmod($path, 0777);
+		}
+		symlink($filepath_in_attic, $filepath_in_attic_share);
+		gh_log(DEBUG, "  Created symlink to deleted file in {$attic_share['name']} share ($filename).");
 	}
 }
 ?>

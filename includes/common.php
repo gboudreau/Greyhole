@@ -59,8 +59,10 @@ if (!isset($smb_config_file)) {
 	$smb_config_file = '/etc/samba/smb.conf';
 }
 
+$attic_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
+
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names;
 
 	$shares_options = array();
 	$storage_pool_directories = array();
@@ -144,7 +146,7 @@ function parse_config() {
 		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
 			$share_name = $regs[1];
 		}
-		if (isset($share_name) && !isset($shares_options[$share_name])) { continue; }
+		if (isset($share_name) && !isset($shares_options[$share_name]) && array_search($share_name, $attic_share_names) === FALSE) { continue; }
 		if (isset($share_name) && preg_match('/path[ \t]*=[ \t]*(.+)$/', $line, $regs)) {
 			$shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
 			$shares_options[$share_name]['name'] = $share_name;
@@ -152,6 +154,12 @@ function parse_config() {
 	}
 	
 	foreach ($shares_options as $share_name => $share_options) {
+		if (array_search($share_name, $attic_share_names) !== FALSE) {
+			global $attic_share;
+			$attic_share = array('name' => $share_name, 'landing_zone' => $shares_options[$share_name]['landing_zone']);
+			unset($shares_options[$share_name]);
+			continue;
+		}
 		if ($share_options['num_copies'] > count($storage_pool_directories)) {
 			$share_options['num_copies'] = count($storage_pool_directories);
 			$shares_options[$share_name] = $share_options;
@@ -356,9 +364,12 @@ function duration_to_human($seconds) {
 }
 
 function get_share_landing_zone($share) {
-	global $shares_options;
+	global $shares_options, $attic_share_names;
 	if (isset($shares_options[$share]['landing_zone'])) {
 		return $shares_options[$share]['landing_zone'];
+	} else if (array_search($share, $attic_share_names) !== FALSE) {
+		global $attic_share;
+		return $attic_share['landing_zone'];
 	} else {
 		global $config_file, $smb_config_file;
 		gh_log(WARN, "  Found a share ($share) with no path in $smb_config_file, or missing from your $config_file. Skipping.");
