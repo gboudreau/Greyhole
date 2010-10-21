@@ -21,15 +21,6 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 include('includes/common.php');
 include('includes/sql.php');
-process_config();
-
-db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
-db_select_db();
-db_migrate();
-
-if (@$db_use_mysql) {
-	db_query("SET SESSION group_concat_max_len = 1048576");
-}
 
 $action = 'unknown';
 $options = array();
@@ -80,6 +71,16 @@ for ($i=1; $i<$argc; $i++) {
 
 if ($action == 'unknown') {
 	print_usage();
+}
+
+process_config();
+
+db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
+db_select_db();
+db_migrate();
+
+if (@$db_use_mysql) {
+	db_query("SET SESSION group_concat_max_len = 1048576");
 }
 
 function print_usage() {
@@ -3036,12 +3037,13 @@ function postpone_task($task_id, $complete='yes') {
 // If running on Amahi, loop until the config works.
 // User might configure Greyhole later, and they don't want to show Greyhole 'offline' until then. Users are easy to confused! ;)
 function process_config() {
+	global $action;
 	while (!parse_config()) {
 		// Sleep for a while, if running on Amahi.
-		// Otherwise, die.
-		if (file_exists('/usr/bin/hdactl')) {
+		if (file_exists('/usr/bin/hdactl') && $action == 'daemon') {
 			sleep(600); // 10 minutes
 		} else {
+			// Otherwise, die.
 			gh_log(CRITICAL, "Config file parsing failed. Exiting.");
 		}
 	}
