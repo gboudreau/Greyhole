@@ -309,7 +309,7 @@ if ($action == 'empty-attic') {
 			echo "Done\n";
 		}
 	}
-	if (isset($attic_share)) {
+	if (isset($attic_share) && strlen(quoted_form($attic_share['landing_zone'])) > 8) {
 		exec("rm -rf " . quoted_form($attic_share['landing_zone']) . '/*');
 	}
 	exit(0);
