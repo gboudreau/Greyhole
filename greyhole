@@ -686,7 +686,7 @@ function gh_unlink($share, $full_path, $task_id) {
 		return;
 	}
 
-	if (gh_file_exists("$landing_zone/$full_path")) {
+	if (gh_file_exists("$landing_zone/$full_path") && !is_dir("$landing_zone/$full_path")) {
 		gh_log(DEBUG, "  File still exists in landing zone; a new file replaced the one deleted here. Skipping.");
 		return;
 	}
