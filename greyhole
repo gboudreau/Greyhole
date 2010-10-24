@@ -1178,10 +1178,14 @@ function gh_chperm($real_file_path, $file_infos) {
 	chgrp($real_file_path, $file_infos->filegroup);
 }
 
-function gh_mkdir($directory, $root_path, $original_directory) {
+function gh_mkdir($directory, $root_path, $original_directory, $force_dir_infos = null) {
 	$root_path = '/' . trim($root_path, '/');
 	if (!is_dir($directory)) {
-		$dir_infos = gh_get_file_infos($original_directory);
+		if ($force_dir_infos == null) {
+			$dir_infos = gh_get_file_infos($original_directory);
+		} else {
+			$dir_infos = $force_dir_infos;
+		}
 		// Try simple mkdir; will work only if parent dir already exists
 		if (!@mkdir($directory, $dir_infos->fileperms)) {
 			// Try recursive mkdir
@@ -1194,7 +1198,11 @@ function gh_mkdir($directory, $root_path, $original_directory) {
 			$original_parent_directory = $original_directory;
 			$i = 0;
 			while ($i++ < 255) { # Safety net... The real way to exit this loop is the break on ($parent_directory == $root_path)
-				$dir_infos = gh_get_file_infos($original_parent_directory);
+				if ($force_dir_infos == null) {
+					$dir_infos = gh_get_file_infos($original_parent_directory);
+				} else {
+					$dir_infos = $force_dir_infos;
+				}
 				if (!chmod($parent_directory, $dir_infos->fileperms)) {
 					gh_log(WARN, "  Failed to chmod directory '$parent_directory'");
 				}
@@ -3167,7 +3175,7 @@ function create_attic_share_symlink($filepath_in_attic, $attic_path) {
 			$new_filepath = $filepath_in_attic_share;
 			$i = 1;
 			while (file_exists($new_filepath)) {
-				if (readlink($new_filepath) == $filepath_in_attic) {
+				if (@readlink($new_filepath) == $filepath_in_attic) {
 					// There's already a symlink to that file in the attic share; let's not make a second one!
 					return;
 				}
@@ -3179,8 +3187,7 @@ function create_attic_share_symlink($filepath_in_attic, $attic_path) {
 		} else {
 			list($original_path, $filename) = explode_full_path($filepath_in_attic);
 			list($path, $filename) = explode_full_path($filepath_in_attic_share);
-			gh_mkdir($path, $attic_share['landing_zone'], $original_path);
-			chmod($path, 0777);
+			gh_mkdir($path, $attic_share['landing_zone'], $original_path, (object) array('fileowner' => 0, 'filegroup' => 0, 'fileperms' => (int) base_convert("0777", 8, 10)));
 		}
 		symlink($filepath_in_attic, $filepath_in_attic_share);
 		gh_log(DEBUG, "  Created symlink to deleted file in {$attic_share['name']} share ($filename).");
