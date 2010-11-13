@@ -38,6 +38,7 @@ for ($i=1; $i<$argc; $i++) {
 		break;
 
 		case '--email-report':
+		case '--walk-graveyard':
 		case '--disk-usage-report':
 		$options[substr($argv[$i], 2)] = TRUE;
 		break;
@@ -86,7 +87,7 @@ if (@$db_use_mysql) {
 function print_usage() {
 	echo "Invalid command line options.\n";
 	echo "Usage: Start the daemon:         greyhole --daemon\n";
-	echo "       Schedule a fsck:          greyhole --fsck [--email-report] [--dir <path>] [--disk-usage-report]\n";
+	echo "       Schedule a fsck:          greyhole --fsck [--email-report] [--walk-graveyard] [--dir <path>]\n";
 	echo "       Balance available space \n";
 	echo "        on storage pool devices: greyhole --balance\n";
 	echo "       Display statistics:       greyhole --stats\n";
@@ -461,6 +462,9 @@ if ($action == 'fsck') {
 	if (isset($options['email-report'])) {
 		$fsck_options[] = 'email';
 	}
+	if (isset($options['walk-graveyard'])) {
+		$fsck_options[] = 'graveyard';
+	}
 	if (isset($options['disk-usage-report'])) {
 		$fsck_options[] = 'du';
 	}
@@ -550,9 +554,11 @@ function execute_next_task() {
 				foreach ($shares_options as $share_name => $share_options) {
 					gh_fsck($share_options['landing_zone'], $share_name);
 				}
-				foreach (get_graveyards() as $graveyard) {
-					foreach ($shares_options as $share_name => $share_options) {
-						gh_fsck_graveyard($graveyard, "/$share_name", $share_name);
+				if (strpos($task->additional_info, 'graveyard') !== FALSE) {
+					foreach (get_graveyards() as $graveyard) {
+						foreach ($shares_options as $share_name => $share_options) {
+							gh_fsck_graveyard($graveyard, "/$share_name", $share_name);
+						}
 					}
 				}
 			} else {
@@ -560,10 +566,13 @@ function execute_next_task() {
 				if ($share_options !== FALSE) {
 					$share = $share_options['name'];
 					gh_fsck($task->share, $share);
-					$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
-					gh_log(DEBUG, "Starting graveyards fsck for $subdir");
-					foreach (get_graveyards() as $graveyard) {
-						gh_fsck_graveyard($graveyard, $subdir, $share);
+
+					if (strpos($task->additional_info, 'graveyard') !== FALSE) {
+						$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
+						gh_log(DEBUG, "Starting graveyards fsck for $subdir");
+						foreach (get_graveyards() as $graveyard) {
+							gh_fsck_graveyard($graveyard, $subdir, $share);
+						}
 					}
 				}
 			}
@@ -2685,11 +2694,6 @@ You'll receive a report email once that fsck run completes.
 
 		foreach ($shares_options as $share_name => $share_options) {
 			gh_fsck($share_options['landing_zone'], $share_name);
-		}
-		foreach (get_graveyards() as $graveyard) {
-			foreach ($shares_options as $share_name => $share_options) {
-				gh_fsck_graveyard($graveyard, "/$share_name", $share_name);
-			}
 		}
 		gh_log(INFO, "fsck for all shares completed.");
 
