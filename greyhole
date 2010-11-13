@@ -736,14 +736,14 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			if (is_dir("$target_drive/$share/$full_path")) {
 				# Make sure the parent directory of target_full_path exists, before we try moving something there...
 				list($path, $dirname) = explode_full_path("$target_drive/$share/$target_full_path");
-				gh_mkdir($path, "$target_drive/$share", $original_path);
+				gh_mkdir($path, $original_path);
 
 				rename("$target_drive/$share/$full_path", "$target_drive/$share/$target_full_path");
 				gh_log(DEBUG, "  Directory moved: $target_drive/$share/$full_path -> $target_drive/$share/$target_full_path");
 			}
 
 			list($path, $dirname) = explode_full_path("$target_drive/.gh_graveyard/$share/$target_full_path");
-			gh_mkdir($path, "$target_drive/.gh_graveyard/$share", $original_path);
+			gh_mkdir($path, $original_path);
 			$result = @rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
 			if ($result) {
 				gh_log(DEBUG, "  Graveyard directory moved: $target_drive/.gh_graveyard/$share/$full_path -> $target_drive/.gh_graveyard/$share/$target_full_path");
@@ -828,9 +828,8 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 
 				// Make sure the target directory exists
 				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-				$root_path = str_replace(clean_dir("/$share/$target_full_path"), '', $tombstone->path);
 				list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
-				gh_mkdir($tombstone_dir_path, "$root_path/$share", $original_path);
+				gh_mkdir($tombstone_dir_path, $original_path);
 
 				$it_worked = rename($old_path, $tombstone->path);
 
@@ -1101,7 +1100,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
 
 		list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$full_path");
-		if (!gh_mkdir($tombstone_dir_path, "$root_path/$share", $original_path)) {
+		if (!gh_mkdir($tombstone_dir_path, $original_path)) {
 			$tombstone->state = 'Gone';
 			$tombstones[$key] = $tombstone;
 			continue;
@@ -1187,50 +1186,34 @@ function gh_chperm($real_file_path, $file_infos) {
 	chgrp($real_file_path, $file_infos->filegroup);
 }
 
-function gh_mkdir($directory, $root_path, $original_directory, $force_dir_infos = null) {
-	$root_path = '/' . trim($root_path, '/');
+function gh_mkdir($directory, $original_directory_or_dir_infos) {
 	if (!is_dir($directory)) {
-		if ($force_dir_infos == null) {
-			$dir_infos = gh_get_file_infos($original_directory);
+		if (is_string($original_directory_or_dir_infos)) {
+			$dir_infos = gh_get_file_infos($original_directory_or_dir_infos);
 		} else {
-			$dir_infos = $force_dir_infos;
+			$dir_infos = $original_directory_or_dir_infos;
 		}
-		// Try simple mkdir; will work only if parent dir already exists
-		if (!@mkdir($directory, $dir_infos->fileperms)) {
-			// Try recursive mkdir
-			if (!mkdir($directory, $dir_infos->fileperms, TRUE)) {
-				gh_log(WARN, "  Failed to create directory $directory");
+		
+		// Need to mkdir & chown/chgrp all dirs that don't exists, up to the full path ($directory)
+		$dir_parts = explode('/', $directory);
+		
+		$i = 0;
+		$parent_directory = '/' . $dir_parts[$i++];
+		while (is_dir($parent_directory)) {
+			$parent_directory = $parent_directory . '/' . $dir_parts[$i++];
+		}
+		while ($i <= count($dir_parts)) {
+			if (!mkdir($parent_directory, $dir_infos->fileperms)) {
+				gh_log(WARN, "  Failed to create directory $parent_directory");
 				return FALSE;
 			}
-			// Need to chown/chgrp parent dirs too
-			$parent_directory = $directory;
-			$original_parent_directory = $original_directory;
-			$i = 0;
-			while ($i++ < 255) { # Safety net... The real way to exit this loop is the break on ($parent_directory == $root_path)
-				if ($force_dir_infos == null) {
-					$dir_infos = gh_get_file_infos($original_parent_directory);
-				} else {
-					$dir_infos = $force_dir_infos;
-				}
-				if (!chmod($parent_directory, $dir_infos->fileperms)) {
-					gh_log(WARN, "  Failed to chmod directory '$parent_directory'");
-				}
-				if (!chown($parent_directory, $dir_infos->fileowner)) {
-					gh_log(WARN, "  Failed to chown directory '$parent_directory'");
-				}
-				if (!chgrp($parent_directory, $dir_infos->filegroup)) {
-					gh_log(WARN, "  Failed to chgrp directory '$parent_directory'");
-				}
-				if ($parent_directory == $root_path) {
-					break;
-				}
-				list($parent_directory, $directory_name) = explode_full_path($parent_directory);
-				list($original_parent_directory, $directory_name) = explode_full_path($original_parent_directory);
+			if (!chown($parent_directory, $dir_infos->fileowner)) {
+				gh_log(WARN, "  Failed to chown directory '$parent_directory'");
 			}
-		} else {
-			// Simple mkdir worked
-			chown($directory, $dir_infos->fileowner);
-			chgrp($directory, $dir_infos->filegroup);
+			if (!chgrp($parent_directory, $dir_infos->filegroup)) {
+				gh_log(WARN, "  Failed to chgrp directory '$parent_directory'");
+			}
+			$parent_directory = $parent_directory . '/' . $dir_parts[$i++];
 		}
 	}
 	return TRUE;
@@ -1474,7 +1457,7 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 		$has_tombstone = FALSE;
 		foreach ($tombstones as $tombstone) {
 			if (strpos($tombstone->path, $target_drive) === 0) {
-				gh_mkdir($data_filepath, "$graveyard/$share", get_share_landing_zone($share) . "/$path");
+				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 				gh_log(DEBUG, "    Saving tombstones in $data_filepath/$filename");
 				file_put_contents("$data_filepath/$filename", serialize($tombstones));
 				$has_tombstone = TRUE;
@@ -1497,7 +1480,7 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 			}
 			$data_filepath = "$graveyard_backup_directory/$share/$path";
 			gh_log(DEBUG, "    Saving tombstones (backup) in $data_filepath/$filename");
-			gh_mkdir($data_filepath, "$graveyard_backup_directory/$share", get_share_landing_zone($share) . "/$path");
+			gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 			file_put_contents("$data_filepath/$filename", serialize($tombstones));
 		}
 	}
@@ -2231,7 +2214,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				if ($tombstone->is_linked) {
 					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
 					@unlink("$landing_zone/$file_path/$filename");
-					gh_mkdir("$landing_zone/$file_path", "$landing_zone", null);
+					list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+					gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
 					symlink($tombstone->path, "$landing_zone/$file_path/$filename");
 					break;
 				}
@@ -2295,7 +2279,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				if ($tombstone->state != 'Gone') {
 					$root_path = str_replace(clean_dir("/$share/$file_path"), '', $tombstone_dir_path);
 					list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$file_path");
-					if (!gh_mkdir($tombstone_dir_path, "$root_path/$share", $original_path)) {
+					if (!gh_mkdir($tombstone_dir_path, $original_path)) {
 						$tombstone->state = 'Gone';
 						$file_tombstones[$key] = $tombstone;
 						continue;
@@ -2340,7 +2324,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				}
 				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
 				gh_recycle("$landing_zone/$file_path/$filename");
-				gh_mkdir("$landing_zone/$file_path", "$landing_zone", null);
+				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+				gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
 				symlink($tombstone->path, "$landing_zone/$file_path/$filename");
 				$symlink_created = TRUE;
 			}
@@ -2352,7 +2337,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 					$file_tombstones[$key] = $tombstone;
 					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
 					gh_recycle("$landing_zone/$file_path/$filename");
-					gh_mkdir("$landing_zone/$file_path", "$landing_zone", null);
+					list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+					gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
 					symlink($tombstone->path, "$landing_zone/$file_path/$filename");
 					break;
 				}
@@ -2413,7 +2399,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				$tombstone = reset($file_tombstones);
 				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
 				gh_recycle("$landing_zone/$file_path/$filename");
-				gh_mkdir("$landing_zone/$file_path", "$landing_zone", null);
+				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+				gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
 				symlink($tombstone->path, "$landing_zone/$file_path/$filename");
 				reset($file_tombstones)->is_linked = TRUE;
 			}
@@ -2595,8 +2582,13 @@ function gh_recycle($real_path) {
 		if (@is_file($path)) {
 			unlink($path);
 		}
-		gh_mkdir($path, "$attic_path/$share", $original_path);
-		chmod($path, 0777);
+		
+		$dir_infos = (object) array(
+			'fileowner' => (int) gh_fileowner($original_path),
+			'filegroup' => (int) gh_filegroup($original_path),
+			'fileperms' => (int) base_convert("0777", 8, 10)
+		);
+		gh_mkdir($path, $dir_infos);
 
 		if (@is_dir($target_path)) {
 			exec("rm -rf " . quoted_form($target_path));
@@ -2832,7 +2824,7 @@ function gh_get_file_infos($real_path) {
 		return (object) array(
 			'fileowner' => 0,
 			'filegroup' => 0,
-			'fileperms' => (int) base_convert("0775", 8, 10)
+			'fileperms' => (int) base_convert("0777", 8, 10)
 		);
 	}
 	return (object) array(
@@ -2943,7 +2935,7 @@ function gh_balance() {
 				// Make sure the parent directory exists, before we try moving something there...
 				$original_path = clean_dir("$source_drive/$share_name/$path");
 				list($target_path, $filename) = explode_full_path("$target_drive/$share_name/$full_path");
-				gh_mkdir($target_path, "$target_drive/$share_name", $original_path);
+				gh_mkdir($target_path, $original_path);
 
 				// Move the file
 				$temp_path = get_temp_filename("$target_drive/$share_name/$full_path");
@@ -3191,7 +3183,13 @@ function create_attic_share_symlink($filepath_in_attic, $attic_path) {
 		} else {
 			list($original_path, $filename) = explode_full_path($filepath_in_attic);
 			list($path, $filename) = explode_full_path($filepath_in_attic_share);
-			gh_mkdir($path, $attic_share['landing_zone'], $original_path, (object) array('fileowner' => 0, 'filegroup' => 0, 'fileperms' => (int) base_convert("0777", 8, 10)));
+
+			$dir_infos = (object) array(
+				'fileowner' => (int) gh_fileowner($original_path),
+				'filegroup' => (int) gh_filegroup($original_path),
+				'fileperms' => (int) base_convert("0777", 8, 10)
+			);
+			gh_mkdir($path, $dir_infos);
 		}
 		symlink($filepath_in_attic, $filepath_in_attic_share);
 		gh_log(DEBUG, "  Created symlink to deleted file in {$attic_share['name']} share ($filename).");
