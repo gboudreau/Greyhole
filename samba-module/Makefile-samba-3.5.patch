@@ -1,0 +1,30 @@
+--- a/Makefile	2010-11-14 03:37:47.776642999 +0100
++++ b/Makefile	2010-11-13 16:57:04.561307561 +0100
+@@ -243,7 +243,7 @@
+ 
+ SCRIPTS = $(srcdir)/script/smbtar $(builddir)/script/findsmb
+ 
+-VFS_MODULES =  bin/recycle.so bin/audit.so bin/extd_audit.so bin/full_audit.so bin/netatalk.so bin/fake_perms.so bin/default_quota.so bin/readonly.so bin/cap.so bin/expand_msdfs.so bin/shadow_copy.so bin/shadow_copy2.so bin/xattr_tdb.so bin/catia.so bin/streams_xattr.so bin/streams_depot.so bin/readahead.so bin/fileid.so bin/preopen.so bin/syncops.so bin/acl_xattr.so bin/acl_tdb.so bin/smb_traffic_analyzer.so bin/dirsort.so bin/scannedonly.so
++VFS_MODULES =  bin/recycle.so bin/audit.so bin/greyhole.so bin/extd_audit.so bin/full_audit.so bin/netatalk.so bin/fake_perms.so bin/default_quota.so bin/readonly.so bin/cap.so bin/expand_msdfs.so bin/shadow_copy.so bin/shadow_copy2.so bin/xattr_tdb.so bin/catia.so bin/streams_xattr.so bin/streams_depot.so bin/readahead.so bin/fileid.so bin/preopen.so bin/syncops.so bin/acl_xattr.so bin/acl_tdb.so bin/smb_traffic_analyzer.so bin/dirsort.so bin/scannedonly.so
+ PERFCOUNT_MODULES = 
+ PDB_MODULES = 
+ RPC_MODULES = 
+@@ -697,6 +697,7 @@
+ VFS_DEFAULT_OBJ = modules/vfs_default.o
+ VFS_AUDIT_OBJ = modules/vfs_audit.o
+ VFS_EXTD_AUDIT_OBJ = modules/vfs_extd_audit.o
++VFS_GREYHOLE_OBJ = modules/vfs_greyhole.o
+ VFS_FULL_AUDIT_OBJ = modules/vfs_full_audit.o
+ VFS_FAKE_PERMS_OBJ = modules/vfs_fake_perms.o
+ VFS_RECYCLE_OBJ = modules/vfs_recycle.o
+@@ -2660,6 +2661,10 @@
+ 	@echo "Building plugin $@"
+ 	@$(SHLD_MODULE) $(VFS_AUDIT_OBJ)
+ 
++bin/greyhole.so: $(BINARY_PREREQS) $(VFS_GREYHOLE_OBJ)
++	@echo "Building plugin $@"
++	@$(SHLD_MODULE) $(VFS_GREYHOLE_OBJ)
++
+ bin/extd_audit.so: $(BINARY_PREREQS) $(VFS_EXTD_AUDIT_OBJ)
+ 	@echo "Building plugin $@"
+ 	@$(SHLD_MODULE) $(VFS_EXTD_AUDIT_OBJ)
