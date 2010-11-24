@@ -2587,8 +2587,8 @@ function gh_recycle($real_path) {
 		}
 		
 		$dir_infos = (object) array(
-			'fileowner' => (int) gh_fileowner($original_path),
-			'filegroup' => (int) gh_filegroup($original_path),
+			'fileowner' => 0,
+			'filegroup' => 0,
 			'fileperms' => (int) base_convert("0777", 8, 10)
 		);
 		gh_mkdir($path, $dir_infos);
@@ -2598,7 +2598,6 @@ function gh_recycle($real_path) {
 		}
 		if (@rename($real_path, $target_path)) {
 			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
-			chmod($target_path, 0640); // Make sure only the user and group users will be able to read files in the attic
 			
 			// Create a symlink in the Greyhole Attic share, to allow the user to remove this file using that share
 			create_attic_share_symlink($target_path, $attic_path);
