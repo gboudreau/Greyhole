@@ -39,6 +39,8 @@ date_default_timezone_set(date_default_timezone_get());
 
 set_error_handler("gh_error_handler");
 
+umask(0);
+
 $constarray = get_defined_constants(true);
 foreach($constarray['user'] as $key => $val) {
     eval(sprintf('$_CONSTANTS[\'%s\'] = ' . (is_int($val) || is_float($val) ? '%s' : "'%s'") . ';', addslashes($key), addslashes($val)));
