@@ -39,7 +39,7 @@ for ($i=1; $i<$argc; $i++) {
 		break;
 
 		case '--email-report':
-		case '--walk-graveyard':
+		case '--dont-walk-graveyard':
 		case '--disk-usage-report':
 		$options[substr($argv[$i], 2)] = TRUE;
 		break;
@@ -88,7 +88,7 @@ if (@$db_use_mysql) {
 function print_usage() {
 	echo "Invalid command line options.\n";
 	echo "Usage: Start the daemon:         greyhole --daemon\n";
-	echo "       Schedule a fsck:          greyhole --fsck [--email-report] [--walk-graveyard] [--dir <path>]\n";
+	echo "       Schedule a fsck:          greyhole --fsck [--email-report] [--dont-walk-graveyard] [--dir <path>]\n";
 	echo "       Balance available space \n";
 	echo "        on storage pool devices: greyhole --balance\n";
 	echo "       Display statistics:       greyhole --stats\n";
@@ -495,7 +495,7 @@ if ($action == 'fsck') {
 	if (isset($options['email-report'])) {
 		$fsck_options[] = 'email';
 	}
-	if (isset($options['walk-graveyard'])) {
+	if (!isset($options['dont-walk-graveyard'])) {
 		$fsck_options[] = 'graveyard';
 	}
 	if (isset($options['disk-usage-report'])) {
