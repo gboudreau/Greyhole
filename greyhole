@@ -34,6 +34,7 @@ for ($i=1; $i<$argc; $i++) {
 		case '--stats':
 		case '--empty-attic':
 		case '--view-queue':
+		case '--iostat':
 		$action = substr($argv[$i], 2);
 		break;
 
@@ -48,7 +49,7 @@ for ($i=1; $i<$argc; $i++) {
 		case '--going':
 		case '--thaw':
 		$action = substr($argv[$i], 2);
-		// Fall through --dir to fetch the path to the Gone/Gone-But-OK drive
+		// Fall through --dir to fetch the path for the above commands
 
 		case '--dir':
 		if (isset($argv[$i+1])) {
@@ -114,11 +115,43 @@ function print_usage() {
 	exit(1);
 }
 
-if ($action != 'stats' && $action != 'view-queue' && $action != 'debug') {
+if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
 		exit(1);
 	}
+}
+
+if ($action == 'iostat') {
+	$devices_directories = array();
+	foreach ($storage_pool_directories as $target_drive) {
+		$device = exec("df " . quoted_form($target_drive) . " | awk '{print \$1}'");
+		$device = preg_replace('@/dev/(sd[a-z])[0-9]+@', '\1', $device);
+		$devices_directories[$device] = $target_drive;
+	}
+
+	while (TRUE) {
+		unset($result);
+		exec("iostat -p ALL -k 10 2 | grep '^sd[a-z] ' | awk '{print \$1,\$3,\$4}'", $result);
+		$iostat = array();
+		foreach ($result as $line) {
+			$info = explode(' ', $line);
+			$device = $info[0];
+			$read_kBps = $info[1];
+			$write_kBps = $info[2];
+			if (!isset($devices_directories[$device])) {
+				# That device isn't in the storage pool.
+				continue;
+			}
+			$directory = $devices_directories[$device];
+			$iostat[$directory] = (float) $read_kBps + $write_kBps;
+		}
+		foreach ($iostat as $dir => $io_kBps) {
+			echo "$dir: $io_kBps kBps\n";
+		}
+	}
+	
+	exit(0);
 }
 
 if ($action == 'thaw') {
