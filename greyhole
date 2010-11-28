@@ -1565,6 +1565,8 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	$old_action = $action;
 	$action = 'parse_logs';
 
+	gh_log(DEBUG, "Parsing Samba logs...");
+
 	// If we have enough queued tasks (9k+), let's not parse the log at this time, and get some work done.
 	// Once we fall below 9k tasks queued, we'll queue at most 1k new tasks, then get back to work.
 	// This will effectively 'batch' large file operations to make sure the DB doesn't become a problem because of the number of row,
@@ -1576,6 +1578,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	$num_rows = (int) $row->num_rows;
 	if ($num_rows >= 9000) {
 		$action = $old_action;
+		gh_log(DEBUG, "  More than 9000 tasks queued... Won't queue any more at this time.");
 		return;
 	}
 
@@ -1690,6 +1693,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			db_free_result($result);
 			$num_rows = (int) $row->num_rows;
 			if ($num_rows >= 10000) {
+				gh_log(DEBUG, "  We now have more than 10000 tasks queued... Will stop parsing for now.");
 				break;
 			}
 		}
@@ -1704,6 +1708,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 		);
 		db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
 	}
+	gh_log(DEBUG, "  Done parsing.");
 	
 	if ($simplify_after_parse && $new_tasks > 0) {
 		$query = "SELECT COUNT(*) num_rows FROM tasks";
