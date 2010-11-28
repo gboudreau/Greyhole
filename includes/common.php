@@ -437,15 +437,20 @@ function gh_is_file($filename) {
 }
 
 function gh_fileinode($filename) {
+	// This function returns deviceid_inode to make sure this value will be different for files on different devices.
 	global $arch;
 	if ($arch != 'x86_64') {
-		$result = exec("stat -c %i ".quoted_form($filename)." 2>/dev/null");
+		$result = exec("stat -c '%d_%i' ".quoted_form($filename)." 2>/dev/null");
 		if (empty($result)) {
 			return FALSE;
 		}
-		return (int) $result;
+		return (string) $result;
 	}
-	return @fileinode($filename);
+	$stat = @stat($filename);
+	if ($stat === FALSE) {
+		return FALSE;
+	}
+	return $stat['dev'] . '_' . $stat['ino'];
 }
 
 ?>

@@ -2384,7 +2384,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 	} else {
 		# Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
 		foreach ($file_copies_inodes as $inode => $path) {
-			if (!is_numeric($inode)) {
+			if (strpos($inode, '/') === 0) {
 				unset($file_copies_inodes[$inode]);
 			}
 		}
