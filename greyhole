@@ -535,11 +535,17 @@ function execute_next_task() {
 		$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
 		$task = db_fetch_object($result);
 		if ($task === FALSE) {
-			$action = 'sleep';
-			gh_log(DEBUG, "Nothing to do... Sleeping.");
-			sleep($log_level == DEBUG ? 10 : ($log_level == TEST ? 1 : 600));
-			db_free_result($result);
-			return;
+			// No more complete = yes|thawed; let's look for complete = idle tasks.
+			$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete = 'idle' ORDER BY id ASC LIMIT 1";
+			$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
+			$task = db_fetch_object($result);
+			if ($task === FALSE) {
+				$action = 'sleep';
+				gh_log(DEBUG, "Nothing to do... Sleeping.");
+				sleep($log_level == DEBUG ? 10 : ($log_level == TEST ? 1 : 600));
+				db_free_result($result);
+				return;
+			}
 		}
 		db_free_result($result);
 	}
@@ -574,6 +580,11 @@ function execute_next_task() {
 			gh_log(INFO, "Starting available space balancing");
 			gh_balance();
 			gh_log(INFO, "Available space balancing completed.");
+			break;
+		case 'fsck_file':
+			$file_type = @filetype($task->full_path);
+			list($path, $filename) = explode_full_path($task->full_path);
+			gh_fsck_file($path, $filename, $file_type, 'landing_zone', $task->share);
 			break;
 		case 'fsck':
 			gh_log(INFO, "Starting fsck for $task->share");
@@ -2053,7 +2064,7 @@ function gh_fsck_graveyard($root, $path, $share) {
 }
 
 function gh_fsck_file($path, $filename, $file_type, $source, $share) {
-	global $storage_pool_directories, $fsck_report, $options;
+	global $storage_pool_directories, $fsck_report, $options, $action;
 
 	$landing_zone = get_share_landing_zone($share);
 
@@ -2075,18 +2086,14 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 			$file_type = FALSE;
 		}
 		if ($file_type === FALSE) {
-			// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
-			parse_samba_log();
-			$query = sprintf("SELECT * FROM tasks WHERE action = 'unlink' AND share = '%s' AND full_path = '%s' AND complete = 'yes' LIMIT 1",
-				db_escape_string($share),
-				db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
-			);
-			$result = db_query($query) or gh_log(CRITICAL, "Can't select future unlink tasks: " . db_error());
-			if (db_fetch_object($result) === FALSE) {
-				gh_log(INFO, "$path/$filename is missing from the share directory. Will try to re-create it, if copies are available.");
-				$fsck_report['not_in_landing']++;
-			} else {
-				// Newly deleted file; let's not do anything with it now.
+			if ($action != 'fsck_file') {
+				// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
+				// We'll queue this file fsck (to restore the symlink) for when all other file operations have been executed.
+				$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('fsck_file', '%s', '%s', 'idle')",
+					db_escape_string($share),
+					db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+				);
+				db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
 				return;
 			}
 		}
@@ -2265,9 +2272,6 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 		}
 	} else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
 		gh_log(WARN, '  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : 'Did you copy that file there without using your Samba shares..? (If you did, don\'t do that in the future!)'));
-		if ($source == 'graveyard') {
-			$fsck_report['not_in_landing']--;
-		}
 		if (is_link("$landing_zone/$file_path/$filename")) {
 			gh_recycle("$landing_zone/$file_path/$filename");
 			if ($source == 'graveyard' || get_tombstone_data_filename($share, $file_path, $filename) !== FALSE) {
@@ -2462,7 +2466,6 @@ function initialize_fsck_report($what) {
 	$fsck_report['landing_zone'] = array();
 	$fsck_report['landing_zone']['num_dirs'] = 0;
 	$fsck_report['landing_zone']['num_files'] = 0;
-	$fsck_report['not_in_landing'] = 0;
 	$fsck_report['no_copies_found_files'] = array();
 	$fsck_report['symlink_target_moved'] = 0;
 	$fsck_report['too_many_copies'] = 0;
@@ -2532,7 +2535,7 @@ Attic size:\n";
 	}
 
 	// Warnings
-	if ($fsck_report['too_many_copies'] == 0 && $fsck_report['symlink_target_moved'] == 0 && $fsck_report['not_in_landing'] == 0 && count($fsck_report['temp_files']) == 0 && $fsck_report['gone_ok'] == 0) {
+	if ($fsck_report['too_many_copies'] == 0 && $fsck_report['symlink_target_moved'] == 0 && count($fsck_report['temp_files']) == 0 && $fsck_report['gone_ok'] == 0) {
 		// Nothing to say...
 	} else {
 		$report .= "Notices:\n";
@@ -2549,11 +2552,6 @@ Attic size:\n";
     Those symlinks were updated to point to the new location of those file copies.\n\n";
 		}
 
-		if ($fsck_report['not_in_landing'] > 0) {
-			$report .= "  Found " . $fsck_report['not_in_landing'] . " files that were not in the Landing Zone.
-    Symlinks were created in the Landing Zone to point to those files.\n\n";
-		}
-	
 		if (count($fsck_report['temp_files']) > 0) {
 			$report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the attic):\n";
 			$report .= "    " . implode("\n    ", $fsck_report['temp_files']) . "\n\n";
