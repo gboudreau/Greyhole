@@ -64,7 +64,7 @@ if (!isset($smb_config_file)) {
 $attic_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks;
 
 	$shares_options = array();
 	$storage_pool_directories = array();
@@ -188,6 +188,14 @@ function parse_config() {
 
 	global ${"db_use_$db_engine"};
 	${"db_use_$db_engine"} = TRUE;
+	
+	if (!isset($max_queued_tasks)) {
+		if ($db_engine == 'sqlite') {
+			$max_queued_tasks = 1000;
+		} else {
+			$max_queued_tasks = 100000;
+		}
+	}
 
 	$db_options = (object) array(
 		'engine' => $db_engine,
