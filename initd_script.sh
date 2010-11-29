@@ -45,7 +45,7 @@ status () {
 }
 
 daemon_start () {
-	ionice -c 2 -n 7 $DAEMON --daemon > /dev/null &
+	nice -n 1 $DAEMON --daemon > /dev/null &
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ]; then
 		touch $LOCKFILE
