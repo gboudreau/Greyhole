@@ -51,7 +51,7 @@ $last_df_time = 0;
 $last_dfs = array();
 $is_new_line = TRUE;
 $sleep_before_task = array();
-$arch = exec('uname -i');
+$arch = exec('uname -m');
 
 if (!isset($config_file)) {
 	$config_file = '/etc/greyhole.conf';
