@@ -45,7 +45,10 @@ echo "Migrating data from SQLite to MySQL..."
 sqlite3 /var/cache/greyhole.sqlite ".dump settings tasks" | grep INSERT | grep -v sqlite_sequence > greyhole.dump.sql
 sed -ie 's/INSERT INTO "tasks"/INSERT INTO tasks/' greyhole.dump.sql
 sed -ie 's/INSERT INTO "settings"/INSERT INTO settings/' greyhole.dump.sql
-mysql -u greyhole -pgreyhole -e 'truncate settings' greyhole
+settings_exists=`grep "INSERT INTO settings" greyhole.dump.sql | wc -l`
+if [ "$settings_exists" != "0" ]; then
+	mysql -u greyhole -pgreyhole -e 'truncate settings' greyhole
+fi
 mysql -u greyhole -pgreyhole greyhole < greyhole.dump.sql
 rm greyhole.dump.sql
 echo "Done."
