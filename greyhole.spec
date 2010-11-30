@@ -34,6 +34,7 @@ install -m 0750 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
 install -m 0644 -D -p schema-mysql.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0644 -D -p schema-sqlite.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
+install -m 0755 -D -p db_migration-sqlite2mysql.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/greyhole.conf
 install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/greyhole
 %ifarch x86_64
