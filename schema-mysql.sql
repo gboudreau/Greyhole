@@ -13,7 +13,7 @@ CREATE TABLE `tasks` (
 `share` TINYTEXT NOT NULL,
 `full_path` TINYTEXT NULL,
 `additional_info` TINYTEXT NULL,
-`complete` ENUM( 'yes',  'no' ) NOT NULL,
+`complete` ENUM( 'yes',  'no', 'frozen', 'thawed', 'idle') NOT NULL,
 `event_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE = MYISAM;
 
