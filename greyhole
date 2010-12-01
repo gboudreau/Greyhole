@@ -129,28 +129,32 @@ if ($action == 'gone' || $action == 'going') {
 		}
 
 		unlink("$going_dir/.greyhole_uses_this");
-
-		// Remove $options['dir'] from config file and restart (if it was running)
-		$escaped_dir = str_replace('/', '\/', $going_dir);
-		exec("/bin/sed -ie 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf");
-		exec("/sbin/service greyhole condrestart");
-
-		// If we're on Amahi, let's remove it from the Storage Pool page too
-		if (file_exists('/usr/bin/hdactl')) {
-			$hda_going_dir = preg_replace('/\/gh$/', '', $going_dir);
-			exec("/usr/bin/mysql -u root -phda -e \"DELETE FROM disk_pool_partitions WHERE path = '$hda_going_dir'\" hda_production");
-		}
-		
-		// Schedule fsck for all shares to re-create missing copies on other shares
-		db_query("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '', NULL, 'yes')") or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
-		echo "All the files that were only on $going_dir have been copied somewhere else.\n";
-		echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.\n";
 	}
 
+	// Remove $options['dir'] from config file and restart (if it was running)
+	$escaped_dir = str_replace('/', '\/', $going_dir);
+	exec("/bin/sed -ie 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf");
+	exec("/sbin/service greyhole condrestart");
+
+	// If we're on Amahi, let's remove it from the Storage Pool page too
+	if (file_exists('/usr/bin/hdactl')) {
+		$hda_going_dir = preg_replace('/\/gh$/', '', $going_dir);
+		exec("/usr/bin/mysql -u root -phda -e \"DELETE FROM disk_pool_partitions WHERE path = '$hda_going_dir'\" hda_production");
+	}
+	
 	mark_gone_ok($options['dir'], 'remove');
 	mark_gone_drive_fscked($options['dir'], 'remove');
 	gh_log(INFO, "Storage pool directory " . $options['dir'] . " has been marked Gone");
 	echo "Storage pool directory " . $options['dir'] . " has been marked Gone, which means the missing file copies that are in this directory will be re-created during the next fsck.\n";
+
+	if ($action == 'going') {
+		// Schedule fsck for all shares to re-create missing copies on other shares
+		db_query("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '', NULL, 'yes')") or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
+		echo "All the files that were only on $going_dir have been copied somewhere else.\n";
+		echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.\n";
+	} else { // $action == 'gone'
+		echo "Sadly, file copies that were only on this drive, if any, are now lost!\n";
+	}
 	exit(0);
 }
 
@@ -2597,7 +2601,7 @@ function check_storage_pool_dirs() {
 		if (!is_greyhole_owned_dir($target_drive) && !gone_fscked($target_drive, $i++ == 0)) {
 			$needs_fsck = 1;
 			mark_gone_drive_fscked($target_drive);
-			gh_log(WARN, "Warning! It seems $target_drive is missing it's \".greyhole_uses_this\" file. This either means this mount is currently unmounted, or you forgot to create this file.");
+			gh_log(WARN, "Warning! It seems $target_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
 			$body = "This is an automated email from Greyhole.
 
 It appears one of your storage pool directory is missing it's \".greyhole_uses_this\" file:
@@ -2609,9 +2613,11 @@ Here are your options:
 
 - If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this directory will not be part of your storage pool.
 
-- If the mount is gone, you should either re-mount it manually (if possible), or remove it from your configuration file, if you know it is gone for good.
+- If the drive is gone, you should either re-mount it manually (if possible), or remove it from your storage pool. To do so, use the following command:
+  greyhole --gone=".quoted_form($target_drive)."
+  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.
 
-- If you know this mount will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:
+- If you know this drive will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:
   greyhole --wait-for=".quoted_form($target_drive)."
 
 A fsck will now start, to fix the symlinks found in your shares, when possible.
