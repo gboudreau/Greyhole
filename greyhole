@@ -22,54 +22,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 include('includes/common.php');
 include('includes/sql.php');
 
-$action = 'unknown';
-$options = array();
-for ($i=1; $i<$argc; $i++) {
-	switch ($argv[$i]) {
-		case '--daemon':
-		case '--fsck':
-		case '--balance':
-		case '--prerotate':
-		case '--postrotate':
-		case '--stats':
-		case '--empty-attic':
-		case '--view-queue':
-		case '--iostat':
-		$action = substr($argv[$i], 2);
-		break;
-
-		case '--email-report':
-		case '--dont-walk-graveyard':
-		case '--disk-usage-report':
-		$options[substr($argv[$i], 2)] = TRUE;
-		break;
-		
-		case '--wait-for':
-		case '--gone':
-		case '--going':
-		case '--thaw':
-		$action = substr($argv[$i], 2);
-		// Fall through --dir to fetch the path for the above commands
-
-		case '--dir':
-		if (isset($argv[$i+1])) {
-			$options['dir'] = $argv[$i+1];
-		}
-		$i++;
-		break;
-
-		case '--debug':
-		$action = 'debug';
-		if (isset($argv[$i+1])) {
-			$options['debug_filename'] = $argv[$i+1];
-			$i++;
-		}
-		break;
-		
-		default:
-		print_usage();
-	}
-}
+list($action, $options) = process_command_line();
 
 if ($action == 'unknown') {
 	print_usage();
@@ -83,36 +36,6 @@ db_migrate();
 
 if (@$db_use_mysql) {
 	db_query("SET SESSION group_concat_max_len = 1048576");
-}
-
-function print_usage() {
-	echo "Invalid command line options.\n";
-	echo "Usage: Start the daemon:         greyhole --daemon\n";
-	echo "       Schedule a fsck:          greyhole --fsck [--email-report] [--dont-walk-graveyard] [--dir <path>]\n";
-	echo "       Balance available space \n";
-	echo "        on storage pool devices: greyhole --balance\n";
-	echo "       Display statistics:       greyhole --stats\n";
-	echo "       Display work queue:       greyhole --view-queue\n";
-	echo "       Empty attic:              greyhole --empty-attic\n";
-	echo "       Debug file operations:    greyhole --debug <filename>\n";
-	echo "\n";
-	echo "       List frozen directories:  greyhole --thaw\n";
-	echo "       Thaw a frozen directory:  greyhole --thaw <share/directory>\n";
-	echo "\n";
-	echo "       Pre-rotate task:          greyhole --prerotate\n";
-	echo "       Post-rotate task:         greyhole --postrotate\n";
-	echo "\n";
-	echo "     When <path>, one of your storage pool directories, is/will become unavailable:\n";
-	echo "       <path> will return soon:      greyhole --wait-for <path>\n";
-	echo "       <path> is gone for good:      greyhole --gone <path>\n";
-	echo "       <path> will be gone for good: greyhole --going <path>\n";
-	echo "\n";
-	echo "     About the attic: The attic is used like a Recycle Bin, or Trash.\n";
-	echo "       That means you'll need to manually empty it once in a while.\n";
-	echo "       To do so, use the --empty-attic parameter (see above).\n";
-	echo "       Another option is to create a 'Greyhole Attic' Samba share.\n";
-	echo "       More details about that here: http://greyhole.pommepause.com/doc/attic\n";
-	exit(1);
 }
 
 if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat') {
@@ -155,13 +78,13 @@ if ($action == 'iostat') {
 }
 
 if ($action == 'thaw') {
-	if (!isset($options['dir'])) {
+	if (!isset($options['dir']) || array_search($options['dir'], $frozen_directories) === FALSE) {
 		echo "Frozen directories:\n";
 		foreach ($frozen_directories as $frozen_directory) {
 			echo "  $frozen_directory\n";
 		}
 		echo "To thaw any of the above directories, use the following command:\n";
-		echo "greyhole --thaw <directory>\n";
+		echo "greyhole --thaw=directory\n";
 		exit(0);
 	}
 	$path = explode('/', $options['dir']);
@@ -454,7 +377,9 @@ if ($action == 'stats') {
 
 if ($action == 'wait-for') {
 	if (!mark_gone_ok($options['dir'])) {
-		echo "Directory " . $options['dir'] . " is not one of your defined storage pool directories.\n";
+		if (!empty($options['dir'])) {
+			echo "Directory " . $options['dir'] . " is not one of your defined storage pool directories.\n";
+		}
 		echo "Please use one of the following with the --wait-for option:\n  ";
 		echo implode("\n  ", $storage_pool_directories) . "\n";
 		exit(1);
@@ -2565,8 +2490,8 @@ Attic size:\n";
 		if ($fsck_report['gone_ok'] > 0) {
 			$report .= "  Found " . $fsck_report['gone_ok'] . " missing files that are in a storage pool directory marked Temporarily-Gone.
   If this directory is gone for good, you should execute the following command, and remove the directory from your configuration file:
-    greyhole --gone <path>
-  where <path> is one of:\n";
+    greyhole --gone=path
+  where path is one of:\n";
 	    	$report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
 		}
 	}
@@ -2687,7 +2612,7 @@ Here are your options:
 - If the mount is gone, you should either re-mount it manually (if possible), or remove it from your configuration file, if you know it is gone for good.
 
 - If you know this mount will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:
-  greyhole --wait-for ".quoted_form($target_drive)."
+  greyhole --wait-for=".quoted_form($target_drive)."
 
 A fsck will now start, to fix the symlinks found in your shares, when possible.
 You'll receive a report email once that fsck run completes.
@@ -3237,5 +3162,157 @@ function create_attic_share_symlink($filepath_in_attic, $attic_path) {
 		symlink($filepath_in_attic, $filepath_in_attic_share);
 		gh_log(DEBUG, "  Created symlink to deleted file in {$attic_share['name']} share ($filename).");
 	}
+}
+
+function process_command_line() {
+	$opts_actions = 'DflpPsaqi';
+	$longopts_actions = array(
+		'daemon',
+		'fsck',
+		'balance',
+		'prerotate',
+		'postrotate',
+		'stats',
+		'empty-attic',
+		'view-queue',
+		'iostat'
+	);
+
+	$opts_actions_with_values = 'w::g::n::t::b:';
+	$longopts_actions_with_values = array(
+		'wait-for::',
+		'gone::',
+		'going::',
+		'thaw::',
+		'debug:'
+	);
+
+	$opts_options = 'eyu';
+	$longopts_options = array(
+		'email-report',
+		'dont-walk-graveyard',
+		'disk-usage-report'
+	);
+
+	$opts_options_with_values = 'd:';
+	$longopts_options_with_values = array(
+		'dir:'
+	);
+
+	$command_line_options = getopt($opts_actions.$opts_actions_with_values.$opts_options.$opts_options_with_values,
+		array_merge($longopts_actions, $longopts_actions_with_values, $longopts_options, $longopts_options_with_values));
+
+	$action = 'unknown';
+	$options = array();
+
+	// Transform short options to long options
+	for ($i=0; $i<strlen($opts_actions); $i++) {
+		if (isset($command_line_options[$opts_actions[$i]])) {
+			$command_line_options[$longopts_actions[$i]] = $command_line_options[$opts_actions[$i]];
+		}
+	}
+	$opts_actions_with_values = str_replace(':', '', $opts_actions_with_values);
+	for ($i=0; $i<strlen($opts_actions_with_values); $i++) {
+		if (isset($command_line_options[$opts_actions_with_values[$i]])) {
+			$command_line_options[str_replace(':', '', $longopts_actions_with_values[$i])] = $command_line_options[$opts_actions_with_values[$i]];
+		}
+	}
+	for ($i=0; $i<strlen($opts_options); $i++) {
+		if (isset($command_line_options[$opts_options[$i]])) {
+			$command_line_options[$longopts_options[$i]] = $command_line_options[$opts_options[$i]];
+		}
+	}
+	$opts_options_with_values = str_replace(':', '', $opts_options_with_values);
+	for ($i=0; $i<strlen($opts_options_with_values); $i++) {
+		if (isset($command_line_options[$opts_options_with_values[$i]])) {
+			$command_line_options[str_replace(':', '', $longopts_options_with_values[$i])] = $command_line_options[$opts_options_with_values[$i]];
+		}
+	}
+
+	// Find action and options, from command_line_options
+	foreach ($longopts_actions as $longopt) {
+		if (isset($command_line_options[$longopt])) {
+			$action = $longopt;
+			break;
+		}
+	}
+	foreach ($longopts_actions_with_values as $longopt) {
+		$longopt_action = str_replace(':', '', $longopt);
+		if (isset($command_line_options[$longopt_action])) {
+			$action = $longopt_action;
+			if ($action == 'debug') {
+				$options['debug_filename'] = $command_line_options[$longopt_action];
+			} else {
+				if ($command_line_options[$longopt_action] !== FALSE) {
+					$options['dir'] = $command_line_options[$longopt_action];
+				}
+			}
+			break;
+		}
+	}
+
+	foreach ($longopts_options as $longopt) {
+		if (isset($command_line_options[$longopt])) {
+			$options[$longopt] = TRUE;
+		}
+	}
+	foreach ($longopts_options_with_values as $longopt) {
+		$longopt_option = str_replace(':', '', $longopt);
+		if (isset($command_line_options[$longopt_option])) {
+			$options[$longopt_option] = $command_line_options[$longopt_option];
+		}
+	}
+
+	return array($action, $options);
+}
+
+function print_usage() {
+	echo "greyhole, version %VERSION%, for linux-gnu (noarch)\n";
+	echo "By Guillaume Boudreau.\n";
+	echo "This software comes with ABSOLUTELY NO WARRANTY. This is free software,\n";
+	echo "and you are welcome to modify and redistribute it under the GPL v3 license.\n";
+	echo "\n";
+	echo "Usage: greyhole [ACTION] [OPTIONS]\n";
+	echo "\n";
+	echo "Where ACTION is one of:\n";
+	echo "  -?, --help            Display this help and exit.\n";
+	echo "  -D, --daemon          Start the daemon.\n";
+	echo "  -f, --fsck            Schedule a fsck.\n";
+	echo "  -l, --balance         Balance available space on storage pool devices.\n";
+	echo "  -s, --stats           Display storage pool statistics.\n";
+	echo "  -q, --view-queue      Display the current work queue.\n";
+	echo "  -a, --empty-attic     Empty the attic.\n";
+	echo "  -b, --debug=filename  Debug past file operations.\n";
+	echo "  -p, --prerotate       Pre-rotate task (for logrotate).\n";
+	echo "  -P, --postrotate      Post-rotate task (for logrotate).\n";
+	echo "  -t, --thaw[=path]     Thaw a frozen directory. Greyhole will start working on\n";
+	echo "                        files inside <path>. If you don't supply an option, the list\n";
+	echo "                        of frozen directories will be displayed.\n";
+	echo "  -w, --wait-for[=path] Tell Greyhole that the missing drive at <path> will return\n";
+	echo "                        soon, and that it shouldn't re-create additional file copies\n";
+	echo "                        to replace it. If you don't supply an option, the available\n";
+	echo "                        options (paths) will be displayed.\n";
+	echo "  -g, --gone[=path]     Tell Greyhole that the missing drive at <path> is gone for\n";
+	echo "                        good. Greyhole will start replacing the missing file copies\n";
+	echo "                        instantly. If you don't supply an option, the available\n";
+	echo "                        options (paths) will be displayed.\n";
+	echo "  -n, --going[=path]    Tell Greyhole that you want to remove a drive. Greyhole will\n";
+	echo "                        then make sure you don't loose any files, and that the\n";
+	echo "                        correct number of file copies are created to replace the\n";
+	echo "                        missing drive. If you don't supply an option, the available\n";
+	echo "                        options (paths) will be displayed.\n";
+	echo "\n";
+	echo "For --fsck, the available OPTIONS are:\n";
+	echo "  -e, --email-report    Send an email when fsck completes, to report on what was\n";
+	echo "                        checked, and any error that was found.\n";
+	echo "  -y, --dont-walk-graveyard\n";
+	echo "                        Speed up fsck by skipping the scan of the graveyard\n";
+	echo "                        directories. Scanning the graveyards is only required to\n";
+	echo "                        re-create symbolic links that might be missing from your\n";
+	echo "                        shared directories.\n";
+	echo "  -d, --dir=path        Only scan a specific directory, and all sub-directories.\n";
+	echo "                        The specified directory should be a Samba share, or a\n";
+	echo "                        sub-directory of a Samba share.\n";
+	exit(1);
 }
 ?>
