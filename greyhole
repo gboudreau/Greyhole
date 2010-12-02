@@ -519,6 +519,7 @@ function execute_next_task() {
 			gh_log(INFO, "Available space balancing completed.");
 			break;
 		case 'fsck_file':
+			$task->full_path = get_share_landing_zone($task->share) . '/' . $task->full_path;
 			$file_type = @filetype($task->full_path);
 			list($path, $filename) = explode_full_path($task->full_path);
 			gh_fsck_file($path, $filename, $file_type, 'landing_zone', $task->share);
