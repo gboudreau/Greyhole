@@ -17,8 +17,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC, etc.:
 
-	Fedora: sudo yum -y install mysql-server php php-mysql samba samba-common patch gcc rsyslog yum-utils php-pear rsync
-	Ubuntu: sudo apt-get -y install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
+	Fedora: sudo yum -y install mysql-server php php-mysql php-mbstring samba samba-common patch gcc rsyslog yum-utils php-pear rsync
+	Ubuntu: sudo apt-get -y install mysql-server php5-cli php5-mysql php5-mbstring samba samba-common samba-common-bin build-essential php-pear rsync
 
 2. Install Greyhole (as root):
 
