@@ -41,6 +41,9 @@ set_error_handler("gh_error_handler");
 
 umask(0);
 
+setlocale(LC_COLLATE, "en_US.UTF-8");
+setlocale(LC_CTYPE, "en_US.UTF-8");
+
 $constarray = get_defined_constants(true);
 foreach($constarray['user'] as $key => $val) {
     eval(sprintf('$_CONSTANTS[\'%s\'] = ' . (is_int($val) || is_float($val) ? '%s' : "'%s'") . ';', addslashes($key), addslashes($val)));
@@ -86,7 +89,7 @@ function parse_config() {
 				case 'log_memory_usage':
 				case 'balance_modified_files':
 					global ${$name};
-					${$name} = trim($value) === '1' || stripos(trim($value), 'yes') !== FALSE || stripos(trim($value), 'true') !== FALSE;
+					${$name} = trim($value) === '1' || mb_stripos(trim($value), 'yes') !== FALSE || mb_stripos(trim($value), 'true') !== FALSE;
 					break;
 				case 'storage_pool_directory':
 					if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?gb?/i", $value, $regs)) {
@@ -111,12 +114,12 @@ function parse_config() {
 					$frozen_directories[] = trim($value, '/');
 					break;
 				default:
-					if (strpos($name, 'num_copies') === 0) {
-						$share = substr($name, 11, strlen($name)-12);
+					if (mb_strpos($name, 'num_copies') === 0) {
+						$share = mb_substr($name, 11, mb_strlen($name)-12);
 						$shares_options[$share]['num_copies'] = (int) $value;
-					} else if (strpos($name, 'delete_moves_to_attic') === 0) {
-						$share = substr($name, 22, strlen($name)-23);
-						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || stripos(trim($value), 'yes') !== FALSE || stripos(trim($value), 'true') !== FALSE;
+					} else if (mb_strpos($name, 'delete_moves_to_attic') === 0) {
+						$share = mb_substr($name, 22, mb_strlen($name)-23);
+						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || mb_stripos(trim($value), 'yes') !== FALSE || mb_stripos(trim($value), 'true') !== FALSE;
 					} else {
 						global ${$name};
 						if (is_numeric($value)) {
@@ -144,7 +147,7 @@ function parse_config() {
 	$config_text = file_get_contents($smb_config_file);
 	foreach (explode("\n", $config_text) as $line) {
 		$line = trim($line);
-		if (strlen($line) == 0) { continue; }
+		if (mb_strlen($line) == 0) { continue; }
 		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
 			$share_name = $regs[1];
 		}
@@ -174,7 +177,7 @@ function parse_config() {
 		
 		// Validate that the landing zone is NOT a subdirectory of a storage pool directory!
 		foreach ($storage_pool_directories as $key => $target_drive) {
-			if (strpos($share_options['landing_zone'], $target_drive) === 0) {
+			if (mb_strpos($share_options['landing_zone'], $target_drive) === 0) {
 				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pooled directory ($target_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
 			}
 		}
@@ -183,7 +186,7 @@ function parse_config() {
 	if (!isset($db_engine)) {
 		$db_engine = 'mysql';
 	} else {
-		$db_engine = strtolower($db_engine);
+		$db_engine = mb_strtolower($db_engine);
 	}
 
 	global ${"db_use_$db_engine"};
@@ -224,20 +227,20 @@ function quoted_form($path) {
 
 function clean_dir($dir) {
 	if ($dir[0] == '.' && $dir[1] == '/') {
-		$dir = substr($dir, 2);
+		$dir = mb_substr($dir, 2);
 	}
-	if (strpos($dir, '//') !== FALSE) {
+	if (mb_strpos($dir, '//') !== FALSE) {
 		$dir = str_replace("//", "/", $dir);
 	}
 	return $dir;
 }
 
 function explode_full_path($full_path) {
-	if (strpos($full_path, '/') === FALSE) {
+	if (mb_strpos($full_path, '/') === FALSE) {
 		return array('', $full_path);
 	}
-	$filename = substr($full_path, strrpos($full_path, '/')+1);
-	$path = substr($full_path, 0, strrpos($full_path, '/'));
+	$filename = mb_substr($full_path, strrpos($full_path, '/')+1);
+	$path = mb_substr($full_path, 0, strrpos($full_path, '/'));
 	return array($path, $filename);
 }
 
@@ -432,7 +435,7 @@ function gh_fileperms($filename) {
 		}
 		return "0" . $result;
 	}
-	return substr(decoct(fileperms($filename)), -4);
+	return mb_substr(decoct(fileperms($filename)), -4);
 }
 
 function gh_is_file($filename) {
