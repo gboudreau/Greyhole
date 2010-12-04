@@ -36,7 +36,7 @@ LOCKFILE="/var/lock/subsys/greyhole"
 
 status () {
 	PID=`cat $PIDFILE`
-	if [ -f $PIDFILE -a "`ps ax | grep \"^$PID.*greyhole --daemon\" | wc -l`" == "1" ]; then
+	if [ -f $PIDFILE -a "`ps ax | grep \"^ *$PID.*greyhole --daemon\" | wc -l`" == "1" ]; then
 		echo "Greyhole is running."
 	else
 		echo "Greyhole isn't running."
