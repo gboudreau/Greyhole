@@ -1092,10 +1092,10 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		
 		$it_worked = FALSE;
 		if (is_link("$landing_zone/$full_path")) {
-			exec("rsync " . quoted_form(readlink("$landing_zone/$full_path")) . " " . quoted_form($temp_path));
+			exec("rsync -t " . quoted_form(readlink("$landing_zone/$full_path")) . " " . quoted_form($temp_path));
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == gh_filesize(readlink("$landing_zone/$full_path"));
 		} else if (gh_is_file("$landing_zone/$full_path")) {
-			exec("rsync " . quoted_form("$landing_zone/$full_path") . " " . quoted_form($temp_path));
+			exec("rsync -t " . quoted_form("$landing_zone/$full_path") . " " . quoted_form($temp_path));
 			$it_worked = file_exists($temp_path) && file_exists("$landing_zone/$full_path") && gh_filesize($temp_path) == gh_filesize("$landing_zone/$full_path");
 			if ($it_worked) {
 				unlink("$landing_zone/$full_path");
@@ -2277,7 +2277,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				if ($tombstone->state == 'Pending') {
 					gh_log(DEBUG, "  Copying file to $tombstone->path");
 					$temp_path = get_temp_filename($tombstone->path);
-					exec("rsync " . quoted_form($original_file_path) . " " . quoted_form($temp_path));
+					exec("rsync -t " . quoted_form($original_file_path) . " " . quoted_form($temp_path));
 					$it_worked = file_exists($temp_path) && file_exists($original_file_path) && gh_filesize($temp_path) == gh_filesize($original_file_path);
 					if ($it_worked) {
 						rename($temp_path, $tombstone->path);
