@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Weekly fsck
+/usr/bin/greyhole --fsck --email-report --dont-walk-graveyard > /dev/null
+
