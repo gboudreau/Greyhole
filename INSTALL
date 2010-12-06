@@ -63,7 +63,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	endscript
 }
 
-4. (For Samba 3.5) The greyhole.so file packaged with Greyhole won't work on your system. You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
+4. For Samba other than 3.4: The greyhole.so file packaged with Greyhole won't work on your system.
+   You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
 	Fedora:
 	yumdownloader --source samba
@@ -73,26 +74,26 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	cd samba-3.*/source3/
 
 	Ubuntu:
-	wget http://samba.org/samba/ftp/stable/samba-3.4.8.tar.gz
-	tar zxf samba-3.*.tar.gz && rm samba-3.*.tar.gz
-	cd samba-3.*/source3
+	SAMBA_VERSION=`smbd --version | awk '{print $2}'`
+	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
+	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm samba-${SAMBA_VERSION}.tar.gz
+	cd samba-${SAMBA_VERSION}/source3
 
 	Both (Fedora & Ubuntu):
-	# For Samba 3.4: #
-		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
-	# For Samba 3.5: #
-		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
 	./configure
-	# For Samba 3.4: #
-		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
-	# For Samba 3.5: #
-		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
 	make
 	if [ -x /usr/lib64/samba/vfs/ ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
 	Fedora: sudo service smb restart
 	Ubuntu (< 10): sudo /etc/init.d/samba restart
 	Ubuntu (10+): sudo restart smbd
+	
+	Note: if, for some reason, you need to compile the VFS module with Samba 3.4, use the following instead of the above commands, before and after running ./configure:
+		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
+		[...]
+		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 
 5. Setup Samba:
 
