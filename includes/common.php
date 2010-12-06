@@ -363,7 +363,7 @@ function get_share_landing_zone($share) {
 		return $attic_share['landing_zone'];
 	} else {
 		global $config_file, $smb_config_file;
-		gh_log(WARN, "  Found a share ($share) with no path in $smb_config_file, or missing from your $config_file. Skipping.");
+		gh_log(WARN, "  Found a share ($share) with no path in $smb_config_file, or missing it's num_copies[$share] config in $config_file. Skipping.");
 		return FALSE;
 	}
 }
