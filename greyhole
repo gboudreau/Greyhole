@@ -38,7 +38,7 @@ if (@$db_use_mysql) {
 	db_query("SET SESSION group_concat_max_len = 1048576");
 }
 
-if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat') {
+if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
 		exit(1);
@@ -329,6 +329,52 @@ if ($action == 'view-queue') {
 	echo sprintf('%-6s', $total_num_rename_pending) . "= ";
 	echo ($total_num_writes_pending + $total_num_delete_pending + $total_num_rename_pending) . "\n";
 
+	echo "\n";
+	exit(0);
+}
+
+function how_long_ago($past_time) {
+	$ago = '';
+	$s = time() - $past_time;
+	$m = floor($s / 60);
+	if ($m > 0) {
+		$s -= $m * 60;
+		$h = floor($m / 60);
+		if ($h > 0) {
+			$ago = $h . "h ";
+			$m -= $h * 60;
+		}
+		$ago = $ago . $m . "m ";
+	}
+	$ago = $ago . $s . "s";
+	return $ago;
+}
+
+if ($action == 'status') {
+	$last_log_line = exec("tail -1 " . quoted_form($greyhole_log_file));
+	$last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
+	$raw_last_log_line = mb_substr($last_log_line, 16);
+	$last_log_line = explode(' ', $raw_last_log_line);
+	$last_action = str_replace(':', '', $last_log_line[1]);
+	echo "\nLast logged action: $last_action\n";
+	echo "  on " . date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . " ago)\n";
+	echo "\nDetails:\n";
+	$details = array();
+	switch($last_action) {
+		case 'balance':
+			$details[] = exec("grep 'Balancing storage pool directory' " . quoted_form($greyhole_log_file) . " | tail -1");
+			$details[] = exec("grep 'Working on file' " . quoted_form($greyhole_log_file) . " | tail -1");
+			break;
+		case 'fsck':
+			$details[] = exec("tail -200 " . quoted_form($greyhole_log_file) . " | grep -v 'fsck: Found' | tail -1");
+			break;
+		default:
+			$details[] = "... .. ..:..:.. .$raw_last_log_line";
+			break;
+	}
+	foreach ($details as $line) {
+		echo "  " . trim(mb_substr($line, 20 + mb_strlen($last_action))) . "\n";
+	}
 	echo "\n";
 	exit(0);
 }
