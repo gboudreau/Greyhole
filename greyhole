@@ -222,8 +222,8 @@ if ($action == 'debug') {
 	$to_grep = array_keys($to_grep);
 	$to_grep = implode("|", $to_grep);
 	$commands = array();
-	$commands[] = "zgrep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log-*";
-	$commands[] = "grep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " /var/log/greyhole.log";
+	$commands[] = "zgrep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " $greyhole_log_file-*";
+	$commands[] = "grep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " " . quoted_form($greyhole_log_file);
 	foreach ($commands as $command) {
 		exec($command, $result);
 	}
