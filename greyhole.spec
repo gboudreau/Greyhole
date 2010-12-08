@@ -27,6 +27,8 @@ mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/
 
+SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
+
 install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/rc.d/init.d/greyhole
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
@@ -39,12 +41,21 @@ install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/grey
 install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/greyhole
 install -m 0755 -D -p greyhole.cron.weekly ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.weekly/greyhole
 %ifarch x86_64
-	install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+	if [ "$SMB_VERSION" = "3 5" ]; then
+		install -m 0755 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+	else
+		install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+	fi
 %else
 	%ifarch %{arm}
+		# TODO Get a 3.5 ARM module compiled
 		install -m 0755 -D -p samba-module/bin/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 	%else
-		install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+		if [ "$SMB_VERSION" = "3 5" ]; then
+			install -m 0755 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+		else
+			install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+		fi
 	%endif
 %endif
 

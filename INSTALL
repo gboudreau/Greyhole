@@ -33,8 +33,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	install -m 0755 -D -p greyhole.cron.weekly /etc/cron.weekly/greyhole
-	# For Samba 3.4 only: #
+	# For Samba 3.4: #
 		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	# For Samba 3.5: #
+		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	
 	Note about SVN: If you're running SVN code instead of a packaged version, you'll need to put sql.php and common.php into an 'includes' directory that you'll need to put in PHP's include_path:
 		include_path=`php -i | grep include_path | awk -F':' '{print $NF}'`
@@ -42,7 +44,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 		install -m 0644 -D -p includes/common.php "$include_path/includes"
 		install -m 0644 -D -p includes/sql.php "$include_path/includes"
 	
-	Ubuntu (10+); install the Upstart script:
+	Ubuntu (10+): install the Upstart script:
 		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
 		rm /etc/init.d/greyhole
 
@@ -63,12 +65,12 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	endscript
 }
 
-4. For Samba other than 3.4: The greyhole.so file packaged with Greyhole won't work on your system.
+4. For Samba other than 3.4/3.5: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
 	Fedora:
 	yumdownloader --source samba
-	rpm -ivh samba-3.*.fc12.src.rpm
+	rpm -ivh samba-3.*.fc*.src.rpm
 	cd rpmbuild/SOURCES
 	tar zxf samba-3.*.tar.gz
 	cd samba-3.*/source3/
