@@ -33,6 +33,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	install -m 0755 -D -p greyhole.cron.weekly /etc/cron.weekly/greyhole
+	install -m 0755 -D -p greyhole.cron.daily /etc/cron.daily/greyhole
 	# For Samba 3.4: #
 		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	# For Samba 3.5: #

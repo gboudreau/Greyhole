@@ -480,6 +480,9 @@ if ($action == 'fsck') {
 	if (!isset($options['dont-walk-graveyard'])) {
 		$fsck_options[] = 'graveyard';
 	}
+	if (isset($options['if-conf-changed'])) {
+		$fsck_options[] = 'if-conf-changed';
+	}
 	if (isset($options['disk-usage-report'])) {
 		$fsck_options[] = 'du';
 	}
@@ -570,6 +573,25 @@ function execute_next_task() {
 			gh_fsck_file($path, $filename, $file_type, 'landing_zone', $task->share);
 			break;
 		case 'fsck':
+			$new_conf_md5 = get_conf_md5();
+			if (mb_strpos($task->additional_info, 'if-conf-changed') !== FALSE) {
+				// Let's check if the conf file changed since the last fsck
+
+				// Last value
+				$last_md5 = '';
+				$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_fsck_conf_md5');
+				$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_fsck_conf_md5': " . db_error());
+				if ($row = db_fetch_object($result)) {
+					$last_md5 = $row->value;
+				}
+				db_free_result($result);
+				
+				// New value
+				if ($new_conf_md5 == $last_md5) {
+					gh_log(INFO, "Skipping fsck; --if-conf-changed was specified, and the configuration file didn't change since the last fsck.");
+					break;
+				}
+			}
 			gh_log(INFO, "Starting fsck for $task->share");
 			initialize_fsck_report($task->share == '' ? 'All shares' : $task->share);
 			if (mb_strpos($task->additional_info, 'du') !== FALSE) {
@@ -604,6 +626,15 @@ function execute_next_task() {
 				}
 			}
 			gh_log(INFO, "fsck for " . ($task->share == '' ? 'All shares' : $task->share) . " completed.");
+			
+			$query = sprintf("DELETE FROM settings WHERE name = '%s'", 'last_fsck_conf_md5');
+			db_query($query) or gh_log(CRITICAL, "Can't delete 'last_fsck_conf_md5' settings: " . db_error());
+			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s')",
+				'last_fsck_conf_md5',
+				db_escape_string($new_conf_md5)
+			);
+			db_query($query) or gh_log(CRITICAL, "Can't insert 'last_fsck_conf_md5' settings: " . db_error());
+			
 			if (mb_strpos($task->additional_info, 'email') !== FALSE) {
 				// Email report for daily fsck
 				$fsck_report = get_fsck_report();
@@ -3267,11 +3298,12 @@ function process_command_line() {
 		'debug:'
 	);
 
-	$opts_options = 'eyu';
+	$opts_options = 'eyuc';
 	$longopts_options = array(
 		'email-report',
 		'dont-walk-graveyard',
-		'disk-usage-report'
+		'disk-usage-report',
+		'if-conf-changed'
 	);
 
 	$opts_options_with_values = 'd:';
@@ -3391,9 +3423,17 @@ function print_usage() {
 	echo "                        directories. Scanning the graveyards is only required to\n";
 	echo "                        re-create symbolic links that might be missing from your\n";
 	echo "                        shared directories.\n";
+	echo "  -c, --if-conf-changed Only fsck if greyhole.conf changed since the last fsck.\n";
+	echo "                        Used in the daily cron to prevent unneccesary fsck runs.\n";
 	echo "  -d, --dir=path        Only scan a specific directory, and all sub-directories.\n";
 	echo "                        The specified directory should be a Samba share, or a\n";
 	echo "                        sub-directory of a Samba share.\n";
 	exit(1);
+}
+
+function get_conf_md5() {
+	global $config_file;
+	exec("grep -e 'num_copies\|storage_pool_directory\|sticky_files' " . quoted_form($config_file) . " | grep -v '^#'", $content);
+	return md5(implode("\n", $content));
 }
 ?>
