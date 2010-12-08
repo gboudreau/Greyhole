@@ -2928,8 +2928,10 @@ function gh_balance() {
 			gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 
 			// Files candidate to get moved
-			unset($files);
-			exec("find ". quoted_form("$source_drive/$share_name") ." -type f -size +10M | head -n 100000", $files);
+			$files = array();
+			if (is_dir("$source_drive/$share_name")) {
+				exec("find ". quoted_form("$source_drive/$share_name") ." -type f -size +10M | head -n 100000", $files);
+			}
 			gh_log(DEBUG, "Found ". count($files) ." files that can be moved.");
 			
 			// Repeat until all drives' available space is balanced.
