@@ -2876,6 +2876,11 @@ function gh_balance() {
 			// Files are everywhere; won't be able to use that share to balance available space!
 			continue;
 		}
+		
+		if (@$skip_stickies && is_share_sticky($share_name)) {
+			gh_log(DEBUG, "Skipping sticky share $share_name.");
+			continue;
+		}
 
  		gh_log(DEBUG, "Balancing share: $share_name");
 
@@ -2885,6 +2890,7 @@ function gh_balance() {
 		foreach ($sorted_pool_drives as $available_space => $drive) {
 			$pool_drives_avail_space[$drive] = $available_space;
 		}
+		$num_total_drives = count($sorted_pool_drives);
 
 		foreach ($sorted_pool_drives as $source_drive) {
 			$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
@@ -2914,6 +2920,12 @@ function gh_balance() {
 
 				unset($target_drive);
 				if ($is_sticky) {
+					if (count($target_drives) < $num_total_drives) {
+						$skip_stickies = TRUE;
+						gh_log(DEBUG, "  Some drives are full. Skipping sticky shares until all drives have some free space.");
+						break;
+					}
+					
 					$sticky_drives = array_slice($target_drives, 0, get_num_copies($share_name));
 					if (array_search($source_drive, $sticky_drives)) {
 						// Source drive is a stick_into drive; let's not move that file!
@@ -3007,8 +3019,18 @@ function gh_balance() {
 				gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 			}
 			gh_log(DEBUG, "Done balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+			
+			if (@$skip_stickies) {
+				break;
+			}
 		}
 		gh_log(DEBUG, "Done balancing share: $share_name");
+	}
+	
+	if (@$skip_stickies) {
+		// We skipped some stickies... Let's re-balance to move those, and continue balancing.
+		gh_log(DEBUG, "Some shares with sticky files were skipped. Balancing will now re-start to continue moving those sticky files as needed, and further balance.");
+		gh_balance();
 	}
 }
 
