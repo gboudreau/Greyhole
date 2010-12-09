@@ -333,23 +333,6 @@ if ($action == 'view-queue') {
 	exit(0);
 }
 
-function how_long_ago($past_time) {
-	$ago = '';
-	$s = time() - $past_time;
-	$m = floor($s / 60);
-	if ($m > 0) {
-		$s -= $m * 60;
-		$h = floor($m / 60);
-		if ($h > 0) {
-			$ago = $h . "h ";
-			$m -= $h * 60;
-		}
-		$ago = $ago . $m . "m ";
-	}
-	$ago = $ago . $s . "s";
-	return $ago;
-}
-
 if ($action == 'status') {
 	$last_log_line = exec("tail -1 " . quoted_form($greyhole_log_file));
 	$last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
@@ -1592,7 +1575,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 
 	// If we have enough queued tasks (90% of $max_queued_tasks), let's not parse the log at this time, and get some work done.
 	// Once we fall below that, we'll queue up to at most $max_queued_tasks new tasks, then get back to work.
-	// This will effectively 'batch' large file operations to make sure the DB doesn't become a problem because of the number of row,
+	// This will effectively 'batch' large file operations to make sure the DB doesn't become a problem because of the number of rows,
 	//   and this will allow the end-user to see real activity, other that new rows in greyhole.tasks...
 	$query = "SELECT COUNT(*) num_rows FROM tasks";
 	$result = db_query($query) or gh_log(CRITICAL, "Can't get tasks count: " . db_error());
@@ -1723,6 +1706,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 			}
 		}
 	}
+	update_last_read_log_smbd_line($fp);
 	fclose($fp);
 
 	// Close logs are only processed when no more duplicates are found, so we'll execute this now that we're done parsing the current log.
@@ -3437,5 +3421,22 @@ function get_conf_md5() {
 	global $config_file;
 	exec("grep -e 'num_copies\|storage_pool_directory\|sticky_files' " . quoted_form($config_file) . " | grep -v '^#'", $content);
 	return md5(implode("\n", $content));
+}
+
+function how_long_ago($past_time) {
+	$ago = '';
+	$s = time() - $past_time;
+	$m = floor($s / 60);
+	if ($m > 0) {
+		$s -= $m * 60;
+		$h = floor($m / 60);
+		if ($h > 0) {
+			$ago = $h . "h ";
+			$m -= $h * 60;
+		}
+		$ago = $ago . $m . "m ";
+	}
+	$ago = $ago . $s . "s";
+	return $ago;
 }
 ?>
