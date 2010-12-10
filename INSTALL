@@ -1,7 +1,7 @@
 Greyhole Installation Instructions
 ==================================
 
-The following instructions are for Fedora 12 or Ubuntu 9/10 (see footnote 1 about Ubuntu 10).
+The following instructions are for Fedora 12 or Ubuntu 9/10.
 If you know what you're doing, you should have no problem installing on any other Linux variant.
 
 Amahi (http://www.amahi.org) comes with Greyhole pre-installed.
@@ -15,10 +15,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
       Also, there have been reports that the Debian-bundled version of Samba would sometime show symlinks as 0-bytes files, to clients.
       If you have such issues, you should compile the latest Samba stable manually and use that.
 
-1. Install the required applications: PHP 5 (cli) with MySQL extension, MySQL server, Samba, GCC, etc.:
+1. Install the required applications: PHP 5 (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
-	Fedora: sudo yum -y install mysql-server php php-mysql php-mbstring samba samba-common patch gcc rsyslog yum-utils php-pear rsync
-	Ubuntu: sudo apt-get -y install mysql-server php5-cli php5-mysql php5-mbstring samba samba-common samba-common-bin build-essential php-pear rsync
+	Fedora: sudo yum -y install mysql-server php php-mysql php-mbstring samba samba-common patch gcc yum-utils php-pear rsync
+	Ubuntu: sudo apt-get -y install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
 
 2. Install Greyhole (as root):
 
@@ -26,6 +26,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	tar zxf greyhole-*.tar.gz
 	cd greyhole-*
 	GREYHOLE_INSTALL_DIR=`pwd`
+	mkdir -p /var/spool/greyhole
+	chmod 777 /var/spool/greyhole
 	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
 	install -m 0755 -D -p greyhole /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
@@ -52,21 +54,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Fedora: service smb restart
 	Ubuntu: /etc/init.d/samba restart, or restart smbd
 
-3. Edit /etc/logrotate.d/syslog (or rsyslog):
-	What we want is add prerotate and postrotate instructions for /var/log/messages. So add one command in the postrotate block, and add a prerotate block. When more logs than just /var/log/messages are rotated together, the sharedscripts option needs to be there.
-
-/var/log/messages /var/log/secure /var/log/maillog /var/log/spooler /var/log/boot.log /var/log/cron {
-	sharedscripts
-	prerotate
-		/usr/bin/greyhole --prerotate
-	endscript
-	postrotate
-		/usr/bin/greyhole --postrotate > /dev/null || true
-		/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
-	endscript
-}
-
-4. For Samba other than 3.4/3.5: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba other than 3.4/3.5: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
 	Fedora:
@@ -83,9 +71,9 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	cd samba-${SAMBA_VERSION}/source3
 
 	Both (Fedora & Ubuntu):
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/vfs_greyhole.c
 	./configure
-	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 	make
 	if [ -x /usr/lib64/samba/vfs/ ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
@@ -98,7 +86,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 		[...]
 		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 
-5. Setup Samba:
+4. Setup Samba:
 
 	Edit /etc/samba/smb.conf
 	Change or add the following values in the [global] section:
@@ -127,7 +115,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Ubuntu (< 10): sudo /etc/init.d/samba restart
 	Ubuntu (10+): sudo restart smbd
 
-6. Setup the database:
+5. Setup the database:
 
 	If using MySQL:
 
@@ -144,13 +132,13 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 		sqlite -u /var/cache/greyhole.db < ${GREYHOLE_INSTALL_DIR}/schema-sqlite.sql
 
-7. Cutomize the Greyhole configuration file:
+6. Cutomize the Greyhole configuration file:
 
 	sudo cp ${GREYHOLE_INSTALL_DIR}/greyhole.example.conf /etc/greyhole.conf
 	
 	Cutomize /etc/greyhole.conf as needed.
 
-8. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
+7. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
 
 	touch <dir>/.greyhole_uses_this
 
@@ -159,20 +147,20 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Those files will be used to differentiate an empty mount from a now-gone mount.
 	i.e. Greyhole will output a warning if this file is not in the root directory where it is about to try to save a file, and it won't use that directory. This will prevent Greyhole from filling the / partition when a partition is unmounted!
 
-9. Add Greyhole to services that start on boot:
+8. Add Greyhole to services that start on boot:
 
 	Fedora: sudo chkconfig --add greyhole; sudo chkconfig greyhole on
 	Ubuntu (< 10): sudo update-rc.d greyhole defaults 98 20
 	Ubuntu (10+): [nothing to do]
 
-10. Work around problems with the CIFS client (as root):
+9. Work around problems with the CIFS client (as root):
     Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
 	Note: The cron.d script added above includes an @reboot cron line to make this permanent.
 
 	modprobe cifs
 	echo 0 > /proc/fs/cifs/OplockEnabled
 
-11. Start the Greyhole service:
+10. Start the Greyhole service:
 
 	Fedora: sudo service greyhole start
 	Ubuntu (< 10): sudo /etc/init.d/greyhole start
@@ -184,11 +172,3 @@ Check for errors in the Greyhole log file: /var/log/greyhole.log
 
 If you use any application that needs to use files on your shares, you'll need to mount the shares locally, and point those applications to those mounts.
 You should not touch the files in your storage pool directories.
-
-Footnotes:
-
-1- Ubuntu 10 seems to have changed a lot of things in how their init.d scripts work.
-The init.d script included with greyhole doesn't support Ubuntu 10, but should work fine with Ubuntu 9.
-If you'd like to contribute a working Greyhole Upstart or init.d script for Ubuntu 10, please contact me.
-To start greyhole manually:
-  ionice -c 2 -n 7 /usr/bin/greyhole --daemon > /dev/null &

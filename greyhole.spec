@@ -6,7 +6,7 @@ Group:          System Environment/Daemons
 Source:         http://greyhole.googlecode.com/files/%{name}-%{version}.tar.gz
 License:        GPL
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-Requires:       samba php php-mysql php-mbstring mysql-server rsyslog rsync
+Requires:       samba php php-mysql php-mbstring mysql-server rsync
 
 %description
 Greyhole allows you to create a storage pool, accessible from 
@@ -66,9 +66,13 @@ rm -rf $RPM_BUILD_ROOT
 %pre
 
 %post
-# Update /etc/logrotate.d/syslog, if needed
-if [ `grep greyhole /etc/logrotate.d/syslog | wc -l` = 0 ]; then
-	sed --in-place -e 's@postrotate@prerotate\n        /usr/bin/greyhole --prerotate\n    endscript\n    postrotate\n        /usr/bin/greyhole --postrotate > /dev/null || true@' /etc/logrotate.d/syslog
+mkdir -p /var/spool/greyhole
+chmod 777 /var/spool/greyhole
+
+if [ -f /etc/logrotate.d/syslog ]; then
+	# Undo changes to /etc/logrotate.d/syslog
+	grep -v greyhole /etc/logrotate.d/syslog > /etc/logrotate.d/syslog.new
+	mv -f /etc/logrotate.d/syslog.new /etc/logrotate.d/syslog
 	service rsyslog reload > /dev/null
 fi
 
@@ -99,11 +103,6 @@ else
 	# Service removal
 	/sbin/service greyhole stop 2>&1 > /dev/null
 	/sbin/chkconfig --del greyhole
-
-	# Undo changes to /etc/logrotate.d/syslog
-	grep -v greyhole /etc/logrotate.d/syslog > /etc/logrotate.d/syslog.new
-	mv -f /etc/logrotate.d/syslog.new /etc/logrotate.d/syslog
-	service rsyslog reload > /dev/null
 
 	# Remove Greyhole from /etc/samba/smb.conf
 	grep -v "dfree.*greyhole" /etc/samba/smb.conf > /etc/samba/smb.conf.new
