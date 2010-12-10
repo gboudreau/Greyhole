@@ -3070,7 +3070,7 @@ function gh_balance() {
 			// Files candidate to get moved
 			$files = array();
 			if (is_dir("$source_drive/$share_name")) {
-				exec("find ". quoted_form("$source_drive/$share_name") ." -type f -size +10M | head -n 100000", $files);
+				exec("find ". quoted_form("$source_drive/$share_name") ." -type f -size +10M", $files);
 			}
 			gh_log(DEBUG, "Found ". count($files) ." files that can be moved.");
 			
@@ -3087,7 +3087,7 @@ function gh_balance() {
 
 				$full_path = mb_substr($file, mb_strlen("$source_drive/$share_name/"));
 				list($path, $filename) = explode_full_path($full_path);
-				gh_log(DEBUG, "  Working on file: $full_path (". bytes_to_human($filesize*1024, FALSE) .")");
+				gh_log(DEBUG, "  Working on file: $share_name/$full_path (". bytes_to_human($filesize*1024, FALSE) .")");
 
 				$target_drives = order_target_drives($filesize, FALSE, $share_name, $path, '  ');
 
