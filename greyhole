@@ -1860,6 +1860,17 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 					$act == 'write' ? 'no' : 'yes'
 				);
 				db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
+				
+				if ($act == 'unlink') {
+					// Remove possible previous mv operations that would cause problems...
+					$query = sprintf("DELETE FROM tasks WHERE action = '%s' AND share = '%s' AND additional_info = '%s' AND id < %s ORDER BY id DESC LIMIT 1",
+						'rename',
+						db_escape_string($share),
+						db_escape_string(clean_dir($fullpath)),
+						db_insert_id()
+					);
+					db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
+				}
 			}
 
 			// If we have enough queued tasks ($max_queued_tasks), let's stop parsing the log, and get some work done.
