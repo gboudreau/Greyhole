@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Daily (conditional) fsck
+/usr/bin/greyhole --fsck --if-conf-changed --email-report --dont-walk-graveyard > /dev/null
+
