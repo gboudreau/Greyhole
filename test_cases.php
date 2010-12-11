@@ -151,6 +151,30 @@ foreach (range(1,16) as $i) { $j = 1;
 }
 
 foreach (range(1,16) as $i) { $j = 1;
+	file_put_contents('file1', 'a');
+	wait($j++, $i);
+
+	file_put_contents('file2', 'b');
+	wait($j++, $i);
+	rename('file1', 'file3');
+	wait($j++, $i);
+	rename('file2', 'file1');
+	wait($j++, $i);
+	unlink('file3');
+
+	$ok = file_get_contents('file1') == 'b';
+	$ok &= !file_exists('file2');
+	$ok &= !file_exists('file3');
+	wait();
+	$ok &= file_get_contents('file1') == 'b';
+	$ok &= !file_exists('file3');
+	unlink('file1');
+	$ok &= !file_exists('file1');
+	print_result('file rename - back and forth - with 3 files', $ok);
+	wait();
+}
+
+foreach (range(1,16) as $i) { $j = 1;
 	mkdir('dir1');
 	file_put_contents('dir1/file1', 'a');
 	wait($j++, $i);
