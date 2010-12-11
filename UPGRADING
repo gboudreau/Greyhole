@@ -1,0 +1,28 @@
+UPGRADING
+
+Generic Upgrade Instructions
+----------------------------
+Do the following when upgrading to any version, then look below for instructions to upgrade past specific versions.
+
+- Update the Greyhole binary: /usr/bin/greyhole
+- Execute any specific instructions from the next sections.
+- Restart the Greyhole service
+
+Note: If you use SVN code instead of packaged versions, you'll want to update includes/common.php too.
+
+Upgrade to 0.8.0
+----------------
+- Remove the Greyhole-related post and pre-rotate scripts from /etc/logrotate.d/syslog.
+- Edit /etc/greyhole.conf: remove the section about 'samba_log_file'; this is now deprecated.
+- mkdir -p /var/spool/greyhole
+- chmod 777 /var/spool/greyhole
+- Update the Samba VFS module
+    # For Samba 3.4: #
+        if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+    # For Samba 3.5: #
+        if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+- Recommended cron entries have changed; they are now split in cron.daily, cron.weekly and cron.d
+    install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
+    install -m 0755 -D -p greyhole.cron.weekly /etc/cron.weekly/greyhole
+    install -m 0755 -D -p greyhole.cron.daily /etc/cron.daily/greyhole
+
