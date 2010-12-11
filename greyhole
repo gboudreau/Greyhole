@@ -500,7 +500,7 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id;
+	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files;
 
 	if (isset($next_task)) {
 		$task = $next_task;
@@ -519,6 +519,7 @@ function execute_next_task() {
 				gh_log(DEBUG, "Nothing to do... Sleeping.");
 				sleep($log_level == DEBUG ? 10 : ($log_level == TEST ? 1 : 600));
 				db_free_result($result);
+				$locked_files = array();
 				return;
 			}
 		}
@@ -545,6 +546,7 @@ function execute_next_task() {
 		gh_log(DEBUG, "Only locked files operations pending... Sleeping.");
 		sleep($log_level == DEBUG ? 10 : ($log_level == TEST ? 1 : 600));
 		$sleep_before_task = array();
+		$locked_files = array();
 	}
 	
 	$action = $task->action;
@@ -836,9 +838,11 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		gh_log(INFO, "File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 		
 		// Check if another process locked this file before we work on it.
-		if (file_is_locked($share, $target_full_path) !== FALSE) {
+		global $locked_files;
+		if (isset($locked_files[clean_dir("$share/$target_full_path")]) || file_is_locked($share, $target_full_path) !== FALSE) {
 			gh_log(DEBUG, "  File $landing_zone/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
 			postpone_task($task_id);
+			$locked_files[clean_dir("$share/$target_full_path")] = TRUE;
 			return;
 		}
 
@@ -1084,9 +1088,11 @@ function gh_write($share, $full_path, $task_id) {
 	// Only need to check for locking if we have something to do!
 	if ($num_copies_required > 1 || count($existing_tombstones) == 0) {
 		// Check if another process locked this file before we work on it.
-		if (($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
-			gh_log(DEBUG, "  File is locked by another process. Will wait until it's unlocked to work on it.");
-			postpone_task($task_id);
+		global $locked_files;
+		if (isset($locked_files[clean_dir("$share/$full_path")]) || ($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
+			gh_log(DEBUG, "  File $landing_zone/$full_path is locked by another process. Will wait until it's unlocked to work on it.");
+			postpone_task($task_id, 'yes');
+			$locked_files[clean_dir("$share/$full_path")] = TRUE;
 			return;
 		}
 		$sleep_before_task = array();
