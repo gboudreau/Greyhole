@@ -289,7 +289,7 @@ if ($action == 'view-queue') {
 	$shares_names = array_keys($shares_options);
 	natcasesort($shares_names);
 
-	$max_share_strlen = 0;
+	$max_share_strlen = 7;
 	foreach ($shares_names as $share_name) {
 		if (mb_strlen($share_name) > $max_share_strlen) {
 			$max_share_strlen = mb_strlen($share_name);
@@ -328,6 +328,13 @@ if ($action == 'view-queue') {
 	echo sprintf('%-6s', $total_num_delete_pending) . "+ ";
 	echo sprintf('%-6s', $total_num_rename_pending) . "= ";
 	echo ($total_num_writes_pending + $total_num_delete_pending + $total_num_rename_pending) . "\n";
+
+	echo "\nThe following is the number of pending operations that the Greyhole daemon still needs to parse.\n";
+	echo "Until it does, the nature of those operations is unknown.\n";
+	echo "Spooled operations that have been parsed will be listed above and disappear from the count below.\n";
+
+	echo sprintf("\n%-$max_share_strlen"."s  ", 'Spooled');
+	echo exec("ls -1 /var/spool/greyhole | wc -l") . "\n";
 
 	echo "\n";
 	exit(0);
@@ -1894,18 +1901,23 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 		db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
 	}
 	
-	if ($simplify_after_parse && $new_tasks > 0) {
-		$query = "SELECT COUNT(*) num_rows FROM tasks";
-		$result = db_query($query) or gh_log(CRITICAL, "Can't get tasks count: " . db_error());
-		$row = db_fetch_object($result);
-		db_free_result($result);
-		$num_rows = (int) $row->num_rows;
-		if ($num_rows < 1000 || $num_rows % 5 == 0) { // Runs 1/5 of the times when num_rows > 1000
-			if ($num_rows < 5000 || $num_rows % 100 == 0) { // Runs 1/100 of the times when num_rows > 5000
-				simplify_tasks();
+	if ($new_tasks > 0) {
+		gh_log(DEBUG, "Found $new_tasks new tasks in spool.");
+
+		if ($simplify_after_parse) {
+			$query = "SELECT COUNT(*) num_rows FROM tasks";
+			$result = db_query($query) or gh_log(CRITICAL, "Can't get tasks count: " . db_error());
+			$row = db_fetch_object($result);
+			db_free_result($result);
+			$num_rows = (int) $row->num_rows;
+			if ($num_rows < 1000 || $num_rows % 5 == 0) { // Runs 1/5 of the times when num_rows > 1000
+				if ($num_rows < 5000 || $num_rows % 100 == 0) { // Runs 1/100 of the times when num_rows > 5000
+					simplify_tasks();
+				}
 			}
 		}
 	}
+	
 	$action = $old_action;
 }
 
