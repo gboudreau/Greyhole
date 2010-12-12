@@ -39,7 +39,7 @@ for POOL_DIR in `grep storage_pool_directory ${DIR}/greyhole.conf${SUFFIX} | gre
 		mkdir $POOL_DIR
 	fi
 	if [ ! -x $POOL_DIR ]; then
-		echo "Error: Missing pool directory: $POOL_DIR"
+		echo "Error: Missing pool directory, and couldn't create: $POOL_DIR"
 		exit
 	fi
 	if [ ! -f $POOL_DIR/.greyhole_uses_this ]; then
@@ -47,10 +47,47 @@ for POOL_DIR in `grep storage_pool_directory ${DIR}/greyhole.conf${SUFFIX} | gre
 	fi
 done
 
+# Check if Upstart, or init.d scripts, should be used to restart Greyhole and reload Samba
+has_daemon=1
+if [ -f /etc/rc.d/init.d/functions ]; then
+	. /etc/rc.d/init.d/functions
+	daemon > /dev/null 2>&1
+	has_daemon=$?
+fi
+man upstart > /dev/null 2>&1
+has_upstart=$?
+
 cp /etc/greyhole.conf /etc/greyhole.conf.bak
 cp ${DIR}/greyhole.conf${SUFFIX} /etc/greyhole.conf
-/sbin/service greyhole restart
+if [ "$has_daemon" = "0" -a -f /etc/init.d/greyhole ]; then
+	# init.d
+	/etc/init.d/greyhole restart
+else
+	
+	if [ "$has_upstart" = "0" ]; then
+		# Upstart
+		restart greyhole
+	else
+		echo "You should now restart the Greyhole service."
+	fi
+fi
 
 cp /etc/samba/smb.conf /etc/samba/smb.conf.bak
 cp ${DIR}/smb.conf${SUFFIX} /etc/samba/smb.conf
-/sbin/service smb reload
+if [ "$has_daemon" = "0" ]; then
+	# init.d
+	if [ -f /etc/init.d/samba ]; then
+		/etc/init.d/samba reload
+	elif [ -f /etc/init.d/smb ]; then
+		/etc/init.d/smb reload
+	else
+		echo "You should now restart the Samba service."
+	fi
+else
+	if [ "$has_upstart" = "0" ]; then
+		# Upstart
+		reload smbd
+	else
+		echo "You should now restart the Samba service."
+	fi
+fi
