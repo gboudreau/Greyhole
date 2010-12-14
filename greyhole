@@ -1583,6 +1583,11 @@ function simplify_tasks() {
 
 function parse_samba_log($simplify_after_parse=TRUE) {
 	global $samba_log_file, $action, $attic_share_names, $max_queued_tasks;
+
+	if (empty($samba_log_file)) {
+		return;
+	}
+
 	$old_action = $action;
 	$action = 'parse_logs';
 
