@@ -1952,7 +1952,6 @@ function get_free_space_in_storage_pool_dirs() {
 	}
 	$dfs = array();
 	exec($df_command, $responses);
-	array_shift($responses); // header
 	foreach ($storage_pool_directories as $target_drive) {
 		$target_dir = '';
 		for ($i=0; $i<count($responses); $i++) {
@@ -1990,7 +1989,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 				}
 			} else {
 				gh_log(ERROR, "Can't find how much free space is left on $target_drive. This partition will never be used!");
-				gh_log(ERROR, "Please report this using the Issues tab at http://greyhole.pommepause.com. You should include the following information in your ticket:");
+				gh_log(ERROR, "Please report this using the 'Bugs Tracker' link found on http://greyhole.net. You should include the following information in your ticket:");
 				gh_log(ERROR, "===== Error report starts here =====");
 				gh_log(ERROR, "Unknown free space for partition: $target_drive");
 				global $df_command;
