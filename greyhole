@@ -453,6 +453,19 @@ if ($action == 'balance') {
 	exit(0);
 }
 
+if ($action == 'cancel-fsck') {
+	db_query("DELETE FROM tasks WHERE action = 'fsck'") or gh_log(CRITICAL, "Can't delete fsck tasks: " . db_error());
+	echo "All scheduled fsck tasks have now been deleted.\n";
+	if (is_file('/etc/init.d/greyhole')) {
+		exec("/etc/init.d/greyhole condrestart");
+	} else if (is_file('/etc/init/greyhole.conf')) {
+		exec("restart greyhole");
+	} else {
+		echo "You should now restart the Greyhole daemon to stop any ongoing fsck.\n";
+	}
+	exit(0);
+}
+
 if ($action == 'fsck') {
 	$pos = array_search('fsck', $argv);
 	$full_path = '';
@@ -3451,10 +3464,11 @@ function create_attic_share_symlink($filepath_in_attic, $attic_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DflpPsSaqi';
+	$opts_actions = 'DfClpPsSaqi';
 	$longopts_actions = array(
 		'daemon',
 		'fsck',
+		'cancel-fsck',
 		'balance',
 		'prerotate',
 		'postrotate',
@@ -3566,6 +3580,7 @@ function print_usage() {
 	echo "  -?, --help            Display this help and exit.\n";
 	echo "  -D, --daemon          Start the daemon.\n";
 	echo "  -f, --fsck            Schedule a fsck.\n";
+	echo "  -C, --cancel-fsck     Cancel all scheduled fsck.\n";
 	echo "  -l, --balance         Balance available space on storage pool devices.\n";
 	echo "  -s, --stats           Display storage pool statistics.\n";
 	echo "  -S, --status          Display what the Greyhole daemon is currently doing.\n";
