@@ -1774,7 +1774,7 @@ function update_last_read_log_smbd_line($fp) {
 }
 
 function parse_samba_spool($simplify_after_parse=TRUE) {
-	global $action, $attic_share_names, $max_queued_tasks;
+	global $action, $attic_share_names, $max_queued_tasks, $db_use_mysql;
 
 	// Let's parse syslog still... just in case people are still using that.
 	parse_samba_log($simplify_after_parse);
@@ -1900,6 +1900,10 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 						db_escape_string(clean_dir($fullpath)),
 						db_insert_id()
 					);
+					if (!@$db_use_mysql) {
+						// SQLite doesn't support ORDER BY & LIMIT in DELETE statements
+						$query = str_replace(' ORDER BY id DESC LIMIT 1', '', $query);
+					}
 					db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
 				}
 			}
