@@ -1,6 +1,6 @@
 CREATE TABLE `settings` (
 `name` TINYTEXT NOT NULL,
-`value` TINYTEXT NOT NULL,
+`value` TEXT NOT NULL,
 PRIMARY KEY ( `name`(255) )
 ) ENGINE = MYISAM;
 

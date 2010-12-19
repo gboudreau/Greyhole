@@ -151,7 +151,20 @@ function db_migrate() {
 				break;
 			}
 		}
-
+	}
+	// Migration #3 (larger settings.value: tinytext > text)
+	if (@$db_use_mysql) {
+		$query = "DESCRIBE settings";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if ($row->Field == 'value') {
+				if ($row->Type == "tinytext") {
+					// migrate
+					db_query("ALTER TABLE settings CHANGE value value TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL");
+				}
+				break;
+			}
+		}
 	}
 }
 ?>
