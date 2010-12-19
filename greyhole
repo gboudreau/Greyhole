@@ -2853,6 +2853,7 @@ function gh_recycle($real_path) {
 }
 
 function repair_tables() {
+	global $db_use_mysql;
 	if (@$db_use_mysql) {
 		db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
 		db_query("REPAIR TABLE tasks_completed") or gh_log(CRITICAL, "Can't repair tasks_completed table: " . db_error());
