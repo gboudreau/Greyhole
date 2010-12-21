@@ -21,7 +21,7 @@ if [ $# -gt 2 -o $# -lt 1 ]; then
 	exit
 fi
 
-if [ $UID != 0 ]; then
+if [ $UID -ne 0 ]; then
 	echo "You need to be root to execute this command."
 	echo "You can use sudo, or become root using the following command: su -"
 	exit
