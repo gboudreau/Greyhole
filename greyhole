@@ -390,7 +390,7 @@ if ($action == 'stats') {
 			continue;
 		}
 
-		$df_command = "df -k " . quoted_form($target_drive) . " | awk '{print \$(NF-4),\$(NF-3)}'";
+		$df_command = "df -k " . quoted_form($target_drive) . " | tail -1 | awk '{print \$(NF-4),\$(NF-3)}'";
 		unset($responses);
 		exec($df_command, $responses);
 		$response = explode(' ', $responses[1]);
