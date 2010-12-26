@@ -3627,8 +3627,9 @@ function print_usage() {
 }
 
 function get_conf_md5() {
-	global $config_file;
-	exec("grep -e 'num_copies\|storage_pool_directory\|sticky_files' " . quoted_form($config_file) . " | grep -v '^#'", $content);
+	global $config_file, $smb_config_file;
+	exec("grep -ie 'num_copies\|storage_pool_directory\|sticky_files' " . quoted_form($config_file) . " | grep -v '^#'", $content);
+	exec("grep -ie 'path\|vfs objects' " . quoted_form($smb_config_file) . " | grep -v '^#'", $content);
 	return md5(implode("\n", $content));
 }
 
