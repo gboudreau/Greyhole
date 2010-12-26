@@ -953,7 +953,8 @@ function get_num_copies($share) {
 	global $shares_options, $storage_pool_directories;
 	if (!isset($shares_options[$share]['num_copies'])) {
 		global $config_file;
-		gh_log(CRITICAL, "Found a share ($share_name) with no 'num_copies' value defined in $config_file. You need to edit $config_file to fix this, then restart Greyhole.");
+		gh_log(WARNING, "Found a task on a share ($share) that disappeared from $config_file. Skipping.");
+		return -1;
 	}
 	$num_copies = $shares_options[$share]['num_copies'];
 	if ($num_copies < 1) {
@@ -1006,7 +1007,7 @@ function gh_write($share, $full_path, $task_id) {
 		return;
 	}
 	
-	if (!gh_file_exists("$landing_zone/$full_path", 'File write: $real_path doesn\'t exist anymore. Skipping.')) {
+	if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore. Skipping.')) {
 		if (!gh_file_exists($landing_zone, '  Share "'.$share.'" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {
 			postpone_task($task_id);
 		}
@@ -1014,6 +1015,9 @@ function gh_write($share, $full_path, $task_id) {
 	}
 	
 	$num_copies_required = get_num_copies($share);
+	if ($num_copies_required === -1) {
+		return;
+	}
 
 	list($path, $filename) = explode_full_path($full_path);
 
