@@ -3263,8 +3263,13 @@ function gh_balance() {
 	
 	if (@$skip_stickies) {
 		// We skipped some stickies... Let's re-balance to move those, and continue balancing.
-		gh_log(DEBUG, "Some shares with sticky files were skipped. Balancing will now re-start to continue moving those sticky files as needed, and further balance.");
-		gh_balance();
+		$arr = debug_backtrace();
+		if (count($arr) < 93) {
+			gh_log(DEBUG, "Some shares with sticky files were skipped. Balancing will now re-start to continue moving those sticky files as needed, and further balance. Recursion level = " . count($arr));
+			gh_balance();
+		} else {
+			gh_log(WARN, "Maximum number of consecutive balance reached. You'll need to re-execute --balance if you want to balance further.");
+		}
 	}
 }
 
