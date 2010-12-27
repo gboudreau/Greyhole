@@ -3154,7 +3154,9 @@ function gh_balance() {
 
 				unset($target_drive);
 				if ($is_sticky) {
-					if (count($target_drives) < $num_total_drives) {
+					if (count($target_drives) == $num_total_drives - 1 && array_search($source_drive, $target_drives) === FALSE) {
+						// Only drive full is the source drive. Let's move files away from there!
+					} else if (count($target_drives) < $num_total_drives) {
 						$skip_stickies = TRUE;
 						gh_log(DEBUG, "  Some drives are full. Skipping sticky shares until all drives have some free space.");
 						break;
@@ -3195,7 +3197,7 @@ function gh_balance() {
 				gh_log(DEBUG, "  Target drive: $target_drive (". bytes_to_human($pool_drives_avail_space[$target_drive]*1024, FALSE) ." available)");
 
 				if ($is_sticky) {
-					gh_log(DEBUG, "  Moving sticky file, even if it won't help balancing available space.");
+					gh_log(DEBUG, "  Moving sticky file, even if that means it won't help balancing available space.");
 				} else if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize
 						|| $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
 						|| $pool_drives_avail_space[$target_drive] < $target_avail_space) {
