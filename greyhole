@@ -1551,6 +1551,9 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 			if (mb_strpos($tombstone->path, $target_drive) === 0) {
 				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 				gh_log(DEBUG, "    Saving tombstones in $data_filepath/$filename");
+				if (is_dir("$data_filepath/$filename")) {
+					exec("rm -rf " . quoted_form("$data_filepath/$filename"));
+				}
 				file_put_contents("$data_filepath/$filename", serialize($tombstones));
 				$has_tombstone = TRUE;
 				$paths_used[] = $data_filepath;
