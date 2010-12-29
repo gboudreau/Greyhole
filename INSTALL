@@ -138,7 +138,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	
 	Cutomize /etc/greyhole.conf as needed.
 
-7. For each directory you defined as 'storage_pool_directories', execute the following command, while the partition is mounted:
+7. For each directory you defined as 'storage_pool_directories', execute the following command, to create a hidden file in the root directory of each partition:
 
 	touch <dir>/.greyhole_uses_this
 
