@@ -393,7 +393,7 @@ if ($action == 'stats') {
 		$df_command = "df -k " . quoted_form($target_drive) . " | tail -1 | awk '{print \$(NF-4),\$(NF-3)}'";
 		unset($responses);
 		exec($df_command, $responses);
-		$response = explode(' ', $responses[1]);
+		$response = explode(' ', $responses[0]);
 		$total_space = (float) array_shift($response);
 		$used_space = (float) array_shift($response);
 
