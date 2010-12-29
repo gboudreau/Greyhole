@@ -1827,7 +1827,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 	$act = FALSE;
 	while (TRUE) {
 		$files = array();
-		exec('ls -1 /var/spool/greyhole | sort -n | head -1000', $files);
+		exec('ls -1 /var/spool/greyhole | sort -n 2> /dev/null | head -1000', $files);
 		if (count($files) == 0) {
 			break;
 		}
