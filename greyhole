@@ -501,6 +501,11 @@ if ($action == 'fsck') {
 	exit(0);
 }
 
+$num_daemon_processes = exec('ps ax | grep ".*/php .*/greyhole --daemon" | grep -v grep | wc -l');
+if ($num_daemon_processes > 1) {
+	die("Found an already running Greyhole daemon with PID " . trim(file_get_contents('/var/run/greyhole.pid')) . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
+}
+
 gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
 set_graveyard_backup();
 parse_samba_spool();
