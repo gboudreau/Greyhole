@@ -1305,6 +1305,8 @@ function get_temp_filename($full_path) {
 
 function create_tombstones($share, $full_path, $num_copies_required, $filesize, $tombstones=array()) {
 	global $going_dir;
+	
+	$found_link_tombstone = FALSE;
 
 	list($path, $filename) = explode_full_path($full_path);
 	
@@ -1322,6 +1324,9 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 		if ($key != $tombstone->path) {
 			unset($tombstones[$key]);
 			$key = $tombstone->path;
+		}
+		if ($tombstone->is_linked) {
+			$found_link_tombstone = TRUE;
 		}
 		$tombstones[$key] = $tombstone;
 	}
@@ -1344,10 +1349,18 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 		}
 		// Prepend new target drives, to make sure sticky directories will be used first
 		$tombstones = array_reverse($tombstones);
-		$tombstones[$clean_target_full_path] = (object) array('path' => $clean_target_full_path, 'is_linked' => count($tombstones) == 0, 'state' => 'Pending');
+		$tombstones[$clean_target_full_path] = (object) array('path' => $clean_target_full_path, 'is_linked' => FALSE, 'state' => 'Pending');
 		$tombstones = array_reverse($tombstones);
 		$num_ok++;
 	}
+	
+	if (!$found_link_tombstone) {
+		foreach ($tombstones as $tombstone) {
+			$tombstone->is_linked = TRUE;
+			break;
+		}
+	}
+	
 	return $tombstones;
 }
 
