@@ -47,7 +47,7 @@ function wait($wait_num=0, $i=0) {
 			if ($last_line_before != $last_line && strpos($last_line, '... Sleeping.') !== FALSE) {
 				break;
 			}
-			sleep(1);
+			usleep(1000*100); // 100ms
 		}
 	}
 }
