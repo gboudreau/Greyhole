@@ -36,7 +36,7 @@ LOCKFILE="/var/lock/subsys/greyhole"
 
 status () {
 	PID=`cat $PIDFILE`
-	if [ -f $PIDFILE -a "`ps ax | grep \"^ *$PID.*greyhole --daemon\" | wc -l`" == "1" ]; then
+	if [ -f $PIDFILE -a "`ps ax | grep \"^ *$PID.*greyhole --daemon\" | grep -v grep | wc -l`" == "1" ]; then
 		echo "Greyhole is running."
 	else
 		echo "Greyhole isn't running."
@@ -49,7 +49,7 @@ daemon_start () {
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ]; then
 		touch $LOCKFILE
-		ps ax | grep "$DAEMON --daemon" | grep -v grep | awk '{print $1}' > $PIDFILE
+		ps ax | grep "$DAEMON --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
 	fi
 	return $RETVAL
 }
