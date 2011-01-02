@@ -10,6 +10,11 @@ Do the following when upgrading to any version, then look below for instructions
 
 Note: If you use SVN code instead of packaged versions, you'll want to update includes/common.php too.
 
+Upgrade to 0.8.3
+----------------
+- If you use the init.d script:
+    install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
+
 Upgrade to 0.8.0
 ----------------
 - Remove the Greyhole-related post and pre-rotate scripts from /etc/logrotate.d/syslog.
