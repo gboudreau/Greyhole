@@ -27,8 +27,6 @@ mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/
 
-SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
-
 install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/rc.d/init.d/greyhole
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
@@ -42,21 +40,15 @@ install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/gre
 install -m 0755 -D -p greyhole.cron.weekly ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.weekly/greyhole
 install -m 0755 -D -p greyhole.cron.daily ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.daily/greyhole
 %ifarch x86_64
-	if [ "$SMB_VERSION" = "3 5" ]; then
-		install -m 0755 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
-	else
-		install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
-	fi
+	install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+	install -m 0755 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
 %else
 	%ifarch %{arm}
 		# TODO Get a 3.5 ARM module compiled
 		install -m 0755 -D -p samba-module/bin/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 	%else
-		if [ "$SMB_VERSION" = "3 5" ]; then
-			install -m 0755 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
-		else
-			install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
-		fi
+		install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+		install -m 0755 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
 	%endif
 %endif
 
@@ -68,6 +60,15 @@ rm -rf $RPM_BUILD_ROOT
 %post
 mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
+
+SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
+if [ "$SMB_VERSION" = "3 5" ]; then
+	LIBDIR=/usr/lib
+	if [ "`uname -i`" = "x86_64" ]; then
+		LIBDIR=/usr/lib64
+	fi
+	cp /usr/share/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
+fi
 
 if [ -f /etc/logrotate.d/syslog ]; then
 	# Undo changes to /etc/logrotate.d/syslog
@@ -86,12 +87,7 @@ fi
 # Service install
 /sbin/chkconfig --add greyhole
 /sbin/chkconfig greyhole on
-
-if [ "`ps aux | grep greyhole-executer | grep -v grep | wc -l`" = "1" ]; then
-	. /etc/rc.d/init.d/functions
-	killproc greyhole-executer 2>&1 > /dev/null
-	/sbin/service greyhole restart 2>&1 > /dev/null
-fi
+/sbin/service greyhole condrestart 2>&1 > /dev/null
 
 %preun
 
@@ -122,6 +118,8 @@ fi
 /usr/share/greyhole/*
 
 %changelog
+* Sun Jan 02 2011 Guillaume Boudreau
+- Fedora 14 (Samba 3.5) compatibility fixes
 * Mon Mar 29 2010 Carlos Puchol
 - add sqlite schema file, rename mysql one
 - use /usr/share/greyhole instead of local 
