@@ -48,7 +48,7 @@ if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $acti
 if ($action == 'iostat') {
 	$devices_directories = array();
 	foreach ($storage_pool_directories as $target_drive) {
-		$device = exec("df " . quoted_form($target_drive) . " | awk '{print \$1}'");
+		$device = exec("df " . escapeshellarg($target_drive) . " | awk '{print \$1}'");
 		$device = preg_replace('@/dev/(sd[a-z])[0-9]+@', '\1', $device);
 		$devices_directories[$device] = $target_drive;
 	}
@@ -223,8 +223,8 @@ if ($action == 'debug') {
 	$to_grep = array_keys($to_grep);
 	$to_grep = implode("|", $to_grep);
 	$commands = array();
-	$commands[] = "zgrep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " $greyhole_log_file*.gz";
-	$commands[] = "grep -E -B 1 -A 1 -h " . quoted_form($to_grep) . " " . quoted_form($greyhole_log_file);
+	$commands[] = "zgrep -E -B 1 -A 1 -h " . escapeshellarg($to_grep) . " $greyhole_log_file*.gz";
+	$commands[] = "grep -E -B 1 -A 1 -h " . escapeshellarg($to_grep) . " " . escapeshellarg($greyhole_log_file);
 	foreach ($commands as $command) {
 		exec($command, $result);
 	}
@@ -243,13 +243,13 @@ if ($action == 'debug') {
 	}
 	list($path, $filename) = explode_full_path($full_path);
 	echo "Landing Zone:\n";
-	echo "  "; passthru("ls -l " . quoted_form(get_share_landing_zone($share) . "/" . $full_path));
+	echo "  "; passthru("ls -l " . escapeshellarg(get_share_landing_zone($share) . "/" . $full_path));
 
 	echo "\nGraveyard:\n";
 	foreach ($storage_pool_directories as $target_drive) {
 		$graveyard = clean_dir("$target_drive/.gh_graveyard");
 		if (file_exists("$graveyard/$share/$full_path")) {
-			echo "  "; passthru("ls -l " . quoted_form("$graveyard/$share/$full_path"));
+			echo "  "; passthru("ls -l " . escapeshellarg("$graveyard/$share/$full_path"));
 			$data = var_export(unserialize(file_get_contents("$graveyard/$share/$full_path")), TRUE);
 			$data = str_replace("\n", "\n    ", $data);
 			echo "    $data\n";
@@ -259,7 +259,7 @@ if ($action == 'debug') {
 	echo "\nFile copies:\n";
 	foreach ($storage_pool_directories as $target_drive) {
 		if (file_exists("$target_drive/$share/$full_path")) {
-			echo "  "; passthru("ls -l " . quoted_form("$target_drive/$share/$full_path"));
+			echo "  "; passthru("ls -l " . escapeshellarg("$target_drive/$share/$full_path"));
 		}
 	}
 
@@ -272,14 +272,14 @@ if ($action == 'empty-attic') {
 		if (!file_exists($attic_path)) {
 			echo "Attic in $target_drive is empty. Nothing to do.\n";
 		} else {
-			$attic_size = trim(exec("du -sk " . quoted_form($attic_path) . " | awk '{print $1}'"));
+			$attic_size = trim(exec("du -sk " . escapeshellarg($attic_path) . " | awk '{print $1}'"));
 			echo "Attic in $target_drive is " . bytes_to_human($attic_size*1024, FALSE) . ". Emptying... ";
-			exec("rm -rf " . quoted_form($attic_path));
+			exec("rm -rf " . escapeshellarg($attic_path));
 			echo "Done\n";
 		}
 	}
-	if (isset($attic_share) && mb_strlen(quoted_form($attic_share['landing_zone'])) > 8) {
-		exec("rm -rf " . quoted_form($attic_share['landing_zone']) . '/*');
+	if (isset($attic_share) && mb_strlen(escapeshellarg($attic_share['landing_zone'])) > 8) {
+		exec("rm -rf " . escapeshellarg($attic_share['landing_zone']) . '/*');
 	}
 	exit(0);
 }
@@ -342,7 +342,7 @@ if ($action == 'view-queue') {
 }
 
 if ($action == 'status') {
-	$last_log_line = exec("tail -1 " . quoted_form($greyhole_log_file));
+	$last_log_line = exec("tail -1 " . escapeshellarg($greyhole_log_file));
 	$last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
 	$raw_last_log_line = mb_substr($last_log_line, 16);
 	$last_log_line = explode(' ', $raw_last_log_line);
@@ -353,11 +353,11 @@ if ($action == 'status') {
 	$details = array();
 	switch($last_action) {
 		case 'balance':
-			$details[] = exec("grep 'Balancing storage pool directory' " . quoted_form($greyhole_log_file) . " | tail -1");
-			$details[] = exec("grep 'Working on file' " . quoted_form($greyhole_log_file) . " | tail -1");
+			$details[] = exec("grep 'Balancing storage pool directory' " . escapeshellarg($greyhole_log_file) . " | tail -1");
+			$details[] = exec("grep 'Working on file' " . escapeshellarg($greyhole_log_file) . " | tail -1");
 			break;
 		case 'fsck':
-			$details[] = exec("tail -200 " . quoted_form($greyhole_log_file) . " | grep -v 'fsck: Found' | tail -1");
+			$details[] = exec("tail -200 " . escapeshellarg($greyhole_log_file) . " | grep -v 'fsck: Found' | tail -1");
 			break;
 		default:
 			$details[] = "... .. ..:..:.. .$raw_last_log_line";
@@ -391,7 +391,7 @@ if ($action == 'stats') {
 			continue;
 		}
 
-		$df_command = "df -k " . quoted_form($target_drive) . " | tail -1 | awk '{print \$(NF-4),\$(NF-3)}'";
+		$df_command = "df -k " . escapeshellarg($target_drive) . " | tail -1 | awk '{print \$(NF-4),\$(NF-3)}'";
 		unset($responses);
 		exec($df_command, $responses);
 		$response = explode(' ', $responses[0]);
@@ -404,7 +404,7 @@ if ($action == 'stats') {
 		if (!file_exists($attic_path)) {
 			$attic_size = 0;
 		} else {
-			$attic_size = trim(exec("du -sk " . quoted_form($attic_path) . " | awk '{print $1}'"));
+			$attic_size = trim(exec("du -sk " . escapeshellarg($attic_path) . " | awk '{print $1}'"));
 		}
 
 		$potential_available_space = (float) $free_space + $attic_size;
@@ -649,9 +649,8 @@ function execute_next_task() {
 			if (mb_strpos($task->additional_info, 'email') !== FALSE) {
 				// Email report for daily fsck
 				$fsck_report = get_fsck_report();
-				$hostname = exec('hostname');
 				gh_log(DEBUG, "Sending fsck report to $email_to");
-				mail($email_to, 'fsck of Greyhole shares on ' . $hostname, $fsck_report);
+				mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report);
 			}
 			if (mb_strpos($task->additional_info, 'du') !== FALSE) {
 				// Save disk-usage report to disk
@@ -982,7 +981,7 @@ function file_is_locked($share, $full_path) {
 	if (is_link($real_fullpath)) {
 		$real_fullpath = readlink($real_fullpath);
 	}
-	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath) . " 2> /dev/null");
+	$result = exec("lsof -M -n -P -l " . escapeshellarg($real_fullpath) . " 2> /dev/null");
 	if (mb_strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
 	}
@@ -998,7 +997,7 @@ function real_file_is_locked($real_fullpath) {
 	if (is_link($real_fullpath)) {
 		$real_fullpath = readlink($real_fullpath);
 	}
-	$result = exec("lsof -M -n -P -l " . quoted_form($real_fullpath) . " 2> /dev/null");
+	$result = exec("lsof -M -n -P -l " . escapeshellarg($real_fullpath) . " 2> /dev/null");
 	if (mb_strpos($result, $real_fullpath) !== FALSE) {
 		return $result;
 	}
@@ -1188,7 +1187,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		
 		$it_worked = FALSE;
 		if (is_link("$landing_zone/$full_path")) {
-			exec("rsync -t " . quoted_form(readlink("$landing_zone/$full_path")) . " " . quoted_form($temp_path));
+			exec("rsync -t " . escapeshellarg(readlink("$landing_zone/$full_path")) . " " . escapeshellarg($temp_path));
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == gh_filesize(readlink("$landing_zone/$full_path"));
 		} else if (gh_is_file("$landing_zone/$full_path")) {
 			$source_size = gh_filesize("$landing_zone/$full_path");
@@ -1199,7 +1198,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 				rename("$landing_zone/$full_path", $temp_path);
 				$copied = FALSE;
 			} else {
-				exec("rsync -t " . quoted_form("$landing_zone/$full_path") . " " . quoted_form($temp_path));
+				exec("rsync -t " . escapeshellarg("$landing_zone/$full_path") . " " . escapeshellarg($temp_path));
 				$copied = TRUE;
 			}
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == $source_size;
@@ -1377,7 +1376,7 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 function get_tombstone_data_filename($share, $path, $filename) {
 	foreach (get_graveyards() as $graveyard) {
 		$f = "$graveyard/$share/$path/$filename";
-		if (gh_is_file($f)) {
+		if (is_file($f)) {
 			return $f;
 		}
 	}
@@ -1562,7 +1561,7 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 				gh_log(DEBUG, "    Saving tombstones in $data_filepath/$filename");
 				if (is_dir("$data_filepath/$filename")) {
-					exec("rm -rf " . quoted_form("$data_filepath/$filename"));
+					exec("rm -rf " . escapeshellarg("$data_filepath/$filename"));
 				}
 				file_put_contents("$data_filepath/$filename", serialize($tombstones));
 				$has_tombstone = TRUE;
@@ -1836,6 +1835,10 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 	$last_line = FALSE;
 	$act = FALSE;
 	while (TRUE) {
+		if (count(glob("/var/spool/greyhole/*")) === 0) {
+			break;
+		}
+
 		$files = array();
 		exec('ls -1 /var/spool/greyhole | sort -n 2> /dev/null | head -1000', $files);
 		if (count($files) == 0) {
@@ -2579,7 +2582,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 				if ($tombstone->state == 'Pending') {
 					gh_log(DEBUG, "  Copying file to $tombstone->path");
 					$temp_path = get_temp_filename($tombstone->path);
-					exec("rsync -t " . quoted_form($original_file_path) . " " . quoted_form($temp_path));
+					exec("rsync -t " . escapeshellarg($original_file_path) . " " . escapeshellarg($temp_path));
 					$it_worked = file_exists($temp_path) && file_exists($original_file_path) && gh_filesize($temp_path) == gh_filesize($original_file_path);
 					if ($it_worked) {
 						rename($temp_path, $tombstone->path);
@@ -2745,7 +2748,7 @@ Attic size:\n";
 	foreach ($storage_pool_directories as $dir) {
 		$attic_path = clean_dir("$dir/.gh_attic");
 		if (is_dir($attic_path)) {
-			$report .= "  $attic_path = " . trim(exec("du -sh " . quoted_form($attic_path) . " | awk '{print $1}'"))."\n";
+			$report .= "  $attic_path = " . trim(exec("du -sh " . escapeshellarg($attic_path) . " | awk '{print $1}'"))."\n";
 		} else {
 			$report .= "  $attic_path = empty\n";
 		}
@@ -2871,7 +2874,7 @@ function gh_recycle($real_path) {
 		gh_mkdir($path, $dir_infos);
 
 		if (@is_dir($target_path)) {
-			exec("rm -rf " . quoted_form($target_path));
+			exec("rm -rf " . escapeshellarg($target_path));
 		}
 		if (@rename($real_path, $target_path)) {
 			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
@@ -2908,7 +2911,6 @@ function repair_tables() {
 
 function check_storage_pool_dirs() {
 	global $storage_pool_directories, $email_to, $gone_ok_drives;
-	$hostname = exec('hostname');
 	$needs_fsck = FALSE;
 	$i = 0; $j = 0;
 	foreach ($storage_pool_directories as $target_drive) {
@@ -2928,16 +2930,16 @@ Here are your options:
 - If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this directory will not be part of your storage pool.
 
 - If the drive is gone, you should either re-mount it manually (if possible), or remove it from your storage pool. To do so, use the following command:
-  greyhole --gone=".quoted_form($target_drive)."
+  greyhole --gone=".escapeshellarg($target_drive)."
   Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.
 
 - If you know this drive will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:
-  greyhole --wait-for=".quoted_form($target_drive)."
+  greyhole --wait-for=".escapeshellarg($target_drive)."
 
 A fsck will now start, to fix the symlinks found in your shares, when possible.
 You'll receive a report email once that fsck run completes.
 ";
-			mail($email_to, 'Missing storage pool directory on ' . $hostname . ': ' . $target_drive, $body);
+			mail($email_to, 'Missing storage pool directory on ' . exec('hostname') . ': ' . $target_drive, $body);
 			gh_log(DEBUG, "Email sent for gone dir: $target_drive");
 			$gone_ok_drives[$target_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
 		} else if ((gone_ok($target_drive, $j++ == 0) || gone_fscked($target_drive, $i++ == 0)) && is_greyhole_owned_dir($target_drive)) {
@@ -2951,7 +2953,7 @@ It appears one of your storage pool directory came back:
 A fsck will now start, to fix the symlinks found in your shares, when possible.
 You'll receive a report email once that fsck run completes.
 ";
-			mail($email_to, 'Storage pool directory now online on ' . $hostname . ': ' . $target_drive, $body);
+			mail($email_to, 'Storage pool directory now online on ' . exec('hostname') . ': ' . $target_drive, $body);
 			gh_log(DEBUG, "Email sent for revived dir: $target_drive");
 
 			mark_gone_ok($target_drive, 'remove');
@@ -2979,7 +2981,7 @@ You'll receive a report email once that fsck run completes.
 
 		$fsck_report = get_fsck_report();
 		gh_log(DEBUG, "Sending fsck report to $email_to");
-		mail($email_to, 'fsck of Greyhole shares on ' . $hostname, $fsck_report);
+		mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report);
 
 		// Refresh $gone_ok_drives to it's real value (from the DB)
 		get_gone_ok_dirs();
@@ -3162,7 +3164,7 @@ function gh_balance() {
 			// Files candidate to get moved
 			$files = array();
 			if (is_dir("$source_drive/$share_name")) {
-				exec("find ". quoted_form("$source_drive/$share_name") ." -type f -size +10M", $files);
+				exec("find ". escapeshellarg("$source_drive/$share_name") ." -type f -size +10M", $files);
 			}
 			gh_log(DEBUG, "Found ". count($files) ." files that can be moved.");
 			
@@ -3676,8 +3678,8 @@ function print_usage() {
 
 function get_conf_md5() {
 	global $config_file, $smb_config_file;
-	exec("grep -ie 'num_copies\|storage_pool_directory\|sticky_files' " . quoted_form($config_file) . " | grep -v '^#'", $content);
-	exec("grep -ie 'path\|vfs objects' " . quoted_form($smb_config_file) . " | grep -v '^#'", $content);
+	exec("grep -ie 'num_copies\|storage_pool_directory\|sticky_files' " . escapeshellarg($config_file) . " | grep -v '^#'", $content);
+	exec("grep -ie 'path\|vfs objects' " . escapeshellarg($smb_config_file) . " | grep -v '^#'", $content);
 	return md5(implode("\n", $content));
 }
 

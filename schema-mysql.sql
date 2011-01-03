@@ -17,9 +17,7 @@ CREATE TABLE `tasks` (
 `event_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE = MYISAM;
 
-ALTER TABLE `tasks` ADD INDEX `incomplete_open` ( `complete` );
-ALTER TABLE `tasks` ADD INDEX `subsequent_writes` ( `action`(10), `share`(64), `full_path`(255) );
-ALTER TABLE `tasks` ADD INDEX `unneeded_unlinks` ( `complete`, `share`(64), `action`(10), `full_path`(255), `additional_info`(255) );
+ALTER TABLE `tasks` ADD INDEX `find_next_task` ( `complete` , `share` (64) , `id` );
 
 CREATE TABLE `tasks_completed` (
 `id` BIGINT UNSIGNED NOT NULL,

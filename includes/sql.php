@@ -32,81 +32,83 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
    cpg+git@amahi.org
 */
 
-function db_connect() {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+if ($db_options->engine == 'sqlite') {
+	function db_connect() {
+		global $db_options;
 		if (!file_exists($db_options->db_path)) {
 			// create the db automatically if it does not exist
 			system("sqlite3 $db_options->db_path < $db_options->schema");
 		}
 		$db_options->dbh = new PDO("sqlite:" . $db_options->db_path);
 		return $db_options->dbh;
-	} else {
-		return mysql_connect($db_options->host, $db_options->user, $db_options->pass);
 	}
-}
 
-function db_select_db() {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+	function db_select_db() {
 		// do nothing - sqlite does not need to select a db; there's only one db per file
-	} else {
-		mysql_select_db($db_options->name);
 	}
-}
 
-function db_query($query) {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+	function db_query($query) {
+		global $db_options;
 		return $db_options->dbh->query($query);
-	} else {
-		return mysql_query($query);
 	}
-}
 
-function db_escape_string($string) {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+	function db_escape_string($string) {
+		global $db_options;
 		$escaped_string = $db_options->dbh->quote($string);
 		return substr($escaped_string, 1, strlen($escaped_string)-2);
-	} else {
-		return mysql_real_escape_string($string);
 	}
-}
 
-function db_fetch_object($result) {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+	function db_fetch_object($result) {
 		return $result->fetchObject();
-	} else {
-		return mysql_fetch_object($result);
 	}
-}
 
-function db_free_result($result) {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+	function db_free_result($result) {
 		return TRUE;
-	} else {
-		return mysql_free_result($result);
 	}
-}
 
-function db_insert_id() {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+	function db_insert_id() {
+		global $db_options;
 		return $db_options->dbh->lastInsertId();
-	} else {
-		return mysql_insert_id();
 	}
-}
 
-function db_error() {
-	global $db_options;
-	if ($db_options->engine == 'sqlite') {
+	function db_error() {
+		global $db_options;
 		$error = $db_options->dbh->errorInfo();
 		return $error[2];
-	} else {
+	}
+} else {
+	// MySQL
+	function db_connect() {
+		global $db_options;
+		return mysql_connect($db_options->host, $db_options->user, $db_options->pass);
+	}
+	
+	function db_select_db() {
+		global $db_options;
+		mysql_select_db($db_options->name);
+	}
+
+	function db_query($query) {
+		return mysql_query($query);
+	}
+
+	function db_escape_string($string) {
+		return mysql_real_escape_string($string);
+	}
+
+	function db_fetch_object($result) {
+		return mysql_fetch_object($result);
+	}
+
+	function db_free_result($result) {
+		return mysql_free_result($result);
+	}
+
+	function db_insert_id() {
+		return mysql_insert_id();
+	}
+
+	function db_error() {
 		return mysql_error();
 	}
 }
@@ -155,7 +157,7 @@ function db_migrate() {
 	// Migration #3 (larger settings.value: tinytext > text)
 	if (@$db_use_mysql) {
 		$query = "DESCRIBE settings";
-		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		$result = db_query($query) or die("Can't describe settings with query: $query - Error: " . db_error());
 		while ($row = db_fetch_object($result)) {
 			if ($row->Field == 'value') {
 				if ($row->Type == "tinytext") {
@@ -164,6 +166,36 @@ function db_migrate() {
 				}
 				break;
 			}
+		}
+	}
+	// Migration #4 (new index for find_next_task function, used by simplify_task, and also for execute_next_task function; also remove deprecated indexes)
+	if (@$db_use_mysql) {
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result) === FALSE) {
+			// migrate
+			db_query("ALTER TABLE tasks ADD INDEX find_next_task (complete, share(64), id)");
+		}
+
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'incomplete_open'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result)) {
+			// migrate
+			db_query("ALTER TABLE tasks DROP INDEX incomplete_open");
+		}
+
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'subsequent_writes'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result)) {
+			// migrate
+			db_query("ALTER TABLE tasks DROP INDEX subsequent_writes");
+		}
+
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'unneeded_unlinks'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result)) {
+			// migrate
+			db_query("ALTER TABLE tasks DROP INDEX unneeded_unlinks");
 		}
 	}
 }

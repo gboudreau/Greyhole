@@ -54,7 +54,6 @@ $last_df_time = 0;
 $last_dfs = array();
 $is_new_line = TRUE;
 $sleep_before_task = array();
-$arch = exec('uname -m');
 
 if (!isset($config_file)) {
 	$config_file = '/etc/greyhole.conf';
@@ -135,7 +134,7 @@ function parse_config() {
 	if (is_array($storage_pool_directories) && count($storage_pool_directories) > 0) {
 		$df_command = "df -k";
 		foreach ($storage_pool_directories as $key => $target_drive) {
-			$df_command .= " " . quoted_form($target_drive);
+			$df_command .= " " . escapeshellarg($target_drive);
 			$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
 		}
 		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
@@ -221,10 +220,6 @@ function parse_config() {
 	return TRUE;
 }
 
-function quoted_form($path) {
-	return escapeshellarg($path);
-}
-
 function clean_dir($dir) {
 	if ($dir[0] == '.' && $dir[1] == '/') {
 		$dir = mb_substr($dir, 2);
@@ -236,23 +231,18 @@ function clean_dir($dir) {
 }
 
 function explode_full_path($full_path) {
-	if (mb_strpos($full_path, '/') === FALSE) {
-		return array('', $full_path);
-	}
-	$filename = mb_substr($full_path, strrpos($full_path, '/')+1);
-	$path = mb_substr($full_path, 0, strrpos($full_path, '/'));
-	return array($path, $filename);
+	return array(dirname($full_path), basename($full_path));
 }
 
 function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
-	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action, $log_to_stdout;
+	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action, $log_to_stdout, $fp_log;
 	if ($local_log_level > $log_level) {
 		return;
 	}
 
-	$date = explode(' ', date("M d H:i:s"));
+	$date = date("M d H:i:s");
 	$log_text = sprintf('%s%s%s%s', 
-		$is_new_line ? $date[0] . sprintf(' %2d ', (int) $date[1]) . $date[2] . " $local_log_level $action: " : '',
+		$is_new_line ? "$date $local_log_level $action: " : '',
 		$text,
 		$add_line_feed && $log_memory_usage ? " [" . memory_get_usage() . "]" : '',
 		$add_line_feed ? "\n": ''
@@ -262,10 +252,11 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 	if (isset($log_to_stdout)) {
 		echo $log_text;
 	} else {
-		@$fp = fopen($greyhole_log_file, 'a');
-		if ($fp) {
-			fwrite($fp, $log_text);
-			fclose($fp);
+		if (!isset($fp_log)) {
+			@$fp_log = fopen($greyhole_log_file, 'a');
+		}
+		if ($fp_log) {
+			fwrite($fp_log, $log_text);
 		} else {
 			error_log(trim($log_text));
 		}
@@ -368,94 +359,101 @@ function get_share_landing_zone($share) {
 	}
 }
 
-function gh_filesize($filename) {
-	global $arch;
-	if ($arch != 'x86_64') {
-		$result = exec("stat -c %s ".quoted_form($filename)." 2>/dev/null");
+$arch = exec('uname -m');
+if ($arch != 'x86_64') {
+	gh_log(DEBUG, "32-bit system detected: Greyhole will NOT use PHP built-in file functions.");
+
+	function gh_filesize($filename) {
+		$result = exec("stat -c %s ".escapeshellarg($filename)." 2>/dev/null");
 		if (empty($result)) {
 			return FALSE;
 		}
 		return (float) $result;
 	}
-	return filesize($filename);
-}
-
-function gh_fileowner($filename) {
-	global $arch;
-	if ($arch != 'x86_64') {
-		$result = exec("stat -c %u ".quoted_form($filename)." 2>/dev/null");
+	
+	function gh_fileowner($filename) {
+		$result = exec("stat -c %u ".escapeshellarg($filename)." 2>/dev/null");
 		if (empty($result)) {
 			return FALSE;
 		}
 		return (int) $result;
 	}
-	return fileowner($filename);
-}
-
-function gh_filegroup($filename) {
-	global $arch;
-	if ($arch != 'x86_64') {
-		$result = exec("stat -c %g ".quoted_form($filename)." 2>/dev/null");
+	
+	function gh_filegroup($filename) {
+		$result = exec("stat -c %g ".escapeshellarg($filename)." 2>/dev/null");
 		if (empty($result)) {
 			return FALSE;
 		}
 		return (int) $result;
 	}
-	return filegroup($filename);
-}
 
-function gh_fileperms($filename) {
-	global $arch;
-	if ($arch != 'x86_64') {
-		$result = exec("stat -c %a ".quoted_form($filename)." 2>/dev/null");
+	function gh_fileperms($filename) {
+		$result = exec("stat -c %a ".escapeshellarg($filename)." 2>/dev/null");
 		if (empty($result)) {
 			return FALSE;
 		}
 		return "0" . $result;
 	}
-	return mb_substr(decoct(fileperms($filename)), -4);
-}
 
-function gh_is_file($filename) {
-	global $arch;
-	if ($arch != 'x86_64') {
-		exec('[ -f '.quoted_form($filename).' ]', $tmp, $result);
+	function gh_is_file($filename) {
+		exec('[ -f '.escapeshellarg($filename).' ]', $tmp, $result);
 		return $result === 0;
 	}
-	return is_file($filename);
-}
 
-function gh_fileinode($filename) {
-	// This function returns deviceid_inode to make sure this value will be different for files on different devices.
-	global $arch;
-	if ($arch != 'x86_64') {
-		$result = exec("stat -c '%d_%i' ".quoted_form($filename)." 2>/dev/null");
+	function gh_fileinode($filename) {
+		// This function returns deviceid_inode to make sure this value will be different for files on different devices.
+		$result = exec("stat -c '%d_%i' ".escapeshellarg($filename)." 2>/dev/null");
 		if (empty($result)) {
 			return FALSE;
 		}
 		return (string) $result;
 	}
-	$stat = @stat($filename);
-	if ($stat === FALSE) {
-		return FALSE;
-	}
-	return $stat['dev'] . '_' . $stat['ino'];
-}
 
-function gh_file_deviceid($filename) {
-	global $arch;
-	if ($arch != 'x86_64') {
-		$result = exec("stat -c '%d' ".quoted_form($filename)." 2>/dev/null");
+	function gh_file_deviceid($filename) {
+		$result = exec("stat -c '%d' ".escapeshellarg($filename)." 2>/dev/null");
 		if (empty($result)) {
 			return FALSE;
 		}
 		return (string) $result;
 	}
-	$stat = @stat($filename);
-	if ($stat === FALSE) {
-		return FALSE;
-	}
-	return $stat['dev'];
-}
+} else {
+	gh_log(DEBUG, "64-bit system detected: Greyhole will use PHP built-in file functions.");
 
+	function gh_filesize($filename) {
+		return filesize($filename);
+	}
+	
+	function gh_fileowner($filename) {
+		return fileowner($filename);
+	}
+
+	function gh_filegroup($filename) {
+		return filegroup($filename);
+	}
+
+	function gh_fileperms($filename) {
+		return mb_substr(decoct(fileperms($filename)), -4);
+	}
+
+	function gh_is_file($filename) {
+		return is_file($filename);
+	}
+
+	function gh_fileinode($filename) {
+		// This function returns deviceid_inode to make sure this value will be different for files on different devices.
+		$stat = @stat($filename);
+		if ($stat === FALSE) {
+			return FALSE;
+		}
+		return $stat['dev'] . '_' . $stat['ino'];
+	}
+
+	function gh_file_deviceid($filename) {
+		$stat = @stat($filename);
+		if ($stat === FALSE) {
+			return FALSE;
+		}
+		return $stat['dev'];
+	}
+}
 ?>
