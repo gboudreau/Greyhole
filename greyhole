@@ -1191,9 +1191,19 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			exec("rsync -t " . quoted_form(readlink("$landing_zone/$full_path")) . " " . quoted_form($temp_path));
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == gh_filesize(readlink("$landing_zone/$full_path"));
 		} else if (gh_is_file("$landing_zone/$full_path")) {
-			exec("rsync -t " . quoted_form("$landing_zone/$full_path") . " " . quoted_form($temp_path));
-			$it_worked = file_exists($temp_path) && file_exists("$landing_zone/$full_path") && gh_filesize($temp_path) == gh_filesize("$landing_zone/$full_path");
-			if ($it_worked) {
+			$source_size = gh_filesize("$landing_zone/$full_path");
+			$source_dev = gh_file_deviceid("$landing_zone/$full_path");
+			$target_dev = gh_file_deviceid($tombstone_dir_path);
+			if ($source_dev === $target_dev && $source_dev !== FALSE) {
+				gh_log(DEBUG, "  (using rename)");
+				rename("$landing_zone/$full_path", $temp_path);
+				$copied = FALSE;
+			} else {
+				exec("rsync -t " . quoted_form("$landing_zone/$full_path") . " " . quoted_form($temp_path));
+				$copied = TRUE;
+			}
+			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == $source_size;
+			if ($copied && $it_worked && file_exists("$landing_zone/$full_path")) {
 				unlink("$landing_zone/$full_path");
 			}
 		}

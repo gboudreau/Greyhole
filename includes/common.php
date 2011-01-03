@@ -442,4 +442,20 @@ function gh_fileinode($filename) {
 	return $stat['dev'] . '_' . $stat['ino'];
 }
 
+function gh_file_deviceid($filename) {
+	global $arch;
+	if ($arch != 'x86_64') {
+		$result = exec("stat -c '%d' ".quoted_form($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (string) $result;
+	}
+	$stat = @stat($filename);
+	if ($stat === FALSE) {
+		return FALSE;
+	}
+	return $stat['dev'];
+}
+
 ?>
