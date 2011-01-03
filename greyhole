@@ -3668,7 +3668,8 @@ function print_usage() {
 	echo "                        directories. Scanning the graveyards is only required to\n";
 	echo "                        re-create symbolic links that might be missing from your\n";
 	echo "                        shared directories.\n";
-	echo "  -c, --if-conf-changed Only fsck if greyhole.conf changed since the last fsck.\n";
+	echo "  -c, --if-conf-changed Only fsck if greyhole.conf or smb.conf paths changed since\n";
+	echo "                        the last fsck.\n";
 	echo "                        Used in the daily cron to prevent unneccesary fsck runs.\n";
 	echo "  -d, --dir=path        Only scan a specific directory, and all sub-directories.\n";
 	echo "                        The specified directory should be a Samba share, or a\n";
