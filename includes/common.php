@@ -235,7 +235,7 @@ function explode_full_path($full_path) {
 }
 
 function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
-	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action, $log_to_stdout, $fp_log;
+	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action, $log_to_stdout;
 	if ($local_log_level > $log_level) {
 		return;
 	}
@@ -252,11 +252,10 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 	if (isset($log_to_stdout)) {
 		echo $log_text;
 	} else {
-		if (!isset($fp_log)) {
-			@$fp_log = fopen($greyhole_log_file, 'a');
-		}
+		@$fp_log = fopen($greyhole_log_file, 'a');
 		if ($fp_log) {
 			fwrite($fp_log, $log_text);
+			fclose($fp_log);
 		} else {
 			error_log(trim($log_text));
 		}
