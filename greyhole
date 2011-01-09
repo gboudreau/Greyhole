@@ -829,24 +829,28 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 
 				// is_linked = is the target of the existing symlink
 				if ($tombstone->is_linked) {
-					$symlinked = TRUE;
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
-					@unlink("$landing_zone/$target_full_path/$file_path");
-					if (!file_exists("$landing_zone/$target_full_path/$file_path")) {
- 						@symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
-						// Creating this symlink can fail if the parent dir was removed
+					if (is_link("$landing_zone/$target_full_path/$file_path")) {
+						$symlinked = TRUE;
+						gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
+						unlink("$landing_zone/$target_full_path/$file_path");
+ 						symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
+					} else {
+						// Maybe the symlink was moved... We need to find all broken symlinks in $landing_zone, and update them to use $target_full_path, if they pointed to $full_path
+						fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
 					}
 				}
 			}
 			if (!$symlinked && count($file_tombstones) > 0) {
 				// None of the tombstones were is_linked; use the last one for the symlink.
-				$tombstone->is_linked = TRUE;
-				$file_tombstones[$key] = $tombstone;
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
-				@unlink("$landing_zone/$target_full_path/$file_path");
-				if (!file_exists("$landing_zone/$target_full_path/$file_path")) {
-					@symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
-					// Creating this symlink can fail if the parent dir was removed
+				if (is_link("$landing_zone/$target_full_path/$file_path")) {
+					$tombstone->is_linked = TRUE;
+					$file_tombstones[$key] = $tombstone;
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $tombstone->path");
+					unlink("$landing_zone/$target_full_path/$file_path");
+					symlink($tombstone->path, "$landing_zone/$target_full_path/$file_path");
+				} else {
+					// Maybe the symlink was moved... We need to find all broken symlinks in $landing_zone, and update them to use $target_full_path, if they pointed to $full_path
+					fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
 				}
 			}
 			list($path, $filename) = explode_full_path("$target_full_path/$file_path");
@@ -907,11 +911,13 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 					// is_linked = is the target of the existing symlink
 					$symlinked = TRUE;
 					if ($tombstone->is_linked) {
-						gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
-						@unlink("$landing_zone/$target_full_path");
-						if (!file_exists("$landing_zone/$target_full_path")) {
-	 						@symlink($tombstone->path, "$landing_zone/$target_full_path");
-							// Creating this symlink can fail if the parent dir was removed
+						if (is_link("$landing_zone/$target_full_path")) {
+							gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
+							unlink("$landing_zone/$target_full_path");
+	 						symlink($tombstone->path, "$landing_zone/$target_full_path");
+						} else {
+							// Maybe the symlink was moved... We need to find all broken symlinks in $landing_zone, and update them to use $target_full_path, if they pointed to $full_path
+							fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
 						}
 					}
 				} else {
@@ -923,11 +929,13 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				// None of the tombstones were is_linked; use the last one for the symlink.
 				$tombstone->is_linked = TRUE;
 				$existing_tombstones[$key] = $tombstone;
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
-				@unlink("$landing_zone/$target_full_path");
-				if (!file_exists("$landing_zone/$target_full_path")) {
-					@symlink($tombstone->path, "$landing_zone/$target_full_path");
-					// Creating this symlink can fail if the parent dir was removed
+				if (is_link("$landing_zone/$target_full_path")) {
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $tombstone->path");
+					unlink("$landing_zone/$target_full_path");
+					symlink($tombstone->path, "$landing_zone/$target_full_path");
+				} else {
+					// Maybe the symlink was moved... We need to find all broken symlinks in $landing_zone, and update them to use $target_full_path, if they pointed to $full_path
+					fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
 				}
 			}
 			remove_tombstones($share, $path, $filename);
@@ -940,6 +948,22 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		}
 	}
 	$sleep_before_task = array();
+}
+
+function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
+	global $storage_pool_directories;
+	exec("find -L " . escapeshellarg($landing_zone) . " -type l", $broken_links);
+	foreach ($broken_links as $broken_link) {
+		$fixed_link_target = readlink($broken_link);
+		foreach ($storage_pool_directories as $dir) {
+			$fixed_link_target = str_replace(clean_dir("$dir/$share/$full_path/"), clean_dir("$dir/$share/$target_full_path/"), $fixed_link_target);
+		}
+		if (gh_is_file($fixed_link_target)) {
+			unlink($broken_link);
+			symlink($fixed_link_target, $broken_link);
+		}
+		gh_log(DEBUG, "  Found a broken symlink to update: $broken_link. Old (broken) target: " . readlink($broken_link) . "; new (fixed) target: $fixed_link_target");
+	}
 }
 
 function gh_file_exists($real_path, $log_message=null) {
