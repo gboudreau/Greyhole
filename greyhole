@@ -1284,14 +1284,19 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
 		$dir_parts = explode('/', $directory);
 		
 		$i = 0;
-		$parent_directory = '/' . $dir_parts[$i++];
+		$parent_directory = clean_dir('/' . $dir_parts[$i++]);
 		while (is_dir($parent_directory)) {
-			$parent_directory = $parent_directory . '/' . $dir_parts[$i++];
+			$parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
 		}
 		while ($i <= count($dir_parts)) {
 			if (!mkdir($parent_directory, $dir_infos->fileperms)) {
-				gh_log(WARN, "  Failed to create directory $parent_directory");
-				return FALSE;
+				if (gh_is_file($parent_directory)) {
+					rename($parent_directory, "$parent_directory (file copy)");
+				}
+				if (!mkdir($parent_directory, $dir_infos->fileperms)) {
+					gh_log(WARN, "  Failed to create directory $parent_directory");
+					return FALSE;
+				}
 			}
 			if (!chown($parent_directory, $dir_infos->fileowner)) {
 				gh_log(WARN, "  Failed to chown directory '$parent_directory'");
@@ -1302,7 +1307,7 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
 			if (!isset($dir_parts[$i])) {
 				break;
 			}
-			$parent_directory = $parent_directory . '/' . $dir_parts[$i++];
+			$parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
 		}
 	}
 	return TRUE;
