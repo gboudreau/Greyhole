@@ -1662,7 +1662,10 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_read_log_smbd_line': " . db_error());
 	$row = db_fetch_object($result);
 	if ($row === FALSE || db_fetch_object($result) !== FALSE) {
-		gh_log(CRITICAL, "Received " . ($row === FALSE ? 'no rows' : 'more than one row') . " when querying settings for 'last_read_log_smbd_line'; expected one.");
+		gh_log(WARN, "Received " . ($row === FALSE ? 'no rows' : 'more than one row') . " when querying settings for 'last_read_log_smbd_line'; expected one.");
+		$query = "INSERT INTO settings (name, value) VALUES ('last_read_log_smbd_line', '0')";
+		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for last_read_log_smbd_line: " . db_error());
+		$row = (object) array('value' => 0);
 	}
 	db_free_result($result);
 
@@ -2089,7 +2092,10 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 			$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_OOS_notification': " . db_error());
 			$row = db_fetch_object($result);
 			if ($row === FALSE || db_fetch_object($result) !== FALSE) {
-				gh_log(CRITICAL, "Received " . ($row === FALSE ? 'no rows' : 'more than one row') . " when querying settings for 'last_OOS_notification'; expected one.");
+				gh_log(WARN, "Received " . ($row === FALSE ? 'no rows' : 'more than one row') . " when querying settings for 'last_OOS_notification'; expected one.");
+				$query = "INSERT INTO settings (name, value) VALUES ('last_OOS_notification', '0')";
+				db_query($query) or gh_log(CRITICAL, "Can't insert new settings for last_OOS_notification: " . db_error());
+				$row = (object) array('value' => 0);
 			}
 			db_free_result($result);
 			$last_OOS_notification = $row->value;
