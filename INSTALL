@@ -15,7 +15,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
       Also, there have been reports that the Debian-bundled version of Samba would sometime show symlinks as 0-bytes files, to clients.
       If you have such issues, you should compile the latest Samba stable manually and use that.
 
-1. Install the required applications: PHP 5 (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
+1. Install the required applications: PHP 5+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
 	Fedora: sudo yum -y install mysql-server php php-mysql php-mbstring samba samba-common patch gcc yum-utils php-pear rsync
 	Ubuntu: sudo apt-get -y install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
