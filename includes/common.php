@@ -88,7 +88,7 @@ function parse_config() {
 				case 'log_memory_usage':
 				case 'balance_modified_files':
 					global ${$name};
-					${$name} = trim($value) === '1' || mb_stripos(trim($value), 'yes') !== FALSE || mb_stripos(trim($value), 'true') !== FALSE;
+					${$name} = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
 					break;
 				case 'storage_pool_directory':
 					if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?gb?/i", $value, $regs)) {
@@ -118,7 +118,7 @@ function parse_config() {
 						$shares_options[$share]['num_copies'] = (int) $value;
 					} else if (mb_strpos($name, 'delete_moves_to_attic') === 0) {
 						$share = mb_substr($name, 22, mb_strlen($name)-23);
-						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || mb_stripos(trim($value), 'yes') !== FALSE || mb_stripos(trim($value), 'true') !== FALSE;
+						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
 					} else {
 						global ${$name};
 						if (is_numeric($value)) {
