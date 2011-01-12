@@ -151,7 +151,7 @@ function parse_config() {
 			$share_name = $regs[1];
 		}
 		if (isset($share_name) && !isset($shares_options[$share_name]) && array_search($share_name, $attic_share_names) === FALSE) { continue; }
-		if (isset($share_name) && preg_match('/path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
+		if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
 			$shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
 			$shares_options[$share_name]['name'] = $share_name;
 		}
