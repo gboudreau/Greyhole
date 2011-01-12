@@ -568,6 +568,12 @@ function execute_next_task() {
 		$locked_files = array();
 	}
 	
+	$task_was_modified = simplify_task($task->share, $task->action == 'rename' ? $task->additional_info : $task->full_path, $task->id, $task->action, $task->action == 'rename' ? $task->full_path : null);
+	if ($task_was_modified) {
+		// Current task was modified by simplify_task. Will reload the next task now.
+		return;
+	}
+	
 	$action = $task->action;
 	gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 
@@ -1619,31 +1625,156 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 	}
 }
 
+/**
+ * This function will remove or change pending tasks, to either save time, or skip 'destructive' operations.
+ *
+ * write X -> write X:  rmtask write X               = write X
+ * write X -> mv X Y:   rmtask write X               = mv X Y
+ * write X -> rm X:     rmtask write X               = rm X
+ * mv X Y -> write Y:   rmtask write Y               = mv X Y
+ * mv X Y -> mv Y Z:    chtask rm X & chtask write Z = rm X & write Z
+ * mv X Y -> rm Y:      chtask rm X & rmtask rm Y    = rm X
+ * rm X -> write X:     rmtask rm X                  = write X
+ * rm X -> mv X Y:      impossible
+ * rm X -> rm X:        impossible
+ */
+function simplify_task($share, $full_path, $task_id, $action, $old_full_path) {
+	if ($action != 'write' && $action != 'rename' && $action != 'unlink') {
+		return FALSE;
+	}
+
+	$modified_initial_task = FALSE;
+	$initial_task_id = $task_id;
+
+	while (TRUE) {
+		$next_task = find_next_task($share, $full_path, $task_id);
+		if (!$next_task) {
+			// Done
+			gh_log(DEBUG, "Found no more upcoming tasks for $share/$full_path after $action task (ID $task_id)");
+			return $modified_initial_task;
+		}
+		gh_log(DEBUG, "Found an upcoming task for $share/$full_path after $action task (ID $task_id): $next_task->action" . (!empty($next_task->additional_info) ? " > $next_task->additional_info" : '') . " (ID $next_task->id)");
+
+		switch($action) {
+			case 'write':
+				// Subsequement write, rename or delete found.
+				// In any case, skipping the current write task only makes sense.
+				rmtask($task_id);
+				if ($task_id == $initial_task_id) {
+					$modified_initial_task = TRUE;
+				}
+				break;
+			case 'rename':
+				if ($next_task->action == 'write') {
+					// Subsequent write found; can skip that write, since the current rename task will already write the latest data for this file.
+					rmtask($next_task->id);
+				} else {
+					// Subsequent rename or delete found; in either case, we can skip writing to new file here, and only delete the old file.
+					chtask($task_id, 'unlink', $action == 'rename' ? $old_full_path : $full_path);
+					if ($task_id == $initial_task_id) {
+						$modified_initial_task = TRUE;
+					}
+					if ($next_task->action == 'rename') {
+						// Subsequent rename found: that new rename is in fact just a write.
+						chtask($next_task->id, 'write', $next_task->additional_info);
+					} else if ($next_task->action == 'unlink') {
+						// Subsequent delete found: can skip it, since that file was never created, per above chtask($task_id, ...)
+						rmtask($next_task->id);
+					}
+				}
+				break;
+			case 'unlink':
+				if ($next_task->action == 'write') {
+					// Skipping delete; subsequent write found, which means the file was re-created.
+					rmtask($task_id);
+					if ($task_id == $initial_task_id) {
+						$modified_initial_task = TRUE;
+					}
+				} else {
+					// Stop looking. We found an 'impossible' sequence of operations, which means we're now on another trail.
+					return $modified_initial_task;
+				}
+				break;
+			default:
+				return $modified_initial_task;
+		}
+
+		// Keep looking...
+		if (!empty($next_task->additional_info)) {
+			$full_path = $next_task->additional_info;
+			$old_full_path = $next_task->full_path;
+		}
+		$task_id = $next_task->id;
+		$action = $next_task->action;
+
+		if ($action == 'rename') {
+			// Let's try to see if we should rename a file copy, to insure it won't be deleted before we need it.
+			$landing_zone = get_share_landing_zone($share);
+			if (is_link("$landing_zone/$full_path")) {
+				$target_drive = find_target_drive(readlink("$landing_zone/$full_path"));
+
+				// Let's make sure the directory where we want to move the file copy exists first
+				list($dir_path, $filename) = explode_full_path("$target_drive/$share/$full_path");
+				list($lz_dir_path, $lz_filename) = explode_full_path("$landing_zone/$full_path");
+				gh_mkdir($dir_path, $lz_dir_path);
+
+				// Rename the file copy to a temporary filename (nobody will touch that)
+				$temp_filename = get_temp_filename("$target_drive/$share/$full_path");
+				$worked = @rename(readlink("$landing_zone/$full_path"), $temp_filename);
+
+				// Re-do symlink to point to new temporary file
+				if ($worked) {
+					gh_recycle("$landing_zone/$full_path");
+					symlink($temp_filename, "$landing_zone/$full_path");
+				}
+			}
+		}
+	}
+}
+
+function find_target_drive($real_path) {
+	global $storage_pool_directories;
+	foreach ($storage_pool_directories as $dir) {
+		if (mb_strpos($real_path, $dir) === 0) {
+			return $dir;
+		}
+	}
+	return FALSE;
+}
+
+function find_next_task($share, $full_path, $task_id) {
+	$query = sprintf("SELECT * FROM tasks WHERE complete = 'yes' AND share = '%s' AND action IN ('write','rename','unlink') AND full_path = '%s' AND id > %s ORDER BY id LIMIT 1",
+		db_escape_string($share),
+		db_escape_string($full_path),
+		db_escape_string($task_id)
+	);
+gh_log(DEBUG, $query);
+	$result = db_query($query) or gh_log(CRITICAL, "Can't select to find next task: " . db_error());
+	return db_fetch_object($result);
+}
+
+function rmtask($task_id) {
+	$query = sprintf("DELETE FROM tasks WHERE id = %s", $task_id);
+gh_log(DEBUG, $query);
+	db_query($query) or gh_log(CRITICAL, "Can't delete task: " . db_error());
+}
+
+function chtask($task_id, $action, $full_path, $additional_info=null) {
+	$query = sprintf("UPDATE tasks SET action = '%s', full_path = '%s', additional_info = %s WHERE id = %s",
+		db_escape_string($action),
+		db_escape_string($full_path),
+		!empty($additional_info) ? "'".db_escape_string(clean_dir($additional_info))."'" : 'NULL',
+		db_escape_string($task_id)
+	);
+gh_log(DEBUG, $query);
+	db_query($query) or gh_log(CRITICAL, "Can't update task: " . db_error());
+}
+
 function simplify_tasks() {
 	global $action;
 	$action = 'simplify_tasks';
 	
 	gh_log(DEBUG, "Simplifying pending tasks.");
-	
-	// Delete duplicate writes/renames
-	$query = "SELECT GROUP_CONCAT(id) ids, action, share, full_path, additional_info FROM tasks WHERE action IN ('write', 'rename') GROUP BY action, share, full_path, additional_info HAVING COUNT(*) > 1";
-	$result = db_query($query) or gh_log(CRITICAL, "Can't select duplicate tasks: " . db_error());
-	while ($row = db_fetch_object($result)) {
-		$ids = explode(',', $row->ids);
-		sort($ids);
-		array_pop($ids);
-		gh_log(DEBUG, "  Removing " . count($ids) . " duplicate pending tasks for $row->share/" . (!empty($row->full_path) ? $row->full_path : '') . (!empty($row->additional_info) ? " -> $row->additional_info" : ''));
-		
-		$ids = implode(',', $ids);
-		if ($ids[0] == ',') {
-			$ids = mb_substr($ids, 1);
-		}
-		$query = sprintf("DELETE FROM tasks WHERE id IN (%s)",
-			$ids
-		);
-		db_query($query) or gh_log(CRITICAL, "Can't delete duplicate tasks: " . db_error());
-	}
-	db_free_result($result);
 	
 	// Remove locked write tasks
 	$query = "SELECT share, full_path FROM tasks WHERE action = 'write' and complete = 'no'";
@@ -1961,21 +2092,6 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 					$act == 'write' ? 'no' : 'yes'
 				);
 				db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
-				
-				if ($act == 'unlink') {
-					// Remove possible previous mv operations that would cause problems...
-					$query = sprintf("DELETE FROM tasks WHERE action = '%s' AND share = '%s' AND additional_info = '%s' AND id < %s ORDER BY id DESC LIMIT 1",
-						'rename',
-						db_escape_string($share),
-						db_escape_string(clean_dir($fullpath)),
-						db_insert_id()
-					);
-					if (!@$db_use_mysql) {
-						// SQLite doesn't support ORDER BY & LIMIT in DELETE statements
-						$query = str_replace(' ORDER BY id DESC LIMIT 1', '', $query);
-					}
-					db_query($query) or gh_log(CRITICAL, "Error inserting task: " . db_error() . "; Query: $query");
-				}
 			}
 
 			// If we have enough queued tasks ($max_queued_tasks), let's stop parsing the log, and get some work done.
