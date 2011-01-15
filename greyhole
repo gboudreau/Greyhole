@@ -1648,6 +1648,17 @@ function simplify_task($share, $full_path, $task_id, $action, $old_full_path) {
 
 	while (TRUE) {
 		$next_task = find_next_task($share, $full_path, $task_id);
+		$is_parent_op = FALSE;
+		$parent_full_path = $full_path;
+		while (!$next_task) {
+			$is_parent_op = TRUE;
+			list($parent_full_path, $basename) = explode_full_path($parent_full_path);
+			if (strlen($parent_full_path) < 2) {
+				break;
+			}
+			gh_log(DEBUG, "Looking for upcoming tasks using full_path = $parent_full_path");
+			$next_task = find_next_task($share, $parent_full_path, $task_id);
+		}
 		if (!$next_task) {
 			// Done
 			gh_log(DEBUG, "Found no more upcoming tasks for $share/$full_path after $action task (ID $task_id)");
@@ -1657,11 +1668,18 @@ function simplify_task($share, $full_path, $task_id, $action, $old_full_path) {
 
 		switch($action) {
 			case 'write':
-				// Subsequement write, rename or delete found.
-				// In any case, skipping the current write task only makes sense.
-				rmtask($task_id);
-				if ($task_id == $initial_task_id) {
+				if ($is_parent_op && $next_task->action == 'rename') {
+					// Parent directory has been renamed.
+					// Modify current task to use the correct path
+					chtask($task_id, $action, str_replace($next_task->full_path, $next_task->additional_info, $full_path));
 					$modified_initial_task = TRUE;
+				} else {
+					// Subsequement write, rename or delete found.
+					// In any case, skipping the current write task only makes sense.
+					rmtask($task_id);
+					if ($task_id == $initial_task_id) {
+						$modified_initial_task = TRUE;
+					}
 				}
 				break;
 			case 'rename':

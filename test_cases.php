@@ -422,6 +422,28 @@ $tests = array(
 		}
 	),
 
+	(object) array(
+		'name' => 'write file, rename parent dir',
+		'repetitions' => 2,
+		'code' => function($run_num) { $i = 1;
+			mkdir('dir1');
+			file_put_contents('dir1/file1', 'a');
+			wait($i++, $run_num);
+			rename('dir1', 'dir2');
+
+			$ok = file_get_contents('dir2/file1') == 'a';
+			wait();
+			$ok &= file_get_contents('dir2/file1') == 'a';
+			unlink('dir2/file1');
+			$ok &= !file_exists('dir2/file1');
+			wait();
+			$ok &= !file_exists('dir2/file1');
+			rmdir('dir2');
+			wait();
+			return $ok;
+		}
+	),
+
 	/*
 	(object) array(
 		'name' => 'name',
@@ -445,6 +467,7 @@ foreach ($tests as $test) {
 		$start = $config->run_only->start_with_run_num;
 	}
 	foreach (range($start, $test->repetitions) as $run_num) {
+		check_pool_is_empty();
 		$ok = call_user_func($test->code, $run_num);
 		print_result($test->name, $ok);
 		wait();
