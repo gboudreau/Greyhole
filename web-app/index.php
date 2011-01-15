@@ -305,7 +305,7 @@ function get_partitions() {
 }
 
 function disk_stats($path) {
-	$cmd = "df -k " . quoted_form($path) . " 2>&1 | grep -v \"^df: .*: No such file or directory$\" | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'";
+	$cmd = "df -k " . escapeshellarg($path) . " 2>&1 | grep -v \"^df: .*: No such file or directory$\" | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'";
 	exec($cmd, $responses);
 	if (count($responses) > 0) {
 		$response = explode(' ', $responses[0]);
