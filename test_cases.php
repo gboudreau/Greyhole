@@ -444,6 +444,80 @@ $tests = array(
 		}
 	),
 
+	(object) array(
+		'name' => 'write file, rename two parent dirs',
+		'repetitions' => 4,
+		'code' => function($run_num) { $i = 1;
+			mkdir('dir1');
+			file_put_contents('dir1/file1', 'a');
+			wait($i++, $run_num);
+			rename('dir1', 'dir2');
+			wait($i++, $run_num);
+			rename('dir2', 'dir3');
+
+			$ok = file_get_contents('dir3/file1') == 'a';
+			wait();
+			$ok &= file_get_contents('dir3/file1') == 'a';
+			unlink('dir3/file1');
+			$ok &= !file_exists('dir3/file1');
+			wait();
+			$ok &= !file_exists('dir3/file1');
+			rmdir('dir3');
+			wait();
+			return $ok;
+		}
+	),
+
+	(object) array(
+		'name' => 'random back and forth dir & file renames',
+		'repetitions' => 512,
+		'code' => function($run_num) { $i = 1;
+			mkdir('dir1');
+			file_put_contents('dir1/file1', 'a');
+			wait($i++, $run_num);
+			file_put_contents('file2', 'b');
+			wait($i++, $run_num);
+			mkdir('dir2');
+			file_put_contents('dir2/file3', 'c');
+			wait($i++, $run_num);
+
+			rename('dir1', 'dir3');
+			wait($i++, $run_num);
+			rename('dir3/file1', 'dir3/file4');
+			wait($i++, $run_num);
+			rename('dir3/file4', 'dir2/file4');
+			wait($i++, $run_num);
+			rename('dir2', 'dir4');
+			wait($i++, $run_num);
+			rename('dir4/file4', 'dir3/file5');
+			wait($i++, $run_num);
+			rename('file2', 'dir4/file4');
+			wait($i++, $run_num);
+
+			$ok = file_get_contents('dir3/file5') == 'a';
+			$ok &= file_get_contents('dir4/file4') == 'b';
+			$ok &= file_get_contents('dir4/file3') == 'c';
+			wait();
+			$ok &= file_get_contents('dir3/file5') == 'a';
+			$ok &= file_get_contents('dir4/file4') == 'b';
+			$ok &= file_get_contents('dir4/file3') == 'c';
+			unlink('dir3/file5');
+			unlink('dir4/file4');
+			unlink('dir4/file3');
+			$ok &= !file_exists('dir3/file5');
+			$ok &= !file_exists('dir4/file4');
+			$ok &= !file_exists('dir4/file3');
+			wait();
+			$ok &= !file_exists('dir3/file5');
+			$ok &= !file_exists('dir4/file4');
+			$ok &= !file_exists('dir4/file3');
+			rmdir('dir3');
+			rmdir('dir4');
+			wait();
+			return $ok;
+		}
+	),
+
 	/*
 	(object) array(
 		'name' => 'name',
