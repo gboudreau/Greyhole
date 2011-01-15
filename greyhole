@@ -1067,10 +1067,10 @@ function gh_write($share, $full_path, $task_id) {
 	
 	$use_temporary_symlink = FALSE;
 	if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore.')) {
-		gh_log(DEBUG, "Looking for new name of $full_path");
+		#gh_log(DEBUG, "Looking for new name of $full_path");
 		$new_full_path = find_future_full_path($share, $full_path, $task_id);
 		if ($new_full_path != $full_path && gh_is_file("$landing_zone/$new_full_path")) {
-			gh_log(DEBUG, "Found future name of $full_path: $new_full_path");
+			gh_log(DEBUG, "  Found that $full_path has been renamed to $new_full_path. Will work using that instead.");
 			$use_temporary_symlink = TRUE;
 			if (is_link("$landing_zone/$new_full_path")) {
 				symlink(readlink("$landing_zone/$new_full_path"), "$landing_zone/$full_path");
