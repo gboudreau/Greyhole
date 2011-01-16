@@ -47,7 +47,7 @@ if (count($_GET) == 0) {
 	exit();
 }
 
-$base_url = 'http://' . $_SERVER['HTTP_HOST'] . '/';
+$base_url = 'http://' . $_SERVER['HTTP_HOST'] . substr($_SERVER['REQUEST_URI'], 0, strrpos($_SERVER['REQUEST_URI'], '/')+1);
 
 $partitions = get_partitions();
 $shares = get_shares();
