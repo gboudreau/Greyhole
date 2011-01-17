@@ -391,12 +391,13 @@ if ($action == 'stats') {
 			continue;
 		}
 
-		$df_command = "df -k " . escapeshellarg($target_drive) . " | tail -1 | awk '{print \$(NF-4),\$(NF-3)}'";
+		$df_command = "df -k " . escapeshellarg($target_drive) . " | tail -1";
 		unset($responses);
 		exec($df_command, $responses);
-		$response = explode(' ', $responses[0]);
-		$total_space = (float) array_shift($response);
-		$used_space = (float) array_shift($response);
+		
+		preg_match("@\s+([0-9]+)\s+([0-9]+)\s+[0-9]+\s+[0-9]+%\s+.+$@", $responses[0], $regs);
+		$total_space = (float) $regs[1];
+		$used_space = (float) $regs[2];
 
 		$free_space = $dfs[$target_drive];
 
@@ -2038,6 +2039,13 @@ function get_free_space_in_storage_pool_dirs() {
 	}
 	$dfs = array();
 	exec($df_command, $responses);
+	$responses_arr = array();
+	foreach ($responses as $line) {
+		if (preg_match("@\s+[0-9]+\s+[0-9]+\s+([0-9]+)\s+[0-9]+%\s+(.+)$@", $line, $regs)) {
+			$responses_arr[] = "$regs[2] $regs[1]";
+		}
+	}
+	$responses = $responses_arr;
 	foreach ($storage_pool_directories as $target_drive) {
 		$target_dir = '';
 		for ($i=0; $i<count($responses); $i++) {

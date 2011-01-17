@@ -137,7 +137,7 @@ function parse_config() {
 			$df_command .= " " . escapeshellarg($target_drive);
 			$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
 		}
-		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\" | awk '{print \$(NF),\$(NF-2)}'";
+		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\"";
 	} else {
 		gh_log(WARN, "You have no storage_pool_directory defined. Greyhole can't run.");
 		return FALSE;
