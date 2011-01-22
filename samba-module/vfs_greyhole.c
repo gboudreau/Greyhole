@@ -114,15 +114,15 @@ static int greyhole_mkdir(vfs_handle_struct *handle, const char *path, mode_t mo
 
 	result = SMB_VFS_NEXT_MKDIR(handle, path, mode);
 
-	gettimeofday(&tp, (struct timezone *) NULL);
-	snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
-	spoolf = fopen(filename, "wt");
-	fprintf(spoolf, "mkdir\n%s\n%s\n%s%s\n",
-		lp_servicename(handle->conn->params->service),
-		path,
-		(result < 0) ? "failed: " : "",
-		(result < 0) ? strerror(errno) : "");
-	fclose(spoolf);
+	if (result >= 0) {
+		gettimeofday(&tp, (struct timezone *) NULL);
+		snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "mkdir\n%s\n%s\n\n",
+			lp_servicename(handle->conn->params->service),
+			path);
+		fclose(spoolf);
+	}
 
 	return result;
 }
@@ -136,15 +136,15 @@ static int greyhole_rmdir(vfs_handle_struct *handle, const char *path)
 
 	result = SMB_VFS_NEXT_RMDIR(handle, path);
 
-	gettimeofday(&tp, (struct timezone *) NULL);
-	snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
-	spoolf = fopen(filename, "wt");
-	fprintf(spoolf, "rmdir\n%s\n%s\n%s%s\n",
-		lp_servicename(handle->conn->params->service),
-		path,
-		(result < 0) ? "failed: " : "",
-		(result < 0) ? strerror(errno) : "");
-	fclose(spoolf);
+	if (result >= 0) {
+		gettimeofday(&tp, (struct timezone *) NULL);
+		snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "rmdir\n%s\n%s\n\n",
+			lp_servicename(handle->conn->params->service),
+			path);
+		fclose(spoolf);
+	}
 
 	return result;
 }
@@ -158,18 +158,18 @@ static int greyhole_open(vfs_handle_struct *handle, const char *fname, files_str
 
 	result = SMB_VFS_NEXT_OPEN(handle, fname, fsp, flags, mode);
 
-	if ((flags & O_WRONLY) || (flags & O_RDWR)) {
-		gettimeofday(&tp, (struct timezone *) NULL);
-		snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
-		spoolf = fopen(filename, "wt");
-		fprintf(spoolf, "open\n%s\n%s\n%d\n%s%s%s\n",
-			lp_servicename(handle->conn->params->service),
-			fname,
-			result,
-			"for writing ",
-			(result < 0) ? "failed: " : "",
-			(result < 0) ? strerror(errno) : "");
-		fclose(spoolf);
+	if (result >= 0) {
+		if ((flags & O_WRONLY) || (flags & O_RDWR)) {
+			gettimeofday(&tp, (struct timezone *) NULL);
+			snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
+			spoolf = fopen(filename, "wt");
+			fprintf(spoolf, "open\n%s\n%s\n%d\n%s\n",
+				lp_servicename(handle->conn->params->service),
+				fname,
+				result,
+				"for writing ");
+			fclose(spoolf);
+		}
 	}
 
 	return result;
@@ -184,15 +184,15 @@ static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)
 
 	result = SMB_VFS_NEXT_CLOSE(handle, fsp);
 
-	gettimeofday(&tp, (struct timezone *) NULL);
-	snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
-	spoolf = fopen(filename, "wt");
-	fprintf(spoolf, "close\n%s\n%d\n%s%s\n",
-		lp_servicename(handle->conn->params->service),
-		fsp->fh->fd,
-		(result < 0) ? "failed: " : "",
-		(result < 0) ? strerror(errno) : "");
-	fclose(spoolf);
+	if (result >= 0) {
+		gettimeofday(&tp, (struct timezone *) NULL);
+		snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "close\n%s\n%d\n\n",
+			lp_servicename(handle->conn->params->service),
+			fsp->fh->fd);
+		fclose(spoolf);
+	}
 
 	return result;
 }
@@ -206,16 +206,16 @@ static int greyhole_rename(vfs_handle_struct *handle, const char *oldname, const
 
 	result = SMB_VFS_NEXT_RENAME(handle, oldname, newname);
 
-	gettimeofday(&tp, (struct timezone *) NULL);
-	snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
-	spoolf = fopen(filename, "wt");
-	fprintf(spoolf, "rename\n%s\n%s\n%s\n%s%s\n",
-		lp_servicename(handle->conn->params->service),
-		oldname,
-		newname,
-		(result < 0) ? "failed: " : "",
-		(result < 0) ? strerror(errno) : "");
-	fclose(spoolf);
+	if (result >= 0) {
+		gettimeofday(&tp, (struct timezone *) NULL);
+		snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "rename\n%s\n%s\n%s\n\n",
+			lp_servicename(handle->conn->params->service),
+			oldname,
+			newname);
+		fclose(spoolf);
+	}
 
 	return result;
 }
@@ -229,15 +229,15 @@ static int greyhole_unlink(vfs_handle_struct *handle, const char *path)
 
 	result = SMB_VFS_NEXT_UNLINK(handle, path);
 
-	gettimeofday(&tp, (struct timezone *) NULL);
-	snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
-	spoolf = fopen(filename, "wt");
-	fprintf(spoolf, "unlink\n%s\n%s\n%s%s\n",
-		lp_servicename(handle->conn->params->service),
-		path,
-		(result < 0) ? "failed: " : "",
-		(result < 0) ? strerror(errno) : "");
-	fclose(spoolf);
+	if (result >= 0) {
+		gettimeofday(&tp, (struct timezone *) NULL);
+		snprintf(filename, 37, "/var/spool/greyhole/%.0f", ((double) (tp.tv_sec)*1000000.0) + (((double) tp.tv_usec)));
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "unlink\n%s\n%s\n\n",
+			lp_servicename(handle->conn->params->service),
+			path);
+		fclose(spoolf);
+	}
 
 	return result;
 }

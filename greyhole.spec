@@ -44,8 +44,8 @@ install -m 0755 -D -p greyhole.cron.daily ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d
 	install -m 0755 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
 %else
 	%ifarch %{arm}
-		# TODO Get a 3.5 ARM module compiled
 		install -m 0755 -D -p samba-module/bin/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
+		install -m 0755 -D -p samba-module/bin/3.5/greyhole-arm.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
 	%else
 		install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
 		install -m 0755 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
