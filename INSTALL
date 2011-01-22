@@ -71,9 +71,9 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	cd samba-${SAMBA_VERSION}/source3
 
 	Both (Fedora & Ubuntu):
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/vfs_greyhole.c
 	./configure
-	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
 	make
 	if [ -x /usr/lib64/samba/vfs/ ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
@@ -81,9 +81,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Ubuntu (< 10): sudo /etc/init.d/samba restart
 	Ubuntu (10+): sudo restart smbd
 	
-	Note: if, for some reason, you need to compile the VFS module with Samba 3.4, use the following instead of the above commands, before and after running ./configure:
+	Note: if, for some reason, you need to compile the VFS module with Samba 3.4, use the following instead of the above cp & patch commands, after running ./configure, then continue with make:
 		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
-		[...]
 		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 
 4. Setup Samba:
