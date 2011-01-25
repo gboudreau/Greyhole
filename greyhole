@@ -1227,6 +1227,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 	list($path, $filename) = explode_full_path($full_path);
 
 	$link_next = FALSE;
+	$file_infos = gh_get_file_infos("$landing_zone/$full_path");
 	foreach ($tombstones as $key => $tombstone) {
 		if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
 		
@@ -1255,7 +1256,6 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		}
 
 		$temp_path = get_temp_filename($tombstone->path);
-		$file_infos = gh_get_file_infos("$landing_zone/$full_path");
 		
 		$it_worked = FALSE;
 		if (is_link("$landing_zone/$full_path")) {
@@ -3171,6 +3171,9 @@ function gh_get_file_infos($real_path) {
 			'filegroup' => 0,
 			'fileperms' => (int) base_convert("0777", 8, 10)
 		);
+	}
+	if (is_link($real_path)) {
+		$real_path = readlink($real_path);
 	}
 	return (object) array(
 		'fileowner' => (int) gh_fileowner($real_path),
