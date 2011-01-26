@@ -381,9 +381,17 @@ if ($action == 'stats') {
 	}
 	$max_drive_strlen++;
 
+	$totals = array(
+		'total_space' => 0,
+		'used_space' => 0,
+		'free_space' => 0,
+		'attic_size' => 0,
+		'potential_available_space' => 0
+	);
+
 	$dfs = get_free_space_in_storage_pool_dirs();
 	echo "Storage Pool\n";
-	printf("%$max_drive_strlen"."s   Total -  Used =  Free + Attic = Possible\n", '');
+	printf("%$max_drive_strlen"."s    Total -   Used =   Free +  Attic = Possible\n", '');
 	foreach ($storage_pool_directories as $target_drive) {
 		printf("  %-$max_drive_strlen"."s ", "$target_drive:");
 		if (!isset($dfs[$target_drive])) {
@@ -410,8 +418,19 @@ if ($action == 'stats') {
 
 		$potential_available_space = (float) $free_space + $attic_size;
 
-		echo sprintf('%4.0f', $total_space/1024/1024) . "G - " . sprintf('%4.0f', $used_space/1024/1024) . "G = " . sprintf('%4.0f', $free_space/1024/1024) . "G + " . sprintf('%4.0f', $attic_size/1024/1024) . "G = " . sprintf('%4.0f', $potential_available_space/1024/1024) . "G\n";
+		echo sprintf('%5.0f', $total_space/1024/1024) . "G - " . sprintf('%5.0f', $used_space/1024/1024) . "G = " . sprintf('%5.0f', $free_space/1024/1024) . "G + " . sprintf('%5.0f', $attic_size/1024/1024) . "G = " . sprintf('%5.0f', $potential_available_space/1024/1024) . "G\n";
+
+		$totals['total_space'] += $total_space;
+		$totals['used_space'] += $used_space;
+		$totals['free_space'] += $free_space;
+		$totals['attic_size'] += $attic_size;
+		$totals['potential_available_space'] += $potential_available_space;
 	}
+
+	// Totals
+	printf("  %-$max_drive_strlen"."s ==========================================\n", "");
+	printf("  %-$max_drive_strlen"."s ", "Total:");
+	echo sprintf('%5.0f', $totals['total_space']/1024/1024) . "G - " . sprintf('%5.0f', $totals['used_space']/1024/1024) . "G = " . sprintf('%5.0f', $totals['free_space']/1024/1024) . "G + " . sprintf('%5.0f', $totals['attic_size']/1024/1024) . "G = " . sprintf('%5.0f', $totals['potential_available_space']/1024/1024) . "G\n";
 	echo "\n";
 	exit(0);
 }
