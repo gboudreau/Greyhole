@@ -1470,19 +1470,19 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 }
 
 function get_tombstone_data_filename($share, $path, $filename) {
-	$filenames = get_tombstone_data_filenames($share, $path, $filename, 1)
+	$filenames = get_tombstone_data_filenames($share, $path, $filename, 1);
 	if (count($filenames) > 0) {
 		return $filenames[0];
 	}
 	return FALSE;
 }
 
-function get_tombstone_data_filenames($share, $path, $filename, $how_many) {
+function get_tombstone_data_filenames($share, $path, $filename, $how_many=9999) {
 	$filenames = array();
 	foreach (get_graveyards() as $graveyard) {
 		$f = "$graveyard/$share/$path/$filename";
 		if (is_file($f)) {
-			$filenames[] = $f
+			$filenames[] = $f;
 			if (count($filenames) == $how_many) {
 				return $filenames;
 			}
