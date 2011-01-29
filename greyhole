@@ -30,13 +30,8 @@ if ($action == 'unknown') {
 
 process_config();
 
-db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
-db_select_db();
+db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
 db_migrate();
-
-if (@$db_use_mysql) {
-	db_query("SET SESSION group_concat_max_len = 1048576");
-}
 
 if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status') {
 	if (exec("whoami") != 'root') {
@@ -709,7 +704,13 @@ function execute_next_task() {
 
 function archive_task($task_id) {
 	$query = sprintf("INSERT INTO tasks_completed SELECT * FROM tasks WHERE id = %d", $task_id);
-	db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
+	$worked = db_query($query);
+	if (!$worked) {
+		// Let's try a second time... This is kinda important!
+		global $db_options;
+		db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
+		db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
+	}
 
 	$query = sprintf("DELETE FROM tasks WHERE id = %d", $task_id);
 	db_query($query) or gh_log(CRITICAL, "Can't delete from tasks: " . db_error());

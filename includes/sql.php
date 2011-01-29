@@ -43,10 +43,6 @@ if ($db_options->engine == 'sqlite') {
 		return $db_options->dbh;
 	}
 
-	function db_select_db() {
-		// do nothing - sqlite does not need to select a db; there's only one db per file
-	}
-
 	function db_query($query) {
 		global $db_options;
 		return $db_options->dbh->query($query);
@@ -80,14 +76,17 @@ if ($db_options->engine == 'sqlite') {
 	// MySQL
 	function db_connect() {
 		global $db_options;
-		return mysql_connect($db_options->host, $db_options->user, $db_options->pass);
+		$connected = mysql_connect($db_options->host, $db_options->user, $db_options->pass);
+		if ($connected) {
+			$connected = mysql_select_db($db_options->name);
+			if ($connected) {
+				db_query("SET SESSION group_concat_max_len = 1048576");
+				db_query("SET SESSION wait_timeout = 86400"); # Allow 24h fsck!
+			}
+		}
+		return $connected;
 	}
 	
-	function db_select_db() {
-		global $db_options;
-		mysql_select_db($db_options->name);
-	}
-
 	function db_query($query) {
 		return mysql_query($query);
 	}
