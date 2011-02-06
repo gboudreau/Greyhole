@@ -19,8 +19,624 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-include('includes/common.php');
-include('includes/sql.php');
+define('TEST', 8);
+define('DEBUG', 7);
+define('INFO',  6);
+define('WARN',  4);
+define('ERROR', 3);
+define('CRITICAL', 2);
+
+$log_level_names = array(
+	DEBUG => 'debug',
+	INFO => 'info',
+	WARN => 'warning',
+	ERROR => 'err',
+	CRITICAL => 'crit'
+);
+
+$action = 'initialize';
+
+date_default_timezone_set(date_default_timezone_get());
+
+set_error_handler("gh_error_handler");
+
+umask(0);
+
+setlocale(LC_COLLATE, "en_US.UTF-8");
+setlocale(LC_CTYPE, "en_US.UTF-8");
+
+$constarray = get_defined_constants(true);
+foreach($constarray['user'] as $key => $val) {
+    eval(sprintf('$_CONSTANTS[\'%s\'] = ' . (is_int($val) || is_float($val) ? '%s' : "'%s'") . ';', addslashes($key), addslashes($val)));
+}
+
+// Cached df results
+$last_df_time = 0;
+$last_dfs = array();
+$is_new_line = TRUE;
+$sleep_before_task = array();
+
+if (!isset($config_file)) {
+	$config_file = '/etc/greyhole.conf';
+}
+
+if (!isset($smb_config_file)) {
+	$smb_config_file = '/etc/samba/smb.conf';
+}
+
+$attic_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
+
+function parse_config() {
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks;
+
+	$shares_options = array();
+	$storage_pool_directories = array();
+	$frozen_directories = array();
+	$config_text = file_get_contents($config_file);
+	foreach (explode("\n", $config_text) as $line) {
+		if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
+			$name = trim($regs[1]);
+			$value = trim($regs[2]);
+			if ($name[0] == '#') {
+				continue;
+			}
+			switch($name) {
+				case 'log_level':
+					global ${$name};
+					${$name} = $_CONSTANTS[$value];
+					break;
+				case 'delete_moves_to_attic':
+				case 'log_memory_usage':
+				case 'balance_modified_files':
+					global ${$name};
+					${$name} = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
+					break;
+				case 'storage_pool_directory':
+					if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?gb?/i", $value, $regs)) {
+						$storage_pool_directories[] = trim($regs[1]);
+						$minimum_free_space_pool_directories[trim($regs[1])] = (float) trim($regs[2]);
+					}
+					break;
+				case 'wait_for_exclusive_file_access':
+					$shares = explode(',', str_replace(' ', '', $value));
+					foreach ($shares as $share) {
+						$shares_options[$share]['wait_for_exclusive_file_access'] = TRUE;
+					}
+					break;
+				case 'sticky_files':
+					$last_sticky_files_dir = trim($value, '/');
+					$sticky_files[$last_sticky_files_dir] = array();
+					break;
+				case 'stick_into':
+					$sticky_files[$last_sticky_files_dir][] = '/' . trim($value, '/');
+					break;
+				case 'frozen_directory':
+					$frozen_directories[] = trim($value, '/');
+					break;
+				default:
+					if (mb_strpos($name, 'num_copies') === 0) {
+						$share = mb_substr($name, 11, mb_strlen($name)-12);
+						$shares_options[$share]['num_copies'] = (int) $value;
+					} else if (mb_strpos($name, 'delete_moves_to_attic') === 0) {
+						$share = mb_substr($name, 22, mb_strlen($name)-23);
+						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
+					} else {
+						global ${$name};
+						if (is_numeric($value)) {
+							${$name} = (int) $value;
+						} else {
+							${$name} = $value;
+						}
+					}
+			}
+		}
+	}
+	
+	if (is_array($storage_pool_directories) && count($storage_pool_directories) > 0) {
+		$df_command = "df -k";
+		foreach ($storage_pool_directories as $key => $target_drive) {
+			$df_command .= " " . escapeshellarg($target_drive);
+			$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
+		}
+		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\"";
+	} else {
+		gh_log(WARN, "You have no storage_pool_directory defined. Greyhole can't run.");
+		return FALSE;
+	}
+
+	$config_text = file_get_contents($smb_config_file);
+	foreach (explode("\n", $config_text) as $line) {
+		$line = trim($line);
+		if (mb_strlen($line) == 0) { continue; }
+		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
+			$share_name = $regs[1];
+		}
+		if (isset($share_name) && !isset($shares_options[$share_name]) && array_search($share_name, $attic_share_names) === FALSE) { continue; }
+		if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
+			$shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
+			$shares_options[$share_name]['name'] = $share_name;
+		}
+	}
+	
+	foreach ($shares_options as $share_name => $share_options) {
+		if (array_search($share_name, $attic_share_names) !== FALSE) {
+			global $attic_share;
+			$attic_share = array('name' => $share_name, 'landing_zone' => $shares_options[$share_name]['landing_zone']);
+			unset($shares_options[$share_name]);
+			continue;
+		}
+		if ($share_options['num_copies'] > count($storage_pool_directories)) {
+			$share_options['num_copies'] = count($storage_pool_directories);
+			$shares_options[$share_name] = $share_options;
+		}
+		if (!isset($share_options['landing_zone'])) {
+			global $config_file, $smb_config_file;
+			gh_log(WARN, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
+			return FALSE;
+		}
+		
+		// Validate that the landing zone is NOT a subdirectory of a storage pool directory!
+		foreach ($storage_pool_directories as $key => $target_drive) {
+			if (mb_strpos($share_options['landing_zone'], $target_drive) === 0) {
+				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pooled directory ($target_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+			}
+		}
+	}
+	
+	if (!isset($db_engine)) {
+		$db_engine = 'mysql';
+	} else {
+		$db_engine = mb_strtolower($db_engine);
+	}
+
+	global ${"db_use_$db_engine"};
+	${"db_use_$db_engine"} = TRUE;
+	
+	if (!isset($max_queued_tasks)) {
+		if ($db_engine == 'sqlite') {
+			$max_queued_tasks = 1000;
+		} else {
+			$max_queued_tasks = 100000;
+		}
+	}
+
+	$db_options = (object) array(
+		'engine' => $db_engine,
+		'schema' => "/usr/share/greyhole/schema-$db_engine.sql"
+	);
+	if ($db_options->engine == 'sqlite') {
+		$db_options->db_path = $db_path;
+		$db_options->dbh = null; // internal handle to use with sqlite
+	} else {
+		$db_options->host = $db_host;
+		$db_options->user = $db_user;
+		$db_options->pass = $db_pass;
+		$db_options->name = $db_name;
+	}
+	
+	if (!isset($balance_modified_files)) {
+		global $balance_modified_files;
+		$balance_modified_files = FALSE;
+	}
+	return TRUE;
+}
+
+function clean_dir($dir) {
+	if ($dir[0] == '.' && $dir[1] == '/') {
+		$dir = mb_substr($dir, 2);
+	}
+	if (mb_strpos($dir, '//') !== FALSE) {
+		$dir = str_replace("//", "/", $dir);
+	}
+	return $dir;
+}
+
+function explode_full_path($full_path) {
+	return array(dirname($full_path), basename($full_path));
+}
+
+function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
+	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action, $log_to_stdout;
+	if ($local_log_level > $log_level) {
+		return;
+	}
+
+	$date = date("M d H:i:s");
+	$log_text = sprintf('%s%s%s%s', 
+		$is_new_line ? "$date $local_log_level $action: " : '',
+		$text,
+		$add_line_feed && $log_memory_usage ? " [" . memory_get_usage() . "]" : '',
+		$add_line_feed ? "\n": ''
+	);
+	$is_new_line = $add_line_feed;
+
+	if (isset($log_to_stdout)) {
+		echo $log_text;
+	} else {
+		@$fp_log = fopen($greyhole_log_file, 'a');
+		if ($fp_log) {
+			fwrite($fp_log, $log_text);
+			fclose($fp_log);
+		} else {
+			error_log(trim($log_text));
+		}
+	}
+	
+	if ($local_log_level === CRITICAL) {
+		exit(1);
+	}
+}
+
+function gh_error_handler($errno, $errstr, $errfile, $errline) {
+	if (error_reporting() === 0) {
+		// Ignored (@) warning
+		return TRUE;
+	}
+
+	switch ($errno) {
+	case E_ERROR:
+	case E_PARSE:
+	case E_CORE_ERROR:
+	case E_COMPILE_ERROR:
+		gh_log(CRITICAL, "PHP Error [$errno]: $errstr in $errfile on line $errline");
+		break;
+
+	case E_WARNING:
+	case E_COMPILE_WARNING:
+	case E_CORE_WARNING:
+	case E_NOTICE:
+		global $greyhole_log_file;
+		if ($errstr == "fopen($greyhole_log_file): failed to open stream: Permission denied") {
+			// We want to ignore this warning. Happens when regular users try to use greyhole, and greyhole tries to log something.
+			// What would have been logged will be echoed instead.
+			return TRUE;
+		}
+		gh_log(WARN, "PHP Warning [$errno]: $errstr in $errfile on line $errline");
+		break;
+
+	default:
+		gh_log(WARN, "PHP Unknown Error [$errno]: $errstr in $errfile on line $errline");
+		break;
+	}
+
+	// Don't execute PHP internal error handler
+	return TRUE;
+}
+
+function bytes_to_human($bytes, $html=TRUE) {
+	$units = 'B';
+	if (abs($bytes) > 1024) {
+		$bytes /= 1024;
+		$units = 'KB';
+	}
+	if (abs($bytes) > 1024) {
+		$bytes /= 1024;
+		$units = 'MB';
+	}
+	if (abs($bytes) > 1024) {
+		$bytes /= 1024;
+		$units = 'GB';
+	}
+	if (abs($bytes) > 1024) {
+		$bytes /= 1024;
+		$units = 'TB';
+	}
+	$decimals = (abs($bytes) > 100 ? 0 : (abs($bytes) > 10 ? 1 : 2));
+	if ($html) {
+		return number_format($bytes, $decimals) . " <span class=\"i18n-$units\">$units</span>";
+	} else {
+		return number_format($bytes, $decimals) . $units;
+	}
+}
+
+function duration_to_human($seconds) {
+	$displayable_duration = '';
+	if ($seconds > 60*60) {
+		$hours = floor($seconds / (60*60));
+		$displayable_duration .= $hours . 'h ';
+		$seconds -= $hours * (60*60);
+	}
+	if ($seconds > 60) {
+		$minutes = floor($seconds / 60);
+		$displayable_duration .= $minutes . 'm ';
+		$seconds -= $minutes * 60;
+	}
+	$displayable_duration .= $seconds . 's';
+	return $displayable_duration;
+}
+
+function get_share_landing_zone($share) {
+	global $shares_options, $attic_share_names;
+	if (isset($shares_options[$share]['landing_zone'])) {
+		return $shares_options[$share]['landing_zone'];
+	} else if (array_search($share, $attic_share_names) !== FALSE) {
+		global $attic_share;
+		return $attic_share['landing_zone'];
+	} else {
+		global $config_file, $smb_config_file;
+		gh_log(WARN, "  Found a share ($share) with no path in $smb_config_file, or missing it's num_copies[$share] config in $config_file. Skipping.");
+		return FALSE;
+	}
+}
+
+$arch = exec('uname -m');
+if ($arch != 'x86_64') {
+	gh_log(DEBUG, "32-bit system detected: Greyhole will NOT use PHP built-in file functions.");
+
+	function gh_filesize($filename) {
+		$result = exec("stat -c %s ".escapeshellarg($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (float) $result;
+	}
+	
+	function gh_fileowner($filename) {
+		$result = exec("stat -c %u ".escapeshellarg($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (int) $result;
+	}
+	
+	function gh_filegroup($filename) {
+		$result = exec("stat -c %g ".escapeshellarg($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (int) $result;
+	}
+
+	function gh_fileperms($filename) {
+		$result = exec("stat -c %a ".escapeshellarg($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return "0" . $result;
+	}
+
+	function gh_is_file($filename) {
+		exec('[ -f '.escapeshellarg($filename).' ]', $tmp, $result);
+		return $result === 0;
+	}
+
+	function gh_fileinode($filename) {
+		// This function returns deviceid_inode to make sure this value will be different for files on different devices.
+		$result = exec("stat -c '%d_%i' ".escapeshellarg($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (string) $result;
+	}
+
+	function gh_file_deviceid($filename) {
+		$result = exec("stat -c '%d' ".escapeshellarg($filename)." 2>/dev/null");
+		if (empty($result)) {
+			return FALSE;
+		}
+		return (string) $result;
+	}
+} else {
+	gh_log(DEBUG, "64-bit system detected: Greyhole will use PHP built-in file functions.");
+
+	function gh_filesize($filename) {
+		return filesize($filename);
+	}
+	
+	function gh_fileowner($filename) {
+		return fileowner($filename);
+	}
+
+	function gh_filegroup($filename) {
+		return filegroup($filename);
+	}
+
+	function gh_fileperms($filename) {
+		return mb_substr(decoct(fileperms($filename)), -4);
+	}
+
+	function gh_is_file($filename) {
+		return is_file($filename);
+	}
+
+	function gh_fileinode($filename) {
+		// This function returns deviceid_inode to make sure this value will be different for files on different devices.
+		$stat = @stat($filename);
+		if ($stat === FALSE) {
+			return FALSE;
+		}
+		return $stat['dev'] . '_' . $stat['ino'];
+	}
+
+	function gh_file_deviceid($filename) {
+		$stat = @stat($filename);
+		if ($stat === FALSE) {
+			return FALSE;
+		}
+		return $stat['dev'];
+	}
+}
+/*
+   Small abstraction layer for supporting MySQL and SQLite based
+   on a user choice. Specify
+
+             db_engine = sqlite
+             db_path = /var/cache/greyhole.sqlite
+
+   in /etc/greyhole.conf to enable sqlite support, otherwise the
+   standard Greyhole MySQL support will be used.
+
+   Carlos Puchol, Amahi
+   cpg+git@amahi.org
+*/
+
+if ($db_options->engine == 'sqlite') {
+	function db_connect() {
+		global $db_options;
+		if (!file_exists($db_options->db_path)) {
+			// create the db automatically if it does not exist
+			system("sqlite3 $db_options->db_path < $db_options->schema");
+		}
+		$db_options->dbh = new PDO("sqlite:" . $db_options->db_path);
+		return $db_options->dbh;
+	}
+
+	function db_select_db() {
+		// do nothing - sqlite does not need to select a db; there's only one db per file
+	}
+
+	function db_query($query) {
+		global $db_options;
+		return $db_options->dbh->query($query);
+	}
+
+	function db_escape_string($string) {
+		global $db_options;
+		$escaped_string = $db_options->dbh->quote($string);
+		return substr($escaped_string, 1, strlen($escaped_string)-2);
+	}
+
+	function db_fetch_object($result) {
+		return $result->fetchObject();
+	}
+
+	function db_free_result($result) {
+		return TRUE;
+	}
+
+	function db_insert_id() {
+		global $db_options;
+		return $db_options->dbh->lastInsertId();
+	}
+
+	function db_error() {
+		global $db_options;
+		$error = $db_options->dbh->errorInfo();
+		return $error[2];
+	}
+} else {
+	// MySQL
+	function db_connect() {
+		global $db_options;
+		return mysql_connect($db_options->host, $db_options->user, $db_options->pass);
+	}
+	
+	function db_select_db() {
+		global $db_options;
+		mysql_select_db($db_options->name);
+	}
+
+	function db_query($query) {
+		return mysql_query($query);
+	}
+
+	function db_escape_string($string) {
+		return mysql_real_escape_string($string);
+	}
+
+	function db_fetch_object($result) {
+		return mysql_fetch_object($result);
+	}
+
+	function db_free_result($result) {
+		return mysql_free_result($result);
+	}
+
+	function db_insert_id() {
+		return mysql_insert_id();
+	}
+
+	function db_error() {
+		return mysql_error();
+	}
+}
+
+function db_migrate() {
+	global $db_options, $db_use_mysql, $db_use_sqlite;
+	// Migration #1 (complete = frozen|thawed)
+	if (@$db_use_mysql) {
+		$query = "DESCRIBE tasks";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if ($row->Field == 'complete') {
+				if ($row->Type == "enum('yes','no')") {
+					// migrate
+					db_query("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
+					db_query("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
+				}
+				break;
+			}
+		}
+	} else if (@$db_use_sqlite) {
+		$query = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tasks'";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if (strpos($row->sql, 'complete BOOL NOT NULL') !== FALSE) {
+				// migrate; not supported! @see http://sqlite.org/omitted.html
+				gh_log(CRITICAL, "Your SQLite database is not up to date. Column tasks.complete needs to be a TINYTEXT. Please fix, then retry.");
+			}
+		}
+	}
+	// Migration #2 (complete = idle)
+	if (@$db_use_mysql) {
+		$query = "DESCRIBE tasks";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if ($row->Field == 'complete') {
+				if ($row->Type == "enum('yes','no','frozen','thawed')") {
+					// migrate
+					db_query("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
+					db_query("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
+				}
+				break;
+			}
+		}
+	}
+	// Migration #3 (larger settings.value: tinytext > text)
+	if (@$db_use_mysql) {
+		$query = "DESCRIBE settings";
+		$result = db_query($query) or die("Can't describe settings with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if ($row->Field == 'value') {
+				if ($row->Type == "tinytext") {
+					// migrate
+					db_query("ALTER TABLE settings CHANGE value value TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL");
+				}
+				break;
+			}
+		}
+	}
+	// Migration #4 (new index for find_next_task function, used by simplify_task, and also for execute_next_task function; also remove deprecated indexes)
+	if (@$db_use_mysql) {
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result) === FALSE) {
+			// migrate
+			db_query("ALTER TABLE tasks ADD INDEX find_next_task (complete, share(64), id)");
+		}
+
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'incomplete_open'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result)) {
+			// migrate
+			db_query("ALTER TABLE tasks DROP INDEX incomplete_open");
+		}
+
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'subsequent_writes'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result)) {
+			// migrate
+			db_query("ALTER TABLE tasks DROP INDEX subsequent_writes");
+		}
+
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'unneeded_unlinks'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result)) {
+			// migrate
+			db_query("ALTER TABLE tasks DROP INDEX unneeded_unlinks");
+		}
+	}
+}
 
 list($action, $options) = process_command_line();
 
@@ -30,8 +646,13 @@ if ($action == 'unknown') {
 
 process_config();
 
-db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
+db_connect() or gh_log(CRITICAL, "Can't connect $db_options->engine to database.");
+db_select_db();
 db_migrate();
+
+if (@$db_use_mysql) {
+	db_query("SET SESSION group_concat_max_len = 1048576");
+}
 
 if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status') {
 	if (exec("whoami") != 'root') {
@@ -376,17 +997,9 @@ if ($action == 'stats') {
 	}
 	$max_drive_strlen++;
 
-	$totals = array(
-		'total_space' => 0,
-		'used_space' => 0,
-		'free_space' => 0,
-		'attic_size' => 0,
-		'potential_available_space' => 0
-	);
-
 	$dfs = get_free_space_in_storage_pool_dirs();
 	echo "Storage Pool\n";
-	printf("%$max_drive_strlen"."s    Total -   Used =   Free +  Attic = Possible\n", '');
+	printf("%$max_drive_strlen"."s   Total -  Used =  Free + Attic = Possible\n", '');
 	foreach ($storage_pool_directories as $target_drive) {
 		printf("  %-$max_drive_strlen"."s ", "$target_drive:");
 		if (!isset($dfs[$target_drive])) {
@@ -413,19 +1026,8 @@ if ($action == 'stats') {
 
 		$potential_available_space = (float) $free_space + $attic_size;
 
-		echo sprintf('%5.0f', $total_space/1024/1024) . "G - " . sprintf('%5.0f', $used_space/1024/1024) . "G = " . sprintf('%5.0f', $free_space/1024/1024) . "G + " . sprintf('%5.0f', $attic_size/1024/1024) . "G = " . sprintf('%5.0f', $potential_available_space/1024/1024) . "G\n";
-
-		$totals['total_space'] += $total_space;
-		$totals['used_space'] += $used_space;
-		$totals['free_space'] += $free_space;
-		$totals['attic_size'] += $attic_size;
-		$totals['potential_available_space'] += $potential_available_space;
+		echo sprintf('%4.0f', $total_space/1024/1024) . "G - " . sprintf('%4.0f', $used_space/1024/1024) . "G = " . sprintf('%4.0f', $free_space/1024/1024) . "G + " . sprintf('%4.0f', $attic_size/1024/1024) . "G = " . sprintf('%4.0f', $potential_available_space/1024/1024) . "G\n";
 	}
-
-	// Totals
-	printf("  %-$max_drive_strlen"."s ==========================================\n", "");
-	printf("  %-$max_drive_strlen"."s ", "Total:");
-	echo sprintf('%5.0f', $totals['total_space']/1024/1024) . "G - " . sprintf('%5.0f', $totals['used_space']/1024/1024) . "G = " . sprintf('%5.0f', $totals['free_space']/1024/1024) . "G + " . sprintf('%5.0f', $totals['attic_size']/1024/1024) . "G = " . sprintf('%5.0f', $totals['potential_available_space']/1024/1024) . "G\n";
 	echo "\n";
 	exit(0);
 }
@@ -492,6 +1094,7 @@ if ($action == 'fsck') {
 			exit(1);
 		}
 	}
+	gh_log(INFO, implode('|', $options));
 	$fsck_options = array();
 	if (isset($options['email-report'])) {
 		$fsck_options[] = 'email';
@@ -504,6 +1107,9 @@ if ($action == 'fsck') {
 	}
 	if (isset($options['disk-usage-report'])) {
 		$fsck_options[] = 'du';
+	}
+	if (isset($options['find-orphaned-files'])){
+		$fsck_options[] = 'orphaned';
 	}
 	$query = sprintf("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '%s', %s, 'yes')",
 		db_escape_string($full_path),
@@ -522,7 +1128,7 @@ if ($num_daemon_processes > 1) {
 	die("Found an already running Greyhole daemon with PID " . trim(file_get_contents('/var/run/greyhole.pid')) . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
 }
 
-gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
+gh_log(INFO, "Greyhole (version 0.8.99) daemon started.");
 set_graveyard_backup();
 parse_samba_spool();
 simplify_tasks();
@@ -534,7 +1140,7 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files;
+	global $log_level, $fsck_report, $shares_options, $email_to, $storage_pool_directories, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files;
 
 	if (isset($next_task)) {
 		$task = $next_task;
@@ -636,6 +1242,13 @@ function execute_next_task() {
 						}
 					}
 				}
+				if (mb_strpos($task->additional_info, 'orphaned') !== FALSE) {
+					foreach ($storage_pool_directories as $target_drive) {
+						foreach ($shares_options as $share_name => $share_options) {
+							gh_fsck_orphans("$target_drive", "", $share_name);
+						}
+					}
+				}
 			} else {
 				$share_options = get_share_options_from_full_path($task->share);
 				if ($share_options !== FALSE) {
@@ -647,6 +1260,15 @@ function execute_next_task() {
 						gh_log(DEBUG, "Starting graveyards fsck for $subdir");
 						foreach (get_graveyards() as $graveyard) {
 							gh_fsck_graveyard($graveyard, $subdir, $share);
+						}
+					}
+					if (mb_strpos($task->additional_info, 'orphaned') !== FALSE) {
+						$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
+						gh_log(DEBUG, "Starting orphans fsck for $subdir");
+						foreach ($storage_pool_directories as $target_drive) {
+							foreach ($shares_options as $share_name => $share_options) {
+								gh_fsck_orphans("$target_drive", "/", $share_name);
+							}
 						}
 					}
 				}
@@ -704,13 +1326,7 @@ function execute_next_task() {
 
 function archive_task($task_id) {
 	$query = sprintf("INSERT INTO tasks_completed SELECT * FROM tasks WHERE id = %d", $task_id);
-	$worked = db_query($query);
-	if (!$worked) {
-		// Let's try a second time... This is kinda important!
-		global $db_options;
-		db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
-		db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
-	}
+	db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
 
 	$query = sprintf("DELETE FROM tasks WHERE id = %d", $task_id);
 	db_query($query) or gh_log(CRITICAL, "Can't delete from tasks: " . db_error());
@@ -1471,25 +2087,13 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 }
 
 function get_tombstone_data_filename($share, $path, $filename) {
-	$filenames = get_tombstone_data_filenames($share, $path, $filename, 1);
-	if (count($filenames) > 0) {
-		return $filenames[0];
-	}
-	return FALSE;
-}
-
-function get_tombstone_data_filenames($share, $path, $filename, $how_many=9999) {
-	$filenames = array();
 	foreach (get_graveyards() as $graveyard) {
 		$f = "$graveyard/$share/$path/$filename";
 		if (is_file($f)) {
-			$filenames[] = $f;
-			if (count($filenames) == $how_many) {
-				return $filenames;
-			}
+			return $f;
 		}
 	}
-	return $filenames;
+	return FALSE;
 }
 
 function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $prefix='') {
@@ -1646,8 +2250,7 @@ function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALS
 
 function remove_tombstones($share, $path, $filename) {
 	gh_log(DEBUG, "  Removing tombstones for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
-	
-	foreach (get_tombstone_data_filenames($share, $path, $filename) as $f) {
+	while (($f = get_tombstone_data_filename($share, $path, $filename)) !== FALSE) {
 		@unlink($f);
 		gh_log(DEBUG, "    Removed tombstone at $f");
 		clearstatcache();
@@ -2360,6 +2963,247 @@ function gh_fsck($path, $share) {
 	closedir($handle);
 }
 
+function gh_fsck_orphans($root, $path, $share) {
+	global $fsck_report, $storage_pool_directories;
+	gh_log(DEBUG, "Entering pool volume $root/$share/$path");
+	if (!is_dir("$root/$share/$path")) {
+		gh_log(DEBUG, "  Not a directory... Aborting.");
+		return;
+	}
+	$handle = opendir("$root/$share/$path");
+	while (($filename = readdir($handle)) !== FALSE) {
+		if ($filename != '.' && $filename != '..') {
+			if (@is_dir("$root/$share/$path/$filename")) {
+				$fsck_report['orphaned']['num_dirs']++;
+				gh_fsck_orphans($root, "$path/$filename", $share);
+			} else {
+				// Found a file
+				$fsck_report['orphaned']['num_files']++;
+				$path_parts = explode('/', $path);
+				$landing_zone = get_share_landing_zone($share);
+				$local_path = $landing_zone . '/' . implode('/', $path_parts);
+				//If we can't find a tombstone for this file, we then assume it is an orphaned file
+				if(get_tombstone_data_filename($share,$path,$filename) === FALSE){
+					$fsck_report['orphaned']['num_orphans']++;
+					$file_tombstones = array();
+					$file_copies_inodes = array();
+					$orphan_file_path = clean_dir("$root/$share/$path/$filename");
+					$orphan_inode_number = @gh_fileinode($orphan_file_path);
+					$file_tombstones[$orphan_file_path] = (object) array('path' => $orphan_file_path, 'is_linked' => FALSE, 'state' => 'OK');
+					$file_copies_inodes[$orphan_inode_number] = $orphan_file_path;
+					$num_ok = 1;
+
+					// Look for this file on all available drives
+					foreach ($storage_pool_directories as $target_drive) {
+						$clean_full_path = clean_dir("$target_drive/$share/$path/$filename");
+						$inode_number = @gh_fileinode($clean_full_path);
+						if ($inode_number !== FALSE) {
+							gh_log(DEBUG, "Found $clean_full_path");
+							if (!is_greyhole_owned_dir($target_drive)) {
+								next;
+							} else {
+								$file_tombstones[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'OK');
+								$file_copies_inodes[$inode_number] = $clean_full_path;
+								$num_ok++;
+							}
+			
+						}
+					}
+					
+					$first_tombstone = reset($file_tombstones);
+					$first_tombstone->is_linked = TRUE;
+					$expected_file_size = gh_filesize($first_tombstone->path);
+					$original_file_path = $first_tombstone->path;
+					// Check that all file copies have the same size
+					foreach ($file_copies_inodes as $key => $real_full_path) {
+						if (array_search($real_full_path, array_keys($file_copies_inodes)) !== FALSE) {
+							// That file isn't available atm, but it's OK.
+							continue;
+						}
+						$file_size = gh_filesize($real_full_path);
+						if ($file_size != $expected_file_size) {
+							if ($file_size == 0) {
+								// Empty file; just delete it.
+								gh_log(WARN, "  An empty file copy was found: $real_full_path is 0 bytes. Original: $orphan_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.");
+								unlink($real_full_path);
+							} else {
+								gh_log(WARN, "  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $orphan_file_path is " . number_format($expected_file_size) . " bytes.");
+								gh_recycle($real_full_path);
+								$fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $orphan_file_path);
+							}
+							// Will not count that copy as a valid copy!
+							unset($file_copies_inodes[$key]);
+							unset($file_tombstones[clean_dir($real_full_path)]);
+						}
+						$num_copies_required = get_num_copies($share);
+						if (count($file_copies_inodes) == $num_copies_required) {
+							foreach ($file_tombstones as $key => $tombstone) {
+								if ($tombstone->is_linked) {
+									gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
+									@unlink("$landing_zone/$path/$filename");
+									list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+									gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
+									symlink($tombstone->path, "$landing_zone/$path/$filename");
+									break;
+								}
+							}
+							save_tombstones($share, $path, $filename, array_values($file_tombstones));
+						} else if (count($file_copies_inodes) < $num_copies_required) {
+							// Create new copies
+							gh_log(INFO, "  Missing file copies for orphaned file. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $orphan_file_path");
+							clearstatcache(); $filesize = gh_filesize("$orphan_file_path");
+							$file_tombstones = create_tombstones($share, "$path/$filename", $num_copies_required, $filesize, $file_tombstones);
+							// Re-copy the file everywhere, and re-create the symlink
+						$symlink_created = FALSE;
+						$num_copies_current = 1; # the source file
+						global $going_dir;
+						foreach ($file_tombstones as $key => $tombstone) {
+							if ($original_file_path != $tombstone->path) {
+								if ($num_copies_current >= $num_copies_required) {
+									$tombstone->state = 'Gone';
+									$file_tombstones[$key] = $tombstone;
+									continue;
+								}
+								list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+								if ($tombstone->state == 'Gone') {
+									foreach ($storage_pool_directories as $target_drive) {
+										if (mb_strpos($tombstone_dir_path, $target_drive) === 0 && is_greyhole_owned_dir($target_drive)) {
+											$tombstone->state = 'Pending';
+											$file_tombstones[$key] = $tombstone;
+											break;
+										}
+									}
+								}
+								if ($tombstone->state != 'Gone') {
+									$root_path = str_replace(clean_dir("/$share/$path"), '', $tombstone_dir_path);
+									list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$path");
+									if (!gh_mkdir($tombstone_dir_path, $orphan_file_path)) {
+										$tombstone->state = 'Gone';
+										$file_tombstones[$key] = $tombstone;
+										continue;
+									}
+								}
+								if (!is_dir($tombstone_dir_path) || $tombstone->state == 'Gone') {
+									continue;
+								}
+								if ($tombstone->state == 'Pending') {
+									gh_log(DEBUG, "  Copying file to $tombstone->path");
+									$temp_path = get_temp_filename($tombstone->path);
+									exec("rsync -t " . escapeshellarg($original_file_path) . " " . escapeshellarg($temp_path));
+									$it_worked = file_exists($temp_path) && file_exists($orphan_file_path) && gh_filesize($temp_path) == gh_filesize($orphan_file_path);
+									if ($it_worked) {
+										rename($temp_path, $tombstone->path);
+										gh_chperm($tombstone->path, gh_get_file_infos($orphan_file_path));
+										$tombstone->state = 'OK';
+										$num_copies_current++;
+									} else {
+										gh_log(WARN, "    Failed file copy. Skipping.");
+										if ($tombstone->is_linked) {
+											$tombstone->is_linked = FALSE;
+										}
+										$tombstone->state = 'Gone';
+									}
+									$file_tombstones[$key] = $tombstone;
+								}
+							}
+							if ($orphan_file_path == $tombstone->path || $tombstone->is_linked) {
+								if ($symlink_created /* already */) {
+									$tombstone->is_linked = FALSE;
+									$file_tombstones[$key] = $tombstone;
+									continue;
+								}
+								gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
+								gh_recycle("$landing_zone/$path/$filename");
+								list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+								gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
+								symlink($tombstone->path, "$landing_zone/$path/$filename");
+								$symlink_created = TRUE;
+							}
+						}
+						if (!$symlink_created) {
+							foreach ($file_tombstones as $key => $tombstone) {
+								if ($tombstone->state == 'OK') {
+									$tombstone->is_linked = TRUE;
+									$file_tombstones[$key] = $tombstone;
+									gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
+									gh_recycle("$landing_zone/$path/$filename");
+									list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+									gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
+									symlink($tombstone->path, "$landing_zone/$path/$filename");
+									break;
+								}
+							}
+						}
+						save_tombstones($share, $path, $filename, array_values($file_tombstones));
+					} else {
+						# Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
+						foreach ($file_copies_inodes as $inode => $path) {
+							if (mb_strpos($inode, '/') === 0) {
+								unset($file_copies_inodes[$inode]);
+							}
+						}
+						if (count($file_copies_inodes) > $num_copies_required) {
+							gh_log(INFO, "  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will try to remove some.");
+							if (file_is_locked($share, "$file_path/$filename") !== FALSE) {
+								gh_log(INFO, "  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
+								return;
+							}
+							$fsck_report['too_many_copies']++;
+							$local_target_drives = array_values(order_target_drives(0, TRUE, $share, $path));
+							while (count($file_copies_inodes) > $num_copies_required && !empty($local_target_drives)) {
+								$target_drive = array_pop($local_target_drives);
+								$key = clean_dir("$target_drive/$share/$path/$filename");
+								gh_log(DEBUG, "  Looking for copy at $key");
+								if (isset($file_tombstones[$key]) || gh_file_exists($key)) {
+									if (isset($file_tombstones[$key])) {
+										$tombstone = $file_tombstones[$key];
+									}
+									if (gh_file_exists($key) || $tombstone->state == 'OK') {
+										gh_log(DEBUG, "    Found file copy at $key, or tombstone is marked OK.");
+										if (real_file_is_locked($key) !== FALSE) {
+											gh_log(DEBUG, "    File copy is locked. Won't remove it.");
+											continue;
+										}
+										$fsck_report['too_many_files'][] = $key;
+										gh_log(DEBUG, "    Removing copy at $key");
+										unset($file_copies_inodes[gh_fileinode($key)]);
+										gh_recycle($key);
+										if (isset($file_tombstones[$key])) {
+											unset($file_tombstones[$key]);
+										}
+										$num_ok--;
+									}
+								}
+							}
+							// If no tombstone is linked, link the 1st one
+							$found_linked_tombstone = FALSE;
+							foreach ($file_tombstones as $key => $tombstone) {
+								if ($tombstone->is_linked) {
+									$found_linked_tombstone = TRUE;
+									break;
+								}
+							}
+							if (!$found_linked_tombstone) {
+								$tombstone = reset($file_tombstones);
+								gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
+								gh_recycle("$landing_zone/$path/$filename");
+								list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+								gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
+								symlink($tombstone->path, "$landing_zone/$path/$filename");
+								reset($file_tombstones)->is_linked = TRUE;
+							}
+							save_tombstones($share, $path, $filename, array_values($file_tombstones));
+						}
+					}
+				}
+			}
+		}
+		}	
+	}
+	closedir($handle);
+
+}
+
 function gh_fsck_graveyard($root, $path, $share) {
 	global $fsck_report;
 	
@@ -2795,6 +3639,9 @@ function initialize_fsck_report($what) {
 	$fsck_report['graveyard'] = array();
 	$fsck_report['graveyard']['num_dirs'] = 0;
 	$fsck_report['graveyard']['num_files'] = 0;
+	$fsck_report['orphaned']['num_files'] = 0;
+	$fsck_report['orphaned']['num_dirs'] = 0;
+	$fsck_report['orphaned']['num_orphans'] = 0;
 	$fsck_report['landing_zone'] = array();
 	$fsck_report['landing_zone']['num_dirs'] = 0;
 	$fsck_report['landing_zone']['num_files'] = 0;
@@ -3633,12 +4480,13 @@ function process_command_line() {
 		'debug:'
 	);
 
-	$opts_options = 'eyuc';
+	$opts_options = 'eyuco';
 	$longopts_options = array(
 		'email-report',
 		'dont-walk-graveyard',
 		'disk-usage-report',
-		'if-conf-changed'
+		'if-conf-changed',
+		'find-orphaned-files'
 	);
 
 	$opts_options_with_values = 'd:';
@@ -3714,7 +4562,7 @@ function process_command_line() {
 }
 
 function print_usage() {
-	echo "greyhole, version %VERSION%, for linux-gnu (noarch)\n";
+	echo "greyhole, version 0.8.99, for linux-gnu (noarch)\n";
 	echo "By Guillaume Boudreau.\n";
 	echo "This software comes with ABSOLUTELY NO WARRANTY. This is free software,\n";
 	echo "and you are welcome to modify and redistribute it under the GPL v3 license.\n";
@@ -3765,6 +4613,10 @@ function print_usage() {
 	echo "  -d, --dir=path        Only scan a specific directory, and all sub-directories.\n";
 	echo "                        The specified directory should be a Samba share, or a\n";
 	echo "                        sub-directory of a Samba share.\n";
+	echo "  -o, --find-orphaned-files\n";
+	echo "                        Scan for oprahned files in the storage pool volumes\n";
+	echo "                        while running the fsck and create tombstones for\n";
+	echo "                        the found files.\n";
 	exit(1);
 }
 
