@@ -537,7 +537,7 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files;
+	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files;
 
 	if (isset($next_task)) {
 		$task = $next_task;
@@ -660,12 +660,10 @@ function execute_next_task() {
 						}
 					}
 					if (mb_strpos($task->additional_info, 'orphaned') !== FALSE) {
-						$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
+						$subdir = str_replace($share_options['landing_zone'], '', $task->share);
 						gh_log(DEBUG, "Starting orphans fsck for $subdir");
 						foreach ($storage_pool_directories as $target_drive) {
-							foreach ($shares_options as $share_name => $share_options) {
-								gh_fsck_orphans("$target_drive", "/", $share_name);
-							}
+							gh_fsck_orphans("$target_drive", "$subdir", $share);
 						}
 					}
 				}
