@@ -2393,19 +2393,15 @@ function gh_fsck_orphans($root, $path, $share) {
 			} else {
 				// Found a file
 				$fsck_report['orphaned']['num_files']++;
-				$path_parts = explode('/', $path);
-				$landing_zone = get_share_landing_zone($share);
-				$local_path = $landing_zone . '/' . implode('/', $path_parts);
 				//If we can't find a tombstone for this file, we then assume it is an orphaned file
 				if(get_tombstone_data_filename($share,$path,$filename) === FALSE){
+					$landing_zone = get_share_landing_zone($share);
 					$fsck_report['orphaned']['num_orphans']++;
 					$file_tombstones = array();
 					$file_copies_inodes = array();
 					$orphan_file_path = clean_dir("$root/$share/$path/$filename");
 					$orphan_inode_number = @gh_fileinode($orphan_file_path);
-					$file_tombstones[$orphan_file_path] = (object) array('path' => $orphan_file_path, 'is_linked' => FALSE, 'state' => 'OK');
-					$file_copies_inodes[$orphan_inode_number] = $orphan_file_path;
-					$num_ok = 1;
+					$num_ok = 0;
 
 					// Look for this file on all available drives
 					foreach ($storage_pool_directories as $target_drive) {
@@ -2413,9 +2409,7 @@ function gh_fsck_orphans($root, $path, $share) {
 						$inode_number = @gh_fileinode($clean_full_path);
 						if ($inode_number !== FALSE) {
 							gh_log(DEBUG, "Found $clean_full_path");
-							if (!is_greyhole_owned_dir($target_drive)) {
-								next;
-							} else {
+							if (is_greyhole_owned_dir($target_drive)) {
 								$file_tombstones[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'OK');
 								$file_copies_inodes[$inode_number] = $clean_full_path;
 								$num_ok++;
@@ -2449,25 +2443,21 @@ function gh_fsck_orphans($root, $path, $share) {
 							unset($file_copies_inodes[$key]);
 							unset($file_tombstones[clean_dir($real_full_path)]);
 						}
-						$num_copies_required = get_num_copies($share);
-						if (count($file_copies_inodes) == $num_copies_required) {
-							foreach ($file_tombstones as $key => $tombstone) {
-								if ($tombstone->is_linked) {
-									gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
-									@unlink("$landing_zone/$path/$filename");
-									list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-									gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
-									symlink($tombstone->path, "$landing_zone/$path/$filename");
-									break;
-								}
-							}
-							save_tombstones($share, $path, $filename, array_values($file_tombstones));
-						} else if (count($file_copies_inodes) < $num_copies_required) {
-							// Create new copies
-							gh_log(INFO, "  Missing file copies for orphaned file. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $orphan_file_path");
-							clearstatcache(); $filesize = gh_filesize("$orphan_file_path");
-							$file_tombstones = create_tombstones($share, "$path/$filename", $num_copies_required, $filesize, $file_tombstones);
-							// Re-copy the file everywhere, and re-create the symlink
+					}
+					$num_copies_required = get_num_copies($share);
+					if (count($file_copies_inodes) == $num_copies_required) {
+						gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $first_tombstone->path");
+						@unlink("$landing_zone/$path/$filename");
+						list($tombstone_dir_path, $tombstone_filename) = explode_full_path($first_tombstone->path);
+						gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
+						symlink($first_tombstone->path, "$landing_zone/$path/$filename");
+						save_tombstones($share, $path, $filename, array_values($file_tombstones));
+					} else if (count($file_copies_inodes) < $num_copies_required) {
+						// Create new copies
+						gh_log(INFO, "  Missing file copies for orphaned file. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $orphan_file_path");
+						clearstatcache(); $filesize = gh_filesize("$orphan_file_path");
+						$file_tombstones = create_tombstones($share, "$path/$filename", $num_copies_required, $filesize, $file_tombstones);
+						// Re-copy the file everywhere, and re-create the symlink
 						$symlink_created = FALSE;
 						$num_copies_current = 1; # the source file
 						global $going_dir;
@@ -2612,7 +2602,6 @@ function gh_fsck_orphans($root, $path, $share) {
 				}
 			}
 		}
-		}	
 	}
 	closedir($handle);
 
@@ -4028,7 +4017,7 @@ function print_usage() {
 	echo "                        The specified directory should be a Samba share, or a\n";
 	echo "                        sub-directory of a Samba share.\n";
 	echo "  -o, --find-orphaned-files\n";
-	echo "                        Scan for oprahned files in the storage pool volumes\n";
+	echo "                        Scan for orphaned files in the storage pool volumes\n";
 	echo "                        while running the fsck and create tombstones for\n";
 	echo "                        the found files.\n";
 	exit(1);
