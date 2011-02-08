@@ -36,16 +36,20 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	install -m 0755 -D -p greyhole.cron.weekly /etc/cron.weekly/greyhole
 	install -m 0755 -D -p greyhole.cron.daily /etc/cron.daily/greyhole
-	# For Samba 3.4: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 3.5: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	
-	Note about SVN: If you're running SVN code instead of a packaged version, you'll need to put sql.php and common.php into an 'includes' directory that you'll need to put in PHP's include_path:
+	if [ -f includes/common.php ]; then
 		include_path=`php -i | grep include_path | awk -F':' '{print $NF}'`
 		mkdir "$include_path/includes"
 		install -m 0644 -D -p includes/common.php "$include_path/includes"
 		install -m 0644 -D -p includes/sql.php "$include_path/includes"
+	fi
+
+	# What version of Samba are you running ?
+	smbd --version
+
+	# For Samba 3.4: #
+		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	# For Samba 3.5: #
+		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	
 	Ubuntu (10+): install the Upstart script:
 		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
