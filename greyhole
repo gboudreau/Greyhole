@@ -628,6 +628,7 @@ function execute_next_task() {
 				$options['disk-usage-report'] = TRUE;
 			}
 			clearstatcache();
+			$orphaned = mb_strpos($task->additional_info, 'orphaned');
 			if ($task->share == '') {
 				foreach ($shares_options as $share_name => $share_options) {
 					gh_fsck($share_options['landing_zone'], $share_name);
@@ -639,31 +640,45 @@ function execute_next_task() {
 						}
 					}
 				}
-				if (mb_strpos($task->additional_info, 'orphaned') !== FALSE) {
+				if ($orphaned !== FALSE) {
 					foreach ($storage_pool_directories as $target_drive) {
 						foreach ($shares_options as $share_name => $share_options) {
-							gh_fsck_orphans("$target_drive", "", $share_name);
+							gh_fsck("$target_drive/$share_name", $share_name, $target_drive, TRUE);
 						}
 					}
 				}
 			} else {
 				$share_options = get_share_options_from_full_path($task->share);
+				$storage_volume = FALSE;
+				if ($share_options === FALSE){
+					//Since share_options is FALSE we didn't get a share path, maybe we got a storage volume path, let's check 
+					$storage_volume = get_storage_volume_from_path($task->share);
+					$share_options = get_share_options_from_storage_volume($task->share,$storage_volume);
+				}
 				if ($share_options !== FALSE) {
 					$share = $share_options['name'];
-					gh_fsck($task->share, $share);
-
-					if (mb_strpos($task->additional_info, 'graveyard') !== FALSE) {
-						$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
-						gh_log(DEBUG, "Starting graveyards fsck for $subdir");
-						foreach (get_graveyards() as $graveyard) {
-							gh_fsck_graveyard($graveyard, $subdir, $share);
-						}
+					$graveyard = get_graveyard_from_path($task->share);
+					if($graveyard === FALSE){
+						//Only kick off an fsck on the passed dir if it's not a graveyard
+						gh_fsck($task->share, $share, $storage_volume, $orphaned);
 					}
-					if (mb_strpos($task->additional_info, 'orphaned') !== FALSE) {
-						$subdir = str_replace($share_options['landing_zone'], '', $task->share);
-						gh_log(DEBUG, "Starting orphans fsck for $subdir");
-						foreach ($storage_pool_directories as $target_drive) {
-							gh_fsck_orphans("$target_drive", "$subdir", $share);
+					if (mb_strpos($task->additional_info, 'graveyard') !== FALSE) {
+						if($graveyard === FALSE){
+							//This isn't a graveyard dir so we'll check the graveyard of this path on all volumes
+							if($storage_volume !== FALSE){
+								$subdir = str_replace($storage_volume, '', $task->share);
+							}else{
+								$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
+							}
+							gh_log(DEBUG, "Starting graveyards fsck for $subdir");
+							foreach (get_graveyards() as $graveyard) {
+								gh_fsck_graveyard($graveyard, $subdir, $share);
+							}
+						}else{
+							//This is a graveyard directory, so only kick off a graveyard fsck for the indicated directory (this will not fsck the corresponding graveyard path on other volumes)
+							$subdir = str_replace("$graveyard", '', $task->share);
+							gh_log(DEBUG, "Starting graveyard fsck for $graveyard/$subdir");
+							gh_fsck_graveyard($graveyard,$subdir,$share);
 						}
 					}
 				}
@@ -2350,7 +2365,7 @@ You probably want to do something about this!
 	return $drives;
 }
 
-function gh_fsck($path, $share) {
+function gh_fsck($path, $share, $storage_path = FALSE, $find_orphans = FALSE) {
 	global $storage_pool_directories, $fsck_report;
 	
 	gh_log(DEBUG, "Entering $path");
@@ -2367,244 +2382,14 @@ function gh_fsck($path, $share) {
 			$full_path = "$path/$filename";
 			$file_type = @filetype($full_path);
 			if ($file_type == 'dir') {
-				gh_fsck($full_path, $share);
+				gh_fsck($full_path, $share, $storage_path, $find_orphans);
 			} else {
 				$fsck_report['landing_zone']['num_files']++;
-				gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share);
+				gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $storage_path, $find_orphans);
 			}
 		}
 	}
 	closedir($handle);
-}
-
-function gh_fsck_orphans($root, $path, $share) {
-	global $fsck_report, $storage_pool_directories;
-	gh_log(DEBUG, "Entering pool volume $root/$share/$path");
-	if (!is_dir("$root/$share/$path")) {
-		gh_log(DEBUG, "  Not a directory... Aborting.");
-		return;
-	}
-	$handle = opendir("$root/$share/$path");
-	while (($filename = readdir($handle)) !== FALSE) {
-		if ($filename != '.' && $filename != '..') {
-			if (@is_dir("$root/$share/$path/$filename")) {
-				$fsck_report['orphaned']['num_dirs']++;
-				gh_fsck_orphans($root, "$path/$filename", $share);
-			} else {
-				// Found a file
-				$fsck_report['orphaned']['num_files']++;
-				//If we can't find a tombstone for this file, we then assume it is an orphaned file
-				if(get_tombstone_data_filename($share,$path,$filename) === FALSE){
-					$landing_zone = get_share_landing_zone($share);
-					$fsck_report['orphaned']['num_orphans']++;
-					$file_tombstones = array();
-					$file_copies_inodes = array();
-					$orphan_file_path = clean_dir("$root/$share/$path/$filename");
-					$orphan_inode_number = @gh_fileinode($orphan_file_path);
-					$num_ok = 0;
-
-					// Look for this file on all available drives
-					foreach ($storage_pool_directories as $target_drive) {
-						$clean_full_path = clean_dir("$target_drive/$share/$path/$filename");
-						$inode_number = @gh_fileinode($clean_full_path);
-						if ($inode_number !== FALSE) {
-							gh_log(DEBUG, "Found $clean_full_path");
-							if (is_greyhole_owned_dir($target_drive)) {
-								$file_tombstones[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'OK');
-								$file_copies_inodes[$inode_number] = $clean_full_path;
-								$num_ok++;
-							}
-			
-						}
-					}
-					
-					$first_tombstone = reset($file_tombstones);
-					$first_tombstone->is_linked = TRUE;
-					$expected_file_size = gh_filesize($first_tombstone->path);
-					$original_file_path = $first_tombstone->path;
-					// Check that all file copies have the same size
-					foreach ($file_copies_inodes as $key => $real_full_path) {
-						if (array_search($real_full_path, array_keys($file_copies_inodes)) !== FALSE) {
-							// That file isn't available atm, but it's OK.
-							continue;
-						}
-						$file_size = gh_filesize($real_full_path);
-						if ($file_size != $expected_file_size) {
-							if ($file_size == 0) {
-								// Empty file; just delete it.
-								gh_log(WARN, "  An empty file copy was found: $real_full_path is 0 bytes. Original: $orphan_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.");
-								unlink($real_full_path);
-							} else {
-								gh_log(WARN, "  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $orphan_file_path is " . number_format($expected_file_size) . " bytes.");
-								gh_recycle($real_full_path);
-								$fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $orphan_file_path);
-							}
-							// Will not count that copy as a valid copy!
-							unset($file_copies_inodes[$key]);
-							unset($file_tombstones[clean_dir($real_full_path)]);
-						}
-					}
-					$num_copies_required = get_num_copies($share);
-					if (count($file_copies_inodes) == $num_copies_required) {
-						gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $first_tombstone->path");
-						@unlink("$landing_zone/$path/$filename");
-						list($tombstone_dir_path, $tombstone_filename) = explode_full_path($first_tombstone->path);
-						gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
-						symlink($first_tombstone->path, "$landing_zone/$path/$filename");
-						save_tombstones($share, $path, $filename, array_values($file_tombstones));
-					} else if (count($file_copies_inodes) < $num_copies_required) {
-						// Create new copies
-						gh_log(INFO, "  Missing file copies for orphaned file. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $orphan_file_path");
-						clearstatcache(); $filesize = gh_filesize("$orphan_file_path");
-						$file_tombstones = create_tombstones($share, "$path/$filename", $num_copies_required, $filesize, $file_tombstones);
-						// Re-copy the file everywhere, and re-create the symlink
-						$symlink_created = FALSE;
-						$num_copies_current = 1; # the source file
-						global $going_dir;
-						foreach ($file_tombstones as $key => $tombstone) {
-							if ($original_file_path != $tombstone->path) {
-								if ($num_copies_current >= $num_copies_required) {
-									$tombstone->state = 'Gone';
-									$file_tombstones[$key] = $tombstone;
-									continue;
-								}
-								list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-								if ($tombstone->state == 'Gone') {
-									foreach ($storage_pool_directories as $target_drive) {
-										if (mb_strpos($tombstone_dir_path, $target_drive) === 0 && is_greyhole_owned_dir($target_drive)) {
-											$tombstone->state = 'Pending';
-											$file_tombstones[$key] = $tombstone;
-											break;
-										}
-									}
-								}
-								if ($tombstone->state != 'Gone') {
-									$root_path = str_replace(clean_dir("/$share/$path"), '', $tombstone_dir_path);
-									list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$path");
-									if (!gh_mkdir($tombstone_dir_path, $orphan_file_path)) {
-										$tombstone->state = 'Gone';
-										$file_tombstones[$key] = $tombstone;
-										continue;
-									}
-								}
-								if (!is_dir($tombstone_dir_path) || $tombstone->state == 'Gone') {
-									continue;
-								}
-								if ($tombstone->state == 'Pending') {
-									gh_log(DEBUG, "  Copying file to $tombstone->path");
-									$temp_path = get_temp_filename($tombstone->path);
-									exec("rsync -t " . escapeshellarg($original_file_path) . " " . escapeshellarg($temp_path));
-									$it_worked = file_exists($temp_path) && file_exists($orphan_file_path) && gh_filesize($temp_path) == gh_filesize($orphan_file_path);
-									if ($it_worked) {
-										rename($temp_path, $tombstone->path);
-										gh_chperm($tombstone->path, gh_get_file_infos($orphan_file_path));
-										$tombstone->state = 'OK';
-										$num_copies_current++;
-									} else {
-										gh_log(WARN, "    Failed file copy. Skipping.");
-										if ($tombstone->is_linked) {
-											$tombstone->is_linked = FALSE;
-										}
-										$tombstone->state = 'Gone';
-									}
-									$file_tombstones[$key] = $tombstone;
-								}
-							}
-							if ($orphan_file_path == $tombstone->path || $tombstone->is_linked) {
-								if ($symlink_created /* already */) {
-									$tombstone->is_linked = FALSE;
-									$file_tombstones[$key] = $tombstone;
-									continue;
-								}
-								gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
-								gh_recycle("$landing_zone/$path/$filename");
-								list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-								gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
-								symlink($tombstone->path, "$landing_zone/$path/$filename");
-								$symlink_created = TRUE;
-							}
-						}
-						if (!$symlink_created) {
-							foreach ($file_tombstones as $key => $tombstone) {
-								if ($tombstone->state == 'OK') {
-									$tombstone->is_linked = TRUE;
-									$file_tombstones[$key] = $tombstone;
-									gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
-									gh_recycle("$landing_zone/$path/$filename");
-									list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-									gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
-									symlink($tombstone->path, "$landing_zone/$path/$filename");
-									break;
-								}
-							}
-						}
-						save_tombstones($share, $path, $filename, array_values($file_tombstones));
-					} else {
-						# Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
-						foreach ($file_copies_inodes as $inode => $path) {
-							if (mb_strpos($inode, '/') === 0) {
-								unset($file_copies_inodes[$inode]);
-							}
-						}
-						if (count($file_copies_inodes) > $num_copies_required) {
-							gh_log(INFO, "  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will try to remove some.");
-							if (file_is_locked($share, "$file_path/$filename") !== FALSE) {
-								gh_log(INFO, "  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
-								return;
-							}
-							$fsck_report['too_many_copies']++;
-							$local_target_drives = array_values(order_target_drives(0, TRUE, $share, $path));
-							while (count($file_copies_inodes) > $num_copies_required && !empty($local_target_drives)) {
-								$target_drive = array_pop($local_target_drives);
-								$key = clean_dir("$target_drive/$share/$path/$filename");
-								gh_log(DEBUG, "  Looking for copy at $key");
-								if (isset($file_tombstones[$key]) || gh_file_exists($key)) {
-									if (isset($file_tombstones[$key])) {
-										$tombstone = $file_tombstones[$key];
-									}
-									if (gh_file_exists($key) || $tombstone->state == 'OK') {
-										gh_log(DEBUG, "    Found file copy at $key, or tombstone is marked OK.");
-										if (real_file_is_locked($key) !== FALSE) {
-											gh_log(DEBUG, "    File copy is locked. Won't remove it.");
-											continue;
-										}
-										$fsck_report['too_many_files'][] = $key;
-										gh_log(DEBUG, "    Removing copy at $key");
-										unset($file_copies_inodes[gh_fileinode($key)]);
-										gh_recycle($key);
-										if (isset($file_tombstones[$key])) {
-											unset($file_tombstones[$key]);
-										}
-										$num_ok--;
-									}
-								}
-							}
-							// If no tombstone is linked, link the 1st one
-							$found_linked_tombstone = FALSE;
-							foreach ($file_tombstones as $key => $tombstone) {
-								if ($tombstone->is_linked) {
-									$found_linked_tombstone = TRUE;
-									break;
-								}
-							}
-							if (!$found_linked_tombstone) {
-								$tombstone = reset($file_tombstones);
-								gh_log(DEBUG, "  Updating symlink at $landing_zone/$path/$filename to point to $tombstone->path");
-								gh_recycle("$landing_zone/$path/$filename");
-								list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-								gh_mkdir("$landing_zone/$path", $tombstone_dir_path);
-								symlink($tombstone->path, "$landing_zone/$path/$filename");
-								reset($file_tombstones)->is_linked = TRUE;
-							}
-							save_tombstones($share, $path, $filename, array_values($file_tombstones));
-						}
-					}
-				}
-			}
-		}
-	}
-	closedir($handle);
-
 }
 
 function gh_fsck_graveyard($root, $path, $share) {
@@ -2642,46 +2427,60 @@ function gh_fsck_graveyard($root, $path, $share) {
 	closedir($handle);
 }
 
-function gh_fsck_file($path, $filename, $file_type, $source, $share) {
+function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_path = FALSE, $find_orphans = FALSE) {
 	global $storage_pool_directories, $fsck_report, $options, $action;
-
 	$landing_zone = get_share_landing_zone($share);
-
-	$file_path = trim(mb_substr($path, mb_strlen($landing_zone)+1), '/');
-
+	if($storage_path === FALSE){
+		$file_path = trim(mb_substr($path, mb_strlen($landing_zone)+1), '/');
+	}else{
+		$file_path = trim(mb_substr($path, mb_strlen("$storage_path/$share")+1), '/');
+	}
 	if ($file_type == 'file') {
-		// Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
-		gh_log(INFO, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
-		$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
-			db_escape_string($share),
-			db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
-		);
-		db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
-		return;
-	} else {
-		if ($file_type == 'link' && !file_exists(readlink("$path/$filename"))) {
-			// Link points to now gone copy; let's just remove it, and treat this as if the link was not there in the first place.
-			unlink("$path/$filename");
-			$file_type = FALSE;
+		if($storage_path === FALSE){
+			// Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
+			gh_log(INFO, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
+			$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
+				db_escape_string($share),
+				db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+			);
+			db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
+			return;
 		}
-		if ($file_type === FALSE) {
-			if ($action != 'fsck_file') {
-				// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
-				// We'll queue this file fsck (to restore the symlink) for when all other file operations have been executed.
-				$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('fsck_file', '%s', '%s', 'idle')",
-					db_escape_string($share),
-					db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
-				);
-				db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
-				return;
+	} else {
+		if($storage_path === FALSE){
+			if ($file_type == 'link' && !file_exists(readlink("$path/$filename"))) {
+				// Link points to now gone copy; let's just remove it, and treat this as if the link was not there in the first place.
+				unlink("$path/$filename");
+				$file_type = FALSE;
+			}
+			if ($file_type === FALSE) {
+				if ($action != 'fsck_file') {
+					// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
+					// We'll queue this file fsck (to restore the symlink) for when all other file operations have been executed.
+					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('fsck_file', '%s', '%s', 'idle')",
+						db_escape_string($share),
+						db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+					);
+					db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
+					return;
+				}
 			}
 		}
 	}
-
+	
 	$file_tombstones = array();
 	$num_ok = 0;
 	$file_copies_inodes = array();
-
+	if(get_tombstone_data_filename($share,$file_path,$filename) === FALSE){
+		if($storage_path !== FALSE && $find_orphans !== FALSE){
+			gh_log(INFO, "$path/$filename is an orphaned file, will proceed to find all copies and symlink file appropriately.");
+			$fsck_report['orphaned']['num_orphans']++;
+		}elseif($storage_path !== FALSE && $find_orphans === FALSE){
+			gh_log(INFO, "$path/$filename is an orphaned file, but we're not looking for orphans, to get greyhole to recognized this file initiate an fsck with the --find-orphaned-files option.");
+			return;
+		}
+	}
+			
 	// Look for this file on all available drives
 	foreach ($storage_pool_directories as $target_drive) {
 		$clean_full_path = clean_dir("$target_drive/$share/$file_path/$filename");
@@ -2827,7 +2626,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share) {
 	$num_copies_required = get_num_copies($share);
 	
 	if (count($file_copies_inodes) == $num_copies_required) {
-		if (!$found_linked_tombstone || $file_type != 'link') {
+		// It's okay if the file isn't a symlink so long as we're looking at a storage volume path and not a share path
+		if (!$found_linked_tombstone || ($file_type != 'link' && $storage_path === FALSE)) {
 			// Re-create symlink...
 			if (!$found_linked_tombstone) {
 				// ... the old one points to a drive that was replaced
@@ -3042,8 +2842,6 @@ function initialize_fsck_report($what) {
 	$fsck_report['graveyard'] = array();
 	$fsck_report['graveyard']['num_dirs'] = 0;
 	$fsck_report['graveyard']['num_files'] = 0;
-	$fsck_report['orphaned']['num_files'] = 0;
-	$fsck_report['orphaned']['num_dirs'] = 0;
 	$fsck_report['orphaned']['num_orphans'] = 0;
 	$fsck_report['landing_zone'] = array();
 	$fsck_report['landing_zone']['num_dirs'] = 0;
@@ -3080,6 +2878,7 @@ Graveyard:
 Landing Zone (shares):
   Found " . number_format($fsck_report['landing_zone']['num_dirs']) . " directories
   Found " . number_format($fsck_report['landing_zone']['num_files']) . " files
+  Found " . number_format($fsck_report['orphaned']['num_orphans']) . " orphans
 
 Attic size:\n";
 
@@ -3250,10 +3049,13 @@ function repair_tables() {
 function check_storage_pool_dirs() {
 	global $storage_pool_directories, $email_to, $gone_ok_drives;
 	$needs_fsck = FALSE;
+	$returned_drives = array();
 	$i = 0; $j = 0;
 	foreach ($storage_pool_directories as $target_drive) {
 		if (!is_greyhole_owned_dir($target_drive) && !gone_fscked($target_drive, $i++ == 0) && !file_exists("$target_drive/.greyhole_used_this")) {
-			$needs_fsck = 1;
+			if($needs_fsck !== 2){	
+				$needs_fsck = 1;
+			}
 			mark_gone_drive_fscked($target_drive);
 			gh_log(WARN, "Warning! It seems $target_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
 			$body = "This is an automated email from Greyhole.
@@ -3283,6 +3085,7 @@ You'll receive a report email once that fsck run completes.
 		} else if ((gone_ok($target_drive, $j++ == 0) || gone_fscked($target_drive, $i++ == 0)) && is_greyhole_owned_dir($target_drive)) {
 			// $target_drive is now back
 			$needs_fsck = 2;
+			$returned_drives[] = $target_drive;
 			$body = "This is an automated email from Greyhole.
 
 It appears one of your storage pool directory came back:
@@ -3304,14 +3107,25 @@ You'll receive a report email once that fsck run completes.
 		set_graveyard_backup();
 		get_graveyards(FALSE); // FALSE => Resets the graveyards cache
 		global $shares_options;
-		if ($needs_fsck === 1) {
-			gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
-		} else {
-			gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
-		}
+		
+		
 		initialize_fsck_report('All shares');
 		clearstatcache();
-
+		if($needs_fsck === 2){
+			foreach ($returned_drives as $drive){
+				$graveyards = get_graveyards_from_storage_volume($drive);
+				gh_log(INFO, "Starting fsck for graveyard on $drive which came back online.");
+				foreach($graveyards as $graveyard){
+					foreach($shares_options as $share_name => $share_options){
+						gh_fsck_graveyard($graveyard,"/$share_name", $share_name);
+					}
+				}
+				gh_log(INFO, "fsck for returning drive $drive's graveyard completed.");
+			}
+			gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
+		}else{
+			gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
+		}
 		foreach ($shares_options as $share_name => $share_options) {
 			gh_fsck($share_options['landing_zone'], $share_name);
 		}
@@ -3415,6 +3229,16 @@ function mark_gone_drive_fscked($target_drive, $action='add') {
 	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-FSCKed-Drives: " . db_error());
 }
 
+function get_graveyards_from_storage_volume($storage_volume){
+	$volume_graveyards = array();
+	foreach(get_graveyards() as $graveyard){
+		if(mb_strpos($graveyard,$storage_volume) === 0){
+			$volume_graveyards[] = $graveyard;
+		}
+	}
+	return $volume_graveyards;
+}
+
 function get_graveyards($use_cache=TRUE) {
 	global $storage_pool_directories, $graveyard_backup_directories, $global_graveyards;
 	if (!isset($global_graveyards) || !$use_cache) {
@@ -3442,9 +3266,58 @@ function get_share_options_from_full_path($full_path) {
 		if (mb_strpos($full_path, $share_options['landing_zone']) === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
 			$landing_zone = $share_options['landing_zone'];
 			$share = $share_options;
+			break;
 		}
 	}
 	return $share;
+
+
+}
+
+function get_storage_volume_from_path($full_path){
+	global $storage_pool_directories;
+	$storage_volume = FALSE;
+	foreach ($storage_pool_directories as $target_drive) {
+		if (mb_strpos($full_path, $target_drive) === 0) {
+			$storage_volume = $target_drive;
+			break;
+		} 
+	}
+	return $storage_volume;
+}
+
+function get_share_options_from_storage_volume($full_path,$storage_volume) {
+	global $shares_options;
+	$landing_zone = '';
+	$share = FALSE;
+	foreach ($shares_options as $share_name => $share_options) {
+		$graveyard = get_graveyard_from_path($full_path);
+		if($graveyard !== FALSE){
+			if (mb_strpos($full_path, "$graveyard/$share_name") === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
+				$land_zone = $share_options['landing_zone'];
+				$share = $share_options;
+				break;
+			}
+		}else{
+			if (mb_strpos($full_path, "$storage_volume/$share_name") === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
+				$landing_zone = $share_options['landing_zone'];
+				$share = $share_options;
+				break;
+			}
+		}
+	}
+	return $share;
+}
+
+function get_graveyard_from_path($path){
+	$graveyard_path = FALSE;
+	foreach(get_graveyards() as $graveyard){
+		if(mb_strpos($path, $graveyard) === 0){
+			$graveyard_path = $graveyard;
+			break;
+		}	
+	}
+	return $graveyard_path;
 }
 
 function gh_get_file_infos($real_path) {
@@ -4014,8 +3887,10 @@ function print_usage() {
 	echo "                        the last fsck.\n";
 	echo "                        Used in the daily cron to prevent unneccesary fsck runs.\n";
 	echo "  -d, --dir=path        Only scan a specific directory, and all sub-directories.\n";
-	echo "                        The specified directory should be a Samba share, or a\n";
-	echo "                        sub-directory of a Samba share.\n";
+	echo "                        The specified directory should be a Samba share, a\n";
+	echo "                        sub-directory of a Samba share, a share directory\n";
+	echo "                        on a storage pool volume, or a sub-directory of\n";
+	echo "                        of a share on a storage pool volume.\n";
 	echo "  -o, --find-orphaned-files\n";
 	echo "                        Scan for orphaned files in the storage pool volumes\n";
 	echo "                        while running the fsck and create tombstones for\n";
