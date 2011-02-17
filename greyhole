@@ -1960,10 +1960,6 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 	$last_line = FALSE;
 	$act = FALSE;
 	while (TRUE) {
-		if (count(glob("/var/spool/greyhole/*")) === 0) {
-			break;
-		}
-
 		$files = array();
 		exec('ls -1 /var/spool/greyhole | sort -n 2> /dev/null | head -1000', $files);
 		if (count($files) == 0) {
