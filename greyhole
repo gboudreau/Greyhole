@@ -1700,7 +1700,7 @@ function save_tombstones($share, $path, $filename, $tombstones, $only_target_dri
 		$data_filepath = "$graveyard/$share/$path";
 		$has_tombstone = FALSE;
 		foreach ($tombstones as $tombstone) {
-			if (get_storage_volume_from_path($tombstone->path) == $target_drive)) {
+			if (get_storage_volume_from_path($tombstone->path) == $target_drive) {
 				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 				gh_log(DEBUG, "    Saving tombstones in $data_filepath/$filename");
 				if (is_dir("$data_filepath/$filename")) {
@@ -2689,7 +2689,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
 				if ($tombstone->state == 'Gone') {
 					foreach ($storage_pool_directories as $target_drive) {
-						if (get_storage_volume_from_path($tombstone_dir_path) == $target_drive) && is_greyhole_owned_dir($target_drive)) {
+						if (get_storage_volume_from_path($tombstone_dir_path) == $target_drive && is_greyhole_owned_dir($target_drive)) {
 							$tombstone->state = 'Pending';
 							$file_tombstones[$key] = $tombstone;
 							break;
@@ -2732,7 +2732,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				}
 			}
 			if ($original_file_path == $tombstone->path || $tombstone->is_linked) {
-				if (!empty($going_dir) && get_storage_volume_from_path($original_file_path) == $going_dir)) {
+				if (!empty($going_dir) && get_storage_volume_from_path($original_file_path) == $going_dir) {
 					$tombstone->is_linked = FALSE;
 					$tombstone->state = 'Gone';
 					$file_tombstones[$key] = $tombstone;
@@ -3229,7 +3229,7 @@ function mark_gone_drive_fscked($target_drive, $action='add') {
 function get_graveyards_from_storage_volume($storage_volume){
 	$volume_graveyards = array();
 	foreach (get_graveyards() as $graveyard) {
-		if (get_storage_volume_from_path($graveyard) == $storage_volume)) {
+		if (get_storage_volume_from_path($graveyard) == $storage_volume) {
 			$volume_graveyards[] = $graveyard;
 		}
 	}
