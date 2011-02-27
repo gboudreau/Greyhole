@@ -1539,8 +1539,7 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 	if($graveyard === Null){
 		$graveyards = get_graveyards();
 	}else{
-		$graveyards = array();
-		$graveyards[] = $graveyard;
+		$graveyards = array($graveyard);
 	}
 	foreach ($graveyards as $graveyard) {
 		$handle = @opendir("$graveyard/$share/$path");
