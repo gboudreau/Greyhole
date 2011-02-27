@@ -3047,6 +3047,7 @@ function check_storage_pool_dirs() {
 	global $storage_pool_directories, $email_to, $gone_ok_drives;
 	$needs_fsck = FALSE;
 	$returned_drives = array();
+	$missing_drives = array();
 	$i = 0; $j = 0;
 	foreach ($storage_pool_directories as $target_drive) {
 		if (!is_greyhole_owned_dir($target_drive) && !gone_fscked($target_drive, $i++ == 0) && !file_exists("$target_drive/.greyhole_used_this")) {
@@ -3054,52 +3055,71 @@ function check_storage_pool_dirs() {
 				$needs_fsck = 1;
 			}
 			mark_gone_drive_fscked($target_drive);
+			$missing_drives[] = $target_drive;
 			gh_log(WARN, "Warning! It seems $target_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
-			$body = "This is an automated email from Greyhole.
-
-It appears one of your storage pool directory is missing it's \".greyhole_uses_this\" file:
-  $target_drive/.greyhole_uses_this: File not found
-
-This either means this mount is currently unmounted, or you forgot to create this file.
-
-Here are your options:
-
-- If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this directory will not be part of your storage pool.
-
-- If the drive is gone, you should either re-mount it manually (if possible), or remove it from your storage pool. To do so, use the following command:
-  greyhole --gone=".escapeshellarg($target_drive)."
-  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.
-
-- If you know this drive will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:
-  greyhole --wait-for=".escapeshellarg($target_drive)."
-
-A fsck will now start, to fix the symlinks found in your shares, when possible.
-You'll receive a report email once that fsck run completes.
-";
-			mail($email_to, 'Missing storage pool directory on ' . exec('hostname') . ': ' . $target_drive, $body);
 			gh_log(DEBUG, "Email sent for gone dir: $target_drive");
 			$gone_ok_drives[$target_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
 		} else if ((gone_ok($target_drive, $j++ == 0) || gone_fscked($target_drive, $i++ == 0)) && is_greyhole_owned_dir($target_drive)) {
 			// $target_drive is now back
 			$needs_fsck = 2;
 			$returned_drives[] = $target_drive;
-			$body = "This is an automated email from Greyhole.
-
-It appears one of your storage pool directory came back:
-  $target_drive was missing; it's now available again.
-
-A fsck will now start, to fix the symlinks found in your shares, when possible.
-You'll receive a report email once that fsck run completes.
-";
-			mail($email_to, 'Storage pool directory now online on ' . exec('hostname') . ': ' . $target_drive, $body);
-			gh_log(DEBUG, "Email sent for revived dir: $target_drive");
+						gh_log(DEBUG, "Email sent for revived dir: $target_drive");
 
 			mark_gone_ok($target_drive, 'remove');
 			mark_gone_drive_fscked($target_drive, 'remove');
 			$i = 0; $j = 0;
 		}
 	}
-	
+	if(count($returned_drives) > 0){
+		$body = "This is an automated email from Greyhole.
+
+It appears one or more of your storage pool directories came back:\n";
+		foreach($returned_drives as $target_drive){
+  			$body = $body . "$target_drive was missing; it's now available again.\n";
+		}
+		$body = $body . "\nA fsck will now start, to fix the symlinks found in your shares, when possible.
+You'll receive a report email once that fsck run completes.
+";
+		$drive_string = join(",",$returned_drives);
+		$subject = "Storage pool directories now online on " . exec ('hostname') . ": ";
+		$subject = $subject . $drive_string;
+		if(strlen($subject) > 255){
+			$subject = substr($subject,0,255);
+		}
+		mail($email_to, $subject, $body);
+	}
+	if(count($missing_drives) > 0){
+		$body = "This is an automated email from Greyhole.
+
+It appears one or more of your storage pool directories are missing their \".greyhole_uses_this\" file:\n";
+		foreach($missing_drives as $target_drive){
+  			$body = $body . "$target_drive/.greyhole_uses_this: File not found\n";
+		}
+		$target_drive = $missing_drives[0];
+		$body = $body . "\nThis either means these mount(s) are currently unmounted, or you forgot to create this file.
+
+Here are your options:
+
+- If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this directory will not be part of your storage pool.
+
+- If the drive(s) are gone, you should either re-mount them manually (if possible), or remove them from your storage pool. To do so, use the following command:
+  greyhole --gone=".escapeshellarg($target_drive)."
+  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.
+
+- If you know these drive(s) will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:
+  greyhole --wait-for=".escapeshellarg($target_drive)."
+
+A fsck will now start, to fix the symlinks found in your shares, when possible.
+You'll receive a report email once that fsck run completes.
+";                      
+			$subject = "Missing storage pool directories on " . exec ('hostname') . ": ";
+			$drive_string = join(",",$missing_drives);
+			$subject = $subject . $drive_string;
+			if(strlen($subject) > 255){
+				$subject = substr($subject,0,255);
+			}
+                        mail($email_to, $subject, $body);
+	}
 	if ($needs_fsck !== FALSE) {
 		set_graveyard_backup();
 		get_graveyards(FALSE); // FALSE => Resets the graveyards cache
