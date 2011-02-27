@@ -1386,7 +1386,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			$tombstone->state = 'OK';
 			$tombstones[$key] = $tombstone;
 		}
-		save_tombstones($share, $path, $filename, array_values($tombstones));
+		save_tombstones($share, $path, $filename, array_values($tombstones), get_storage_volume_from_path($tombstone->path));
 	}
 }
 
@@ -1686,16 +1686,19 @@ function remove_tombstones($share, $path, $filename) {
 	}
 }
 
-function save_tombstones($share, $path, $filename, $tombstones) {
+function save_tombstones($share, $path, $filename, $tombstones, $only_target_drive=NULL) {
 	if (count($tombstones) == 0) {
 		remove_tombstones($share, $path, $filename);
 		return;
 	}
 
-	gh_log(DEBUG, "  Saving " . count($tombstones) . " tombstones for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+	gh_log(DEBUG, "  Saving " . (empty($only_target_drive) ? count($tombstones) : 1) . " tombstones for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
 	$paths_used = array();
 	foreach (get_graveyards() as $graveyard) {
 		$target_drive = str_replace('/.gh_graveyard', '', $graveyard);
+		if (!empty($only_target_drive) && $only_target_drive != $target_drive) {
+			continue;
+		}
 		$data_filepath = "$graveyard/$share/$path";
 		$has_tombstone = FALSE;
 		foreach ($tombstones as $tombstone) {
@@ -1715,7 +1718,7 @@ function save_tombstones($share, $path, $filename, $tombstones) {
 			unlink("$data_filepath/$filename");
 		}
 	}
-	if (count($paths_used) == 1) {
+	if (count($paths_used) == 1 && empty($only_target_drive)) {
 		// Also save a backup on another drive
 		global $graveyard_backup_directories;
 		if (count($graveyard_backup_directories) > 0) {
