@@ -3546,6 +3546,10 @@ function sort_storage_dirs_available_space() {
 		$free_space = $dfs[$target_drive];
 		$minimum_free_space = (float) (isset($minimum_free_space_pool_directories[$target_drive]) ? $minimum_free_space_pool_directories[$target_drive]*1024*1024 : 0.0);
 		$available_space = (float) $free_space - $minimum_free_space;
+		while (isset($sorted_target_drives[$available_space])) {
+			// In case some drives have the exact same amount of available_space, make sure we return all drives!
+			$available_space++;
+		}
 		$sorted_target_drives[$available_space] = $target_drive;
 	}
 	ksort($sorted_target_drives);
