@@ -1524,7 +1524,7 @@ function get_tombstone_data_filenames($share, $path, $filename, $how_many=9999) 
 	return $filenames;
 }
 
-function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $prefix='') {
+function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $prefix='',$graveyard = Null) {
 	if (!$quiet) {
 		gh_log(DEBUG, "Loading tombstones for (dir) $share" . (!empty($path) ? "/$path" : "") . "...");
 	}
@@ -1536,29 +1536,13 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 	$loaded_tombstones_dir = array();
 	
 	// Find new files (files with no tombstones yet)
-	$handle = @opendir("$landing_zone/$path");
-	if ($handle) {
-		while (($filename = readdir($handle)) !== FALSE) {
-			if ($filename != '.' && $filename != '..') {
-				if (is_dir("$landing_zone/$path/$filename")) {
-					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $full_filename => $file_tombstones) {
-						$tombstones[$full_filename] = $file_tombstones;
-					}
-					$loaded_tombstones_dir["$path/$filename"] = TRUE;
-				} else if (gh_is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
-					// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
-					gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
-					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
-						db_escape_string($share),
-						db_escape_string(clean_dir("$path/$filename"))
-					);
-					db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
-				}
-			}
-		}
+	if($graveyard === Null){
+		$graveyards = get_graveyards();
+	}else{
+		$graveyards = array();
+		$graveyards[] = $graveyard;
 	}
-
-	foreach (get_graveyards() as $graveyard) {
+	foreach ($graveyards as $graveyard) {
 		$handle = @opendir("$graveyard/$share/$path");
 		if (!$handle) {
 			#gh_log(DEBUG, "Got 0 tombstones ($graveyard/$share/$path does't exists).");
@@ -1567,11 +1551,7 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 		while (($filename = readdir($handle)) !== FALSE) {
 			if ($filename != '.' && $filename != '..') {
 				if (is_dir("$graveyard/$share/$path/$filename")) {
-					if (isset($loaded_tombstones_dir["$path/$filename"])) {
-						// Already loaded the tombstones in this directory above
-						continue;
-					}
-					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/') as $full_filename => $file_tombstones) {
+					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/',$graveyard) as $full_filename => $file_tombstones) {
 						$tombstones[$full_filename] = $file_tombstones;
 					}
 				} else {
@@ -1582,15 +1562,6 @@ function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $pr
 					}
 					// Found a new file
 					$tombstones[$prefix.$filename] = get_tombstones($share, $path, $filename, $load_nok_tombstones, $quiet);
-					if (count($tombstones[$prefix.$filename]) == 0 && gh_is_file("$landing_zone/$path/$filename") && !is_link("$landing_zone/$path/$filename")) {
-						// Found a file in a renamed directory that has no tombstone. Let's queue it for processing.
-						gh_log(DEBUG, "$share/$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
-						$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
-							db_escape_string($share),
-							db_escape_string(clean_dir("$path/$filename"))
-						);
-						db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
-					}
 				}
 			}
 		}
