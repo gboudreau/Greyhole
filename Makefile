@@ -1,4 +1,4 @@
-VERSION=0.9.0
+VERSION=0.9.1
 ARCH=x86_64
 PACKAGE=greyhole
 
