@@ -87,6 +87,7 @@ function parse_config() {
 				case 'delete_moves_to_attic':
 				case 'log_memory_usage':
 				case 'balance_modified_files':
+				case 'check_for_open_files':
 					global ${$name};
 					${$name} = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
 					break;

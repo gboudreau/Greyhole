@@ -1053,6 +1053,12 @@ function get_num_copies($share) {
 }
 
 function file_is_locked($share, $full_path) {
+	global $check_for_open_files;
+	if (!$check_for_open_files) {
+		gh_log(DEBUG, "  Skipping open file (lock) check.");
+		return FALSE;
+	}
+	
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
 		return FALSE;
@@ -1479,7 +1485,7 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 
 	// Select drives that have enough free space for this file
 	if ($num_ok < $num_copies_required) {
-		$local_target_drives = order_target_drives($filesize/1024, FALSE, $share, $path);
+		$local_target_drives = order_target_drives($filesize/1024, FALSE, $share, $path, '  ');
 	}
 	while ($num_ok < $num_copies_required && count($local_target_drives) > 0) {
 		$target_drive = array_shift($local_target_drives);
