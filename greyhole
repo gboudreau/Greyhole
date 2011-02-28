@@ -1099,7 +1099,7 @@ function find_future_full_path($share, $full_path, $task_id) {
 			$new_full_path = $next_task->additional_info;
 		} else {
 			// A parent directory was renamed
-			$new_full_path = preg_replace("/^$next_task->full_path/", $next_task->additional_info, $new_full_path);
+			$new_full_path = preg_replace("@^$next_task->full_path@", $next_task->additional_info, $new_full_path);
 		}
 		$task_id = $next_task->id;
 	}
@@ -1132,17 +1132,14 @@ function gh_write($share, $full_path, $task_id) {
 		return;
 	}
 	
-	$use_temporary_symlink = FALSE;
 	if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore.')) {
-		#gh_log(DEBUG, "Looking for new name of $full_path");
 		$new_full_path = find_future_full_path($share, $full_path, $task_id);
 		if ($new_full_path != $full_path && gh_is_file("$landing_zone/$new_full_path")) {
 			gh_log(DEBUG, "  Found that $full_path has been renamed to $new_full_path. Will work using that instead.");
-			$use_temporary_symlink = TRUE;
 			if (is_link("$landing_zone/$new_full_path")) {
-				symlink(readlink("$landing_zone/$new_full_path"), "$landing_zone/$full_path");
+				$source_file = clean_dir(readlink("$landing_zone/$new_full_path"));
 			} else {
-				symlink("$landing_zone/$new_full_path", "$landing_zone/$full_path");
+				$source_file = clean_dir("$landing_zone/$new_full_path");
 			}
 		} else {
 			gh_log(INFO, "  Skipping.");
@@ -1160,8 +1157,10 @@ function gh_write($share, $full_path, $task_id) {
 
 	list($path, $filename) = explode_full_path($full_path);
 
-	if (is_link("$landing_zone/$full_path")) {
-		$source_file = clean_dir(readlink("$landing_zone/$full_path"));
+	if ((isset($new_full_path) && is_link("$landing_zone/$new_full_path")) || is_link("$landing_zone/$full_path")) {
+		if (!isset($source_file)) {
+			$source_file = clean_dir(readlink("$landing_zone/$full_path"));
+		}
 		gh_log(INFO, "File changed: $share/$full_path", FALSE);
 		clearstatcache();
 		$filesize = gh_filesize($source_file);
@@ -1208,7 +1207,9 @@ function gh_write($share, $full_path, $task_id) {
 			}
 		}
 	} else {
-		$source_file = clean_dir("$landing_zone/$full_path");
+		if (!isset($source_file)) {
+			$source_file = clean_dir("$landing_zone/$full_path");
+		}
 		gh_log(INFO, "File created: $share/$full_path", FALSE);
 		clearstatcache();
 		$filesize = gh_filesize($source_file);
@@ -1273,10 +1274,6 @@ function gh_write($share, $full_path, $task_id) {
 	save_tombstones($share, $path, $filename, $tombstones);
 
 	create_copies_from_tombstones($tombstones, $share, $full_path, $source_file);
-
-	if ($use_temporary_symlink) {
-		gh_recycle("$landing_zone/$full_path");
-	}
 }
 
 function is_greyhole_owned_dir($path) {
