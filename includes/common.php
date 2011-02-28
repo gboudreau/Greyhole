@@ -18,20 +18,13 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+define('PERF', 9);
 define('TEST', 8);
 define('DEBUG', 7);
 define('INFO',  6);
 define('WARN',  4);
 define('ERROR', 3);
 define('CRITICAL', 2);
-
-$log_level_names = array(
-	DEBUG => 'debug',
-	INFO => 'info',
-	WARN => 'warning',
-	ERROR => 'err',
-	CRITICAL => 'crit'
-);
 
 $action = 'initialize';
 
@@ -236,12 +229,17 @@ function explode_full_path($full_path) {
 }
 
 function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
-	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $log_level_names, $action, $log_to_stdout;
+	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $action, $log_to_stdout;
 	if ($local_log_level > $log_level) {
 		return;
 	}
 
 	$date = date("M d H:i:s");
+	if ($log_level >= PERF) {
+		$utimestamp = microtime(true);
+		$timestamp = floor($utimestamp);
+		$date .= '.' . round(($utimestamp - $timestamp) * 1000000);
+	}
 	$log_text = sprintf('%s%s%s%s', 
 		$is_new_line ? "$date $local_log_level $action: " : '',
 		$text,
