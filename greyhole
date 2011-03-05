@@ -1054,7 +1054,7 @@ function get_num_copies($share) {
 
 function file_is_locked($share, $full_path) {
 	global $check_for_open_files;
-	if (!$check_for_open_files) {
+	if (isset($check_for_open_files) && $check_for_open_files === FALSE) {
 		gh_log(DEBUG, "  Skipping open file (lock) check.");
 		return FALSE;
 	}
@@ -2646,7 +2646,9 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	} else if (count($file_copies_inodes) < $num_copies_required) {
 		// Create new copies
 		gh_log(INFO, "  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
-		$fsck_report['missing_copies']++;
+		if (isset($fsck_report['missing_copies'])) {
+			$fsck_report['missing_copies']++;
+		}
 		clearstatcache(); $filesize = gh_filesize("$original_file_path");
 		$file_tombstones = create_tombstones($share, "$file_path/$filename", $num_copies_required, $filesize, $file_tombstones);
 
