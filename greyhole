@@ -102,6 +102,9 @@ if ($action == 'gone' || $action == 'going') {
 		}
 		echo "Please use one of the following with the --$action option:\n  ";
 		echo implode("\n  ", $storage_pool_directories) . "\n";
+		echo "Note that the correct syntax for this command is:\n"
+		echo "  greyhole --$action=<directory>\n";
+		echo "The '=' character is mandatory.\n";
 		exit(1);
 	}
 
@@ -2112,7 +2115,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
 	$full_drives = array();
-
+	
 	$dfs = get_free_space_in_storage_pool_dirs();
 
 	foreach ($storage_pool_directories as $target_drive) {
