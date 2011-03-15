@@ -102,7 +102,7 @@ if ($action == 'gone' || $action == 'going') {
 		}
 		echo "Please use one of the following with the --$action option:\n  ";
 		echo implode("\n  ", $storage_pool_directories) . "\n";
-		echo "Note that the correct syntax for this command is:\n"
+		echo "Note that the correct syntax for this command is:\n";
 		echo "  greyhole --$action=<directory>\n";
 		echo "The '=' character is mandatory.\n";
 		exit(1);
