@@ -125,7 +125,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 		# Make sure your MySQL server service (mysqld) is running, and runs on boot.
 		Fedora: sudo service mysqld start; sudo chkconfig mysqld on
 		Ubuntu (< 10): sudo /etc/init.d/mysqld start; sudo update-rc.d mysqld defaults
-		Ubuntu (10+): start mysqld
+		Ubuntu (10+): start mysql
 		
 		# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
