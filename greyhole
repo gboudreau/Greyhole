@@ -1427,7 +1427,7 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
 			$parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
 		}
 		while ($i <= count($dir_parts)) {
-			if (!mkdir($parent_directory, $dir_infos->fileperms)) {
+			if (!is_dir($parent_directory) && !mkdir($parent_directory, $dir_infos->fileperms)) {
 				if (gh_is_file($parent_directory)) {
 					rename($parent_directory, "$parent_directory (file copy)");
 				}
