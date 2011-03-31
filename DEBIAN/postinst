@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e
+
+mkdir -p /var/spool/greyhole
+chmod 777 /var/spool/greyhole
+
+LIBDIR=/usr/lib
+if [ "`uname -m`" = "x86_64" ]; then
+	LIBDIR=/usr/lib64
+fi
+if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
+	rm ${LIBDIR}/samba/vfs/greyhole.so
+fi
+
+SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
+if [ "$SMB_VERSION" = "3 5" ]; then
+	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
+else
+	ln -s ${LIBDIR}/greyhole/greyhole-samba.so ${LIBDIR}/samba/vfs/greyhole.so
+fi
+
+if [ -f /proc/fs/cifs/OplockEnabled ]; then
+	# cifs client workaround
+	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
+	modprobe cifs
+	echo 0 > /proc/fs/cifs/OplockEnabled
+fi
+
+if [ -f /sbin/start ]; then
+	# Using Upstart instead of SYSV init.d
+	if [ -f /etc/init.d/greyhole ]; then
+		rm /etc/init.d/greyhole
+		stop greyhole 2> /dev/null > /dev/null
+		start greyhole 2> /dev/null > /dev/null
+	fi
+	restart greyhole
+else
+	# (SYSV) Service install & start
+	update-rc.d greyhole defaults
+	service greyhole condrestart 2>&1 > /dev/null
+fi

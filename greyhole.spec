@@ -23,14 +23,14 @@ Samba shares, that offers data redundancy and JBOD concatenation.
 %install
 rm -rf $RPM_BUILD_ROOT
 
-mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
+mkdir -p $RPM_BUILD_ROOT/etc/init.d
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/
 
-install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/rc.d/init.d/greyhole
+install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/init.d/greyhole
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
-install -m 0750 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
+install -m 0755 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
 install -m 0644 -D -p schema-mysql.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0644 -D -p schema-sqlite.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
@@ -40,15 +40,15 @@ install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/gre
 install -m 0755 -D -p greyhole.cron.weekly ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.weekly/greyhole
 install -m 0755 -D -p greyhole.cron.daily ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.daily/greyhole
 %ifarch x86_64
-	install -m 0755 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
-	install -m 0755 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
+	install -m 0644 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba.so
+	install -m 0644 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
 %else
 	%ifarch %{arm}
-		install -m 0755 -D -p samba-module/bin/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
-		install -m 0755 -D -p samba-module/bin/3.5/greyhole-arm.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
+		install -m 0644 -D -p samba-module/bin/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba.so
+		install -m 0644 -D -p samba-module/bin/3.5/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
 	%else
-		install -m 0755 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/samba/vfs/greyhole.so
-		install -m 0755 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/share/greyhole/greyhole-samba35.so
+		install -m 0644 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba.so
+		install -m 0644 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
 	%endif
 %endif
 
@@ -61,13 +61,19 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
 
+LIBDIR=/usr/lib
+if [ "`uname -i`" = "x86_64" ]; then
+        LIBDIR=/usr/lib64
+fi
+if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
+	rm ${LIBDIR}/samba/vfs/greyhole.so
+fi
+
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
 if [ "$SMB_VERSION" = "3 5" ]; then
-	LIBDIR=/usr/lib
-	if [ "`uname -i`" = "x86_64" ]; then
-		LIBDIR=/usr/lib64
-	fi
-	cp /usr/share/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
+	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
+else
+	ln -s ${LIBDIR}/greyhole/greyhole-samba.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
 if [ -f /etc/logrotate.d/syslog ]; then
@@ -111,7 +117,7 @@ fi
 %files
 %defattr(-,root,root,-)
 %config(noreplace) %{_sysconfdir}/greyhole.conf
-/etc/rc.d/init.d/greyhole
+/etc/init.d/greyhole
 %{_bindir}/
 %{_sysconfdir}/
 %{_libdir}

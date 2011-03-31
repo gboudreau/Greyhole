@@ -1,0 +1,7 @@
+/etc/init.d/greyhole
+/etc/init/greyhole.conf
+/etc/greyhole.conf
+/etc/logrotate.d/greyhole
+/etc/cron.weekly/greyhole
+/etc/cron.d/greyhole
+/etc/cron.daily/greyhole

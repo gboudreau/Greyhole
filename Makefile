@@ -1,6 +1,26 @@
-VERSION=0.9.2
-ARCH=x86_64
+VERSION=0.9.3
+ARCH=amd64
 PACKAGE=greyhole
+
+deb: dist
+	(cd release && rm -rf $(PACKAGE)-$(VERSION))
+	(cd release && tar -xzf $(PACKAGE)-$(VERSION).tar.gz)
+	rm release/$(PACKAGE)-$(VERSION)/greyhole.spec
+	(cp -r DEBIAN release/$(PACKAGE)-$(VERSION)/)
+	sed -i 's/^Version:.*/Version: $(VERSION)-1/' release/$(PACKAGE)-$(VERSION)/DEBIAN/control
+	sed -i 's/^Architecture:.*/Architecture: $(ARCH)/' release/$(PACKAGE)-$(VERSION)/DEBIAN/control
+	sed -i 's/__VERSION__/$(VERSION)-1/' release/$(PACKAGE)-$(VERSION)/DEBIAN/changelog
+	sed -i "s/__DATE__/`date +'%a, %d %b %Y %T %z'`/" release/$(PACKAGE)-$(VERSION)/DEBIAN/changelog
+	(cd release/$(PACKAGE)-$(VERSION) && mv DEBIAN/Makefile .)
+	(cd release/$(PACKAGE)-$(VERSION) && mkdir -p usr/share/doc/greyhole/ && mv DEBIAN/copyright usr/share/doc/greyhole/)
+	(cd release/$(PACKAGE)-$(VERSION) && mv DEBIAN/changelog usr/share/doc/greyhole/ && cd usr/share/doc/greyhole/ && gzip -9 changelog && mv changelog.gz changelog.Debian.gz)
+	(cd release/$(PACKAGE)-$(VERSION) && sed -i "s/^ARCH=.*/ARCH=$(ARCH)/" Makefile)
+	(cd release/$(PACKAGE)-$(VERSION) && make deb && rm Makefile)
+	(cd release/$(PACKAGE)-$(VERSION) && find . -type f -exec md5sum {} \; | grep -v 'DEBIAN' > DEBIAN/md5sums)
+	sed -i 's@ \./@ @' release/$(PACKAGE)-$(VERSION)/DEBIAN/md5sums
+	(cd release/$(PACKAGE)-$(VERSION) && sudo chown -R root:root .)
+	(cd release && sudo dpkg-deb --build $(PACKAGE)-$(VERSION) greyhole-$(VERSION)-1.$(ARCH).deb)
+	(cd release && sudo rm -rf $(PACKAGE)-$(VERSION))
 
 rpm: dist
 	(cd release && rpmbuild -ta --target $(ARCH) $(PACKAGE)-$(VERSION).tar.gz)
@@ -19,7 +39,7 @@ amahi-rpm: dist
 
 dist:
 	(mkdir -p release && cd release && mkdir -p $(PACKAGE)-$(VERSION))
-	rsync -a --exclude .svn/ --exclude make_rpm.sh --exclude release/ * release/$(PACKAGE)-$(VERSION)/
+	rsync -a --exclude .svn/ --exclude make_rpm.sh --exclude make_deb.sh --exclude DEBIAN/ --exclude release/ * release/$(PACKAGE)-$(VERSION)/
 	(cd release/$(PACKAGE)-$(VERSION)/ && svn log -r 1:HEAD http://greyhole.googlecode.com/svn/trunk/ > CHANGES)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' greyhole)

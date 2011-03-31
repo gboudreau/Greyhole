@@ -110,6 +110,9 @@ case "$1" in
 	restart)
 		restart
 		;;
+	force-reload)
+		restart
+		;;
 	condrestart)
 		condrestart
 		;;
