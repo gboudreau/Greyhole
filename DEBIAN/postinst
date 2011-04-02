@@ -33,7 +33,9 @@ if [ -f /sbin/start ]; then
 		stop greyhole 2> /dev/null > /dev/null
 		start greyhole 2> /dev/null > /dev/null
 	fi
-	restart greyhole
+	if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
+		restart greyhole
+	fi
 else
 	# (SYSV) Service install & start
 	update-rc.d greyhole defaults
