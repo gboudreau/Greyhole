@@ -834,9 +834,10 @@ function gh_unlink($share, $full_path, $task_id) {
 
 	list($path, $filename) = explode_full_path($full_path);
 
-	$existing_tombstones = get_tombstones($share, $path, $filename, TRUE);
-	foreach ($existing_tombstones as $tombstone) {
-		gh_recycle($tombstone->path);
+	foreach (get_tombstones($share, $full_path, $filename, TRUE) as $existing_tombstones){
+		foreach ($existing_tombstones as $tombstone) {
+			gh_recycle($tombstone->path);
+		}
 	}
 	remove_tombstones($share, $path, $filename);
 }
@@ -860,7 +861,6 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 	if (is_dir("$landing_zone/$target_full_path") || is_a_graveyard_dir($share, $full_path)) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
-		$existing_tombstones = get_tombstones($share, $full_path, null, FALSE, FALSE, FALSE); // $check_symlink=FALSE to prevent symlinks to be handled at this point; they'll be fixed below.
 
 		foreach ($storage_pool_directories as $target_drive) {
 			list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
@@ -880,44 +880,52 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			if ($result) {
 				gh_log(DEBUG, "  Graveyard directory moved: $target_drive/.gh_graveyard/$share/$full_path -> $target_drive/.gh_graveyard/$share/$target_full_path");
 			}
+			$result = @rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
+			if ($result) {
+				gh_log(DEBUG, "  Backup graveyard directory moved: $target_drive/.gh_graveyard_backup/$share/$full_path -> $target_drive/.gh_graveyard_backup/$share/$target_full_path");
+			}
 		}
 
-		foreach ($existing_tombstones as $file_path => $file_tombstones) {
-			$new_file_tombstones = array();
-			$symlinked = FALSE;
-			foreach ($file_tombstones as $key => $tombstone) {
-				$old_path = $tombstone->path;
-				$tombstone->path = str_replace("/$share/$full_path/", "/$share/$target_full_path/", $tombstone->path);
-				gh_log(DEBUG, "  Changing tombstone: $old_path -> $tombstone->path");
-				$new_file_tombstones[$tombstone->path] = $tombstone;
+		foreach (get_tombstones($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_tombstones){
+			gh_log(DEBUG, "Existing tombstones " . count($existing_tombstones));
+			foreach ($existing_tombstones as $file_path => $file_tombstones) {
+				gh_log(DEBUG, "file tombstones " . count($file_tombstones));
+				$new_file_tombstones = array();
+				$symlinked = FALSE;
+				foreach ($file_tombstones as $key => $tombstone) {
+					$old_path = $tombstone->path;
+					$tombstone->path = str_replace("/$share/$full_path/$file_path", "/$share/$target_full_path/$file_path", $tombstone->path);
+					gh_log(DEBUG, "  Changing tombstone: $old_path -> $tombstone->path");
+					$new_file_tombstones[$tombstone->path] = $tombstone;
 
-				// is_linked = is the target of the existing symlink
-				if ($tombstone->is_linked) {
-					$symlinked = TRUE;
+					// is_linked = is the target of the existing symlink
+					if ($tombstone->is_linked) {
+						$symlinked = TRUE;
+						$symlink_target = $tombstone->path;
+					}
+				}
+				if (!$symlinked && count($file_tombstones) > 0) {
+					// None of the tombstones were is_linked; use the last one for the symlink.
+					$tombstone->is_linked = TRUE;
+					$file_tombstones[$key] = $tombstone;
 					$symlink_target = $tombstone->path;
 				}
+				
+				if (is_link("$landing_zone/$target_full_path/$file_path") && readlink("$landing_zone/$target_full_path/$file_path") != $symlink_target) {
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $symlink_target");
+					unlink("$landing_zone/$target_full_path/$file_path");
+					symlink($symlink_target, "$landing_zone/$target_full_path/$file_path");
+				} else if (is_link("$landing_zone/$full_path/$file_path") && !file_exists(readlink("$landing_zone/$full_path/$file_path"))) {
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path/$file_path to point to $symlink_target");
+					unlink("$landing_zone/$full_path/$file_path");
+					symlink($symlink_target, "$landing_zone/$full_path/$file_path");
+				} else {
+					fix_symlinks($landing_zone, $share, "$full_path/$file_path", "$target_full_path/$file_path");
+				}
+				
+				list($path, $filename) = explode_full_path("$target_full_path/$file_path");
+				save_tombstones($share, $path, $filename, $new_file_tombstones);
 			}
-			if (!$symlinked && count($file_tombstones) > 0) {
-				// None of the tombstones were is_linked; use the last one for the symlink.
-				$tombstone->is_linked = TRUE;
-				$file_tombstones[$key] = $tombstone;
-				$symlink_target = $tombstone->path;
-			}
-			
-			if (is_link("$landing_zone/$target_full_path/$file_path") && readlink("$landing_zone/$target_full_path/$file_path") != $symlink_target) {
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $symlink_target");
-				unlink("$landing_zone/$target_full_path/$file_path");
-				symlink($symlink_target, "$landing_zone/$target_full_path/$file_path");
-			} else if (is_link("$landing_zone/$full_path/$file_path") && !file_exists(readlink("$landing_zone/$full_path/$file_path"))) {
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path/$file_path to point to $symlink_target");
-				unlink("$landing_zone/$full_path/$file_path");
-				symlink($symlink_target, "$landing_zone/$full_path/$file_path");
-			} else {
-				fix_symlinks($landing_zone, $share, "$full_path/$file_path", "$target_full_path/$file_path");
-			}
-			
-			list($path, $filename) = explode_full_path("$target_full_path/$file_path");
-			save_tombstones($share, $path, $filename, $new_file_tombstones);
 		}
 	} else {
 		gh_log(INFO, "File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
@@ -934,72 +942,74 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 		list($path, $filename) = explode_full_path($full_path);
 		list($target_path, $target_filename) = explode_full_path($target_full_path);
 
-		$existing_tombstones = get_tombstones($share, $path, $filename, FALSE, FALSE, FALSE); // $check_symlink=FALSE to prevent symlink to be handled at this point; it'll be fixed below.
-
-		// There might be old tombstones... for example, when a delete task was skipped.
-		// Let's remove the file copies if there are any leftovers; correct copies will be re-created below.
-		if (file_exists("$landing_zone/$target_full_path") && (count($existing_tombstones) > 0 || !is_link("$landing_zone/$target_full_path"))) {
-			$existing_target_tombstones = get_tombstones($share, $target_path, $target_filename);
-			if (count($existing_target_tombstones) > 0) {
-				foreach ($existing_target_tombstones as $tombstone) {
-					gh_recycle($tombstone->path);
-				}
-				remove_tombstones($share, $target_path, $target_filename);
-			}
-		}
-
-		if (count($existing_tombstones) == 0) {
-			// Any NOK tombstones that need to be removed?
-			$all_existing_tombstones = get_tombstones($share, $path, $filename, TRUE, FALSE, FALSE);
-			if (count($all_existing_tombstones) > 0) {
-				remove_tombstones($share, $path, $filename);
-			}
-			// New file
-			gh_write($share, $target_full_path, $task_id);
-		} else {
-			$symlinked = FALSE;
-			foreach ($existing_tombstones as $key => $tombstone) {
-				$old_path = $tombstone->path;
-				$tombstone->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $old_path);
-				gh_log(DEBUG, "  Renaming copy at $old_path to $tombstone->path");
-
-				// Make sure the target directory exists
-				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-				list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
-				gh_mkdir($tombstone_dir_path, $original_path);
-
-				$it_worked = rename($old_path, $tombstone->path);
-
-				if ($it_worked) {
-					// is_linked = is the target of the existing symlink
-					if ($tombstone->is_linked) {
-						$symlinked = TRUE;
-						$symlink_target = $tombstone->path;
+		foreach (get_tombstones($share, $path, $filename, FALSE, FALSE, FALSE) as $existing_tombstones){
+			// There might be old tombstones... for example, when a delete task was skipped.
+			// Let's remove the file copies if there are any leftovers; correct copies will be re-created below.
+			if (file_exists("$landing_zone/$target_full_path") && (count($existing_tombstones) > 0 || !is_link("$landing_zone/$target_full_path"))) {
+				foreach (get_tombstones($share, $target_path, $target_filename) as $existing_target_tombstones){
+					if (count($existing_target_tombstones) > 0) {
+						foreach ($existing_target_tombstones as $tombstone) {
+							gh_recycle($tombstone->path);
+						}
+						remove_tombstones($share, $target_path, $target_filename);
 					}
-				} else {
-					gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $tombstone->path.");
 				}
-				$existing_tombstones[$key] = $tombstone;
 			}
-			if (!$symlinked && count($existing_tombstones) > 0) {
-				// None of the tombstones were is_linked; use the last one for the symlink.
-				$tombstone->is_linked = TRUE;
-				$existing_tombstones[$key] = $tombstone;
-				$symlink_target = $tombstone->path;
-			}
-			remove_tombstones($share, $path, $filename);
-			save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
-
-			if (is_link("$landing_zone/$target_full_path") && readlink("$landing_zone/$target_full_path") != $symlink_target) {
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
-				unlink("$landing_zone/$target_full_path");
-				symlink($symlink_target, "$landing_zone/$target_full_path");
-			} else if (is_link("$landing_zone/$full_path") && !file_exists(readlink("$landing_zone/$full_path"))) {
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $symlink_target");
-				unlink("$landing_zone/$full_path");
-				symlink($symlink_target, "$landing_zone/$full_path");
+		
+			if (count($existing_tombstones) == 0) {
+				// Any NOK tombstones that need to be removed?
+				foreach (get_tombstones($share, $path, $filename, TRUE, FALSE, FALSE) as $all_existing_tombstones){
+					if (count($all_existing_tombstones) > 0) {
+						remove_tombstones($share, $path, $filename);
+					}
+				}
+				// New file
+				gh_write($share, $target_full_path, $task_id);
 			} else {
-				fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
+				$symlinked = FALSE;
+				foreach ($existing_tombstones as $key => $tombstone) {
+					$old_path = $tombstone->path;
+					$tombstone->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $old_path);
+					gh_log(DEBUG, "  Renaming copy at $old_path to $tombstone->path");
+
+					// Make sure the target directory exists
+					list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+					list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
+					gh_mkdir($tombstone_dir_path, $original_path);
+
+					$it_worked = rename($old_path, $tombstone->path);
+
+					if ($it_worked) {
+						// is_linked = is the target of the existing symlink
+						if ($tombstone->is_linked) {
+							$symlinked = TRUE;
+							$symlink_target = $tombstone->path;
+						}
+					} else {
+						gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $tombstone->path.");
+					}
+					$existing_tombstones[$key] = $tombstone;
+				}
+				if (!$symlinked && count($existing_tombstones) > 0) {
+					// None of the tombstones were is_linked; use the last one for the symlink.
+					$tombstone->is_linked = TRUE;
+					$existing_tombstones[$key] = $tombstone;
+					$symlink_target = $tombstone->path;
+				}
+				remove_tombstones($share, $path, $filename);
+				save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
+
+				if (is_link("$landing_zone/$target_full_path") && readlink("$landing_zone/$target_full_path") != $symlink_target) {
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
+					unlink("$landing_zone/$target_full_path");
+					symlink($symlink_target, "$landing_zone/$target_full_path");
+				} else if (is_link("$landing_zone/$full_path") && !file_exists(readlink("$landing_zone/$full_path"))) {
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $symlink_target");
+					unlink("$landing_zone/$full_path");
+					symlink($symlink_target, "$landing_zone/$full_path");
+				} else {
+					fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
+				}
 			}
 		}
 	}
@@ -1173,41 +1183,43 @@ function gh_write($share, $full_path, $task_id) {
 		gh_log(INFO, "");
 		gh_log(DEBUG, "  Will use source file: $source_file");
 
-		$existing_tombstones = get_tombstones($share, $path, $filename);
-		
-		// Will keep existing copies at their location if balance_modified_files = no
-		// This will allow us to use rsync instead of blindly copying the complete files.
-		if ($balance_modified_files) {
-			// Remove old copies (but not the one that was updated!)
-			$keys_to_remove = array();
-			$found_source_file = FALSE;
-			foreach ($existing_tombstones as $key => $tombstone) {
-				$tombstone->path = clean_dir($tombstone->path);
-				if ($tombstone->path == $source_file) {
-					$tombstone->is_linked = TRUE;
-					$tombstone->state = 'OK';
-					$found_source_file = TRUE;
-				} else {
-					gh_log(DEBUG, "  Will remove copy at $tombstone->path");
-					$keys_to_remove[] = $tombstone->path;
+		foreach (get_tombstones($share, $path, $filename) as $existing_tombstones){
+			gh_log(DEBUG, count($existing_tombstones) . " tombstones loaded.");
+			// Will keep existing copies at their location if balance_modified_files = no
+			// This will allow us to use rsync instead of blindly copying the complete files.
+			if ($balance_modified_files) {
+				// Remove old copies (but not the one that was updated!)
+				$keys_to_remove = array();
+				$found_source_file = FALSE;
+				foreach ($existing_tombstones as $key => $tombstone) {
+					$tombstone->path = clean_dir($tombstone->path);
+					if ($tombstone->path == $source_file) {
+						$tombstone->is_linked = TRUE;
+						$tombstone->state = 'OK';
+						$found_source_file = TRUE;
+					} else {
+						gh_log(DEBUG, "  Will remove copy at $tombstone->path");
+						$keys_to_remove[] = $tombstone->path;
+					}
+					// This will make sure the correct key is used in the $existing_tombstones array...
+					//   This is important because that key is what is used to check if there's already a copy on that drive.
+					unset($existing_tombstones[$key]);
+					$existing_tombstones[$tombstone->path] = $tombstone;
 				}
-				// This will make sure the correct key is used in the $existing_tombstones array...
-				//   This is important because that key is what is used to check if there's already a copy on that drive.
-				unset($existing_tombstones[$key]);
-				$existing_tombstones[$tombstone->path] = $tombstone;
-			}
-			if (!$found_source_file) {
-				// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
-				$key = array_shift($keys_to_remove);
-				$source_file = $existing_tombstones[$key]->path;
-				gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
-			}
-			foreach ($keys_to_remove as $key) {
-				if ($existing_tombstones[$key]->path != $source_file) {
-					gh_recycle($existing_tombstones[$key]->path);
+				if (!$found_source_file) {
+					// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
+					$key = array_shift($keys_to_remove);
+					$source_file = $existing_tombstones[$key]->path;
+					gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
 				}
-				unset($existing_tombstones[$key]);
+				foreach ($keys_to_remove as $key) {
+					if ($existing_tombstones[$key]->path != $source_file) {
+						gh_recycle($existing_tombstones[$key]->path);
+					}
+					unset($existing_tombstones[$key]);
+				}
 			}
+			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize);
 		}
 	} else {
 		if (!isset($source_file)) {
@@ -1228,22 +1240,31 @@ function gh_write($share, $full_path, $task_id) {
 
 		// There might be old tombstones... for example, when a delete task was skipped.
 		// Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_tombstones()
-		$existing_tombstones = get_tombstones($share, $path, $filename);
-		if (count($existing_tombstones) > 0) {
-			foreach ($existing_tombstones as $tombstone) {
-				gh_recycle($tombstone->path);
-			}
-			remove_tombstones($share, $path, $filename);
-			$existing_tombstones = array();
-			// Maybe there's other file copies, that weren't tombstones, or were NOK tombstones!
-			global $storage_pool_directories;
-			foreach ($storage_pool_directories as $dir) {
-				if (file_exists("$dir/$share/$path/$filename")) {
-					gh_recycle("$dir/$share/$path/$filename");
+		foreach (get_tombstones($share, $path, $filename) as $existing_tombstones){
+			gh_log(DEBUG, count($existing_tombstones) . " tombstones loaded.");
+			if (count($existing_tombstones) > 0) {
+				foreach ($existing_tombstones as $tombstone) {
+					gh_recycle($tombstone->path);
+				}
+				remove_tombstones($share, $path, $filename);
+				$existing_tombstones = array();
+				// Maybe there's other file copies, that weren't tombstones, or were NOK tombstones!
+				global $storage_pool_directories;
+				foreach ($storage_pool_directories as $dir) {
+					if (file_exists("$dir/$share/$path/$filename")) {
+						gh_recycle("$dir/$share/$path/$filename");
+					}
 				}
 			}
+			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize);
 		}
 	}
+
+}
+
+function gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize){
+	$landing_zone = get_share_landing_zone($share);
+	list($path, $filename) = explode_full_path($full_path);
 
 	// Only need to check for locking if we have something to do!
 	if ($num_copies_required > 1 || count($existing_tombstones) == 0) {
@@ -1538,58 +1559,15 @@ function get_tombstone_data_filenames($share, $path, $filename, $how_many=9999) 
 	return $filenames;
 }
 
-function get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet, $prefix='',$graveyard = Null) {
-	if (!$quiet) {
-		gh_log(DEBUG, "Loading tombstones for (dir) $share" . (!empty($path) ? "/$path" : "") . "...");
-	}
-
-	$landing_zone = get_share_landing_zone($share);
-	
-	$tombstones = array();
-	
-	$loaded_tombstones_dir = array();
-	
-	// Find new files (files with no tombstones yet)
-	if($graveyard === Null){
-		$graveyards = get_graveyards();
+function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE){
+	if($filename === null){
+		return new tombstone_iterator($share, $path, $filename, $load_nok_tombstones, $quiet, $check_symlink);
 	}else{
-		$graveyards = array($graveyard);
-	}
-	foreach ($graveyards as $graveyard) {
-		$handle = @opendir("$graveyard/$share/$path");
-		if (!$handle) {
-			#gh_log(DEBUG, "Got 0 tombstones ($graveyard/$share/$path does't exists).");
-			continue;
-		}
-		while (($filename = readdir($handle)) !== FALSE) {
-			if ($filename != '.' && $filename != '..') {
-				if (is_dir("$graveyard/$share/$path/$filename")) {
-					foreach (get_tombstones_for_dir($share, "$path/$filename", $load_nok_tombstones, $quiet, $prefix.$filename.'/',$graveyard) as $full_filename => $file_tombstones) {
-						$tombstones[$full_filename] = $file_tombstones;
-					}
-				} else {
-					// Found a file
-					if (isset($tombstones[$prefix.$filename])) {
-						// For which we already have the tombstones...
-						continue;
-					}
-					// Found a new file
-					$tombstones[$prefix.$filename] = get_tombstones($share, $path, $filename, $load_nok_tombstones, $quiet);
-				}
-			}
-		}
-		closedir($handle);
-	}
-
-	return $tombstones;
+		return array(get_tombstones_for_file($share,$path,$filename,$load_nok_tombstones,$quiet,$check_symlink));
+	}	
 }
 
-function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
-	if ($filename === null) {
-		// Load all tombstones from the specified directory
-		$tombstones = get_tombstones_for_dir($share, $path, $load_nok_tombstones, $quiet);
-		return $tombstones;
-	}
+function get_tombstones_for_file($share, $path, $filename=null, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
 	if (!$quiet) {
 		gh_log(DEBUG, "Loading tombstones for $share" . (!empty($path) ? "/$path" : "") . "/$filename... ", FALSE);
 	}
@@ -2115,7 +2093,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
 	$full_drives = array();
-	
+
 	$dfs = get_free_space_in_storage_pool_dirs();
 
 	foreach ($storage_pool_directories as $target_drive) {
@@ -2496,34 +2474,35 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			}
 		}
 	}
+	foreach (get_tombstones($share, $file_path, $filename, TRUE) as $tombstone_block){
+		foreach ($tombstone_block as $tombstone) {
+			$inode_number = @gh_fileinode($tombstone->path);
+			if ($inode_number === FALSE) {
+				$tombstone->state = 'Gone';
+				$tombstone->is_linked = FALSE;
 
-	foreach (get_tombstones($share, $file_path, $filename, TRUE) as $tombstone) {
-		$inode_number = @gh_fileinode($tombstone->path);
-		if ($inode_number === FALSE) {
-			$tombstone->state = 'Gone';
-			$tombstone->is_linked = FALSE;
-
-			$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $tombstone->path);
-			if (gone_ok($root_path)) {
-				// Let's not replace this copy yet...
-				$file_copies_inodes[$tombstone->path] = $tombstone->path;
-				$num_ok++;
-				$fsck_report['gone_ok']++;
+				$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $tombstone->path);
+				if (gone_ok($root_path)) {
+					// Let's not replace this copy yet...
+					$file_copies_inodes[$tombstone->path] = $tombstone->path;
+					$num_ok++;
+					$fsck_report['gone_ok']++;
+				}
+			} else if (is_dir($tombstone->path)) {
+				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
+				@rmdir($tombstone->path);
+				$tombstone->state = 'Gone';
+				$tombstone->is_linked = FALSE;
+				continue;
+			} else {
+				$tombstone->state = 'OK';
+				if (!isset($file_tombstones[$tombstone->path])) {
+					$file_copies_inodes[$inode_number] = $tombstone->path;
+					$num_ok++;
+				}
 			}
-		} else if (is_dir($tombstone->path)) {
-			gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
-			@rmdir($tombstone->path);
-			$tombstone->state = 'Gone';
-			$tombstone->is_linked = FALSE;
-			continue;
-		} else {
-			$tombstone->state = 'OK';
-			if (!isset($file_tombstones[$tombstone->path])) {
-				$file_copies_inodes[$inode_number] = $tombstone->path;
-				$num_ok++;
-			}
+			$file_tombstones[clean_dir($tombstone->path)] = $tombstone;
 		}
-		$file_tombstones[clean_dir($tombstone->path)] = $tombstone;
 	}
 
 	if (count($file_copies_inodes) > 0) {
@@ -3480,29 +3459,29 @@ function gh_balance() {
 				}
 
 				// Update tombstones
-				$existing_tombstones = get_tombstones($share_name, $path, $filename, FALSE, TRUE, FALSE);
-				foreach ($existing_tombstones as $key => $tombstone) {
-					if ($tombstone->path == $file) {
-						$tombstone->path = "$target_drive/$share_name/$full_path";
-						unset($existing_tombstones[$key]);
-						$tombstone->state = 'OK';
-						if ($tombstone->is_linked) {
-							// Re-create correct symlink
-							$landing_zone = $share_options['landing_zone'];
-							if (is_link("$landing_zone/$full_path")) {
-								gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $tombstone->path");
-								if (gh_recycle("$landing_zone/$full_path")) {
-			 						@symlink($tombstone->path, "$landing_zone/$full_path");
-									// Creating this symlink can fail if the parent dir was removed
+				foreach (get_tombstones($share_name, $path, $filename, FALSE, TRUE, FALSE) as $existing_tombstones){
+					foreach ($existing_tombstones as $key => $tombstone) {
+						if ($tombstone->path == $file) {
+							$tombstone->path = "$target_drive/$share_name/$full_path";
+							unset($existing_tombstones[$key]);
+							$tombstone->state = 'OK';
+							if ($tombstone->is_linked) {
+								// Re-create correct symlink
+								$landing_zone = $share_options['landing_zone'];
+								if (is_link("$landing_zone/$full_path")) {
+									gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $tombstone->path");
+									if (gh_recycle("$landing_zone/$full_path")) {
+										@symlink($tombstone->path, "$landing_zone/$full_path");
+										// Creating this symlink can fail if the parent dir was removed
+									}
 								}
 							}
+							$existing_tombstones[$tombstone->path] = $tombstone;
+							save_tombstones($share_name, $path, $filename, $existing_tombstones);
+							break;
 						}
-						$existing_tombstones[$tombstone->path] = $tombstone;
-						save_tombstones($share_name, $path, $filename, $existing_tombstones);
-						break;
 					}
-				}
-				
+				}	
 				$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
 				gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 			}

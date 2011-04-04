@@ -59,7 +59,7 @@ if (!isset($smb_config_file)) {
 $attic_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks, $memory_limit;
 
 	$shares_options = array();
 	$storage_pool_directories = array();
@@ -106,6 +106,9 @@ function parse_config() {
 				case 'frozen_directory':
 					$frozen_directories[] = trim($value, '/');
 					break;
+				case 'memory_limit':
+					ini_set('memory_limit',$value);
+					$memory_limit = $value;
 				default:
 					if (mb_strpos($name, 'num_copies') === 0) {
 						$share = mb_substr($name, 11, mb_strlen($name)-12);
@@ -193,6 +196,19 @@ function parse_config() {
 		}
 	}
 
+	if (!isset($memory_limit)) {
+		$memory_limit = '128M';
+		ini_set('memory_limit',$memory_limit);
+	}
+	if (isset($memory_limit)){
+		if(preg_match('/M$/',$memory_limit)){
+			$memory_limit = preg_replace('/M$/','',$memory_limit);
+			$memory_limit = $memory_limit * 1048576;
+		}elseif(preg_match('/K$/',$memory_limit)){
+			$memory_limit = preg_replace('/K$/','',$memory_limit);
+			$memory_limit = $memory_limit * 1024;
+		}
+	}
 	$db_options = (object) array(
 		'engine' => $db_engine,
 		'schema' => "/usr/share/greyhole/schema-$db_engine.sql"
@@ -454,4 +470,120 @@ if ($arch != 'x86_64') {
 		return $stat['dev'];
 	}
 }
+
+function memory_check(){
+	global $memory_limit;
+        $usage = memory_get_usage();
+        $used = $usage/$memory_limit;
+        $used = $used * 100;
+        if($used > 95){
+                return False;
+        }
+        return True;
+}
+
+class tombstone_iterator implements Iterator {
+	private $path;
+	private $share;
+	private $load_nok_tombstones;
+	private $quiet;
+	private $tombstones;
+	private $graveyards;
+	private $dir_handle;
+	private $count;
+
+	public function __construct($share, $path, $filename=NULL, $load_nok_tombstones=FALSE, $quiet=FALSE, $block_size=1000) {
+		$this->quiet = $quiet;
+		$this->share = $share;
+		$this->path = $path;
+		$this->filename = $filename;
+		$this->load_nok_tombstones = $load_nok_tombstones;
+	}
+
+	public function rewind(){
+		$this->graveyards = get_graveyards();
+		$this->directory_stack = array($this->path);
+		$this->dir_handle = NULL;
+		$this->tombstones = array();
+		$this->iterCount = 0;
+		$this->first = TRUE;
+		$this->next();
+	}
+
+	public function current(){
+		return $this->tombstones;
+	}
+
+	public function key() {
+		return count($this->tombstones);
+	}
+
+	public function next() {
+		if(!$this->first){
+			$this->iterCount++;
+		}else{
+			$this->first = FALSE;
+		}
+		$this->tombstones = array();
+		if($this->filename !== NULL){
+			$this->tombstones[$this->filename] = get_tombstones_for_file($this->share, $this->path, $this->filename, $this->load_nok_tombstones, $this->quiet);
+			$this->filename = NULL;
+			$this->directory_stack = array();
+			return $this->tombstones;
+		}
+		while(count($this->directory_stack)>0 && $this->directory_stack !== NULL){
+			$this->dir = array_pop($this->directory_stack);
+			if($this->quiet == FALSE){
+				gh_log(DEBUG,"Loading tombstones for (dir) " . $this->share . (!empty($this->dir) ? "/" . $this->dir : "") . "...");
+			}
+			for( $i = 0; $i < count($this->graveyards); $i++ ){
+				$graveyard = $this->graveyards[$i];
+				$this->base = "$graveyard/".$this->share."/";
+				if(!file_exists($this->base.$this->dir)){
+					continue;
+				}	
+				if($this->dir_handle = opendir($this->base.$this->dir)){
+					while (false !== ($file = readdir($this->dir_handle))){
+						if(!memory_check()){
+							gh_log(ERROR,'Memory usage is >95%, exiting. Please increase memory_limit in greyhole.conf.');
+							exit(1);
+						}
+						if($file=='.' || $file=='..')
+							continue;
+						if(!empty($this->dir)){
+							$full_filename = $this->dir . '/' . $file;
+						}else
+							$full_filename = $file;
+						if(is_dir($this->base.$full_filename))
+							$this->directory_stack[] = $full_filename;
+						else{
+							$full_filename = str_replace("$this->path/",'',$full_filename);
+							if(isset($this->tombstones[$full_filename])) {
+								continue;
+							}						
+							$this->tombstones[$full_filename] = get_tombstones_for_file($this->share, "$this->dir", $file, $this->load_nok_tombstones, $this->quiet);
+						}
+					}
+					closedir($this->dir_handle);
+					$this->directory_stack = array_unique($this->directory_stack);
+				}
+			}
+			if(count($this->tombstones) > 0){
+				break;
+			}
+			
+		}
+		gh_log(DEBUG,'Found ' . count($this->tombstones) . ' tombstones.');
+		return $this->tombstones;
+	}
+	
+	public function valid(){
+		if(count($this->tombstones)){
+			return TRUE;
+		}else{
+			return FALSE;
+		}
+	}
+}
+
 ?>
