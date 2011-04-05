@@ -1049,10 +1049,9 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 						symlink($symlink_target, "$landing_zone/$target_full_path");
 					}
 				} else if (is_link("$landing_zone/$full_path") && !file_exists(readlink("$landing_zone/$full_path"))) {
-					// Old link exists, and is broken. Replace it with a new symlink in $landing_zone/$target_full_path
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $symlink_target");
 					unlink("$landing_zone/$full_path");
-					symlink($symlink_target, "$landing_zone/$target_full_path");
+					symlink($symlink_target, "$landing_zone/$full_path");
 				} else {
 					fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
 				}
