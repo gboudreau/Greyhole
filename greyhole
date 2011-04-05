@@ -1254,7 +1254,7 @@ function gh_write($share, $full_path, $task_id) {
 					unset($existing_tombstones[$key]);
 				}
 			}
-			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize);
+			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize,$task_id);
 		}
 	} else {
 		if (!isset($source_file)) {
@@ -1291,13 +1291,13 @@ function gh_write($share, $full_path, $task_id) {
 					}
 				}
 			}
-			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize);
+			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize,$task_id);
 		}
 	}
 
 }
 
-function gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize){
+function gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize,$task_id){
 	$landing_zone = get_share_landing_zone($share);
 	list($path, $filename) = explode_full_path($full_path);
 
