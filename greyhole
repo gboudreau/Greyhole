@@ -1040,14 +1040,19 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				remove_tombstones($share, $path, $filename);
 				save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
 
-				if (is_link("$landing_zone/$target_full_path") && readlink("$landing_zone/$target_full_path") != $symlink_target) {
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
-					unlink("$landing_zone/$target_full_path");
-					symlink($symlink_target, "$landing_zone/$target_full_path");
+				if (is_link("$landing_zone/$target_full_path")) {
+					// New link exists...
+					if (readlink("$landing_zone/$target_full_path") != $symlink_target) {
+						// ...and needs to be updated.
+						gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
+						unlink("$landing_zone/$target_full_path");
+						symlink($symlink_target, "$landing_zone/$target_full_path");
+					}
 				} else if (is_link("$landing_zone/$full_path") && !file_exists(readlink("$landing_zone/$full_path"))) {
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $symlink_target");
+					// Old link exists, and is broken. Replace it with a new symlink in $landing_zone/$target_full_path
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
 					unlink("$landing_zone/$full_path");
-					symlink($symlink_target, "$landing_zone/$full_path");
+					symlink($symlink_target, "$landing_zone/$target_full_path");
 				} else {
 					fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
 				}
