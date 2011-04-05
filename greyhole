@@ -875,7 +875,7 @@ function gh_unlink($share, $full_path, $task_id) {
 
 	list($path, $filename) = explode_full_path($full_path);
 
-	foreach (get_tombstones($share, $full_path, $filename, TRUE) as $existing_tombstones){
+	foreach (get_tombstones($share, $path, $filename, TRUE) as $existing_tombstones){
 		foreach ($existing_tombstones as $tombstone) {
 			gh_recycle($tombstone->path);
 		}
