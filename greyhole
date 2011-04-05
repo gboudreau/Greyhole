@@ -1029,10 +1029,10 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
 			}
 		}
 		if (gh_is_file($fixed_link_target)) {
+			gh_log(DEBUG, "  Found a broken symlink to update: $broken_link. Old (broken) target: " . readlink($broken_link) . "; new (fixed) target: $fixed_link_target");
 			unlink($broken_link);
 			symlink($fixed_link_target, $broken_link);
 		}
-		gh_log(DEBUG, "  Found a broken symlink to update: $broken_link. Old (broken) target: " . readlink($broken_link) . "; new (fixed) target: $fixed_link_target");
 	}
 }
 
@@ -3758,7 +3758,7 @@ function process_command_line() {
 		'dir:'
 	);
 
-	$command_line_options = getopt($opts_actions.$opts_actions_with_values.$opts_options.$opts_options_with_values,
+	$command_line_options = _getopt($opts_actions.$opts_actions_with_values.$opts_options.$opts_options_with_values,
 		array_merge($longopts_actions, $longopts_actions_with_values, $longopts_options, $longopts_options_with_values));
 
 	$action = 'unknown';
