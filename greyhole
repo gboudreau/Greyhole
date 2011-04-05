@@ -283,8 +283,6 @@ if ($action == 'empty-attic') {
 }
 
 if ($action == 'view-queue') {
-	echo "\nGreyhole Work Queue Statistics\n==============================\n\n";
-	
 	$shares_names = array_keys($shares_options);
 	natcasesort($shares_names);
 
@@ -295,8 +293,7 @@ if ($action == 'view-queue') {
 		}
 	}
 
-	echo "This table gives you the number of pending operations queued for the Greyhole daemon, per share.\n\n";
-	printf("%$max_share_strlen"."s  Write   Delete  Rename\n", '');
+	$queues = array();
 	$total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = 0;
 	foreach ($shares_names as $share_name) {
 		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'write' AND share = '%s' AND complete IN ('yes', 'thawed')", db_escape_string($share_name))) or die("Can't find # of writes in tasks table: " . db_error());
@@ -314,28 +311,50 @@ if ($action == 'view-queue') {
 		$num_rename_pending = (int) $row->num;
 		$total_num_rename_pending += $num_rename_pending;
 
-		echo sprintf("%-$max_share_strlen"."s", $share_name) . "  ";
-		echo sprintf('%-7s', $num_writes_pending) . " ";
-		echo sprintf('%-7s', $num_delete_pending) . " ";
-		echo sprintf('%-7s', $num_rename_pending) . "\n";
+		$queues[$share_name] = (object) array(
+			'num_writes_pending' => $num_writes_pending,
+			'num_delete_pending' => $num_delete_pending,
+			'num_rename_pending' => $num_rename_pending,
+		);
 	}
-	for ($i=0; $i<$max_share_strlen; $i++) {
-		echo "=";
+	$queues['Total'] = (object) array(
+		'num_writes_pending' => $total_num_writes_pending,
+		'num_delete_pending' => $total_num_delete_pending,
+		'num_rename_pending' => $total_num_rename_pending,
+	);
+	
+	$queues['Spooled'] = (int) exec("ls -1 /var/spool/greyhole | wc -l");
+
+	if (isset($options['json'])) {
+		echo json_encode($queues);
+	} else {
+		echo "\nGreyhole Work Queue Statistics\n==============================\n\n";
+		echo "This table gives you the number of pending operations queued for the Greyhole daemon, per share.\n\n";
+		printf("%$max_share_strlen"."s  Write   Delete  Rename\n", '');
+
+		foreach ($queues as $share_name => $queue) {
+			if ($share_name == 'Spooled') continue;
+			if ($share_name == 'Total') {
+				for ($i=0; $i<$max_share_strlen; $i++) {
+					echo "=";
+				}
+				echo "\n";
+			}
+			echo sprintf("%-$max_share_strlen"."s", $share_name) . "  ";
+			echo sprintf('%-7s', $queue->num_writes_pending) . " ";
+			echo sprintf('%-7s', $queue->num_delete_pending) . " ";
+			echo sprintf('%-7s', $queue->num_rename_pending) . "\n";
+		}
+
+		echo "\nThe following is the number of pending operations that the Greyhole daemon still needs to parse.\n";
+		echo "Until it does, the nature of those operations is unknown.\n";
+		echo "Spooled operations that have been parsed will be listed above and disappear from the count below.\n";
+
+		echo sprintf("\n%-$max_share_strlen"."s  ", 'Spooled');
+		echo $queues['Spooled'] . "\n";
+
+		echo "\n";
 	}
-	echo sprintf("\n%-$max_share_strlen"."s  ", 'Total');
-	echo sprintf('%-6s', $total_num_writes_pending) . "+ ";
-	echo sprintf('%-6s', $total_num_delete_pending) . "+ ";
-	echo sprintf('%-6s', $total_num_rename_pending) . "= ";
-	echo ($total_num_writes_pending + $total_num_delete_pending + $total_num_rename_pending) . "\n";
-
-	echo "\nThe following is the number of pending operations that the Greyhole daemon still needs to parse.\n";
-	echo "Until it does, the nature of those operations is unknown.\n";
-	echo "Spooled operations that have been parsed will be listed above and disappear from the count below.\n";
-
-	echo sprintf("\n%-$max_share_strlen"."s  ", 'Spooled');
-	echo exec("ls -1 /var/spool/greyhole | wc -l") . "\n";
-
-	echo "\n";
 	exit(0);
 }
 
@@ -369,8 +388,6 @@ if ($action == 'status') {
 }
 
 if ($action == 'stats') {
-	echo "\nGreyhole Statistics\n===================\n\n";
-
 	$max_drive_strlen = 0;
 	foreach ($storage_pool_directories as $target_drive) {
 		if (mb_strlen($target_drive) > $max_drive_strlen) {
@@ -388,12 +405,10 @@ if ($action == 'stats') {
 	);
 
 	$dfs = get_free_space_in_storage_pool_dirs();
-	echo "Storage Pool\n";
-	printf("%$max_drive_strlen"."s    Total -   Used =   Free +  Attic = Possible\n", '');
+	$stats = array();
 	foreach ($storage_pool_directories as $target_drive) {
-		printf("  %-$max_drive_strlen"."s ", "$target_drive:");
 		if (!isset($dfs[$target_drive])) {
-			echo "  N/A -   N/A =   N/A +   N/A =   N/A\n";
+			$stats[$target_drive] = (object) array();
 			continue;
 		}
 
@@ -405,18 +420,24 @@ if ($action == 'stats') {
 		$total_space = (float) $regs[1];
 		$used_space = (float) $regs[2];
 
-		$free_space = $dfs[$target_drive];
+		$free_space = (float) $dfs[$target_drive];
 
 		$attic_path = clean_dir("$target_drive/.gh_attic");
 		if (!file_exists($attic_path)) {
-			$attic_size = 0;
+			$attic_size = (float) 0;
 		} else {
-			$attic_size = trim(exec("du -sk " . escapeshellarg($attic_path) . " | awk '{print $1}'"));
+			$attic_size = (float) trim(exec("du -sk " . escapeshellarg($attic_path) . " | awk '{print $1}'"));
 		}
 
 		$potential_available_space = (float) $free_space + $attic_size;
-
-		echo sprintf('%5.0f', $total_space/1024/1024) . "G - " . sprintf('%5.0f', $used_space/1024/1024) . "G = " . sprintf('%5.0f', $free_space/1024/1024) . "G + " . sprintf('%5.0f', $attic_size/1024/1024) . "G = " . sprintf('%5.0f', $potential_available_space/1024/1024) . "G\n";
+		
+		$stats[$target_drive] = (object) array(
+			'total_space' => $total_space,
+			'used_space' => $used_space,
+			'free_space' => $free_space,
+			'attic_size' => $attic_size,
+			'potential_available_space' => $potential_available_space,
+		);
 
 		$totals['total_space'] += $total_space;
 		$totals['used_space'] += $used_space;
@@ -424,12 +445,26 @@ if ($action == 'stats') {
 		$totals['attic_size'] += $attic_size;
 		$totals['potential_available_space'] += $potential_available_space;
 	}
+	$stats['Total'] = (object) $totals;
+	
+	if (isset($options['json'])) {
+		echo json_encode($stats);
+	} else {
+		echo "\nGreyhole Statistics\n===================\n\n";
+		echo "Storage Pool\n";
+		printf("%$max_drive_strlen"."s    Total -   Used =   Free +  Attic = Possible\n", '');
+		foreach ($stats as $target_drive => $stat) {
+			if ($target_drive == 'Total') printf("  %-$max_drive_strlen"."s ==========================================\n", "");
+			printf("  %-$max_drive_strlen"."s ", "$target_drive:");
+			if (empty($stat)) {
+				echo "  N/A -   N/A =   N/A +   N/A =   N/A\n";
+			} else {
+				echo sprintf('%5.0f', $stat->total_space/1024/1024) . "G - " . sprintf('%5.0f', $stat->used_space/1024/1024) . "G = " . sprintf('%5.0f', $stat->free_space/1024/1024) . "G + " . sprintf('%5.0f', $stat->attic_size/1024/1024) . "G = " . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G\n";
+			}
+		}
+		echo "\n";
+	}
 
-	// Totals
-	printf("  %-$max_drive_strlen"."s ==========================================\n", "");
-	printf("  %-$max_drive_strlen"."s ", "Total:");
-	echo sprintf('%5.0f', $totals['total_space']/1024/1024) . "G - " . sprintf('%5.0f', $totals['used_space']/1024/1024) . "G = " . sprintf('%5.0f', $totals['free_space']/1024/1024) . "G + " . sprintf('%5.0f', $totals['attic_size']/1024/1024) . "G = " . sprintf('%5.0f', $totals['potential_available_space']/1024/1024) . "G\n";
-	echo "\n";
 	exit(0);
 }
 
@@ -3744,13 +3779,14 @@ function process_command_line() {
 		'debug:'
 	);
 
-	$opts_options = 'eyuco';
+	$opts_options = 'eyucoj';
 	$longopts_options = array(
 		'email-report',
 		'dont-walk-graveyard',
 		'disk-usage-report',
 		'if-conf-changed',
-		'find-orphaned-files'
+		'find-orphaned-files',
+		'json'
 	);
 
 	$opts_options_with_values = 'd:';
@@ -3862,6 +3898,9 @@ function print_usage() {
 	echo "                        correct number of file copies are created to replace the\n";
 	echo "                        missing drive. If you don't supply an option, the available\n";
 	echo "                        options (paths) will be displayed.\n";
+	echo "\n";
+	echo "For --stats and --view-queue, the available OPTIONS are:\n";
+	echo "  -j, --json            Output the result as JSON, instead of human-readable text.\n";
 	echo "\n";
 	echo "For --fsck, the available OPTIONS are:\n";
 	echo "  -e, --email-report    Send an email when fsck completes, to report on what was\n";
