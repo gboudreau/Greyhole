@@ -880,7 +880,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 			if ($result) {
 				gh_log(DEBUG, "  Graveyard directory moved: $target_drive/.gh_graveyard/$share/$full_path -> $target_drive/.gh_graveyard/$share/$target_full_path");
 			}
-			$result = @rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
+			$result = @rename("$target_drive/.gh_graveyard_backup/$share/$full_path", "$target_drive/.gh_graveyard_backup/$share/$target_full_path");
 			if ($result) {
 				gh_log(DEBUG, "  Backup graveyard directory moved: $target_drive/.gh_graveyard_backup/$share/$full_path -> $target_drive/.gh_graveyard_backup/$share/$target_full_path");
 			}
