@@ -33,13 +33,18 @@ process_config();
 db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
 db_migrate();
 
-if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status') {
+if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status' && $action != 'getuid') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
 		exit(1);
 	}
 }
 
+if ($action == 'getuid') {
+	$uniq_id = set_uniq_id();
+	echo $uniq_id;
+	exit(0);
+}
 if ($action == 'iostat') {
 	$devices_directories = array();
 	foreach ($storage_pool_directories as $target_drive) {
@@ -565,6 +570,7 @@ if ($num_daemon_processes > 1) {
 
 gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
 set_graveyard_backup();
+set_uniq_id();
 parse_samba_spool();
 simplify_tasks();
 while (TRUE) {
@@ -3755,7 +3761,7 @@ function create_attic_share_symlink($filepath_in_attic, $attic_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DfClpPsSaqi';
+	$opts_actions = 'DfClpPsSaqiU';
 	$longopts_actions = array(
 		'daemon',
 		'fsck',
@@ -3767,7 +3773,8 @@ function process_command_line() {
 		'status',
 		'empty-attic',
 		'view-queue',
-		'iostat'
+		'iostat',
+		'getuid'
 	);
 
 	$opts_actions_with_values = 'w::g::n::t::b:';
@@ -3947,5 +3954,43 @@ function how_long_ago($past_time) {
 	}
 	$ago = $ago . $s . "s";
 	return $ago;
+}
+
+// This unique identifier will be used when Greyhole calls home, to uniquely identify this Greyhole instance.
+function get_uniq_id() {
+	global $storage_pool_directories;
+
+	foreach ($storage_pool_directories as $target_drive) {
+		$f = "$target_drive/.greyhole_uses_this";
+		if (file_exists($f) && filesize($f) == 23) {
+			// Found a valid uid
+			$uniq_id = file_get_contents($f);
+			break;
+		}
+	}
+
+	if (!isset($uniq_id)) {
+		// No uid found; generate a new one.
+		$uniq_id = uniqid('', TRUE);
+	}
+	
+	return $uniq_id;
+}
+
+// Save a uid in all .greyhole_uses_this files
+function set_uniq_id() {
+	global $storage_pool_directories;
+
+	$uniq_id = get_uniq_id();
+
+	// Save the old/new uid into all .greyhole_uses_this files
+	foreach ($storage_pool_directories as $target_drive) {
+		$f = "$target_drive/.greyhole_uses_this";
+		if (file_exists($f)) {
+			file_put_contents($f, $uniq_id);
+		}
+	}
+	
+	return $uniq_id;
 }
 ?>

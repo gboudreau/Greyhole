@@ -3,3 +3,7 @@
 # Weekly fsck
 /usr/bin/greyhole --fsck --email-report --dont-walk-graveyard > /dev/null
 
+# This calls home to report anonymous data about Greyhole usage.
+# It sends the output of 'greyhole --stats' to the greyhole.net server.
+# Please leave this here... We use it to get usage stats for Greyhole.
+/usr/bin/greyhole --getuid > /tmp/greyhole.stats ; /usr/bin/greyhole --stats --json >> /tmp/greyhole.stats; curl -s --data @/tmp/greyhole.stats http://www.greyhole.net/usage_stats.php > /dev/null ; rm /tmp/greyhole.stats
