@@ -23,11 +23,11 @@ Samba shares, that offers data redundancy and JBOD concatenation.
 %install
 rm -rf $RPM_BUILD_ROOT
 
-mkdir -p $RPM_BUILD_ROOT/etc/init.d
+mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/
 
-install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/init.d/greyhole
+install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/rc.d/init.d/greyhole
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
@@ -117,7 +117,7 @@ fi
 %files
 %defattr(-,root,root,-)
 %config(noreplace) %{_sysconfdir}/greyhole.conf
-/etc/init.d/greyhole
+/etc/rc.d/init.d/greyhole
 %{_bindir}/
 %{_sysconfdir}/
 %{_libdir}
