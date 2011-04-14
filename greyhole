@@ -299,7 +299,7 @@ if ($action == 'view-queue') {
 	}
 
 	$queues = array();
-	$total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = 0;
+	$total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = $total_num_fsck_pending = 0;
 	foreach ($shares_names as $share_name) {
 		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE action = 'write' AND share = '%s' AND complete IN ('yes', 'thawed')", db_escape_string($share_name))) or die("Can't find # of writes in tasks table: " . db_error());
 		$row = db_fetch_object($result);
@@ -316,16 +316,23 @@ if ($action == 'view-queue') {
 		$num_rename_pending = (int) $row->num;
 		$total_num_rename_pending += $num_rename_pending;
 
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file') AND share = '%s' AND complete IN ('yes', 'thawed')", db_escape_string($share_name))) or die("Can't find # of fsck in tasks table: " . db_error());
+		$row = db_fetch_object($result);
+		$num_fsck_pending = (int) $row->num;
+		$total_num_fsck_pending += $num_fsck_pending;
+
 		$queues[$share_name] = (object) array(
 			'num_writes_pending' => $num_writes_pending,
 			'num_delete_pending' => $num_delete_pending,
 			'num_rename_pending' => $num_rename_pending,
+			'num_fsck_pending' => $num_fsck_pending,
 		);
 	}
 	$queues['Total'] = (object) array(
 		'num_writes_pending' => $total_num_writes_pending,
 		'num_delete_pending' => $total_num_delete_pending,
 		'num_rename_pending' => $total_num_rename_pending,
+		'num_fsck_pending' => $total_num_fsck_pending,
 	);
 	
 	$queues['Spooled'] = (int) exec("ls -1 /var/spool/greyhole | wc -l");
@@ -335,7 +342,7 @@ if ($action == 'view-queue') {
 	} else {
 		echo "\nGreyhole Work Queue Statistics\n==============================\n\n";
 		echo "This table gives you the number of pending operations queued for the Greyhole daemon, per share.\n\n";
-		printf("%$max_share_strlen"."s  Write   Delete  Rename\n", '');
+		printf("%$max_share_strlen"."s  Write   Delete  Rename  Repair (fsck)\n", '');
 
 		foreach ($queues as $share_name => $queue) {
 			if ($share_name == 'Spooled') continue;
@@ -348,7 +355,8 @@ if ($action == 'view-queue') {
 			echo sprintf("%-$max_share_strlen"."s", $share_name) . "  ";
 			echo sprintf('%-7s', $queue->num_writes_pending) . " ";
 			echo sprintf('%-7s', $queue->num_delete_pending) . " ";
-			echo sprintf('%-7s', $queue->num_rename_pending) . "\n";
+			echo sprintf('%-7s', $queue->num_rename_pending) . " ";
+			echo sprintf('%-7s', $queue->num_fsck_pending) . "\n";
 		}
 
 		echo "\nThe following is the number of pending operations that the Greyhole daemon still needs to parse.\n";
