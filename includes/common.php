@@ -482,9 +482,8 @@ function memory_check(){
         $used = $usage/$memory_limit;
         $used = $used * 100;
         if($used > 95){
-                return False;
+		gh_log(CRITICAL,$used.'% memory usage, exiting. Please increase memory_limit in greyhole.conf.');
         }
-        return True;
 }
 
 class tombstone_iterator implements Iterator {
@@ -492,16 +491,16 @@ class tombstone_iterator implements Iterator {
 	private $share;
 	private $load_nok_tombstones;
 	private $quiet;
+	private $check_symlink;
 	private $tombstones;
 	private $graveyards;
 	private $dir_handle;
-	private $count;
 
-	public function __construct($share, $path, $filename=NULL, $load_nok_tombstones=FALSE, $quiet=FALSE, $block_size=1000) {
+	public function __construct($share, $path, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
 		$this->quiet = $quiet;
 		$this->share = $share;
 		$this->path = $path;
-		$this->filename = $filename;
+		$this->check_symlink = $check_symlink;
 		$this->load_nok_tombstones = $load_nok_tombstones;
 	}
 
@@ -510,8 +509,6 @@ class tombstone_iterator implements Iterator {
 		$this->directory_stack = array($this->path);
 		$this->dir_handle = NULL;
 		$this->tombstones = array();
-		$this->iterCount = 0;
-		$this->first = TRUE;
 		$this->next();
 	}
 
@@ -524,18 +521,7 @@ class tombstone_iterator implements Iterator {
 	}
 
 	public function next() {
-		if(!$this->first){
-			$this->iterCount++;
-		}else{
-			$this->first = FALSE;
-		}
 		$this->tombstones = array();
-		if($this->filename !== NULL){
-			$this->tombstones[$this->filename] = get_tombstones_for_file($this->share, $this->path, $this->filename, $this->load_nok_tombstones, $this->quiet);
-			$this->filename = NULL;
-			$this->directory_stack = array();
-			return $this->tombstones;
-		}
 		while(count($this->directory_stack)>0 && $this->directory_stack !== NULL){
 			$this->dir = array_pop($this->directory_stack);
 			if($this->quiet == FALSE){
@@ -549,10 +535,7 @@ class tombstone_iterator implements Iterator {
 				}	
 				if($this->dir_handle = opendir($this->base.$this->dir)){
 					while (false !== ($file = readdir($this->dir_handle))){
-						if(!memory_check()){
-							gh_log(ERROR,'Memory usage is >95%, exiting. Please increase memory_limit in greyhole.conf.');
-							exit(1);
-						}
+						memory_check();
 						if($file=='.' || $file=='..')
 							continue;
 						if(!empty($this->dir)){
@@ -566,7 +549,7 @@ class tombstone_iterator implements Iterator {
 							if(isset($this->tombstones[$full_filename])) {
 								continue;
 							}						
-							$this->tombstones[$full_filename] = get_tombstones_for_file($this->share, "$this->dir", $file, $this->load_nok_tombstones, $this->quiet);
+							$this->tombstones[$full_filename] = get_tombstones_for_file($this->share, "$this->dir", $file, $this->load_nok_tombstones, $this->quiet, $this->check_symlink);
 						}
 					}
 					closedir($this->dir_handle);
@@ -583,11 +566,7 @@ class tombstone_iterator implements Iterator {
 	}
 	
 	public function valid(){
-		if(count($this->tombstones)){
-			return TRUE;
-		}else{
-			return FALSE;
-		}
+		return count($this->tombstones) > 0;
 	}
 }
 

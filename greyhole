@@ -1614,7 +1614,7 @@ function get_tombstone_data_filenames($share, $path, $filename, $how_many=9999) 
 
 function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE){
 	if($filename === null){
-		return new tombstone_iterator($share, $path, $filename, $load_nok_tombstones, $quiet, $check_symlink);
+		return new tombstone_iterator($share, $path, $load_nok_tombstones, $quiet, $check_symlink);
 	}else{
 		return array(get_tombstones_for_file($share,$path,$filename,$load_nok_tombstones,$quiet,$check_symlink));
 	}	
