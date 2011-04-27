@@ -31,6 +31,7 @@ if ($action == 'unknown') {
 process_config();
 
 db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
+repair_tables();
 db_migrate();
 
 if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status' && $action != 'getuid') {
@@ -501,8 +502,6 @@ if ($action == 'prerotate') {
 	echo "Samba log parsed successfully. You can now rotate the log, then reset the read pointer using --postrotate\n";
 	exit(0);
 }
-
-repair_tables();
 
 if ($action == 'postrotate') {
 	$query = sprintf("UPDATE settings SET value = '0' WHERE name = '%s'", 'last_read_log_smbd_line');
