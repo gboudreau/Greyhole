@@ -48,15 +48,11 @@ file, but you already have Greyhole installed.
 		
 		# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
-		mysql -u greyhole_user -p89y63jdwe greyhole < ${GREYHOLE_INSTALL_DIR}/schema-mysql.sql
-
-	If using SQLite:
-
-		sqlite -u /var/cache/greyhole.db < ${GREYHOLE_INSTALL_DIR}/schema-sqlite.sql
+		mysql -u greyhole_user -p89y63jdwe greyhole < /usr/share/greyhole/schema-mysql.sql
 
 3. Cutomize the Greyhole configuration file:
 
-	sudo cp ${GREYHOLE_INSTALL_DIR}/greyhole.example.conf /etc/greyhole.conf
+	sudo cp /usr/share/greyhole/greyhole.example.conf /etc/greyhole.conf
 	
 	Cutomize /etc/greyhole.conf as needed.
 
