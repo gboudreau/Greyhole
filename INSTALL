@@ -1,8 +1,12 @@
 Greyhole Installation Instructions
 ==================================
 
-The following instructions are for Fedora 12 or Ubuntu 9/10.
+The following instructions are for Fedora 12+ or Ubuntu 9+.
 If you know what you're doing, you should have no problem installing on any other Linux variant.
+
+Greyhole comes as RPM or DEB packages. If your distribution supports those, you should definitely install one of them.
+Once you did, look in /usr/share/greyhole/USAGE for configuration instructions.
+If you can't install a pre-packaged version, follow the steps below to install from source.
 
 Amahi (http://www.amahi.org) comes with Greyhole pre-installed.
 If you're looking for an easy way to try Greyhole, in a virtual machine or a spare computer, installing Amahi might be the easiest way to get a working Greyhole install.
