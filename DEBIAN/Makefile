@@ -13,7 +13,6 @@ deb: build
 	rm greyhole.cron.d
 	rm greyhole.cron.weekly
 	rm greyhole.cron.daily
-	rm Logo.psd
 	rm upstart.conf
 	rm UPGRADING
 	rm CHANGES

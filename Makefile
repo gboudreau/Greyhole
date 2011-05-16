@@ -39,8 +39,8 @@ amahi-rpm: dist
 
 dist:
 	(mkdir -p release && cd release && mkdir -p $(PACKAGE)-$(VERSION))
-	rsync -a --exclude .svn/ --exclude make_rpm.sh --exclude make_deb.sh --exclude DEBIAN/ --exclude release/ * release/$(PACKAGE)-$(VERSION)/
-	(cd release/$(PACKAGE)-$(VERSION)/ && svn log -r 1:HEAD http://greyhole.googlecode.com/svn/trunk/ > CHANGES)
+	rsync -a --exclude .svn/ --exclude .git/ --exclude Logo.psd --exclude make_rpm.sh --exclude make_deb.sh --exclude DEBIAN/ --exclude release/ * release/$(PACKAGE)-$(VERSION)/
+	(cd release/$(PACKAGE)-$(VERSION)/ && git clone git@github.com:gboudreau/Greyhole.git; cd Greyhole; git log --pretty=oneline --reverse | cut -d ' ' -f2-  | grep -v '^Tag: ' > ../CHANGES; cd ..; rm -rf Greyhole)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' greyhole)
 
