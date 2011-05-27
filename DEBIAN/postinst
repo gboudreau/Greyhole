@@ -30,7 +30,7 @@ if [ -f /sbin/start ]; then
 	# Using Upstart instead of SYSV init.d
 	if [ -f /etc/init.d/greyhole ]; then
 		rm /etc/init.d/greyhole
-		stop greyhole 2> /dev/null > /dev/null
+		stop greyhole 2> /dev/null > /dev/null || true
 		start greyhole 2> /dev/null > /dev/null
 	fi
 	if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
