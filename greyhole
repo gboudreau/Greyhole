@@ -136,10 +136,17 @@ if ($action == 'gone' || $action == 'going') {
 		}
 	}
 
-	// Remove $options['dir'] from config file and restart (if it was running)
+	// Remove $going_dir from config file and restart (if it was running)
 	$escaped_dir = str_replace('/', '\/', $going_dir);
-	exec("/bin/sed -ie 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf");
-	exec("/sbin/service greyhole condrestart");
+	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf");
+	if (is_file('/sbin/restart')) {
+	    $running = (int) exec('status greyhole | grep running | wc -l');
+	    if ($running) {
+	        exec("/sbin/restart greyhole");
+	    }
+	} else {
+	    exec("/sbin/service greyhole condrestart");
+	}
 
 	// For Amahi users
 	if (file_exists('/usr/bin/hdactl')) {
