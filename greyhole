@@ -380,7 +380,7 @@ if ($action == 'view-queue') {
 }
 
 if ($action == 'status') {
-	$last_log_line = exec("tail -1 " . escapeshellarg($greyhole_log_file));
+	$last_log_line = exec("tail -2 " . escapeshellarg($greyhole_log_file) . ' | head -1');
 	$last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
 	$raw_last_log_line = mb_substr($last_log_line, 16);
 	$last_log_line = explode(' ', $raw_last_log_line);
