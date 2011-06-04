@@ -76,6 +76,12 @@ else
 	ln -s ${LIBDIR}/greyhole/greyhole-samba.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
+if [ ! -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
+	echo "Error: missing symlink ${LIBDIR}/samba/vfs/greyhole.so"
+	echo "Please try re-installing this RPM."
+	exit 1
+fi
+
 if [ -f /etc/logrotate.d/syslog ]; then
 	# Undo changes to /etc/logrotate.d/syslog
 	grep -v greyhole /etc/logrotate.d/syslog > /etc/logrotate.d/syslog.new
