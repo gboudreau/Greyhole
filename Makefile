@@ -1,5 +1,5 @@
-VERSION=0.9.6
-ARCH=amd64
+VERSION=0.9.8
+ARCH=x86_64
 PACKAGE=greyhole
 
 deb: dist
