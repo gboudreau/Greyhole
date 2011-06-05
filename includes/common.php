@@ -435,6 +435,11 @@ if ($arch != 'x86_64') {
 		}
 		return (string) $result;
 	}
+	
+	function gh_rename($filename, $target_filename) {
+		exec("mv ".escapeshellarg($filename)." ".escapeshellarg($target_filename)." 2>/dev/null", $output, $result);
+		return $result === 0;
+	}
 } else {
 	gh_log(DEBUG, "64-bit system detected: Greyhole will use PHP built-in file functions.");
 
@@ -473,6 +478,10 @@ if ($arch != 'x86_64') {
 			return FALSE;
 		}
 		return $stat['dev'];
+	}
+
+	function gh_rename($filename, $target_filename) {
+	    return rename($filename, $target_filename);
 	}
 }
 

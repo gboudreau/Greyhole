@@ -123,7 +123,7 @@ if ($action == 'gone' || $action == 'going') {
 		$going_dir = $options['dir'];
 
 		// Renaming that file will insure this drive won't be used while we're moving files away
-		rename("$going_dir/.greyhole_uses_this", "$going_dir/.greyhole_used_this");
+		gh_rename("$going_dir/.greyhole_uses_this", "$going_dir/.greyhole_used_this");
 
 		// fsck shares with only 1 file copy to remove those from $options['dir']
 		initialize_fsck_report('Shares with only 1 copy');
@@ -785,7 +785,7 @@ function execute_next_task() {
 			gh_write($task->share, $task->full_path, $task->id);
 			break;
 		case 'rename':
-			gh_rename($task->share, $task->full_path, $task->additional_info, $task->id);
+			gh_mv($task->share, $task->full_path, $task->additional_info, $task->id);
 			break;
 		case 'unlink':
 			gh_unlink($task->share, $task->full_path, $task->id);
@@ -906,7 +906,7 @@ function is_a_graveyard_dir($share, $full_path) {
 	return FALSE;
 }
 
-function gh_rename($share, $full_path, $target_full_path, $task_id) {
+function gh_mv($share, $full_path, $target_full_path, $task_id) {
 	global $storage_pool_directories, $log_level, $sleep_before_task;
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
@@ -925,17 +925,17 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 				list($path, $dirname) = explode_full_path("$target_drive/$share/$target_full_path");
 				gh_mkdir($path, $original_path);
 
-				rename("$target_drive/$share/$full_path", "$target_drive/$share/$target_full_path");
+				gh_rename("$target_drive/$share/$full_path", "$target_drive/$share/$target_full_path");
 				gh_log(DEBUG, "  Directory moved: $target_drive/$share/$full_path -> $target_drive/$share/$target_full_path");
 			}
 
 			list($path, $dirname) = explode_full_path("$target_drive/.gh_graveyard/$share/$target_full_path");
 			gh_mkdir($path, $original_path);
-			$result = @rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
+			$result = @gh_rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
 			if ($result) {
 				gh_log(DEBUG, "  Graveyard directory moved: $target_drive/.gh_graveyard/$share/$full_path -> $target_drive/.gh_graveyard/$share/$target_full_path");
 			}
-			$result = @rename("$target_drive/.gh_graveyard_backup/$share/$full_path", "$target_drive/.gh_graveyard_backup/$share/$target_full_path");
+			$result = @gh_rename("$target_drive/.gh_graveyard_backup/$share/$full_path", "$target_drive/.gh_graveyard_backup/$share/$target_full_path");
 			if ($result) {
 				gh_log(DEBUG, "  Backup graveyard directory moved: $target_drive/.gh_graveyard_backup/$share/$full_path -> $target_drive/.gh_graveyard_backup/$share/$target_full_path");
 			}
@@ -1032,7 +1032,7 @@ function gh_rename($share, $full_path, $target_full_path, $task_id) {
 					list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
 					gh_mkdir($tombstone_dir_path, $original_path);
 
-					$it_worked = rename($old_path, $tombstone->path);
+					$it_worked = gh_rename($old_path, $tombstone->path);
 
 					if ($it_worked) {
 						// is_linked = is the target of the existing symlink
@@ -1413,7 +1413,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			$target_dev = gh_file_deviceid($tombstone_dir_path);
 			if ($source_dev === $target_dev && $source_dev !== FALSE) {
 				gh_log(DEBUG, "  (using rename)");
-				rename("$landing_zone/$full_path", $temp_path);
+				gh_rename("$landing_zone/$full_path", $temp_path);
 				$copied = FALSE;
 			} else {
 				exec("rsync -t " . escapeshellarg("$landing_zone/$full_path") . " " . escapeshellarg($temp_path));
@@ -1426,7 +1426,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		}
 		
 		if ($it_worked) {
-			rename($temp_path, $tombstone->path);
+			gh_rename($temp_path, $tombstone->path);
 			gh_chperm($tombstone->path, $file_infos);
 		} else {
 			gh_log(WARN, "    Failed file copy. Will mark this tombstone 'Gone'.");
@@ -1470,7 +1470,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			gh_log(DEBUG, "    Creating symlink in share pointing to the above file copy.");
 			symlink($tombstone->path, "$landing_zone/$path/.gh_$filename");
 			if (!file_exists("$landing_zone/$full_path") || unlink("$landing_zone/$full_path")) {
-				rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
+				gh_rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
 			} else {
 				unlink("$landing_zone/$path/.gh_$filename");
 			}
@@ -1509,7 +1509,7 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
 		while ($i <= count($dir_parts)) {
 			if (!is_dir($parent_directory) && !mkdir($parent_directory, $dir_infos->fileperms)) {
 				if (gh_is_file($parent_directory)) {
-					rename($parent_directory, "$parent_directory (file copy)");
+					gh_rename($parent_directory, "$parent_directory (file copy)");
 				}
 				if (!mkdir($parent_directory, $dir_infos->fileperms)) {
 					gh_log(WARN, "  Failed to create directory $parent_directory");
@@ -2738,7 +2738,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 					exec("rsync -t " . escapeshellarg($original_file_path) . " " . escapeshellarg($temp_path));
 					$it_worked = file_exists($temp_path) && file_exists($original_file_path) && gh_filesize($temp_path) == gh_filesize($original_file_path);
 					if ($it_worked) {
-						rename($temp_path, $tombstone->path);
+						gh_rename($temp_path, $tombstone->path);
 						gh_chperm($tombstone->path, gh_get_file_infos($original_file_path));
 						$tombstone->state = 'OK';
 						$num_copies_current++;
@@ -3031,7 +3031,7 @@ function gh_recycle($real_path) {
 		if (@is_dir($target_path)) {
 			exec("rm -rf " . escapeshellarg($target_path));
 		}
-		if (@rename($real_path, $target_path)) {
+		if (@gh_rename($real_path, $target_path)) {
 			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
 			
 			// Create a symlink in the Greyhole Attic share, to allow the user to remove this file using that share
@@ -3501,9 +3501,9 @@ function gh_balance() {
 				$temp_path = get_temp_filename("$target_drive/$share_name/$full_path");
 				$file_infos = gh_get_file_infos($file);
 				gh_log(DEBUG, "  Moving file copy...");
-				$it_worked = rename($file, $temp_path);
+				$it_worked = gh_rename($file, $temp_path);
 				if ($it_worked) {
-					rename($temp_path, "$target_drive/$share_name/$full_path");
+					gh_rename($temp_path, "$target_drive/$share_name/$full_path");
 					gh_chperm("$target_drive/$share_name/$full_path", $file_infos);
 
 					$pool_drives_avail_space[$target_drive] -= $filesize;
