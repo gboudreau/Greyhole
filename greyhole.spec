@@ -101,6 +101,10 @@ fi
 /sbin/chkconfig greyhole on
 /sbin/service greyhole condrestart 2>&1 > /dev/null
 
+echo "==========================================================================="
+echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
+echo "==========================================================================="
+
 %preun
 
 if [ "$1" != 0 ]; then

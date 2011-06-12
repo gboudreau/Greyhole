@@ -21,8 +21,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 1. Install the required applications: PHP 5+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
-	Fedora: sudo yum -y install mysql-server php php-mysql php-mbstring samba samba-common patch gcc yum-utils php-pear rsync
-	Ubuntu: sudo apt-get -y install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
+	Fedora: yum -y install mysql-server php php-mysql php-mbstring samba samba-common patch gcc yum-utils php-pear rsync
+	Ubuntu: apt-get -y install mysql-server php5-cli php5-mysql samba samba-common samba-common-bin build-essential php-pear rsync
 
 2. Install Greyhole (as root):
 
@@ -62,6 +62,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 	Fedora: service smb restart
 	Ubuntu: /etc/init.d/samba restart, or restart smbd
+	Debian: service samba restart
 
 3. For Samba other than 3.4/3.5: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
@@ -84,11 +85,12 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
 	make
-	if [ -x /usr/lib64/samba/vfs/ ]; then sudo cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else sudo cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
+	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
-	Fedora: sudo service smb restart
-	Ubuntu (< 10): sudo /etc/init.d/samba restart
-	Ubuntu (10+): sudo restart smbd
+	Fedora: service smb restart
+	Ubuntu (< 10): /etc/init.d/samba restart
+	Ubuntu (10+): restart smbd
+	Debian: service samba restart
 	
 	Note: if, for some reason, you need to compile the VFS module with Samba 3.4, use the following instead of the above cp & patch commands, after running ./configure, then continue with make:
 		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
@@ -96,9 +98,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 4. Add Greyhole to services that start on boot:
 
-	Fedora: sudo chkconfig --add greyhole; sudo chkconfig greyhole on
-	Ubuntu (< 10): sudo update-rc.d greyhole defaults 98 20
+	Fedora: chkconfig --add greyhole; chkconfig greyhole on
+	Ubuntu (< 10): update-rc.d greyhole defaults 98 20
 	Ubuntu (10+): [nothing to do]
+	Debian: update-rc.d greyhole defaults
 
 5. Work around problems with the CIFS client (as root):
     Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid

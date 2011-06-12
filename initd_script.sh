@@ -1,9 +1,9 @@
 #!/bin/sh
-#
+
 ### BEGIN INIT INFO
 # Provides:          greyhole
-# Required-Start:    $network $local_fs $remote_fs mysqld smb
-# Required-Stop:     $network $local_fs $remote_fs mysqld smb
+# Required-Start:    mysqld smb
+# Required-Stop:     mysqld smb
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: start Greyhole daemon
@@ -30,57 +30,71 @@ if [ -f /etc/rc.d/init.d/functions ]; then
 	. /etc/rc.d/init.d/functions
 fi
 
+if [ -f /lib/lsb/init-functions ]; then
+	. /lib/lsb/init-functions
+fi
+
 DAEMON="greyhole"
 PIDFILE="/var/run/greyhole.pid"
-LOCKFILE="/var/lock/subsys/greyhole"
+COMMAND="$1"
 
 status () {
-	PID=`cat $PIDFILE`
-	if [ -f $PIDFILE -a "`ps ax | grep \"^ *$PID.*greyhole --daemon\" | grep -v grep | wc -l`" == "1" ]; then
-		echo "Greyhole is running."
+	PID=`cat $PIDFILE 2> /dev/null`
+	if [ -f $PIDFILE -a "`ps ax | grep \"^ *$PID.*greyhole --daemon\" | grep -v grep | wc -l`" -eq "1" ]; then
+		[ "$COMMAND" = "status" ] && echo "Greyhole is running."
+    	return 0
 	else
-		echo "Greyhole isn't running."
+		[ "$COMMAND" = "status" ] && echo "Greyhole isn't running."
+    	return 1
 	fi
-	exit $?
 }
 
 daemon_start () {
 	nice -n 1 $DAEMON --daemon > /dev/null &
 	RETVAL=$?
 	if [ $RETVAL -eq 0 ]; then
-		touch $LOCKFILE
 		ps ax | grep "$DAEMON --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
 	fi
 	return $RETVAL
 }
 
 start () {
-	if [ -f $PIDFILE ]; then
-		PID=`cat $PIDFILE`
-	fi
-	if [ -f $LOCKFILE -a -f $PIDFILE -a "`ps ax | grep \"^$PID.*greyhole --daemon\" | wc -l`" == "1" ]; then
-		echo "Greyhole is already running."
-		return 0
-	fi
-	echo -n $"Starting Greyhole ... "
-	daemon +5 --check $DAEMON $0 daemon_start
-	RETVAL=$?
-	if [ $RETVAL -eq 0 ]; then
-		success $"$base startup"
+	echo -n "Starting Greyhole ... "
+	status && echo "greyhole already running." && return 0
+	if [ -f /sbin/start-stop-daemon ]; then
+	    start-stop-daemon --start --pidfile $PIDFILE --exec $0 --background -- daemon_start
+    	RETVAL=$?
+    	if [ $RETVAL -eq 0 ]; then
+    		echo "OK"
+    	else
+    		echo "FAILED"
+    	fi
 	else
-		failure $"$base startup"
+    	daemon +5 --check $DAEMON $0 daemon_start
+    	RETVAL=$?
+    	if [ $RETVAL -eq 0 ]; then
+    		success $"$base startup"
+    	else
+    		failure $"$base startup"
+    	fi
+    	echo
 	fi
-	echo
 	return $RETVAL
 }
 
 stop () {
-	echo -n $"Shutting down Greyhole: "
-	killproc $DAEMON
-	RETVAL=$?
-	[ $RETVAL -eq 0 ] && success $"$base shutdown" || failure $"$base shutdown"
-	[ $RETVAL -eq 0 ] && rm -f $LOCKFILE $PIDFILE
-	echo
+	echo -n "Shutting down Greyhole ... "
+	if [ -f /sbin/start-stop-daemon ]; then
+	    start-stop-daemon --stop --quiet --retry=TERM/10/KILL/5 --pidfile $PIDFILE --name $DAEMON
+    	RETVAL=$?
+	    [ $RETVAL -eq 0 ] && echo "OK" || echo "FAILED"
+	else
+    	killproc $DAEMON
+    	RETVAL=$?
+    	[ $RETVAL -eq 0 ] && success $"$base shutdown" || failure $"$base shutdown"
+    	echo
+    fi
+	[ $RETVAL -eq 0 ] && rm -f $PIDFILE
 	return $ret
 }
 
@@ -91,10 +105,10 @@ restart () {
 }
 
 condrestart () {
-    [ -e $LOCKFILE ] && restart || :
+    status && restart || :
 }
 
-case "$1" in
+case "$COMMAND" in
 	status)
 		status
 		;;

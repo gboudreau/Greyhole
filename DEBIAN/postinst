@@ -38,6 +38,19 @@ if [ -f /sbin/start ]; then
 	fi
 else
 	# (SYSV) Service install & start
+	if [ -f /etc/init/greyhole.conf ]; then
+		rm /etc/init/greyhole.conf
+	fi
+	if [ -f /etc/init.d/mysql ]; then
+	    sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
+    fi
+    if [ -f /etc/init.d/samba ]; then
+        sed -i 's/smb/samba/' /etc/init.d/greyhole
+    fi
 	update-rc.d greyhole defaults
 	service greyhole condrestart 2>&1 > /dev/null
 fi
+
+echo "==========================================================================="
+echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
+echo "==========================================================================="

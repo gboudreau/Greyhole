@@ -8,6 +8,9 @@ See the INSTALL file for installation instructions.
 If you installed using a pre-packaged RPM or DEB, you won't have any INSTALL 
 file, but you already have Greyhole installed.
 
+Most of the commands below require root access, so now would be a good time 
+to become root, if you're not already.
+
 1. Setup Samba:
 
 	Edit /etc/samba/smb.conf
@@ -33,18 +36,20 @@ file, but you already have Greyhole installed.
 		    dfree command = /usr/bin/greyhole-dfree
 		    vfs objects = greyhole
 
-	Fedora: sudo service smb restart
-	Ubuntu (< 10): sudo /etc/init.d/samba restart
-	Ubuntu (10+): sudo restart smbd
+	Fedora: service smb restart
+	Ubuntu (< 10): /etc/init.d/samba restart
+	Ubuntu (10+): restart smbd
+	Debian: service samba restart
 
 2. Setup the database:
 
 	If using MySQL:
 
 		# Make sure your MySQL server service (mysqld) is running, and runs on boot.
-		Fedora: sudo service mysqld start; sudo chkconfig mysqld on
-		Ubuntu (< 10): sudo /etc/init.d/mysqld start; sudo update-rc.d mysqld defaults
+		Fedora: service mysqld start; chkconfig mysqld on
+		Ubuntu (< 10): /etc/init.d/mysqld start; update-rc.d mysqld defaults
 		Ubuntu (10+): start mysql
+		Debian: service mysql start
 		
 		# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
@@ -52,7 +57,7 @@ file, but you already have Greyhole installed.
 
 3. Cutomize the Greyhole configuration file:
 
-	sudo cp /usr/share/greyhole/greyhole.example.conf /etc/greyhole.conf
+	cp /usr/share/greyhole/greyhole.example.conf /etc/greyhole.conf
 	
 	Cutomize /etc/greyhole.conf as needed.
 
@@ -67,9 +72,10 @@ file, but you already have Greyhole installed.
 
 5. Start the Greyhole service:
 
-	Fedora: sudo service greyhole start
-	Ubuntu (< 10): sudo /etc/init.d/greyhole start
-	Ubuntu (10+): sudo start greyhole
+	Fedora: service greyhole start
+	Ubuntu (< 10): /etc/init.d/greyhole start
+	Ubuntu (10+): start greyhole
+	Debian: service greyhole start
 
 
 Check for errors in the Greyhole log file: /var/log/greyhole.log
