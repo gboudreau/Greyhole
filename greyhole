@@ -595,7 +595,7 @@ while (TRUE) {
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks;
+	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
 
 	if (isset($next_task)) {
 		$task = $next_task;
@@ -785,6 +785,7 @@ function execute_next_task() {
 			gh_write($task->share, $task->full_path, $task->id);
 			break;
 		case 'rename':
+		    $fix_symlinks_scanned_dirs = array();
 			gh_mv($task->share, $task->full_path, $task->additional_info, $task->id);
 			break;
 		case 'unlink':
@@ -942,9 +943,9 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 		}
 
 		foreach (get_tombstones($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_tombstones){
-			gh_log(DEBUG, "Existing tombstones " . count($existing_tombstones));
+			gh_log(DEBUG, "Existing tombstones: " . count($existing_tombstones));
 			foreach ($existing_tombstones as $file_path => $file_tombstones) {
-				gh_log(DEBUG, "file tombstones " . count($file_tombstones));
+				gh_log(DEBUG, "  File tombstones: " . count($file_tombstones));
 				$new_file_tombstones = array();
 				$symlinked = FALSE;
 				foreach ($file_tombstones as $key => $tombstone) {
@@ -1076,8 +1077,13 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 }
 
 function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
-	global $storage_pool_directories;
+	global $storage_pool_directories, $fix_symlinks_scanned_dirs;
+	if (isset($fix_symlinks_scanned_dirs[$landing_zone])) {
+	    return;
+	}
+	gh_log(INFO, "  Scanning $landing_zone for broken links... This can take a while!");
 	exec("find -L " . escapeshellarg($landing_zone) . " -type l", $broken_links);
+	gh_log(DEBUG, "    Found " . count($broken_links) . " broken links.");
 	foreach ($broken_links as $broken_link) {
 		$fixed_link_target = readlink($broken_link);
 		foreach ($storage_pool_directories as $dir) {
@@ -1093,6 +1099,7 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
 			symlink($fixed_link_target, $broken_link);
 		}
 	}
+	$fix_symlinks_scanned_dirs[$landing_zone] = TRUE;
 }
 
 function gh_file_exists($real_path, $log_message=null) {
