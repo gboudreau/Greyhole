@@ -1,12 +1,13 @@
 Greyhole Installation Instructions
 ==================================
 
-The following instructions are for Fedora 12+ or Ubuntu 9+.
-If you know what you're doing, you should have no problem installing on any other Linux variant.
-
 Greyhole comes as RPM or DEB packages. If your distribution supports those, you should definitely install one of them.
-Once you did, look in /usr/share/greyhole/USAGE for configuration instructions.
+They are available from http://greyhole.net/download/
+Once you did, look in /usr/share/greyhole/USAGE (or online https://raw.github.com/gboudreau/Greyhole/master/USAGE) for configuration instructions.
 If you can't install a pre-packaged version, follow the steps below to install from source.
+
+The following instructions have been tested on Fedora 12, and Ubuntu 9 & 10.
+If you know what you're doing, you should have no problem installing on any other Linux variant.
 
 Amahi (http://www.amahi.org) comes with Greyhole pre-installed.
 If you're looking for an easy way to try Greyhole, in a virtual machine or a spare computer, installing Amahi might be the easiest way to get a working Greyhole install.
@@ -17,7 +18,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
       With this bug present, trying to delete files on Greyhole shares will not work!
       Make sure the Samba version you use includes this fix, or isn't affected by this bug.
       Also, there have been reports that the Debian-bundled version of Samba would sometime show symlinks as 0-bytes files, to clients.
-      If you have such issues, you should compile the latest Samba stable manually and use that.
+      If you have such issues, you should upgrade to Samba 3.5+ from the Sernet repo, using instructions such as http://www.faqforge.com/linux/distributions/centos/updating-samba-on-centos-5/
+      or compile the latest Samba stable manually and use that.
 
 1. Install the required applications: PHP 5+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
@@ -26,7 +28,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 2. Install Greyhole (as root):
 
-	Get the latest version from http://code.google.com/p/greyhole/downloads/list
+	Get the latest Source Install TGZ from http://greyhole.net/download/
+
 	tar zxf greyhole-*.tar.gz
 	cd greyhole-*
 	GREYHOLE_INSTALL_DIR=`pwd`
@@ -112,4 +115,6 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 
 You are now ready to configure and use Greyhole.
-See the USAGE file for details.
+See the USAGE file for details:
+	/usr/share/greyhole/USAGE
+	or online https://raw.github.com/gboudreau/Greyhole/master/USAGE

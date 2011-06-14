@@ -6,8 +6,12 @@
 # Required-Stop:     mysqld smb
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: start Greyhole daemon
+# Short-Description: Starts the Greyhole daemon.
 ### END INIT INFO
+
+### For CentOS
+# chkconfig:         2345 20 80
+# description:       Starts the Greyhole daemon.
 
 # Copyright 2009 Guillaume Boudreau
 # 
