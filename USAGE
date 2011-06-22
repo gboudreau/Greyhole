@@ -4,9 +4,7 @@ Greyhole Configuration Instructions
 The following are instructions on how to configure and run Greyhole.
 
 You need Greyhole installed for those instructions to make sense. 
-See the INSTALL file for installation instructions.
-If you installed using a pre-packaged RPM or DEB, you won't have any INSTALL 
-file, but you already have Greyhole installed.
+See https://github.com/gboudreau/Greyhole/wiki/Installing for details.
 
 Most of the commands below require root access, so now would be a good time 
 to become root, if you're not already.
