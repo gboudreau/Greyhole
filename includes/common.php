@@ -66,6 +66,7 @@ $attic_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle
 function parse_config() {
 	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks, $memory_limit;
 
+	$parsing_dir_selection_groups = FALSE;
 	$shares_options = array();
 	$storage_pool_directories = array();
 	$frozen_directories = array();
@@ -77,6 +78,7 @@ function parse_config() {
 			if ($name[0] == '#') {
 				continue;
 			}
+			$parsing_dir_selection_groups = FALSE;
 			switch($name) {
 				case 'log_level':
 					global ${$name};
@@ -114,6 +116,20 @@ function parse_config() {
 				case 'memory_limit':
 					ini_set('memory_limit',$value);
 					$memory_limit = $value;
+					break;
+				case 'dir_selection_groups':
+				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
+    				    global $dir_selection_groups;
+				        $group_name = trim($regs[1]);
+				        $dirs = array_map('trim', explode(',', $regs[2]));
+						$dir_selection_groups[$group_name] = $dirs;
+						$parsing_dir_selection_groups = TRUE;
+					}
+					break;
+				case 'dir_selection_algorithm':
+				    global $dir_selection_algorithm;
+				    $dir_selection_algorithm = DirectorySelection::parse($value, $dir_selection_groups);
+				    break;
 				default:
 					if (mb_strpos($name, 'num_copies') === 0) {
 						$share = mb_substr($name, 11, mb_strlen($name)-12);
@@ -121,6 +137,20 @@ function parse_config() {
 					} else if (mb_strpos($name, 'delete_moves_to_attic') === 0) {
 						$share = mb_substr($name, 22, mb_strlen($name)-23);
 						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
+					} else if (mb_strpos($name, 'dir_selection_groups') === 0) {
+						$share = mb_substr($name, 21, mb_strlen($name)-22);
+    				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
+    						$group_name = trim($regs[1]);
+    						$dirs = array_map('trim', explode(',', $regs[2]));
+    						$shares_options[$share]['dir_selection_groups'][$group_name] = $dirs;
+    						$parsing_dir_selection_groups = $share;
+    					}
+					} else if (mb_strpos($name, 'dir_selection_algorithm') === 0) {
+						$share = mb_substr($name, 24, mb_strlen($name)-25);
+						if (!isset($shares_options[$share]['dir_selection_groups'])) {
+						    $shares_options[$share]['dir_selection_groups'] = $dir_selection_groups;
+						}
+						$shares_options[$share]['dir_selection_algorithm'] = DirectorySelection::parse($value, $shares_options[$share]['dir_selection_groups']);
 					} else {
 						global ${$name};
 						if (is_numeric($value)) {
@@ -130,7 +160,22 @@ function parse_config() {
 						}
 					}
 			}
-		}
+		} else if ($parsing_dir_selection_groups !== FALSE) {
+			$value = trim($line);
+			if (strlen($value) == 0 || $value[0] == '#') {
+			    continue;
+			}
+		    if (preg_match("/(.+):(.+)/", $value, $regs)) {
+				$group_name = trim($regs[1]);
+				$dirs = array_map('trim', explode(',', $regs[2]));
+				if (is_string($parsing_dir_selection_groups)) {
+				    $share = $parsing_dir_selection_groups;
+    				$shares_options[$share]['dir_selection_groups'][$group_name] = $dirs;
+				} else {
+    				$dir_selection_groups[$group_name] = $dirs;
+				}
+			}
+	    }
 	}
 	
 	if (is_array($storage_pool_directories) && count($storage_pool_directories) > 0) {
@@ -168,18 +213,27 @@ function parse_config() {
 		}
 		if ($share_options['num_copies'] > count($storage_pool_directories)) {
 			$share_options['num_copies'] = count($storage_pool_directories);
-			$shares_options[$share_name] = $share_options;
 		}
 		if (!isset($share_options['landing_zone'])) {
 			global $config_file, $smb_config_file;
 			gh_log(WARN, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
 			return FALSE;
 		}
+		if (!isset($share_options['delete_moves_to_attic'])) {
+		    $share_options['delete_moves_to_attic'] = $delete_moves_to_attic;
+		}
+		if (!isset($share_options['dir_selection_algorithm']) && isset($dir_selection_algorithm)) {
+		    $share_options['dir_selection_algorithm'] = $dir_selection_algorithm;
+		}
+		if (isset($share_options['dir_selection_groups'])) {
+    		unset($share_options['dir_selection_groups']);
+		}
+		$shares_options[$share_name] = $share_options;
 		
 		// Validate that the landing zone is NOT a subdirectory of a storage pool directory!
 		foreach ($storage_pool_directories as $key => $target_drive) {
 			if (mb_strpos($share_options['landing_zone'], $target_drive) === 0) {
-				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pooled directory ($target_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pool directory ($target_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
 			}
 		}
 	}
@@ -945,5 +999,114 @@ var_dump( $result );
      $result[] = $cand1;
 
   return $result;
+}
+
+function kshift(&$arr) {
+    if (count($arr) == 0) {
+        return FALSE;
+    }
+    foreach ($arr as $k => $v) {
+        unset($arr[$k]);
+        break;
+    }
+    return array($k, $v);
+}
+
+function kshuffle(&$array) {
+    if (!is_array($array)) { return $array; }
+    $keys = array_keys($array);
+    shuffle($keys);
+    $random = array();
+    foreach ($keys as $key) {
+        $random[$key] = $array[$key];
+    }
+    $array = $random;
+}
+
+class DirectorySelection {
+    var $num_dirs_per_draft;
+    var $selection_algorithm;
+    var $directories;
+    
+    var $sorted_target_drives;
+    var $last_resort_sorted_target_drives;
+    
+    function __construct($num_dirs_per_draft, $selection_algorithm, $directories) {
+        $this->num_dirs_per_draft = $num_dirs_per_draft;
+        $this->selection_algorithm = $selection_algorithm;
+        $this->directories = $directories;
+    }
+    
+    function init(&$sorted_target_drives, &$last_resort_sorted_target_drives) {
+        // Shuffle or sort by available space (desc)
+        if ($this->selection_algorithm == 'random') {
+    		kshuffle($sorted_target_drives);
+    		kshuffle($last_resort_sorted_target_drives);
+        } else if ($this->selection_algorithm == 'most_available_space') {
+        	krsort($sorted_target_drives);
+    		krsort($last_resort_sorted_target_drives);
+		}
+		// Only keep directories that are in $this->directories
+        $this->sorted_target_drives = array();
+		foreach ($sorted_target_drives as $k => $v) {
+		    if (array_search($v, $this->directories) !== FALSE) {
+		        $this->sorted_target_drives[$k] = $v;
+		    }
+		}
+        $this->last_resort_sorted_target_drives = array();
+		foreach ($last_resort_sorted_target_drives as $k => $v) {
+		    if (array_search($v, $this->directories) !== FALSE) {
+		        $this->last_resort_sorted_target_drives[$k] = $v;
+		    }
+		}
+    }
+    
+    function draft() {
+        $drives = array();
+        $drives_last_resort = array();
+        
+        for ($i=0; $i<$this->num_dirs_per_draft; $i++) {
+            $arr = kshift($this->sorted_target_drives);
+            if ($arr === FALSE) {
+                break;
+            }
+            list($k, $v) = $arr;
+            $drives[$k] = $v;
+        }
+        for ($i=$i; $i<$this->num_dirs_per_draft; $i++) {
+            $arr = kshift($this->last_resort_sorted_target_drives);
+            if ($arr === FALSE) {
+                break;
+            }
+            list($k, $v) = $arr;
+            $drives_last_resort[$k] = $v;
+        }
+        
+        return array($drives, $drives_last_resort);
+    }
+    
+    static function parse($config_string, $dir_selection_groups) {
+        $ds = array();
+        if ($config_string == 'random' || $config_string == 'most_available_space') {
+            global $storage_pool_directories;
+            $ds[] = new DirectorySelection(count($storage_pool_directories), $config_string, $storage_pool_directories);
+            return $ds;
+        }
+        if (!preg_match('/forced ?\((.+)\) ?(random|most_available_space)/i', $config_string, $regs)) {
+            gh_log(CRITICAL, "Can't understand the dir_selection_algorithm value: $config_string");
+        }
+        $selection_algorithm = $regs[2];
+        $groups = array_map('trim', explode(',', $regs[1]));
+        foreach ($groups as $group) {
+            $group = explode(' ', preg_replace('/^([0-9]+)x/', '\\1 ', $group));
+            $num_dirs = trim($group[0]);
+            $group_name = trim($group[1]);
+            if ($num_dirs == 'all' || $num_dirs > count($dir_selection_groups[$group_name])) {
+                $num_dirs = count($dir_selection_groups[$group_name]);
+            }
+            $ds[] = new DirectorySelection($num_dirs, $selection_algorithm, $dir_selection_groups[$group_name]);
+        }
+        return $ds;
+    }
 }
 ?>

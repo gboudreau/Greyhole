@@ -2152,7 +2152,7 @@ function get_free_space_in_storage_pool_dirs() {
 }
 
 function order_target_drives($filesize_kb, $include_full_drives, $share, $path, $log_prefix='') {
-	global $storage_pool_directories, $minimum_free_space_pool_directories, $dir_selection_algorithm, $last_OOS_notification, $sticky_files;
+	global $storage_pool_directories, $minimum_free_space_pool_directories, $last_OOS_notification, $sticky_files, $shares_options;
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
 	$full_drives = array();
@@ -2210,9 +2210,33 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 		}
 		$sorted_target_drives[$available_space] = $target_drive;
 	}
-	if ($dir_selection_algorithm == 'most_available_space') {
-		krsort($sorted_target_drives);
-		krsort($last_resort_sorted_target_drives);
+
+	foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
+	    $ds->init($sorted_target_drives, $last_resort_sorted_target_drives);
+	}
+
+	$sorted_target_drives = array();
+	$last_resort_sorted_target_drives = array();
+	while (!$got_all_drives) {
+    	$num_empty_ds = 0;
+    	foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
+    	    list($drives, $drives_last_resort) = $ds->draft();
+    	    foreach ($drives as $k => $v) {
+    	        $sorted_target_drives[$k] = $v;
+    	    }
+    	    foreach ($drives_last_resort as $k => $v) {
+    	        $last_resort_sorted_target_drives[$k] = $v;
+    	    }
+    	    if (count($drives) == 0 && count($drives_last_resort) == 0) {
+    	        $num_empty_ds++;
+    	    }
+    	}
+	    if ($num_empty_ds == count($shares_options[$share]['dir_selection_algorithm'])) {
+	        // All DS are empty; exit.
+	        $got_all_drives = TRUE;
+	        var_dump('stopping; got all drives');
+	        break;
+	    }
 	}
 	
 	// Email notification when all dirs are over-capacity
@@ -2253,11 +2277,6 @@ You probably want to do something about this!
 			$query = sprintf("UPDATE settings SET value = '%s' WHERE name = '%s'", db_escape_string($last_OOS_notification), 'last_OOS_notification');
 			db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_OOS_notification': " . db_error());
 		}
-	}
-
-	if ($dir_selection_algorithm == 'random') {
-		shuffle($sorted_target_drives);
-		shuffle($last_resort_sorted_target_drives);
 	}
 	
 	global $log_level;
@@ -3003,11 +3022,7 @@ function gh_recycle($real_path) {
 
 			$share = mb_substr($full_path, 0, mb_strpos($full_path, '/'));
 
-			if (isset($shares_options[$share]['delete_moves_to_attic'])) {
-				$should_move_to_attic = $shares_options[$share]['delete_moves_to_attic'];
-			} else {
-				$should_move_to_attic = $delete_moves_to_attic;
-			}
+			$should_move_to_attic = $shares_options[$share]['delete_moves_to_attic'];
 		}
 	}
 	
