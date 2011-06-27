@@ -2217,6 +2217,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
+	$got_all_drives = FALSE;
 	while (!$got_all_drives) {
     	$num_empty_ds = 0;
     	foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
