@@ -1,6 +1,7 @@
 VERSION=0.9.9
 ARCH=x86_64
 PACKAGE=greyhole
+UIPACKAGE=greyhole-ui
 
 deb: dist
 	(cd release && rm -rf $(PACKAGE)-$(VERSION))
@@ -72,13 +73,12 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole.new greyhole)
 	rm release/$(PACKAGE)-$(VERSION)/includes/sql.php.[1,2]
 
-	mv release/$(PACKAGE)-$(VERSION)/includes/ release/$(PACKAGE)-$(VERSION)/web-app/
-	mv release/$(PACKAGE)-$(VERSION)/web-app/ release/$(PACKAGE)-web-app-$(VERSION)
+	rm -rf release/$(PACKAGE)-$(VERSION)/includes/
+	mv release/$(PACKAGE)-$(VERSION)/web-ui/ release/$(UIPACKAGE)-$(VERSION)
 	(cd release/ && tar -czvf $(PACKAGE)-$(VERSION).tar.gz $(PACKAGE)-$(VERSION))
 	(cd release/ && rm -rf $(PACKAGE)-$(VERSION))
-	mv release/$(PACKAGE)-web-app-$(VERSION) release/$(PACKAGE)-$(VERSION)
-	(cd release/ && tar -czvf $(PACKAGE)-web-app-$(VERSION).tar.gz $(PACKAGE)-$(VERSION))
-	(cd release/ && rm -rf $(PACKAGE)-$(VERSION))
+	(cd release/ && tar -czvf $(UIPACKAGE)-$(VERSION).tar.gz $(UIPACKAGE)-$(VERSION))
+	(cd release/ && rm -rf $(UIPACKAGE)-$(VERSION))
 
 install: rpm
 	(cd release && sudo rpm -Uvh $(PACKAGE)-$(VERSION)-*.$(ARCH).rpm)
