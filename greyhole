@@ -79,6 +79,9 @@ if ($action == 'iostat') {
 }
 
 if ($action == 'thaw') {
+    if (isset($options['dir']) && array_search($options['dir'], $frozen_directories) === FALSE) {
+	    $options['dir'] = '/' . trim($options['dir'], '/');
+    }
 	if (!isset($options['dir']) || array_search($options['dir'], $frozen_directories) === FALSE) {
 		echo "Frozen directories:\n";
 		foreach ($frozen_directories as $frozen_directory) {
@@ -102,6 +105,9 @@ if ($action == 'thaw') {
 
 if ($action == 'gone' || $action == 'going') {
 	global $storage_pool_directories;
+	if (array_search($options['dir'], $storage_pool_directories) === FALSE) {
+	    $options['dir'] = '/' . trim($options['dir'], '/');
+    }
 	if (array_search($options['dir'], $storage_pool_directories) === FALSE) {
 		if (!empty($options['dir'])) {
 			echo "Directory " . $options['dir'] . " is not one of your defined storage pool directories.\n";
@@ -3232,7 +3238,10 @@ function get_gone_ok_dirs() {
 
 function mark_gone_ok($target_drive, $action='add') {
 	global $storage_pool_directories;
-	if (!array_search($target_drive, $storage_pool_directories)) {
+	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
+	    $target_drive = '/' . trim($target_drive, '/');
+    }
+	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
 		return FALSE;
 	}
 
