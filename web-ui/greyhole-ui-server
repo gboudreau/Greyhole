@@ -1,3 +1,4 @@
+#!/usr/bin/php
 <?php
 
 define("STATIC_DIR", __DIR__); // @TODO
@@ -55,7 +56,7 @@ function didReceiveRequest($msg, $thread) {
 }
 
 function logRequest($request, $reponse_code, $response_size) {
-    if (DEBUG) echo '- - - [' . date('d/M/Y:H:i:s O') . "] \"$request->method $request->url HTTP/$request->protocol_version" . (!empty($request->parameters) ? '?' . $request->parameters : '') . "\" $reponse_code $response_size \"-\" \"{$request->headers['User-Agent']}\"" . PHP_EOL;
+    if (DEBUG) glog('- - - [' . date('d/M/Y:H:i:s O') . "] \"$request->method $request->url HTTP/$request->protocol_version" . (!empty($request->parameters) ? '?' . $request->parameters : '') . "\" $reponse_code $response_size \"-\" \"{$request->headers['User-Agent']}\"" . PHP_EOL);
 }
 
 function getContentType($url) {
@@ -232,7 +233,9 @@ class Socket {
 			throw new SocketException("Cannot listen on $host:$port. PHP said, " . $this->getLastError($this->link));
 		}
 
-		if (DEBUG) echo "Listening on port $port ..." . PHP_EOL;
+		echo PHP_EOL . "Greyhole-UI is now running." . PHP_EOL . PHP_EOL;
+
+		if (DEBUG) glog("Listening on port $port ..." . PHP_EOL);
 		
 	    exec('ifconfig | grep inet | grep -v inet6 | awk \'{print $2}\' | grep -v \'127.0.0.1\'', $ips);
 		echo "Open any of the following URLs in your browser to access Greyhole-UI:" . PHP_EOL;
@@ -250,7 +253,7 @@ class Socket {
 			if (($thread = @socket_accept($this->link)) !== false) {
 				$child = new ChildSocket($thread);
 				array_push($this->threads, $child);
-				if (DEBUG) echo "Accepted child, " . $child->getInfo() . PHP_EOL;
+				if (DEBUG) glog("Accepted child, " . $child->getInfo() . PHP_EOL);
 			}
 
 			// Loop through children, listen for read
@@ -413,7 +416,7 @@ class ChildSocket {
             $message = substr($message, $wrote);
     		$wrote = @socket_write($this->link, $message);
     		if ($wrote === FALSE) $wrote = 0;
-    		#if (DEBUG) echo "Sent $wrote bytes..." . PHP_EOL;
+    		#if (DEBUG) glog("Sent $wrote bytes..." . PHP_EOL);
 		}
 		if ($wrote === FALSE) {
 			throw new SocketException("Failed to write to socket.\n PHP said: " . $this->getLastError());
@@ -452,7 +455,7 @@ class ChildSocket {
 
 		$buf = implode(PHP_EOL, $buf);
 		
-		#if (DEBUG && $content_type == 'text/html') echo "Response: " . PHP_EOL . '  ' . str_replace("\n", "\n  ", $buf) . PHP_EOL;
+		#if (DEBUG && $content_type == 'text/html') glog("Response: " . PHP_EOL . '  ' . str_replace("\n", "\n  ", $buf) . PHP_EOL);
 
 		try {
 			$this->write($buf);
@@ -558,5 +561,11 @@ class ChildSocket {
 	public function getLastError() {
 		return socket_strerror(socket_last_error($this->link));
 	}
+}
+
+function glog($log_message) {
+    $stderr = fopen('php://stderr', 'w');
+    fwrite($stderr, $log_message); 
+    fclose($stderr); 
 }
 ?>
