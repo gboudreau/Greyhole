@@ -1,0 +1,52 @@
+#!/bin/sh
+
+if [ "$1" = 'stop' ]; then
+	if [ `whoami` != 'root' ]; then
+		echo "You need to execute this as root."
+		exit 1
+	fi
+	pid=`ps au | grep "greyhole-ui-server" | grep -v grep | awk '{print $2}'`
+	if [ "$pid" = "" ]; then
+		echo "Can't find any Greyhole-UI instance running."
+	else
+		echo "Found Greyhole-UI running with PID $pid. Stopping..."
+		kill $pid
+
+		pid=`ps au | grep "greyhole-ui-server" | grep -v grep | awk '{print $2}'`
+		if [ "$pid" = "" ]; then
+			echo "Stopped."
+		else
+			echo "Could'nt stop Greyhole-UI normally. Trying to forcefully stop it now..."
+			kill -9 $pid
+
+			sleep 1
+			pid=`ps au | grep "greyhole-ui-server" | grep -v grep | awk '{print $2}'`
+			if [ "$pid" = "" ]; then
+				echo "Stopped."
+			else
+				echo "Sorry, it seems I'm unable to stop the Greyhole-UI server (PID $pid), even using kill -9..."
+			fi
+		fi
+	fi
+elif [ "$1" = 'status' ]; then
+	pid=`ps au | grep "greyhole-ui-server" | grep -v grep | awk '{print $2}'`
+	if [ "$pid" = "" ]; then
+		echo "Can't find any Greyhole-UI instance running."
+	else
+		echo "Found Greyhole-UI running with PID $pid."
+	fi
+elif [ "$1" = 'debug' ]; then
+	if [ `whoami` != 'root' ]; then
+		echo "You need to execute this as root."
+		exit 1
+	fi
+	nice /usr/bin/greyhole-ui-server --debug 2>> /var/log/greyhole-ui.log &
+	sleep 2
+else # "$1" = 'start', or empty $1: Start greyhole-ui-server
+	if [ `whoami` != 'root' ]; then
+		echo "You need to execute this as root."
+		exit 1
+	fi
+	nice /usr/bin/greyhole-ui-server 2>> /var/log/greyhole-ui.log &
+	sleep 2
+fi
