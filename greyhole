@@ -559,7 +559,7 @@ if ($action == 'fsck') {
 	if (isset($options['email-report'])) {
 		$fsck_options[] = 'email';
 	}
-	if (!isset($options['dont-walk-metastore'])) {
+	if (!isset($options['dont-walk-metadata-store'])) {
 		$fsck_options[] = 'metastore';
 	}
 	if (isset($options['if-conf-changed'])) {
