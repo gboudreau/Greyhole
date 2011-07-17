@@ -222,7 +222,7 @@ function showHideSharesOptions() {
 
 <?php
 function get_shares() {
-	global $shares_options, $delete_moves_to_attic, $smb_config_file;
+	global $shares_options, $delete_moves_to_trash, $smb_config_file;
 	$shares = array();
 	$smb_conf = file_get_contents($smb_config_file);
 	$id = 0;
@@ -255,10 +255,10 @@ function get_shares() {
 			$shares[$share_name] = (object) array('id' => $id++, 'name' => $share_name, 'num_copies' => 0);
 			if (isset($shares_options[$share_name])) {
 				$shares[$share_name]->num_copies = $shares_options[$share_name]['num_copies'];
-				if (isset($shares_options[$share_name]['delete_moves_to_attic'])) {
-					$shares[$share_name]->delete_moves_to_attic = $shares_options[$share_name]['delete_moves_to_attic'];
+				if (isset($shares_options[$share_name]['delete_moves_to_trash'])) {
+					$shares[$share_name]->delete_moves_to_trash = $shares_options[$share_name]['delete_moves_to_trash'];
 				} else {
-					$shares[$share_name]->delete_moves_to_attic = $delete_moves_to_attic;
+					$shares[$share_name]->delete_moves_to_trash = $delete_moves_to_trash;
 				}
 			}
 		}
