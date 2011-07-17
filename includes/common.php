@@ -128,7 +128,7 @@ function parse_config() {
 					break;
 				case 'dir_selection_algorithm':
 				    global $dir_selection_algorithm;
-				    $dir_selection_algorithm = DirectorySelection::parse($value, $dir_selection_groups);
+				    $dir_selection_algorithm = DirectorySelection::parse($value, @$dir_selection_groups);
 				    break;
 				default:
 					if (mb_strpos($name, 'num_copies') === 0) {
