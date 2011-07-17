@@ -61,10 +61,10 @@ if (!isset($smb_config_file)) {
 	$smb_config_file = '/etc/samba/smb.conf';
 }
 
-$attic_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
+$trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks, $memory_limit;
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit;
 
 	$parsing_dir_selection_groups = FALSE;
 	$shares_options = array();
@@ -84,7 +84,7 @@ function parse_config() {
 					global ${$name};
 					${$name} = $_CONSTANTS[$value];
 					break;
-				case 'delete_moves_to_attic':
+				case 'delete_moves_to_trash':
 				case 'log_memory_usage':
 				case 'balance_modified_files':
 				case 'check_for_open_files':
@@ -134,9 +134,9 @@ function parse_config() {
 					if (mb_strpos($name, 'num_copies') === 0) {
 						$share = mb_substr($name, 11, mb_strlen($name)-12);
 						$shares_options[$share]['num_copies'] = (int) $value;
-					} else if (mb_strpos($name, 'delete_moves_to_attic') === 0) {
+					} else if (mb_strpos($name, 'delete_moves_to_trash') === 0) {
 						$share = mb_substr($name, 22, mb_strlen($name)-23);
-						$shares_options[$share]['delete_moves_to_attic'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
+						$shares_options[$share]['delete_moves_to_trash'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
 					} else if (mb_strpos($name, 'dir_selection_groups') === 0) {
 						$share = mb_substr($name, 21, mb_strlen($name)-22);
     				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
@@ -197,7 +197,7 @@ function parse_config() {
 		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
 			$share_name = $regs[1];
 		}
-		if (isset($share_name) && !isset($shares_options[$share_name]) && array_search($share_name, $attic_share_names) === FALSE) { continue; }
+		if (isset($share_name) && !isset($shares_options[$share_name]) && array_search($share_name, $trash_share_names) === FALSE) { continue; }
 		if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
 			$shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
 			$shares_options[$share_name]['name'] = $share_name;
@@ -205,9 +205,9 @@ function parse_config() {
 	}
 	
 	foreach ($shares_options as $share_name => $share_options) {
-		if (array_search($share_name, $attic_share_names) !== FALSE) {
-			global $attic_share;
-			$attic_share = array('name' => $share_name, 'landing_zone' => $shares_options[$share_name]['landing_zone']);
+		if (array_search($share_name, $trash_share_names) !== FALSE) {
+			global $trash_share;
+			$trash_share = array('name' => $share_name, 'landing_zone' => $shares_options[$share_name]['landing_zone']);
 			unset($shares_options[$share_name]);
 			continue;
 		}
@@ -219,8 +219,8 @@ function parse_config() {
 			gh_log(WARN, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
 			return FALSE;
 		}
-		if (!isset($share_options['delete_moves_to_attic'])) {
-		    $share_options['delete_moves_to_attic'] = $delete_moves_to_attic;
+		if (!isset($share_options['delete_moves_to_trash'])) {
+		    $share_options['delete_moves_to_trash'] = $delete_moves_to_trash;
 		}
 		if (!isset($share_options['dir_selection_algorithm']) && isset($dir_selection_algorithm)) {
 		    $share_options['dir_selection_algorithm'] = $dir_selection_algorithm;
@@ -419,12 +419,12 @@ function duration_to_human($seconds) {
 }
 
 function get_share_landing_zone($share) {
-	global $shares_options, $attic_share_names;
+	global $shares_options, $trash_share_names;
 	if (isset($shares_options[$share]['landing_zone'])) {
 		return $shares_options[$share]['landing_zone'];
-	} else if (array_search($share, $attic_share_names) !== FALSE) {
-		global $attic_share;
-		return $attic_share['landing_zone'];
+	} else if (array_search($share, $trash_share_names) !== FALSE) {
+		global $trash_share;
+		return $trash_share['landing_zone'];
 	} else {
 		global $config_file, $smb_config_file;
 		gh_log(WARN, "  Found a share ($share) with no path in $smb_config_file, or missing it's num_copies[$share] config in $config_file. Skipping.");
@@ -549,50 +549,50 @@ function memory_check(){
         }
 }
 
-class tombstone_iterator implements Iterator {
+class metafile_iterator implements Iterator {
 	private $path;
 	private $share;
-	private $load_nok_tombstones;
+	private $load_nok_metafiles;
 	private $quiet;
 	private $check_symlink;
-	private $tombstones;
-	private $graveyards;
+	private $metafiles;
+	private $metastores;
 	private $dir_handle;
 
-	public function __construct($share, $path, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
+	public function __construct($share, $path, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
 		$this->quiet = $quiet;
 		$this->share = $share;
 		$this->path = $path;
 		$this->check_symlink = $check_symlink;
-		$this->load_nok_tombstones = $load_nok_tombstones;
+		$this->load_nok_metafiles = $load_nok_metafiles;
 	}
 
 	public function rewind(){
-		$this->graveyards = get_graveyards();
+		$this->metastores = get_metastores();
 		$this->directory_stack = array($this->path);
 		$this->dir_handle = NULL;
-		$this->tombstones = array();
+		$this->metafiles = array();
 		$this->next();
 	}
 
 	public function current(){
-		return $this->tombstones;
+		return $this->metafiles;
 	}
 
 	public function key() {
-		return count($this->tombstones);
+		return count($this->metafiles);
 	}
 
 	public function next() {
-		$this->tombstones = array();
+		$this->metafiles = array();
 		while(count($this->directory_stack)>0 && $this->directory_stack !== NULL){
 			$this->dir = array_pop($this->directory_stack);
 			if($this->quiet == FALSE){
-				gh_log(DEBUG,"Loading tombstones for (dir) " . $this->share . (!empty($this->dir) ? "/" . $this->dir : "") . "...");
+				gh_log(DEBUG,"Loading metadata files for (dir) " . $this->share . (!empty($this->dir) ? "/" . $this->dir : "") . "...");
 			}
-			for( $i = 0; $i < count($this->graveyards); $i++ ){
-				$graveyard = $this->graveyards[$i];
-				$this->base = "$graveyard/".$this->share."/";
+			for( $i = 0; $i < count($this->metastores); $i++ ){
+				$metastore = $this->metastores[$i];
+				$this->base = "$metastore/".$this->share."/";
 				if(!file_exists($this->base.$this->dir)){
 					continue;
 				}	
@@ -609,27 +609,27 @@ class tombstone_iterator implements Iterator {
 							$this->directory_stack[] = $full_filename;
 						else{
 							$full_filename = str_replace("$this->path/",'',$full_filename);
-							if(isset($this->tombstones[$full_filename])) {
+							if(isset($this->metafiles[$full_filename])) {
 								continue;
 							}						
-							$this->tombstones[$full_filename] = get_tombstones_for_file($this->share, "$this->dir", $file, $this->load_nok_tombstones, $this->quiet, $this->check_symlink);
+							$this->metafiles[$full_filename] = get_metafiles_for_file($this->share, "$this->dir", $file, $this->load_nok_metafiles, $this->quiet, $this->check_symlink);
 						}
 					}
 					closedir($this->dir_handle);
 					$this->directory_stack = array_unique($this->directory_stack);
 				}
 			}
-			if(count($this->tombstones) > 0){
+			if(count($this->metafiles) > 0){
 				break;
 			}
 			
 		}
-		gh_log(DEBUG,'Found ' . count($this->tombstones) . ' tombstones.');
-		return $this->tombstones;
+		gh_log(DEBUG,'Found ' . count($this->metafiles) . ' metadata files.');
+		return $this->metafiles;
 	}
 	
 	public function valid(){
-		return count($this->tombstones) > 0;
+		return count($this->metafiles) > 0;
 	}
 }
 
