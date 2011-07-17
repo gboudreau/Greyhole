@@ -589,6 +589,7 @@ if ($num_daemon_processes > 1) {
 }
 
 gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
+terminology_conversion();
 set_metastore_backup();
 set_uniq_id();
 parse_samba_spool();
@@ -599,6 +600,32 @@ while (TRUE) {
 	check_storage_pool_dirs();
 	execute_next_task();
 }
+
+function terminology_conversion() {
+	convert_metastores();
+	convert_metastores('_backup');
+	convert_database();
+}
+
+function convert_database(){
+	#db_query("DELETE from settings where name = 'metastore_backup_directory'") or gh_log(CRITICAL, db_error());
+	#gh_log(CRITICAL, 'test');
+	$query = "UPDATE settings SET name = 'metastore_backup_directory' WHERE name = 'graveyard_backup_directory'";
+	db_query($query) or gh_log(CRITICAL, "Can't convert graveyard_backup_directory in the settings table: " . db_error());
+}
+
+function convert_metastores($append = ''){
+	global $storage_pool_directories;
+	foreach ($storage_pool_directories as $target_drive) {
+		$old_term = clean_dir("$target_drive/.gh_graveyard".$append);
+		$new_term = clean_dir("$target_drive/.gh_metastore".$append);
+		if (file_exists($old_term)) {
+			gh_log(INFO, "Moving $old_term to $new_term...");
+			gh_rename($old_term,$new_term);
+		}
+	}
+}
+
 
 function execute_next_task() {
 	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
