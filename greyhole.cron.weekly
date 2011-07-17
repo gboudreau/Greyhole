@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Weekly fsck
-/usr/bin/greyhole --fsck --email-report --dont-walk-graveyard > /dev/null
+/usr/bin/greyhole --fsck --email-report --dont-walk-metadata-store > /dev/null
 
 # This calls home to report anonymous data about Greyhole usage.
 # It sends the output of 'greyhole --stats' to the greyhole.net server.

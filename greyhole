@@ -121,7 +121,7 @@ if ($action == 'gone' || $action == 'going') {
 	}
 
 	if ($action == 'going') {
-		set_graveyard_backup();
+		set_metastore_backup();
 		gh_log(INFO, "Storage pool directory " . $options['dir'] . " will be removed from the storage pool.");
 		echo("Storage pool directory " . $options['dir'] . " will be removed from the storage pool.\n");
 
@@ -262,12 +262,12 @@ if ($action == 'debug') {
 	echo "Landing Zone:\n";
 	echo "  "; passthru("ls -l " . escapeshellarg(get_share_landing_zone($share) . "/" . $full_path));
 
-	echo "\nGraveyard:\n";
+	echo "\nMetadata Store:\n";
 	foreach ($storage_pool_directories as $target_drive) {
-		$graveyard = clean_dir("$target_drive/.gh_graveyard");
-		if (file_exists("$graveyard/$share/$full_path")) {
-			echo "  "; passthru("ls -l " . escapeshellarg("$graveyard/$share/$full_path"));
-			$data = var_export(unserialize(file_get_contents("$graveyard/$share/$full_path")), TRUE);
+		$metastore = clean_dir("$target_drive/.gh_metastore");
+		if (file_exists("$metastore/$share/$full_path")) {
+			echo "  "; passthru("ls -l " . escapeshellarg("$metastore/$share/$full_path"));
+			$data = var_export(unserialize(file_get_contents("$metastore/$share/$full_path")), TRUE);
 			$data = str_replace("\n", "\n    ", $data);
 			echo "    $data\n";
 		}
@@ -283,20 +283,20 @@ if ($action == 'debug') {
 	exit(0);
 }
 
-if ($action == 'empty-attic') {
+if ($action == 'empty-trash') {
 	foreach ($storage_pool_directories as $target_drive) {
-		$attic_path = clean_dir("$target_drive/.gh_attic");
-		if (!file_exists($attic_path)) {
-			echo "Attic in $target_drive is empty. Nothing to do.\n";
+		$trash_path = clean_dir("$target_drive/.gh_trash");
+		if (!file_exists($trash_path)) {
+			echo "Trash in $target_drive is empty. Nothing to do.\n";
 		} else {
-			$attic_size = trim(exec("du -sk " . escapeshellarg($attic_path) . " | awk '{print $1}'"));
-			echo "Attic in $target_drive is " . bytes_to_human($attic_size*1024, FALSE) . ". Emptying... ";
-			exec("rm -rf " . escapeshellarg($attic_path));
+			$trash_size = trim(exec("du -sk " . escapeshellarg($trash_path) . " | awk '{print $1}'"));
+			echo "Trash in $target_drive is " . bytes_to_human($trash_size*1024, FALSE) . ". Emptying... ";
+			exec("rm -rf " . escapeshellarg($trash_path));
 			echo "Done\n";
 		}
 	}
-	if (isset($attic_share) && mb_strlen(escapeshellarg($attic_share['landing_zone'])) > 8) {
-		exec("rm -rf " . escapeshellarg($attic_share['landing_zone']) . '/*');
+	if (isset($trash_share) && mb_strlen(escapeshellarg($trash_share['landing_zone'])) > 8) {
+		exec("rm -rf " . escapeshellarg($trash_share['landing_zone']) . '/*');
 	}
 	exit(0);
 }
@@ -427,7 +427,7 @@ if ($action == 'stats') {
 		'total_space' => 0,
 		'used_space' => 0,
 		'free_space' => 0,
-		'attic_size' => 0,
+		'trash_size' => 0,
 		'potential_available_space' => 0
 	);
 
@@ -449,27 +449,27 @@ if ($action == 'stats') {
 
 		$free_space = (float) $dfs[$target_drive];
 
-		$attic_path = clean_dir("$target_drive/.gh_attic");
-		if (!file_exists($attic_path)) {
-			$attic_size = (float) 0;
+		$trash_path = clean_dir("$target_drive/.gh_trash");
+		if (!file_exists($trash_path)) {
+			$trash_size = (float) 0;
 		} else {
-			$attic_size = (float) trim(exec("du -sk " . escapeshellarg($attic_path) . " | awk '{print $1}'"));
+			$trash_size = (float) trim(exec("du -sk " . escapeshellarg($trash_path) . " | awk '{print $1}'"));
 		}
 
-		$potential_available_space = (float) $free_space + $attic_size;
+		$potential_available_space = (float) $free_space + $trash_size;
 		
 		$stats[$target_drive] = (object) array(
 			'total_space' => $total_space,
 			'used_space' => $used_space,
 			'free_space' => $free_space,
-			'attic_size' => $attic_size,
+			'trash_size' => $trash_size,
 			'potential_available_space' => $potential_available_space,
 		);
 
 		$totals['total_space'] += $total_space;
 		$totals['used_space'] += $used_space;
 		$totals['free_space'] += $free_space;
-		$totals['attic_size'] += $attic_size;
+		$totals['trash_size'] += $trash_size;
 		$totals['potential_available_space'] += $potential_available_space;
 	}
 	$stats['Total'] = (object) $totals;
@@ -479,14 +479,14 @@ if ($action == 'stats') {
 	} else {
 		echo "\nGreyhole Statistics\n===================\n\n";
 		echo "Storage Pool\n";
-		printf("%$max_drive_strlen"."s    Total -   Used =   Free +  Attic = Possible\n", '');
+		printf("%$max_drive_strlen"."s    Total -   Used =   Free +  Trash = Possible\n", '');
 		foreach ($stats as $target_drive => $stat) {
 			if ($target_drive == 'Total') printf("  %-$max_drive_strlen"."s ==========================================\n", "");
 			printf("  %-$max_drive_strlen"."s ", "$target_drive:");
 			if (empty($stat)) {
 				echo "  N/A -   N/A =   N/A +   N/A =   N/A\n";
 			} else {
-				echo sprintf('%5.0f', $stat->total_space/1024/1024) . "G - " . sprintf('%5.0f', $stat->used_space/1024/1024) . "G = " . sprintf('%5.0f', $stat->free_space/1024/1024) . "G + " . sprintf('%5.0f', $stat->attic_size/1024/1024) . "G = " . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G\n";
+				echo sprintf('%5.0f', $stat->total_space/1024/1024) . "G - " . sprintf('%5.0f', $stat->used_space/1024/1024) . "G = " . sprintf('%5.0f', $stat->free_space/1024/1024) . "G + " . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G = " . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G\n";
 			}
 		}
 		echo "\n";
@@ -559,8 +559,8 @@ if ($action == 'fsck') {
 	if (isset($options['email-report'])) {
 		$fsck_options[] = 'email';
 	}
-	if (!isset($options['dont-walk-graveyard'])) {
-		$fsck_options[] = 'graveyard';
+	if (!isset($options['dont-walk-metadata-store'])) {
+		$fsck_options[] = 'metastore';
 	}
 	if (isset($options['if-conf-changed'])) {
 		$fsck_options[] = 'if-conf-changed';
@@ -589,7 +589,8 @@ if ($num_daemon_processes > 1) {
 }
 
 gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
-set_graveyard_backup();
+terminology_conversion();
+set_metastore_backup();
 set_uniq_id();
 parse_samba_spool();
 simplify_tasks();
@@ -599,6 +600,31 @@ while (TRUE) {
 	check_storage_pool_dirs();
 	execute_next_task();
 }
+
+function terminology_conversion() {
+	convert_folders('.gh_graveyard','.gh_metastore');
+	convert_folders('.gh_graveyard_backup','.gh_metastore_backup');
+	convert_folders('.gh_attic','.gh_trash');
+	convert_database();
+}
+
+function convert_database() {
+	$query = "UPDATE settings SET name = 'metastore_backup_directory' WHERE name = 'graveyard_backup_directory'";
+	db_query($query) or gh_log(CRITICAL, "Can't convert graveyard_backup_directory in the settings table: " . db_error());
+}
+
+function convert_folders($old,$new) {
+	global $storage_pool_directories;
+	foreach ($storage_pool_directories as $target_drive) {
+		$old_term = clean_dir("$target_drive/".$old);
+		$new_term = clean_dir("$target_drive/".$new);
+		if (file_exists($old_term)) {
+			gh_log(INFO, "Moving $old_term to $new_term...");
+			gh_rename($old_term,$new_term);
+		}
+	}
+}
+
 
 function execute_next_task() {
 	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
@@ -705,10 +731,10 @@ function execute_next_task() {
 				foreach ($shares_options as $share_name => $share_options) {
 					gh_fsck($share_options['landing_zone'], $share_name);
 				}
-				if (mb_strpos($task->additional_info, 'graveyard') !== FALSE) {
-					foreach (get_graveyards() as $graveyard) {
+				if (mb_strpos($task->additional_info, 'metastore') !== FALSE) {
+					foreach (get_metastores() as $metastore) {
 						foreach ($shares_options as $share_name => $share_options) {
-							gh_fsck_graveyard($graveyard, "/$share_name", $share_name);
+							gh_fsck_metastore($metastore, "/$share_name", $share_name);
 						}
 					}
 				}
@@ -729,28 +755,28 @@ function execute_next_task() {
 				}
 				if ($share_options !== FALSE) {
 					$share = $share_options['name'];
-					$graveyard = get_graveyard_from_path($task->share);
-					if($graveyard === FALSE){
-						//Only kick off an fsck on the passed dir if it's not a graveyard
+					$metastore = get_metastore_from_path($task->share);
+					if($metastore === FALSE){
+						//Only kick off an fsck on the passed dir if it's not a metastore
 						gh_fsck($task->share, $share, $storage_volume, $orphaned);
 					}
-					if (mb_strpos($task->additional_info, 'graveyard') !== FALSE) {
-						if($graveyard === FALSE){
-							//This isn't a graveyard dir so we'll check the graveyard of this path on all volumes
+					if (mb_strpos($task->additional_info, 'metastore') !== FALSE) {
+						if($metastore === FALSE){
+							//This isn't a metastore dir so we'll check the metastore of this path on all volumes
 							if($storage_volume !== FALSE){
 								$subdir = str_replace($storage_volume, '', $task->share);
 							}else{
 								$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
 							}
-							gh_log(DEBUG, "Starting graveyards fsck for $subdir");
-							foreach (get_graveyards() as $graveyard) {
-								gh_fsck_graveyard($graveyard, $subdir, $share);
+							gh_log(DEBUG, "Starting metastores fsck for $subdir");
+							foreach (get_metastores() as $metastore) {
+								gh_fsck_metastore($metastore, $subdir, $share);
 							}
 						}else{
-							//This is a graveyard directory, so only kick off a graveyard fsck for the indicated directory (this will not fsck the corresponding graveyard path on other volumes)
-							$subdir = str_replace("$graveyard", '', $task->share);
-							gh_log(DEBUG, "Starting graveyard fsck for $graveyard/$subdir");
-							gh_fsck_graveyard($graveyard,$subdir,$share);
+							//This is a metastore directory, so only kick off a metastore fsck for the indicated directory (this will not fsck the corresponding metastore path on other volumes)
+							$subdir = str_replace("$metastore", '', $task->share);
+							gh_log(DEBUG, "Starting metastore fsck for $metastore/$subdir");
+							gh_fsck_metastore($metastore,$subdir,$share);
 						}
 					}
 				}
@@ -822,7 +848,7 @@ function archive_task($task_id) {
 }
 
 function gh_rmdir($share, $full_path) {
-	global $storage_pool_directories, $attic_share_names;
+	global $storage_pool_directories, $trash_share_names;
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
 		return;
@@ -830,11 +856,11 @@ function gh_rmdir($share, $full_path) {
 	
 	gh_log(INFO, "Directory deleted: $landing_zone/$full_path");
 	
-	if (array_search($share, $attic_share_names) !== FALSE) {
-		// Remove that directory from all attics
+	if (array_search($share, $trash_share_names) !== FALSE) {
+		// Remove that directory from all trashs
 		foreach ($storage_pool_directories as $target_drive) {
-			if (@rmdir("$target_drive/.gh_attic/$full_path")) {
-				gh_log(DEBUG, "  Removed copy from attic at $target_drive/.gh_attic/$full_path");
+			if (@rmdir("$target_drive/.gh_trash/$full_path")) {
+				gh_log(DEBUG, "  Removed copy from trash at $target_drive/.gh_trash/$full_path");
 			}
 		}
 		return;
@@ -844,15 +870,15 @@ function gh_rmdir($share, $full_path) {
 		if (@rmdir("$target_drive/$share/$full_path/")) {
 			gh_log(DEBUG, "  Removed copy at $target_drive/$share/$full_path");
 		}
-		$graveyard = "$target_drive/.gh_graveyard";
-		if (@rmdir("$graveyard/$share/$full_path/")) {
-			gh_log(DEBUG, "  Removed tombstones directory $graveyard/$share/$full_path");
+		$metastore = "$target_drive/.gh_metastore";
+		if (@rmdir("$metastore/$share/$full_path/")) {
+			gh_log(DEBUG, "  Removed Metadata files directory $metastore/$share/$full_path");
 		}
 	}
 }
 
 function gh_unlink($share, $full_path, $task_id) {
-	global $attic_share_names, $attic_share, $storage_pool_directories;
+	global $trash_share_names, $trash_share, $storage_pool_directories;
 	
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
@@ -861,27 +887,27 @@ function gh_unlink($share, $full_path, $task_id) {
 	
 	gh_log(INFO, "File deleted: $landing_zone/$full_path");
 	
-	if (array_search($share, $attic_share_names) !== FALSE) {
-		// Will delete the file in the attic which has no corresponding symlink in the Greyhole Attic share.
+	if (array_search($share, $trash_share_names) !== FALSE) {
+		// Will delete the file in the trash which has no corresponding symlink in the Greyhole Trash share.
 		// That symlink is what was deleted from that share to create the task we're currently working on.
 		$full_path = preg_replace('/ copy [0-9]+$/', '', $full_path);
-		gh_log(DEBUG, "  Looking for corresponding file in attic to delete...");
+		gh_log(DEBUG, "  Looking for corresponding file in trash to delete...");
 		foreach ($storage_pool_directories as $target_drive) {
-			if (file_exists("$target_drive/.gh_attic/$full_path")) {
+			if (file_exists("$target_drive/.gh_trash/$full_path")) {
 				$delete = TRUE;
-				list($path, $filename) = explode_full_path("{$attic_share['landing_zone']}/$full_path");
+				list($path, $filename) = explode_full_path("{$trash_share['landing_zone']}/$full_path");
 				if ($dh = opendir($path)) {
 					while (($file = readdir($dh)) !== FALSE) {
 						if ($file == '.' || $file == '..') { continue; }
-						if (is_link("$path/$file") && readlink("$path/$file") == "$target_drive/.gh_attic/$full_path") {
+						if (is_link("$path/$file") && readlink("$path/$file") == "$target_drive/.gh_trash/$full_path") {
 							$delete = FALSE;
 							continue;
 						}
 					}
 				}
 				if ($delete) {
-					gh_log(DEBUG, "    Deleting corresponding copy $target_drive/.gh_attic/$full_path");
-					unlink("$target_drive/.gh_attic/$full_path");
+					gh_log(DEBUG, "    Deleting corresponding copy $target_drive/.gh_trash/$full_path");
+					unlink("$target_drive/.gh_trash/$full_path");
 					break;
 				}
 			}
@@ -896,17 +922,17 @@ function gh_unlink($share, $full_path, $task_id) {
 
 	list($path, $filename) = explode_full_path($full_path);
 
-	foreach (get_tombstones($share, $path, $filename, TRUE) as $existing_tombstones){
-		foreach ($existing_tombstones as $tombstone) {
-			gh_recycle($tombstone->path);
+	foreach (get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles){
+		foreach ($existing_metafiles as $metafile) {
+			gh_recycle($metafile->path);
 		}
 	}
-	remove_tombstones($share, $path, $filename);
+	remove_metafiles($share, $path, $filename);
 }
 
-function is_a_graveyard_dir($share, $full_path) {
-	foreach (get_graveyards() as $graveyard) {
-		if (is_dir("$graveyard/$share/$full_path")) {
+function is_a_metastore_dir($share, $full_path) {
+	foreach (get_metastores() as $metastore) {
+		if (is_dir("$metastore/$share/$full_path")) {
 			return TRUE;
 		}
 	}
@@ -920,7 +946,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 		return;
 	}
 	
-	if (is_dir("$landing_zone/$target_full_path") || is_a_graveyard_dir($share, $full_path)) {
+	if (is_dir("$landing_zone/$target_full_path") || is_a_metastore_dir($share, $full_path)) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
 
@@ -936,41 +962,41 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 				gh_log(DEBUG, "  Directory moved: $target_drive/$share/$full_path -> $target_drive/$share/$target_full_path");
 			}
 
-			list($path, $dirname) = explode_full_path("$target_drive/.gh_graveyard/$share/$target_full_path");
+			list($path, $dirname) = explode_full_path("$target_drive/.gh_metastore/$share/$target_full_path");
 			gh_mkdir($path, $original_path);
-			$result = @gh_rename("$target_drive/.gh_graveyard/$share/$full_path", "$target_drive/.gh_graveyard/$share/$target_full_path");
+			$result = @gh_rename("$target_drive/.gh_metastore/$share/$full_path", "$target_drive/.gh_metastore/$share/$target_full_path");
 			if ($result) {
-				gh_log(DEBUG, "  Graveyard directory moved: $target_drive/.gh_graveyard/$share/$full_path -> $target_drive/.gh_graveyard/$share/$target_full_path");
+				gh_log(DEBUG, "  Metadata Store directory moved: $target_drive/.gh_metastore/$share/$full_path -> $target_drive/.gh_metastore/$share/$target_full_path");
 			}
-			$result = @gh_rename("$target_drive/.gh_graveyard_backup/$share/$full_path", "$target_drive/.gh_graveyard_backup/$share/$target_full_path");
+			$result = @gh_rename("$target_drive/.gh_metastore_backup/$share/$full_path", "$target_drive/.gh_metastore_backup/$share/$target_full_path");
 			if ($result) {
-				gh_log(DEBUG, "  Backup graveyard directory moved: $target_drive/.gh_graveyard_backup/$share/$full_path -> $target_drive/.gh_graveyard_backup/$share/$target_full_path");
+				gh_log(DEBUG, "  Backup metastore directory moved: $target_drive/.gh_metastore_backup/$share/$full_path -> $target_drive/.gh_metastore_backup/$share/$target_full_path");
 			}
 		}
 
-		foreach (get_tombstones($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_tombstones){
-			gh_log(DEBUG, "Existing tombstones: " . count($existing_tombstones));
-			foreach ($existing_tombstones as $file_path => $file_tombstones) {
-				gh_log(DEBUG, "  File tombstones: " . count($file_tombstones));
-				$new_file_tombstones = array();
+		foreach (get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles){
+			gh_log(DEBUG, "Existing Metadata files: " . count($existing_metafiles));
+			foreach ($existing_metafiles as $file_path => $file_metafiles) {
+				gh_log(DEBUG, "  File metafiles: " . count($file_metafiles));
+				$new_file_metafiles = array();
 				$symlinked = FALSE;
-				foreach ($file_tombstones as $key => $tombstone) {
-					$old_path = $tombstone->path;
-					$tombstone->path = str_replace("/$share/$full_path/$file_path", "/$share/$target_full_path/$file_path", $tombstone->path);
-					gh_log(DEBUG, "  Changing tombstone: $old_path -> $tombstone->path");
-					$new_file_tombstones[$tombstone->path] = $tombstone;
+				foreach ($file_metafiles as $key => $metafile) {
+					$old_path = $metafile->path;
+					$metafile->path = str_replace("/$share/$full_path/$file_path", "/$share/$target_full_path/$file_path", $metafile->path);
+					gh_log(DEBUG, "  Changing Metadata file: $old_path -> $metafile->path");
+					$new_file_metafiles[$metafile->path] = $metafile;
 
 					// is_linked = is the target of the existing symlink
-					if ($tombstone->is_linked) {
+					if ($metafile->is_linked) {
 						$symlinked = TRUE;
-						$symlink_target = $tombstone->path;
+						$symlink_target = $metafile->path;
 					}
 				}
-				if (!$symlinked && count($file_tombstones) > 0) {
-					// None of the tombstones were is_linked; use the last one for the symlink.
-					$tombstone->is_linked = TRUE;
-					$file_tombstones[$key] = $tombstone;
-					$symlink_target = $tombstone->path;
+				if (!$symlinked && count($file_metafiles) > 0) {
+					// None of the metafiles were is_linked; use the last one for the symlink.
+					$metafile->is_linked = TRUE;
+					$file_metafiles[$key] = $metafile;
+					$symlink_target = $metafile->path;
 				}
 				
 				if (is_link("$landing_zone/$target_full_path/$file_path") && readlink("$landing_zone/$target_full_path/$file_path") != $symlink_target) {
@@ -986,7 +1012,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 				}
 				
 				list($path, $filename) = explode_full_path("$target_full_path/$file_path");
-				save_tombstones($share, $path, $filename, $new_file_tombstones);
+				save_metafiles($share, $path, $filename, $new_file_metafiles);
 			}
 		}
 	} else {
@@ -1004,62 +1030,62 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 		list($path, $filename) = explode_full_path($full_path);
 		list($target_path, $target_filename) = explode_full_path($target_full_path);
 
-		foreach (get_tombstones($share, $path, $filename, FALSE, FALSE, FALSE) as $existing_tombstones){
-			// There might be old tombstones... for example, when a delete task was skipped.
+		foreach (get_metafiles($share, $path, $filename, FALSE, FALSE, FALSE) as $existing_metafiles){
+			// There might be old metafiles... for example, when a delete task was skipped.
 			// Let's remove the file copies if there are any leftovers; correct copies will be re-created below.
-			if (file_exists("$landing_zone/$target_full_path") && (count($existing_tombstones) > 0 || !is_link("$landing_zone/$target_full_path"))) {
-				foreach (get_tombstones($share, $target_path, $target_filename) as $existing_target_tombstones){
-					if (count($existing_target_tombstones) > 0) {
-						foreach ($existing_target_tombstones as $tombstone) {
-							gh_recycle($tombstone->path);
+			if (file_exists("$landing_zone/$target_full_path") && (count($existing_metafiles) > 0 || !is_link("$landing_zone/$target_full_path"))) {
+				foreach (get_metafiles($share, $target_path, $target_filename) as $existing_target_metafiles){
+					if (count($existing_target_metafiles) > 0) {
+						foreach ($existing_target_metafiles as $metafile) {
+							gh_recycle($metafile->path);
 						}
-						remove_tombstones($share, $target_path, $target_filename);
+						remove_metafiles($share, $target_path, $target_filename);
 					}
 				}
 			}
 		
-			if (count($existing_tombstones) == 0) {
-				// Any NOK tombstones that need to be removed?
-				foreach (get_tombstones($share, $path, $filename, TRUE, FALSE, FALSE) as $all_existing_tombstones){
-					if (count($all_existing_tombstones) > 0) {
-						remove_tombstones($share, $path, $filename);
+			if (count($existing_metafiles) == 0) {
+				// Any NOK metafiles that need to be removed?
+				foreach (get_metafiles($share, $path, $filename, TRUE, FALSE, FALSE) as $all_existing_metafiles){
+					if (count($all_existing_metafiles) > 0) {
+						remove_metafiles($share, $path, $filename);
 					}
 				}
 				// New file
 				gh_write($share, $target_full_path, $task_id);
 			} else {
 				$symlinked = FALSE;
-				foreach ($existing_tombstones as $key => $tombstone) {
-					$old_path = $tombstone->path;
-					$tombstone->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $old_path);
-					gh_log(DEBUG, "  Renaming copy at $old_path to $tombstone->path");
+				foreach ($existing_metafiles as $key => $metafile) {
+					$old_path = $metafile->path;
+					$metafile->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $old_path);
+					gh_log(DEBUG, "  Renaming copy at $old_path to $metafile->path");
 
 					// Make sure the target directory exists
-					list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+					list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
 					list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
-					gh_mkdir($tombstone_dir_path, $original_path);
+					gh_mkdir($metafile_dir_path, $original_path);
 
-					$it_worked = gh_rename($old_path, $tombstone->path);
+					$it_worked = gh_rename($old_path, $metafile->path);
 
 					if ($it_worked) {
 						// is_linked = is the target of the existing symlink
-						if ($tombstone->is_linked) {
+						if ($metafile->is_linked) {
 							$symlinked = TRUE;
-							$symlink_target = $tombstone->path;
+							$symlink_target = $metafile->path;
 						}
 					} else {
-						gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $tombstone->path.");
+						gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $metafile->path.");
 					}
-					$existing_tombstones[$key] = $tombstone;
+					$existing_metafiles[$key] = $metafile;
 				}
-				if (!$symlinked && count($existing_tombstones) > 0) {
-					// None of the tombstones were is_linked; use the last one for the symlink.
-					$tombstone->is_linked = TRUE;
-					$existing_tombstones[$key] = $tombstone;
-					$symlink_target = $tombstone->path;
+				if (!$symlinked && count($existing_metafiles) > 0) {
+					// None of the metafiles were is_linked; use the last one for the symlink.
+					$metafile->is_linked = TRUE;
+					$existing_metafiles[$key] = $metafile;
+					$symlink_target = $metafile->path;
 				}
-				remove_tombstones($share, $path, $filename);
-				save_tombstones($share, $target_path, $target_filename, $existing_tombstones);
+				remove_metafiles($share, $path, $filename);
+				save_metafiles($share, $target_path, $target_filename, $existing_metafiles);
 
 				if (is_link("$landing_zone/$target_full_path")) {
 					// New link exists...
@@ -1255,43 +1281,43 @@ function gh_write($share, $full_path, $task_id) {
 		gh_log(INFO, "");
 		gh_log(DEBUG, "  Will use source file: $source_file");
 
-		foreach (get_tombstones($share, $path, $filename) as $existing_tombstones){
-			gh_log(DEBUG, count($existing_tombstones) . " tombstones loaded.");
+		foreach (get_metafiles($share, $path, $filename) as $existing_metafiles){
+			gh_log(DEBUG, count($existing_metafiles) . " Metadata files loaded.");
 			// Will keep existing copies at their location if balance_modified_files = no
 			// This will allow us to use rsync instead of blindly copying the complete files.
 			if ($balance_modified_files) {
 				// Remove old copies (but not the one that was updated!)
 				$keys_to_remove = array();
 				$found_source_file = FALSE;
-				foreach ($existing_tombstones as $key => $tombstone) {
-					$tombstone->path = clean_dir($tombstone->path);
-					if ($tombstone->path == $source_file) {
-						$tombstone->is_linked = TRUE;
-						$tombstone->state = 'OK';
+				foreach ($existing_metafiles as $key => $metafile) {
+					$metafile->path = clean_dir($metafile->path);
+					if ($metafile->path == $source_file) {
+						$metafile->is_linked = TRUE;
+						$metafile->state = 'OK';
 						$found_source_file = TRUE;
 					} else {
-						gh_log(DEBUG, "  Will remove copy at $tombstone->path");
-						$keys_to_remove[] = $tombstone->path;
+						gh_log(DEBUG, "  Will remove copy at $metafile->path");
+						$keys_to_remove[] = $metafile->path;
 					}
-					// This will make sure the correct key is used in the $existing_tombstones array...
+					// This will make sure the correct key is used in the $existing_metafiles array...
 					//   This is important because that key is what is used to check if there's already a copy on that drive.
-					unset($existing_tombstones[$key]);
-					$existing_tombstones[$tombstone->path] = $tombstone;
+					unset($existing_metafiles[$key]);
+					$existing_metafiles[$metafile->path] = $metafile;
 				}
 				if (!$found_source_file) {
 					// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
 					$key = array_shift($keys_to_remove);
-					$source_file = $existing_tombstones[$key]->path;
+					$source_file = $existing_metafiles[$key]->path;
 					gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
 				}
 				foreach ($keys_to_remove as $key) {
-					if ($existing_tombstones[$key]->path != $source_file) {
-						gh_recycle($existing_tombstones[$key]->path);
+					if ($existing_metafiles[$key]->path != $source_file) {
+						gh_recycle($existing_metafiles[$key]->path);
 					}
-					unset($existing_tombstones[$key]);
+					unset($existing_metafiles[$key]);
 				}
 			}
-			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize,$task_id);
+			gh_write_process_metafiles($num_copies_required,$existing_metafiles,$share,$full_path,$source_file,$filesize,$task_id);
 		}
 	} else {
 		if (!isset($source_file)) {
@@ -1310,17 +1336,17 @@ function gh_write($share, $full_path, $task_id) {
 			return;
 		}
 
-		// There might be old tombstones... for example, when a delete task was skipped.
-		// Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_tombstones()
-		foreach (get_tombstones($share, $path, $filename) as $existing_tombstones){
-			gh_log(DEBUG, count($existing_tombstones) . " tombstones loaded.");
-			if (count($existing_tombstones) > 0) {
-				foreach ($existing_tombstones as $tombstone) {
-					gh_recycle($tombstone->path);
+		// There might be old metafiles... for example, when a delete task was skipped.
+		// Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_metafiles()
+		foreach (get_metafiles($share, $path, $filename) as $existing_metafiles){
+			gh_log(DEBUG, count($existing_metafiles) . " metafiles loaded.");
+			if (count($existing_metafiles) > 0) {
+				foreach ($existing_metafiles as $metafile) {
+					gh_recycle($metafile->path);
 				}
-				remove_tombstones($share, $path, $filename);
-				$existing_tombstones = array();
-				// Maybe there's other file copies, that weren't tombstones, or were NOK tombstones!
+				remove_metafiles($share, $path, $filename);
+				$existing_metafiles = array();
+				// Maybe there's other file copies, that weren't metafiles, or were NOK metafiles!
 				global $storage_pool_directories;
 				foreach ($storage_pool_directories as $dir) {
 					if (file_exists("$dir/$share/$path/$filename")) {
@@ -1328,18 +1354,18 @@ function gh_write($share, $full_path, $task_id) {
 					}
 				}
 			}
-			gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize,$task_id);
+			gh_write_process_metafiles($num_copies_required,$existing_metafiles,$share,$full_path,$source_file,$filesize,$task_id);
 		}
 	}
 
 }
 
-function gh_write_process_tombstones($num_copies_required,$existing_tombstones,$share,$full_path,$source_file,$filesize,$task_id){
+function gh_write_process_metafiles($num_copies_required,$existing_metafiles,$share,$full_path,$source_file,$filesize,$task_id){
 	$landing_zone = get_share_landing_zone($share);
 	list($path, $filename) = explode_full_path($full_path);
 
 	// Only need to check for locking if we have something to do!
-	if ($num_copies_required > 1 || count($existing_tombstones) == 0) {
+	if ($num_copies_required > 1 || count($existing_metafiles) == 0) {
 		// Check if another process locked this file before we work on it.
 		global $locked_files;
 		if (isset($locked_files[clean_dir("$share/$full_path")]) || ($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
@@ -1351,25 +1377,25 @@ function gh_write_process_tombstones($num_copies_required,$existing_tombstones,$
 		$sleep_before_task = array();
 	}
 	
-	$tombstones = create_tombstones($share, $full_path, $num_copies_required, $filesize, $existing_tombstones);
+	$metafiles = create_metafiles($share, $full_path, $num_copies_required, $filesize, $existing_metafiles);
 
-	if (count($tombstones) == 0) {
-		gh_log(WARN, "  No tombstones could be created. Will wait until tombstones can be created to work on this file.");
+	if (count($metafiles) == 0) {
+		gh_log(WARN, "  No Metadata files could be created. Will wait until Metadata files can be created to work on this file.");
 		postpone_task($task_id);
 		return;
 	}
 
 	if (!is_link("$landing_zone/$full_path")) {
-		// Use the 1st tombstone for the symlink; it might be on a sticky drive.
+		// Use the 1st metafile for the symlink; it might be on a sticky drive.
 		$i = 0;
-		foreach ($tombstones as $tombstone) {
-			$tombstone->is_linked = ($i++ == 0);
+		foreach ($metafiles as $metafile) {
+			$metafile->is_linked = ($i++ == 0);
 		}
 	}
 
-	save_tombstones($share, $path, $filename, $tombstones);
+	save_metafiles($share, $path, $filename, $metafiles);
 
-	create_copies_from_tombstones($tombstones, $share, $full_path, $source_file);
+	create_copies_from_metafiles($metafiles, $share, $full_path, $source_file);
 }
 
 function is_greyhole_owned_dir($path) {
@@ -1380,41 +1406,41 @@ function is_greyhole_owned_dir($path) {
 	return file_exists("$path/.greyhole_uses_this");
 }
 
-function create_copies_from_tombstones($tombstones, $share, $full_path, $source_file) {
+function create_copies_from_metafiles($metafiles, $share, $full_path, $source_file) {
 	$landing_zone = get_share_landing_zone($share);
 	
 	list($path, $filename) = explode_full_path($full_path);
 
 	$link_next = FALSE;
 	$file_infos = gh_get_file_infos("$landing_zone/$full_path");
-	foreach ($tombstones as $key => $tombstone) {
+	foreach ($metafiles as $key => $metafile) {
 		if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
 		
-		if ($tombstone->path == $source_file && $tombstone->state == 'OK' && gh_filesize($tombstone->path) == gh_filesize($source_file)) {
-			gh_log(DEBUG, "  File copy at $tombstone->path is already up to date.");
+		if ($metafile->path == $source_file && $metafile->state == 'OK' && gh_filesize($metafile->path) == gh_filesize($source_file)) {
+			gh_log(DEBUG, "  File copy at $metafile->path is already up to date.");
 			continue;
 		}
 
-		gh_log(DEBUG, "  Copying file to $tombstone->path");
+		gh_log(DEBUG, "  Copying file to $metafile->path");
 
-		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $tombstone->path);
+		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
 		if (!is_greyhole_owned_dir($root_path)) {
 			gh_log(WARN, "  Warning! It seems $root_path is missing it's \".greyhole_uses_this\" file. This either means this mount is currently unmounted, or you forgot to create this file.");
-			$tombstone->state = 'Gone';
-			$tombstones[$key] = $tombstone;
+			$metafile->state = 'Gone';
+			$metafiles[$key] = $metafile;
 			continue;
 		}
 
-		list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+		list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
 
-		list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$full_path");
-		if (!gh_mkdir($tombstone_dir_path, $original_path)) {
-			$tombstone->state = 'Gone';
-			$tombstones[$key] = $tombstone;
+		list($original_path, $metafile_filename) = explode_full_path(get_share_landing_zone($share) . "/$full_path");
+		if (!gh_mkdir($metafile_dir_path, $original_path)) {
+			$metafile->state = 'Gone';
+			$metafiles[$key] = $metafile;
 			continue;
 		}
 
-		$temp_path = get_temp_filename($tombstone->path);
+		$temp_path = get_temp_filename($metafile->path);
 		
 		$it_worked = FALSE;
 		if (is_link("$landing_zone/$full_path")) {
@@ -1423,7 +1449,7 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		} else if (gh_is_file("$landing_zone/$full_path")) {
 			$source_size = gh_filesize("$landing_zone/$full_path");
 			$source_dev = gh_file_deviceid("$landing_zone/$full_path");
-			$target_dev = gh_file_deviceid($tombstone_dir_path);
+			$target_dev = gh_file_deviceid($metafile_dir_path);
 			if ($source_dev === $target_dev && $source_dev !== FALSE) {
 				gh_log(DEBUG, "  (using rename)");
 				gh_rename("$landing_zone/$full_path", $temp_path);
@@ -1439,19 +1465,19 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		}
 		
 		if ($it_worked) {
-			gh_rename($temp_path, $tombstone->path);
-			gh_chperm($tombstone->path, $file_infos);
+			gh_rename($temp_path, $metafile->path);
+			gh_chperm($metafile->path, $file_infos);
 		} else {
-			gh_log(WARN, "    Failed file copy. Will mark this tombstone 'Gone'.");
+			gh_log(WARN, "    Failed file copy. Will mark this Metadata file 'Gone'.");
 			@unlink($temp_path);
-			if ($tombstone->is_linked) {
-				$tombstone->is_linked = FALSE;
+			if ($metafile->is_linked) {
+				$metafile->is_linked = FALSE;
 				$link_next = TRUE;
 			}
-			$tombstone->state = 'Gone';
-			gh_recycle($tombstone->path);
-			$tombstones[$key] = $tombstone;
-			save_tombstones($share, $path, $filename, array_values($tombstones));
+			$metafile->state = 'Gone';
+			gh_recycle($metafile->path);
+			$metafiles[$key] = $metafile;
+			save_metafiles($share, $path, $filename, array_values($metafiles));
 
 			if (file_exists("$landing_zone/$full_path")) {
 				global $current_task_id;
@@ -1474,14 +1500,14 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 		    continue;
 		}
 
-		if ($link_next && !$tombstone->is_linked) {
-			$tombstone->is_linked = TRUE;
-			$tombstones[$key] = $tombstone;
+		if ($link_next && !$metafile->is_linked) {
+			$metafile->is_linked = TRUE;
+			$metafiles[$key] = $metafile;
 		}
 		$link_next = FALSE;
-		if ($tombstone->is_linked) {
+		if ($metafile->is_linked) {
 			gh_log(DEBUG, "    Creating symlink in share pointing to the above file copy.");
-			symlink($tombstone->path, "$landing_zone/$path/.gh_$filename");
+			symlink($metafile->path, "$landing_zone/$path/.gh_$filename");
 			if (!file_exists("$landing_zone/$full_path") || unlink("$landing_zone/$full_path")) {
 				gh_rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
 			} else {
@@ -1489,11 +1515,11 @@ function create_copies_from_tombstones($tombstones, $share, $full_path, $source_
 			}
 		}
 
-		if (gh_file_exists($tombstone->path, '  Copy at $real_path doesn\'t exist. Will not mark it OK!')) {
-			$tombstone->state = 'OK';
-			$tombstones[$key] = $tombstone;
+		if (gh_file_exists($metafile->path, '  Copy at $real_path doesn\'t exist. Will not mark it OK!')) {
+			$metafile->state = 'OK';
+			$metafiles[$key] = $metafile;
 		}
-		save_tombstones($share, $path, $filename, array_values($tombstones));
+		save_metafiles($share, $path, $filename, array_values($metafiles));
 	}
 }
 
@@ -1549,31 +1575,31 @@ function get_temp_filename($full_path) {
 	return "$path/.$filename." . mb_substr(md5($filename), 0, 5);
 }
 
-function create_tombstones($share, $full_path, $num_copies_required, $filesize, $tombstones=array()) {
-	$found_link_tombstone = FALSE;
+function create_metafiles($share, $full_path, $num_copies_required, $filesize, $metafiles=array()) {
+	$found_link_metafile = FALSE;
 
 	list($path, $filename) = explode_full_path($full_path);
 	
-	$num_ok = count($tombstones);
-	foreach ($tombstones as $key => $tombstone) {
-		if (!file_exists($tombstone->path)) {
-			$tombstone->state = 'Gone';
+	$num_ok = count($metafiles);
+	foreach ($metafiles as $key => $metafile) {
+		if (!file_exists($metafile->path)) {
+			$metafile->state = 'Gone';
 		}
-		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $tombstone->path);
+		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
 		if (!is_greyhole_owned_dir($root_path)) {
-			$tombstone->state = 'Gone';
+			$metafile->state = 'Gone';
 		}
-		if ($tombstone->state != 'OK' && $tombstone->state != 'Pending') {
+		if ($metafile->state != 'OK' && $metafile->state != 'Pending') {
 			$num_ok--;
 		}
-		if ($key != $tombstone->path) {
-			unset($tombstones[$key]);
-			$key = $tombstone->path;
+		if ($key != $metafile->path) {
+			unset($metafiles[$key]);
+			$key = $metafile->path;
 		}
-		if ($tombstone->is_linked) {
-			$found_link_tombstone = TRUE;
+		if ($metafile->is_linked) {
+			$found_link_metafile = TRUE;
 		}
-		$tombstones[$key] = $tombstone;
+		$metafiles[$key] = $metafile;
 	}
 
 	// Select drives that have enough free space for this file
@@ -1584,43 +1610,43 @@ function create_tombstones($share, $full_path, $num_copies_required, $filesize, 
 		$target_drive = array_shift($local_target_drives);
 		$clean_target_full_path = clean_dir("$target_drive/$share/$full_path");
 		// Don't use drives that already have a copy
-		if (isset($tombstones[$clean_target_full_path])) {
+		if (isset($metafiles[$clean_target_full_path])) {
 			continue;
 		}
-		foreach ($tombstones as $tombstone) {
-			if ($clean_target_full_path == clean_dir($tombstone->path)) {
+		foreach ($metafiles as $metafile) {
+			if ($clean_target_full_path == clean_dir($metafile->path)) {
 				continue;
 			}
 		}
 		// Prepend new target drives, to make sure sticky directories will be used first
-		$tombstones = array_reverse($tombstones);
-		$tombstones[$clean_target_full_path] = (object) array('path' => $clean_target_full_path, 'is_linked' => FALSE, 'state' => 'Pending');
-		$tombstones = array_reverse($tombstones);
+		$metafiles = array_reverse($metafiles);
+		$metafiles[$clean_target_full_path] = (object) array('path' => $clean_target_full_path, 'is_linked' => FALSE, 'state' => 'Pending');
+		$metafiles = array_reverse($metafiles);
 		$num_ok++;
 	}
 	
-	if (!$found_link_tombstone) {
-		foreach ($tombstones as $tombstone) {
-			$tombstone->is_linked = TRUE;
+	if (!$found_link_metafile) {
+		foreach ($metafiles as $metafile) {
+			$metafile->is_linked = TRUE;
 			break;
 		}
 	}
 	
-	return $tombstones;
+	return $metafiles;
 }
 
-function get_tombstone_data_filename($share, $path, $filename) {
-	$filenames = get_tombstone_data_filenames($share, $path, $filename, 1);
+function get_metafile_data_filename($share, $path, $filename) {
+	$filenames = get_metafile_data_filenames($share, $path, $filename, 1);
 	if (count($filenames) > 0) {
 		return $filenames[0];
 	}
 	return FALSE;
 }
 
-function get_tombstone_data_filenames($share, $path, $filename, $how_many=9999) {
+function get_metafile_data_filenames($share, $path, $filename, $how_many=9999) {
 	$filenames = array();
-	foreach (get_graveyards() as $graveyard) {
-		$f = "$graveyard/$share/$path/$filename";
+	foreach (get_metastores() as $metastore) {
+		$f = "$metastore/$share/$path/$filename";
 		if (is_file($f)) {
 			$filenames[] = $f;
 			if (count($filenames) == $how_many) {
@@ -1631,24 +1657,24 @@ function get_tombstone_data_filenames($share, $path, $filename, $how_many=9999) 
 	return $filenames;
 }
 
-function get_tombstones($share, $path, $filename=null, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE){
+function get_metafiles($share, $path, $filename=null, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE){
 	if($filename === null){
-		return new tombstone_iterator($share, $path, $load_nok_tombstones, $quiet, $check_symlink);
+		return new metafile_iterator($share, $path, $load_nok_metafiles, $quiet, $check_symlink);
 	}else{
-		return array(get_tombstones_for_file($share,$path,$filename,$load_nok_tombstones,$quiet,$check_symlink));
+		return array(get_metafiles_for_file($share,$path,$filename,$load_nok_metafiles,$quiet,$check_symlink));
 	}	
 }
 
-function get_tombstones_for_file($share, $path, $filename=null, $load_nok_tombstones=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
+function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
 	if (!$quiet) {
-		gh_log(DEBUG, "Loading tombstones for $share" . (!empty($path) ? "/$path" : "") . "/$filename... ", FALSE);
+		gh_log(DEBUG, "Loading metafiles for $share" . (!empty($path) ? "/$path" : "") . "/$filename... ", FALSE);
 	}
-	$tombstones_data_file = get_tombstone_data_filename($share, $path, $filename);
+	$metafiles_data_file = get_metafile_data_filename($share, $path, $filename);
 	clearstatcache();
-	$tombstones = array();
-	if (file_exists($tombstones_data_file)) {
-		$t = file_get_contents($tombstones_data_file);
-		$tombstones = unserialize($t);
+	$metafiles = array();
+	if (file_exists($metafiles_data_file)) {
+		$t = file_get_contents($metafiles_data_file);
+		$metafiles = unserialize($t);
 	}
 
 	if ($check_symlink) {
@@ -1658,108 +1684,108 @@ function get_tombstones_for_file($share, $path, $filename=null, $load_nok_tombst
 		if (is_link($share_file)) {
 			$share_file_link_to = readlink($share_file);
 		}
-		foreach ($tombstones as $key => $tombstone) {
-			if ($tombstone->state == 'OK' && $share_file_link_to !== FALSE) {
-				if ($tombstone->is_linked && $tombstone->path != $share_file_link_to) {
+		foreach ($metafiles as $key => $metafile) {
+			if ($metafile->state == 'OK' && $share_file_link_to !== FALSE) {
+				if ($metafile->is_linked && $metafile->path != $share_file_link_to) {
 					if (!$quiet) {
-						gh_log(DEBUG, 'Changing is_linked to FALSE for ' . $tombstone->path);
+						gh_log(DEBUG, 'Changing is_linked to FALSE for ' . $metafile->path);
 					}
-					$tombstone->is_linked = FALSE;
-					$tombstones[$key] = $tombstone;
-					save_tombstones($share, $path, $filename, array_values($tombstones));
-				} else if (!$tombstone->is_linked && $tombstone->path == $share_file_link_to) {
+					$metafile->is_linked = FALSE;
+					$metafiles[$key] = $metafile;
+					save_metafiles($share, $path, $filename, array_values($metafiles));
+				} else if (!$metafile->is_linked && $metafile->path == $share_file_link_to) {
 					if (!$quiet) {
-						gh_log(DEBUG, 'Changing is_linked to TRUE for ' . $tombstone->path);
+						gh_log(DEBUG, 'Changing is_linked to TRUE for ' . $metafile->path);
 					}
-					$tombstone->is_linked = TRUE;
-					$tombstones[$key] = $tombstone;
-					save_tombstones($share, $path, $filename, array_values($tombstones));
+					$metafile->is_linked = TRUE;
+					$metafiles[$key] = $metafile;
+					save_metafiles($share, $path, $filename, array_values($metafiles));
 				}
 			}
 		}
 	}
 
-	$ok_tombstones = array();
-	foreach ($tombstones as $key => $tombstone) {
+	$ok_metafiles = array();
+	foreach ($metafiles as $key => $metafile) {
 		$valid_path = FALSE;
 		
-		$dir = get_storage_volume_from_path($tombstone->path);
+		$dir = get_storage_volume_from_path($metafile->path);
 		if ($dir !== FALSE) {
 			$valid_path = TRUE;
 		}
-		if ($valid_path && ($load_nok_tombstones || $tombstone->state == 'OK')) {
-			$ok_tombstones[$key] = $tombstone;
+		if ($valid_path && ($load_nok_metafiles || $metafile->state == 'OK')) {
+			$ok_metafiles[$key] = $metafile;
 		} else {
 			if (!$valid_path) {
-				gh_log(INFO, "Found a tombstone pointing to a directory not defined in your storage pool: '$tombstone->path'. Will mark it as Gone.");
-				$tombstone->state = 'Gone';
-				$tombstones[$key] = $tombstone;
-				save_tombstones($share, $path, $filename, array_values($tombstones));
+				gh_log(INFO, "Found a Metadata file pointing to a directory not defined in your storage pool: '$metafile->path'. Will mark it as Gone.");
+				$metafile->state = 'Gone';
+				$metafiles[$key] = $metafile;
+				save_metafiles($share, $path, $filename, array_values($metafiles));
 			} else {
-				gh_log(INFO, "Found a tombstone, pointing to '$tombstone->path', with state = '$tombstone->state'. We just want 'OK' tombstones; will not use this tombstone.");
+				gh_log(INFO, "Found a Metadata file, pointing to '$metafile->path', with state = '$metafile->state'. We just want 'OK' Metadata files; will not use this Metadata file.");
 			}
 		}
 	}
-	$tombstones = $ok_tombstones;
+	$metafiles = $ok_metafiles;
 	
 	if (!$quiet) {
-		gh_log(DEBUG, "Got " . count($tombstones) . " tombstones.");
+		gh_log(DEBUG, "Got " . count($metafiles) . " Metadata files.");
 	}
-	return $tombstones;
+	return $metafiles;
 }
 
-function remove_tombstones($share, $path, $filename) {
-	gh_log(DEBUG, "  Removing tombstones for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+function remove_metafiles($share, $path, $filename) {
+	gh_log(DEBUG, "  Removing Metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
 	
-	foreach (get_tombstone_data_filenames($share, $path, $filename) as $f) {
+	foreach (get_metafile_data_filenames($share, $path, $filename) as $f) {
 		@unlink($f);
-		gh_log(DEBUG, "    Removed tombstone at $f");
+		gh_log(DEBUG, "    Removed Metadata file at $f");
 		clearstatcache();
 	}
 }
 
-function save_tombstones($share, $path, $filename, $tombstones) {
-	if (count($tombstones) == 0) {
-		remove_tombstones($share, $path, $filename);
+function save_metafiles($share, $path, $filename, $metafiles) {
+	if (count($metafiles) == 0) {
+		remove_metafiles($share, $path, $filename);
 		return;
 	}
 
-	gh_log(DEBUG, "  Saving " . count($tombstones) . " tombstones for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+	gh_log(DEBUG, "  Saving " . count($metafiles) . " Metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
 	$paths_used = array();
-	foreach (get_graveyards() as $graveyard) {
-		$target_drive = str_replace('/.gh_graveyard', '', $graveyard);
-		$data_filepath = "$graveyard/$share/$path";
-		$has_tombstone = FALSE;
-		foreach ($tombstones as $tombstone) {
-			if (get_storage_volume_from_path($tombstone->path) == $target_drive) {
+	foreach (get_metastores() as $metastore) {
+		$target_drive = str_replace('/.gh_metastore', '', $metastore);
+		$data_filepath = "$metastore/$share/$path";
+		$has_metafile = FALSE;
+		foreach ($metafiles as $metafile) {
+			if (get_storage_volume_from_path($metafile->path) == $target_drive) {
 				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
-				gh_log(DEBUG, "    Saving tombstones in $data_filepath/$filename");
+				gh_log(DEBUG, "    Saving Metadata files in $data_filepath/$filename");
 				if (is_dir("$data_filepath/$filename")) {
 					exec("rm -rf " . escapeshellarg("$data_filepath/$filename"));
 				}
-				file_put_contents("$data_filepath/$filename", serialize($tombstones));
-				$has_tombstone = TRUE;
+				file_put_contents("$data_filepath/$filename", serialize($metafiles));
+				$has_metafile = TRUE;
 				$paths_used[] = $data_filepath;
 				break;
 			}
 		}
-		if (!$has_tombstone && file_exists("$data_filepath/$filename")) {
+		if (!$has_metafile && file_exists("$data_filepath/$filename")) {
 			unlink("$data_filepath/$filename");
 		}
 	}
 	if (count($paths_used) == 1) {
 		// Also save a backup on another drive
-		global $graveyard_backup_directories;
-		if (count($graveyard_backup_directories) > 0) {
-			if (mb_strpos($paths_used[0], str_replace('.gh_graveyard_backup', '.gh_graveyard', $graveyard_backup_directories[0])) === FALSE) {
-				$graveyard_backup_directory = $graveyard_backup_directories[0];
+		global $metastore_backup_directories;
+		if (count($metastore_backup_directories) > 0) {
+			if (mb_strpos($paths_used[0], str_replace('.gh_metastore_backup', '.gh_metastore', $metastore_backup_directories[0])) === FALSE) {
+				$metastore_backup_directory = $metastore_backup_directories[0];
 			} else {
-				$graveyard_backup_directory = $graveyard_backup_directories[1];
+				$metastore_backup_directory = $metastore_backup_directories[1];
 			}
-			$data_filepath = "$graveyard_backup_directory/$share/$path";
-			gh_log(DEBUG, "    Saving tombstones (backup) in $data_filepath/$filename");
+			$data_filepath = "$metastore_backup_directory/$share/$path";
+			gh_log(DEBUG, "    Saving Metadata files (backup) in $data_filepath/$filename");
 			gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
-			file_put_contents("$data_filepath/$filename", serialize($tombstones));
+			file_put_contents("$data_filepath/$filename", serialize($metafiles));
 		}
 	}
 }
@@ -1783,7 +1809,7 @@ function simplify_tasks() {
 }
 
 function parse_samba_log($simplify_after_parse=TRUE) {
-	global $samba_log_file, $action, $attic_share_names, $max_queued_tasks;
+	global $samba_log_file, $action, $trash_share_names, $max_queued_tasks;
 
 	if (empty($samba_log_file)) {
 		return;
@@ -1907,7 +1933,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 				if (isset($fd) && $fd == -1) {
 					continue;
 				}
-				if ($act != 'unlink' && $act != 'rmdir' && array_search($share, $attic_share_names) !== FALSE) { continue; }
+				if ($act != 'unlink' && $act != 'rmdir' && array_search($share, $trash_share_names) !== FALSE) { continue; }
 				$new_tasks++;
 				$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) VALUES ('%s', '%s', %s, %s, '%s')",
 					$act,
@@ -1965,7 +1991,7 @@ function update_last_read_log_smbd_line($fp) {
 }
 
 function parse_samba_spool($simplify_after_parse=TRUE) {
-	global $action, $attic_share_names, $max_queued_tasks, $db_use_mysql;
+	global $action, $trash_share_names, $max_queued_tasks, $db_use_mysql;
 
 	// Let's parse syslog still... just in case people are still using that.
 	parse_samba_log($simplify_after_parse);
@@ -2072,7 +2098,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 				if (isset($fd) && $fd == -1) {
 					continue;
 				}
-				if ($act != 'unlink' && $act != 'rmdir' && array_search($share, $attic_share_names) !== FALSE) { continue; }
+				if ($act != 'unlink' && $act != 'rmdir' && array_search($share, $trash_share_names) !== FALSE) { continue; }
 				$new_tasks++;
 				$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) VALUES ('%s', '%s', %s, %s, '%s')",
 					$act,
@@ -2440,10 +2466,10 @@ function gh_fsck($path, $share, $storage_path = FALSE, $find_orphans = FALSE) {
 	closedir($handle);
 }
 
-function gh_fsck_graveyard($root, $path, $share) {
+function gh_fsck_metastore($root, $path, $share) {
 	global $fsck_report;
 	
-	gh_log(DEBUG, "Entering graveyard $root$path");
+	gh_log(DEBUG, "Entering metastore $root$path");
 	if (!is_dir("$root$path")) {
 		gh_log(DEBUG, "  Not a directory... Aborting.");
 		return;
@@ -2453,11 +2479,11 @@ function gh_fsck_graveyard($root, $path, $share) {
 	while (($filename = readdir($handle)) !== FALSE) {
 		if ($filename != '.' && $filename != '..') {
 			if (@is_dir("$root$path/$filename")) {
-				$fsck_report['graveyard']['num_dirs']++;
-				gh_fsck_graveyard($root, "$path/$filename", $share);
+				$fsck_report['metastore']['num_dirs']++;
+				gh_fsck_metastore($root, "$path/$filename", $share);
 			} else {
-				// Found a tombstone
-				$fsck_report['graveyard']['num_files']++;
+				// Found a metafile
+				$fsck_report['metastore']['num_files']++;
 				
 				$path_parts = explode('/', $path);
 				array_shift($path_parts);
@@ -2467,7 +2493,7 @@ function gh_fsck_graveyard($root, $path, $share) {
 				
 				// If file exists in landing zone, we already fsck-ed it in gh_fsck(); let's not repeat ourselves, shall we?
 				if (!file_exists("$local_path/$filename")) {
-					gh_fsck_file($local_path, $filename, FALSE, 'graveyard', $share);
+					gh_fsck_file($local_path, $filename, FALSE, 'metastore', $share);
 				}
 			}
 		}
@@ -2516,10 +2542,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		}
 	}
 	
-	$file_tombstones = array();
+	$file_metafiles = array();
 	$num_ok = 0;
 	$file_copies_inodes = array();
-	if(get_tombstone_data_filename($share,$file_path,$filename) === FALSE){
+	if(get_metafile_data_filename($share,$file_path,$filename) === FALSE){
 		if($storage_path !== FALSE && $find_orphans !== FALSE){
 			gh_log(INFO, "$path/$filename is an orphaned file, will proceed to find all copies and symlink file appropriately.");
 			$fsck_report['orphaned']['num_orphans']++;
@@ -2544,12 +2570,12 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
 			if (!is_greyhole_owned_dir($target_drive)) {
 				gh_log(DEBUG, "  Directory $target_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
-				$file_tombstones[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'Gone');
+				$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'Gone');
 				if (!isset($original_file_path)) {
 					$original_file_path = $clean_full_path;
 				}
 			} else {
-				$file_tombstones[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'OK');
+				$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'OK');
 				$file_copies_inodes[$inode_number] = $clean_full_path;
 				$num_ok++;
 			}
@@ -2563,58 +2589,58 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			}
 		}
 	}
-	foreach (get_tombstones($share, $file_path, $filename, TRUE) as $tombstone_block){
-		foreach ($tombstone_block as $tombstone) {
-			$inode_number = @gh_fileinode($tombstone->path);
+	foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block){
+		foreach ($metafile_block as $metafile) {
+			$inode_number = @gh_fileinode($metafile->path);
 			if ($inode_number === FALSE) {
-				$tombstone->state = 'Gone';
-				$tombstone->is_linked = FALSE;
+				$metafile->state = 'Gone';
+				$metafile->is_linked = FALSE;
 
-				$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $tombstone->path);
+				$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
 				if (gone_ok($root_path)) {
 					// Let's not replace this copy yet...
-					$file_copies_inodes[$tombstone->path] = $tombstone->path;
+					$file_copies_inodes[$metafile->path] = $metafile->path;
 					$num_ok++;
 					$fsck_report['gone_ok']++;
 				}
-			} else if (is_dir($tombstone->path)) {
+			} else if (is_dir($metafile->path)) {
 				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
-				@rmdir($tombstone->path);
-				$tombstone->state = 'Gone';
-				$tombstone->is_linked = FALSE;
+				@rmdir($metafile->path);
+				$metafile->state = 'Gone';
+				$metafile->is_linked = FALSE;
 				continue;
 			} else {
-				$tombstone->state = 'OK';
-				if (!isset($file_tombstones[$tombstone->path])) {
-					$file_copies_inodes[$inode_number] = $tombstone->path;
+				$metafile->state = 'OK';
+				if (!isset($file_metafiles[$metafile->path])) {
+					$file_copies_inodes[$inode_number] = $metafile->path;
 					$num_ok++;
 				}
 			}
-			$file_tombstones[clean_dir($tombstone->path)] = $tombstone;
+			$file_metafiles[clean_dir($metafile->path)] = $metafile;
 		}
 	}
 
 	if (count($file_copies_inodes) > 0) {
-		// If no tombstone is linked, link the 1st one
-		$found_linked_tombstone = FALSE;
-		foreach ($file_tombstones as $key => $tombstone) {
-			if ($tombstone->is_linked) {
-				if (file_exists($tombstone->path)) {
-					$found_linked_tombstone = TRUE;
-					$expected_file_size = gh_filesize($tombstone->path);
-					$original_file_path = $tombstone->path;
+		// If no metafile is linked, link the 1st one
+		$found_linked_metafile = FALSE;
+		foreach ($file_metafiles as $key => $metafile) {
+			if ($metafile->is_linked) {
+				if (file_exists($metafile->path)) {
+					$found_linked_metafile = TRUE;
+					$expected_file_size = gh_filesize($metafile->path);
+					$original_file_path = $metafile->path;
 					break;
 				} else {
-					$tombstone->is_linked = FALSE;
-					$tombstone->state = 'Gone';
+					$metafile->is_linked = FALSE;
+					$metafile->state = 'Gone';
 				}
 			}
 		}
-		if (!$found_linked_tombstone) {
-			$first_tombstone = reset($file_tombstones);
-			$first_tombstone->is_linked = TRUE;
-			$expected_file_size = gh_filesize($first_tombstone->path);
-			$original_file_path = $first_tombstone->path;
+		if (!$found_linked_metafile) {
+			$first_metafile = reset($file_metafiles);
+			$first_metafile->is_linked = TRUE;
+			$expected_file_size = gh_filesize($first_metafile->path);
+			$original_file_path = $first_metafile->path;
 		}
 		
 		if (isset($options['disk-usage-report'])) {
@@ -2667,7 +2693,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				}
 				// Will not count that copy as a valid copy!
 				unset($file_copies_inodes[$key]);
-				unset($file_tombstones[clean_dir($real_full_path)]);
+				unset($file_metafiles[clean_dir($real_full_path)]);
 			}
 		}
 	}
@@ -2676,9 +2702,9 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	
 	if (count($file_copies_inodes) == $num_copies_required) {
 		// It's okay if the file isn't a symlink so long as we're looking at a storage volume path and not a share path
-		if (!$found_linked_tombstone || ($file_type != 'link' && $storage_path === FALSE)) {
+		if (!$found_linked_metafile || ($file_type != 'link' && $storage_path === FALSE)) {
 			// Re-create symlink...
-			if (!$found_linked_tombstone) {
+			if (!$found_linked_metafile) {
 				// ... the old one points to a drive that was replaced
 				gh_log(INFO, '  Symlink target moved. Updating symlink.');
 				$fsck_report['symlink_target_moved']++;
@@ -2686,23 +2712,23 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				// ... it was missing
 				gh_log(INFO, '  Symlink was missing. Creating new symlink.');
 			}
-			foreach ($file_tombstones as $key => $tombstone) {
-				if ($tombstone->is_linked) {
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
+			foreach ($file_metafiles as $key => $metafile) {
+				if ($metafile->is_linked) {
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
 					@unlink("$landing_zone/$file_path/$filename");
-					list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-					gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
-					symlink($tombstone->path, "$landing_zone/$file_path/$filename");
+					list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
+					gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
+					symlink($metafile->path, "$landing_zone/$file_path/$filename");
 					break;
 				}
 			}
-			save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
+			save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
 		}
 	} else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
 		gh_log(WARN, '  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')));
 		if (is_link("$landing_zone/$file_path/$filename")) {
 			gh_recycle("$landing_zone/$file_path/$filename");
-			if ($source == 'graveyard' || get_tombstone_data_filename($share, $file_path, $filename) !== FALSE) {
+			if ($source == 'metastore' || get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
 				$fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
 			}
 		} else if (gh_is_file("$landing_zone/$file_path/$filename")) {
@@ -2713,7 +2739,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			);
 			db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
 		}
-		save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
+		save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
 	} else if (count($file_copies_inodes) < $num_copies_required) {
 		// Create new copies
 		gh_log(INFO, "  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
@@ -2721,7 +2747,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			$fsck_report['missing_copies']++;
 		}
 		clearstatcache(); $filesize = gh_filesize("$original_file_path");
-		$file_tombstones = create_tombstones($share, "$file_path/$filename", $num_copies_required, $filesize, $file_tombstones);
+		$file_metafiles = create_metafiles($share, "$file_path/$filename", $num_copies_required, $filesize, $file_metafiles);
 
 		// Re-copy the file everywhere, and re-create the symlink
 		$symlink_created = FALSE;
@@ -2731,95 +2757,95 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			// Let's not count the source file here, since it will be gone soon!
 			$num_copies_current = 0;
 		}
-		foreach ($file_tombstones as $key => $tombstone) {
-			if ($original_file_path != $tombstone->path) {
+		foreach ($file_metafiles as $key => $metafile) {
+			if ($original_file_path != $metafile->path) {
 				if ($num_copies_current >= $num_copies_required) {
-					$tombstone->state = 'Gone';
-					$file_tombstones[$key] = $tombstone;
+					$metafile->state = 'Gone';
+					$file_metafiles[$key] = $metafile;
 					continue;
 				}
 
-				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
+				list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
 
-				if ($tombstone->state == 'Gone') {
+				if ($metafile->state == 'Gone') {
 					foreach ($storage_pool_directories as $target_drive) {
-						if (get_storage_volume_from_path($tombstone_dir_path) == $target_drive && is_greyhole_owned_dir($target_drive)) {
-							$tombstone->state = 'Pending';
-							$file_tombstones[$key] = $tombstone;
+						if (get_storage_volume_from_path($metafile_dir_path) == $target_drive && is_greyhole_owned_dir($target_drive)) {
+							$metafile->state = 'Pending';
+							$file_metafiles[$key] = $metafile;
 							break;
 						}
 					}
 				}
 
-				if ($tombstone->state != 'Gone') {
-					$root_path = str_replace(clean_dir("/$share/$file_path"), '', $tombstone_dir_path);
-					list($original_path, $tombstone_filename) = explode_full_path(get_share_landing_zone($share) . "/$file_path");
-					if (!gh_mkdir($tombstone_dir_path, $original_path)) {
-						$tombstone->state = 'Gone';
-						$file_tombstones[$key] = $tombstone;
+				if ($metafile->state != 'Gone') {
+					$root_path = str_replace(clean_dir("/$share/$file_path"), '', $metafile_dir_path);
+					list($original_path, $metafile_filename) = explode_full_path(get_share_landing_zone($share) . "/$file_path");
+					if (!gh_mkdir($metafile_dir_path, $original_path)) {
+						$metafile->state = 'Gone';
+						$file_metafiles[$key] = $metafile;
 						continue;
 					}
 				}
 				
-				if (!is_dir($tombstone_dir_path) || $tombstone->state == 'Gone') {
+				if (!is_dir($metafile_dir_path) || $metafile->state == 'Gone') {
 					continue;
 				}
 
-				if ($tombstone->state == 'Pending') {
-					gh_log(DEBUG, "  Copying file to $tombstone->path");
-					$temp_path = get_temp_filename($tombstone->path);
+				if ($metafile->state == 'Pending') {
+					gh_log(DEBUG, "  Copying file to $metafile->path");
+					$temp_path = get_temp_filename($metafile->path);
 					exec("rsync -t " . escapeshellarg($original_file_path) . " " . escapeshellarg($temp_path));
 					$it_worked = file_exists($temp_path) && file_exists($original_file_path) && gh_filesize($temp_path) == gh_filesize($original_file_path);
 					if ($it_worked) {
-						gh_rename($temp_path, $tombstone->path);
-						gh_chperm($tombstone->path, gh_get_file_infos($original_file_path));
-						$tombstone->state = 'OK';
+						gh_rename($temp_path, $metafile->path);
+						gh_chperm($metafile->path, gh_get_file_infos($original_file_path));
+						$metafile->state = 'OK';
 						$num_copies_current++;
 					} else {
 						gh_log(WARN, "    Failed file copy. Skipping.");
-						if ($tombstone->is_linked) {
-							$tombstone->is_linked = FALSE;
+						if ($metafile->is_linked) {
+							$metafile->is_linked = FALSE;
 						}
-						$tombstone->state = 'Gone';
+						$metafile->state = 'Gone';
 					}
-					$file_tombstones[$key] = $tombstone;
+					$file_metafiles[$key] = $metafile;
 				}
 			}
-			if ($original_file_path == $tombstone->path || $tombstone->is_linked) {
+			if ($original_file_path == $metafile->path || $metafile->is_linked) {
 				if (!empty($going_dir) && get_storage_volume_from_path($original_file_path) == $going_dir) {
-					$tombstone->is_linked = FALSE;
-					$tombstone->state = 'Gone';
-					$file_tombstones[$key] = $tombstone;
+					$metafile->is_linked = FALSE;
+					$metafile->state = 'Gone';
+					$file_metafiles[$key] = $metafile;
 					continue;
 				}
 				if ($symlink_created /* already */) {
-					$tombstone->is_linked = FALSE;
-					$file_tombstones[$key] = $tombstone;
+					$metafile->is_linked = FALSE;
+					$file_metafiles[$key] = $metafile;
 					continue;
 				}
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
+				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
 				gh_recycle("$landing_zone/$file_path/$filename");
-				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-				gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
-				symlink($tombstone->path, "$landing_zone/$file_path/$filename");
+				list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
+				gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
+				symlink($metafile->path, "$landing_zone/$file_path/$filename");
 				$symlink_created = TRUE;
 			}
 		}
 		if (!$symlink_created) {
-			foreach ($file_tombstones as $key => $tombstone) {
-				if ($tombstone->state == 'OK') {
-					$tombstone->is_linked = TRUE;
-					$file_tombstones[$key] = $tombstone;
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
+			foreach ($file_metafiles as $key => $metafile) {
+				if ($metafile->state == 'OK') {
+					$metafile->is_linked = TRUE;
+					$file_metafiles[$key] = $metafile;
+					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
 					gh_recycle("$landing_zone/$file_path/$filename");
-					list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-					gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
-					symlink($tombstone->path, "$landing_zone/$file_path/$filename");
+					list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
+					gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
+					symlink($metafile->path, "$landing_zone/$file_path/$filename");
 					break;
 				}
 			}
 		}
-		save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
+		save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
 	} else {
 		# Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
 		foreach ($file_copies_inodes as $inode => $path) {
@@ -2840,12 +2866,12 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				$target_drive = array_pop($local_target_drives);
 				$key = clean_dir("$target_drive/$share/$file_path/$filename");
 				gh_log(DEBUG, "  Looking for copy at $key");
-				if (isset($file_tombstones[$key]) || gh_file_exists($key)) {
-					if (isset($file_tombstones[$key])) {
-						$tombstone = $file_tombstones[$key];
+				if (isset($file_metafiles[$key]) || gh_file_exists($key)) {
+					if (isset($file_metafiles[$key])) {
+						$metafile = $file_metafiles[$key];
 					}
-					if (gh_file_exists($key) || $tombstone->state == 'OK') {
-						gh_log(DEBUG, "    Found file copy at $key, or tombstone is marked OK.");
+					if (gh_file_exists($key) || $metafile->state == 'OK') {
+						gh_log(DEBUG, "    Found file copy at $key, or Metadata file is marked OK.");
 						if (real_file_is_locked($key) !== FALSE) {
 							gh_log(DEBUG, "    File copy is locked. Won't remove it.");
 							continue;
@@ -2854,33 +2880,33 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 						gh_log(DEBUG, "    Removing copy at $key");
 						unset($file_copies_inodes[gh_fileinode($key)]);
 						gh_recycle($key);
-						if (isset($file_tombstones[$key])) {
-							unset($file_tombstones[$key]);
+						if (isset($file_metafiles[$key])) {
+							unset($file_metafiles[$key]);
 						}
 						$num_ok--;
 					}
 				}
 			}
 
-			// If no tombstone is linked, link the 1st one
-			$found_linked_tombstone = FALSE;
-			foreach ($file_tombstones as $key => $tombstone) {
-				if ($tombstone->is_linked) {
-					$found_linked_tombstone = TRUE;
+			// If no metafile is linked, link the 1st one
+			$found_linked_metafile = FALSE;
+			foreach ($file_metafiles as $key => $metafile) {
+				if ($metafile->is_linked) {
+					$found_linked_metafile = TRUE;
 					break;
 				}
 			}
-			if (!$found_linked_tombstone) {
-				$tombstone = reset($file_tombstones);
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $tombstone->path");
+			if (!$found_linked_metafile) {
+				$metafile = reset($file_metafiles);
+				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
 				gh_recycle("$landing_zone/$file_path/$filename");
-				list($tombstone_dir_path, $tombstone_filename) = explode_full_path($tombstone->path);
-				gh_mkdir("$landing_zone/$file_path", $tombstone_dir_path);
-				symlink($tombstone->path, "$landing_zone/$file_path/$filename");
-				reset($file_tombstones)->is_linked = TRUE;
+				list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
+				gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
+				symlink($metafile->path, "$landing_zone/$file_path/$filename");
+				reset($file_metafiles)->is_linked = TRUE;
 			}
 
-			save_tombstones($share, $file_path, $filename, array_values($file_tombstones));
+			save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
 		}
 	}
 }
@@ -2890,9 +2916,9 @@ function initialize_fsck_report($what) {
 	$fsck_report = array();
 	$fsck_report['start'] = time();
 	$fsck_report['what'] = $what;
-	$fsck_report['graveyard'] = array();
-	$fsck_report['graveyard']['num_dirs'] = 0;
-	$fsck_report['graveyard']['num_files'] = 0;
+	$fsck_report['metastore'] = array();
+	$fsck_report['metastore']['num_dirs'] = 0;
+	$fsck_report['metastore']['num_files'] = 0;
 	$fsck_report['orphaned']['num_orphans'] = 0;
 	$fsck_report['landing_zone'] = array();
 	$fsck_report['landing_zone']['num_dirs'] = 0;
@@ -2922,23 +2948,23 @@ Started:  " . date('Y-m-d H:i:s', $fsck_report['start']) . "
 Ended:    " . date('Y-m-d H:i:s', $fsck_report['end']) . "
 Duration: $displayable_duration
 
-Graveyard:
-  Found " . number_format($fsck_report['graveyard']['num_dirs']) . " directories
-  Found " . number_format($fsck_report['graveyard']['num_files']) . " files
+Metadata Store:
+  Found " . number_format($fsck_report['metastore']['num_dirs']) . " directories
+  Found " . number_format($fsck_report['metastore']['num_files']) . " files
 
 Landing Zone (shares):
   Found " . number_format($fsck_report['landing_zone']['num_dirs']) . " directories
   Found " . number_format($fsck_report['landing_zone']['num_files']) . " files
   Found " . number_format($fsck_report['orphaned']['num_orphans']) . " orphans
 
-Attic size:\n";
+Trash size:\n";
 
 	foreach ($storage_pool_directories as $dir) {
-		$attic_path = clean_dir("$dir/.gh_attic");
-		if (is_dir($attic_path)) {
-			$report .= "  $attic_path = " . trim(exec("du -sh " . escapeshellarg($attic_path) . " | awk '{print $1}'"))."\n";
+		$trash_path = clean_dir("$dir/.gh_trash");
+		if (is_dir($trash_path)) {
+			$report .= "  $trash_path = " . trim(exec("du -sh " . escapeshellarg($trash_path) . " | awk '{print $1}'"))."\n";
 		} else {
-			$report .= "  $attic_path = empty\n";
+			$report .= "  $trash_path = empty\n";
 		}
 	}
 
@@ -2950,15 +2976,15 @@ Attic size:\n";
 
 		if (!empty($fsck_report['no_copies_found_files'])) {
 			ksort($fsck_report['no_copies_found_files']);
-			$report .= "  Found " . count($fsck_report['no_copies_found_files']) . " files in the graveyard for which no file copies were found.
+			$report .= "  Found " . count($fsck_report['no_copies_found_files']) . " files in the metadata store for which no file copies were found.
     Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.
-    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the graveyard.
+    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store.
   Files with no copies:\n";
 			$report .= "    " . implode("\n    ", array_keys($fsck_report['no_copies_found_files'])) . "\n\n";
 		}
 
 		if (count($fsck_report['wrong_file_size']) > 0) {
-			$report .= "  Found " . count($fsck_report['wrong_file_size']) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. The invalid copies have been moved into the attic.\n";
+			$report .= "  Found " . count($fsck_report['wrong_file_size']) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. The invalid copies have been moved into the trash.\n";
 			foreach ($fsck_report['wrong_file_size'] as $real_file_path => $info_array) {
 				$report .= "    $real_file_path is " . number_format($info_array[0]) . " bytes; should be " . number_format($info_array[1]) . " bytes.\n";
 			}
@@ -2975,7 +3001,7 @@ Attic size:\n";
 		if ($fsck_report['too_many_copies'] > 0) {
 			$fsck_report['too_many_files'] = array_unique($fsck_report['too_many_files']);
 		
-			$report .= "  Found " . $fsck_report['too_many_copies'] . " files for which there was too many file copies. Deleted (or moved in attic) files:\n";
+			$report .= "  Found " . $fsck_report['too_many_copies'] . " files for which there was too many file copies. Deleted (or moved in trash) files:\n";
 			$report .= "    " . implode("\n    ", $fsck_report['too_many_files']) . "\n\n";
 		}
 
@@ -2985,7 +3011,7 @@ Attic size:\n";
 		}
 
 		if (count($fsck_report['temp_files']) > 0) {
-			$report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the attic):\n";
+			$report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the trash):\n";
 			$report .= "    " . implode("\n    ", $fsck_report['temp_files']) . "\n\n";
 		}
 	
@@ -3010,9 +3036,9 @@ function gh_recycle($real_path) {
 		return TRUE;
 	}
 
-	$should_move_to_attic = FALSE;
+	$should_move_to_trash = FALSE;
 	if (!$is_symlink) {
-		global $storage_pool_directories, $delete_moves_to_attic, $shares_options;
+		global $storage_pool_directories, $delete_moves_to_trash, $shares_options;
 		
 		$share_options = get_share_options_from_full_path($real_path);
 		if ($share_options !== FALSE) {
@@ -3021,7 +3047,7 @@ function gh_recycle($real_path) {
 		} else {
 			foreach ($storage_pool_directories as $dir) {
 				if (get_storage_volume_from_path($real_path) == $dir) {
-					$attic_path = "$dir/.gh_attic";
+					$trash_path = "$dir/.gh_trash";
 					$full_path = trim(str_replace($dir, '', $real_path), '/');
 					break;
 				}
@@ -3029,18 +3055,18 @@ function gh_recycle($real_path) {
 
 			$share = mb_substr($full_path, 0, mb_strpos($full_path, '/'));
 
-			$should_move_to_attic = $shares_options[$share]['delete_moves_to_attic'];
+			$should_move_to_trash = $shares_options[$share]['delete_moves_to_trash'];
 		}
 	}
 	
-	if ($should_move_to_attic) {
-		// Move to attic
-		if (!isset($attic_path)) {
-			gh_log(WARN, "  Warning! Can't find attic for $real_path. Won't delete this file!");
+	if ($should_move_to_trash) {
+		// Move to trash
+		if (!isset($trash_path)) {
+			gh_log(WARN, "  Warning! Can't find trash for $real_path. Won't delete this file!");
 			return FALSE;
 		}
 		
-		$target_path = clean_dir("$attic_path/$full_path");
+		$target_path = clean_dir("$trash_path/$full_path");
 
 		list($path, $filename) = explode_full_path($target_path);
 		
@@ -3061,10 +3087,10 @@ function gh_recycle($real_path) {
 			exec("rm -rf " . escapeshellarg($target_path));
 		}
 		if (@gh_rename($real_path, $target_path)) {
-			gh_log(DEBUG, "  Moved copy from $real_path to attic: $target_path");
+			gh_log(DEBUG, "  Moved copy from $real_path to trash: $target_path");
 			
-			// Create a symlink in the Greyhole Attic share, to allow the user to remove this file using that share
-			create_attic_share_symlink($target_path, $attic_path);
+			// Create a symlink in the Greyhole Trash share, to allow the user to remove this file using that share
+			create_trash_share_symlink($target_path, $trash_path);
 			return TRUE;
 		}
 	} else {
@@ -3173,8 +3199,8 @@ You'll receive a report email once that fsck run completes.
                         mail($email_to, $subject, $body);
 	}
 	if ($needs_fsck !== FALSE) {
-		set_graveyard_backup();
-		get_graveyards(FALSE); // FALSE => Resets the graveyards cache
+		set_metastore_backup();
+		get_metastores(FALSE); // FALSE => Resets the metastores cache
 		global $shares_options;
 		
 		
@@ -3182,14 +3208,14 @@ You'll receive a report email once that fsck run completes.
 		clearstatcache();
 		if($needs_fsck === 2){
 			foreach ($returned_drives as $drive){
-				$graveyards = get_graveyards_from_storage_volume($drive);
-				gh_log(INFO, "Starting fsck for graveyard on $drive which came back online.");
-				foreach($graveyards as $graveyard){
+				$metastores = get_metastores_from_storage_volume($drive);
+				gh_log(INFO, "Starting fsck for metadata store on $drive which came back online.");
+				foreach($metastores as $metastore){
 					foreach($shares_options as $share_name => $share_options){
-						gh_fsck_graveyard($graveyard,"/$share_name", $share_name);
+						gh_fsck_metastore($metastore,"/$share_name", $share_name);
 					}
 				}
-				gh_log(INFO, "fsck for returning drive $drive's graveyard completed.");
+				gh_log(INFO, "fsck for returning drive $drive's metadata store completed.");
 			}
 			gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
 		}else{
@@ -3301,33 +3327,33 @@ function mark_gone_drive_fscked($target_drive, $action='add') {
 	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-FSCKed-Drives: " . db_error());
 }
 
-function get_graveyards_from_storage_volume($storage_volume){
-	$volume_graveyards = array();
-	foreach (get_graveyards() as $graveyard) {
-		if (get_storage_volume_from_path($graveyard) == $storage_volume) {
-			$volume_graveyards[] = $graveyard;
+function get_metastores_from_storage_volume($storage_volume){
+	$volume_metastores = array();
+	foreach (get_metastores() as $metastore) {
+		if (get_storage_volume_from_path($metastore) == $storage_volume) {
+			$volume_metastores[] = $metastore;
 		}
 	}
-	return $volume_graveyards;
+	return $volume_metastores;
 }
 
-function get_graveyards($use_cache=TRUE) {
-	global $storage_pool_directories, $graveyard_backup_directories, $global_graveyards;
-	if (!isset($global_graveyards) || !$use_cache) {
-		$graveyards = array();
+function get_metastores($use_cache=TRUE) {
+	global $storage_pool_directories, $metastore_backup_directories, $global_metastores;
+	if (!isset($global_metastores) || !$use_cache) {
+		$metastores = array();
 		foreach ($storage_pool_directories as $target_drive) {
 			if (is_greyhole_owned_dir($target_drive)) {
-				$graveyards[] = "$target_drive/.gh_graveyard";
+				$metastores[] = "$target_drive/.gh_metastore";
 			}
 		}
-		foreach ($graveyard_backup_directories as $graveyard_backup_directory) {
-			if (is_greyhole_owned_dir(str_replace('/.gh_graveyard_backup', '', $graveyard_backup_directory))) {
-				$graveyards[] = $graveyard_backup_directory;
+		foreach ($metastore_backup_directories as $metastore_backup_directory) {
+			if (is_greyhole_owned_dir(str_replace('/.gh_metastore_backup', '', $metastore_backup_directory))) {
+				$metastores[] = $metastore_backup_directory;
 			}
 		}
-		$global_graveyards = $graveyards;
+		$global_metastores = $metastores;
 	}
-	return $global_graveyards;
+	return $global_metastores;
 }
 
 function get_share_options_from_full_path($full_path) {
@@ -3365,9 +3391,9 @@ function get_share_options_from_storage_volume($full_path,$storage_volume) {
 	$landing_zone = '';
 	$share = FALSE;
 	foreach ($shares_options as $share_name => $share_options) {
-		$graveyard = get_graveyard_from_path($full_path);
-		if($graveyard !== FALSE){
-			if (mb_strpos($full_path, "$graveyard/$share_name") === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
+		$metastore = get_metastore_from_path($full_path);
+		if($metastore !== FALSE){
+			if (mb_strpos($full_path, "$metastore/$share_name") === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
 				$land_zone = $share_options['landing_zone'];
 				$share = $share_options;
 				break;
@@ -3383,15 +3409,15 @@ function get_share_options_from_storage_volume($full_path,$storage_volume) {
 	return $share;
 }
 
-function get_graveyard_from_path($path){
-	$graveyard_path = FALSE;
-	foreach(get_graveyards() as $graveyard){
-		if(mb_strpos($path, $graveyard) === 0){
-			$graveyard_path = $graveyard;
+function get_metastore_from_path($path){
+	$metastore_path = FALSE;
+	foreach(get_metastores() as $metastore){
+		if(mb_strpos($path, $metastore) === 0){
+			$metastore_path = $metastore;
 			break;
 		}	
 	}
-	return $graveyard_path;
+	return $metastore_path;
 }
 
 function gh_get_file_infos($real_path) {
@@ -3548,26 +3574,26 @@ function gh_balance() {
 					continue;
 				}
 
-				// Update tombstones
-				foreach (get_tombstones($share_name, $path, $filename, FALSE, TRUE, FALSE) as $existing_tombstones){
-					foreach ($existing_tombstones as $key => $tombstone) {
-						if ($tombstone->path == $file) {
-							$tombstone->path = "$target_drive/$share_name/$full_path";
-							unset($existing_tombstones[$key]);
-							$tombstone->state = 'OK';
-							if ($tombstone->is_linked) {
+				// Update metafiles
+				foreach (get_metafiles($share_name, $path, $filename, FALSE, TRUE, FALSE) as $existing_metafiles){
+					foreach ($existing_metafiles as $key => $metafile) {
+						if ($metafile->path == $file) {
+							$metafile->path = "$target_drive/$share_name/$full_path";
+							unset($existing_metafiles[$key]);
+							$metafile->state = 'OK';
+							if ($metafile->is_linked) {
 								// Re-create correct symlink
 								$landing_zone = $share_options['landing_zone'];
 								if (is_link("$landing_zone/$full_path")) {
-									gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $tombstone->path");
+									gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $metafile->path");
 									if (gh_recycle("$landing_zone/$full_path")) {
-										@symlink($tombstone->path, "$landing_zone/$full_path");
+										@symlink($metafile->path, "$landing_zone/$full_path");
 										// Creating this symlink can fail if the parent dir was removed
 									}
 								}
 							}
-							$existing_tombstones[$tombstone->path] = $tombstone;
-							save_tombstones($share_name, $path, $filename, $existing_tombstones);
+							$existing_metafiles[$metafile->path] = $metafile;
+							save_metafiles($share_name, $path, $filename, $existing_metafiles);
 							break;
 						}
 					}
@@ -3711,91 +3737,91 @@ function str_replace_first($search, $replace, $subject) {
 	}
 }
 
-function set_graveyard_backup() {
-	global $graveyard_backup_directories, $storage_pool_directories;
+function set_metastore_backup() {
+	global $metastore_backup_directories, $storage_pool_directories;
 
-	$num_graveyard_backups_needed = 2;
+	$num_metastore_backups_needed = 2;
 	if (count($storage_pool_directories) < 2) {
-		$graveyard_backup_directories = array();
+		$metastore_backup_directories = array();
 		return;
 	}
 
-	gh_log(DEBUG, "Loading graveyard backup directories...");
-	if (empty($graveyard_backup_directories)) {
+	gh_log(DEBUG, "Loading metastore backup directories...");
+	if (empty($metastore_backup_directories)) {
 		// In the DB ?
-		$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'graveyard_backup_directory');
-		$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'graveyard_backup_directory': " . db_error());
+		$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'metastore_backup_directory');
+		$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'metastore_backup_directory': " . db_error());
 		$row = db_fetch_object($result);
 		db_free_result($result);
 		if ($row !== FALSE) {
-			$graveyard_backup_directories = unserialize($row->value);
-			gh_log(DEBUG, "  Found " . count($graveyard_backup_directories) . " directories in the settings table.");
+			$metastore_backup_directories = unserialize($row->value);
+			gh_log(DEBUG, "  Found " . count($metastore_backup_directories) . " directories in the settings table.");
 		}
 	}
 
 	// Verify the directories, if any
-	if (!empty($graveyard_backup_directories)) {
-		foreach ($graveyard_backup_directories as $key => $graveyard_backup_directory) {
-			if (!is_greyhole_owned_dir(str_replace('/.gh_graveyard_backup', '', $graveyard_backup_directory))) {
+	if (!empty($metastore_backup_directories)) {
+		foreach ($metastore_backup_directories as $key => $metastore_backup_directory) {
+			if (!is_greyhole_owned_dir(str_replace('/.gh_metastore_backup', '', $metastore_backup_directory))) {
 				// Directory is now invalid; stop using it.
-				gh_log(DEBUG, "Removing $graveyard_backup_directory from available 'graveyard_backup_directories' - directory isn't a greyhole storage pool directory (anymore?)");
-				unset($graveyard_backup_directories[$key]);
-			} else if (!is_dir($graveyard_backup_directory)) {
+				gh_log(DEBUG, "Removing $metastore_backup_directory from available 'metastore_backup_directories' - directory isn't a greyhole storage pool directory (anymore?)");
+				unset($metastore_backup_directories[$key]);
+			} else if (!is_dir($metastore_backup_directory)) {
 				// Directory is invalid, but needs to be created (was rm'ed?)
-				mkdir($graveyard_backup_directory);
+				mkdir($metastore_backup_directory);
 			}
 		}
 	}
 	
-	if (empty($graveyard_backup_directories) || count($graveyard_backup_directories) < $num_graveyard_backups_needed) {
-		gh_log(DEBUG, "  Missing some directories. Need $num_graveyard_backups_needed, currently have " . count($graveyard_backup_directories) . ". Will select more...");
-		$graveyard_backup_directories_hash = array();
-		if (count($graveyard_backup_directories) > 0) {
-			$graveyard_backup_directories_hash[array_shift($graveyard_backup_directories)] = TRUE;
+	if (empty($metastore_backup_directories) || count($metastore_backup_directories) < $num_metastore_backups_needed) {
+		gh_log(DEBUG, "  Missing some directories. Need $num_metastore_backups_needed, currently have " . count($metastore_backup_directories) . ". Will select more...");
+		$metastore_backup_directories_hash = array();
+		if (count($metastore_backup_directories) > 0) {
+			$metastore_backup_directories_hash[array_shift($metastore_backup_directories)] = TRUE;
 		}
 
-		while (count($graveyard_backup_directories_hash) < $num_graveyard_backups_needed) {
+		while (count($metastore_backup_directories_hash) < $num_metastore_backups_needed) {
 			// Let's pick new one
-			$graveyard_backup_directory = clean_dir($storage_pool_directories[array_rand($storage_pool_directories)] . '/.gh_graveyard_backup');
-			$graveyard_backup_directories_hash[$graveyard_backup_directory] = TRUE;
-			if (!is_dir($graveyard_backup_directory)) {
-				mkdir($graveyard_backup_directory);
+			$metastore_backup_directory = clean_dir($storage_pool_directories[array_rand($storage_pool_directories)] . '/.gh_metastore_backup');
+			$metastore_backup_directories_hash[$metastore_backup_directory] = TRUE;
+			if (!is_dir($metastore_backup_directory)) {
+				mkdir($metastore_backup_directory);
 			}
-			gh_log(DEBUG, "    Randomly picked $graveyard_backup_directory");
+			gh_log(DEBUG, "    Randomly picked $metastore_backup_directory");
 		}
-		$graveyard_backup_directories = array_keys($graveyard_backup_directories_hash);
+		$metastore_backup_directories = array_keys($metastore_backup_directories_hash);
 
 		// Got 2 directories now; save them in the DB
-		$query = "DELETE FROM settings WHERE name = 'graveyard_backup_directory'";
-		db_query($query) or gh_log(CRITICAL, "Can't delete settings for graveyard_backup_directory: " . db_error());
-		$query = sprintf("INSERT INTO settings (name, value) VALUES ('graveyard_backup_directory', '%s')",
-			db_escape_string(serialize($graveyard_backup_directories))
+		$query = "DELETE FROM settings WHERE name = 'metastore_backup_directory'";
+		db_query($query) or gh_log(CRITICAL, "Can't delete settings for metastore_backup_directory: " . db_error());
+		$query = sprintf("INSERT INTO settings (name, value) VALUES ('metastore_backup_directory', '%s')",
+			db_escape_string(serialize($metastore_backup_directories))
 		);
-		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for graveyard_backup_directory: " . db_error());
+		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for metastore_backup_directory: " . db_error());
 	}
 }
 
-function create_attic_share_symlink($filepath_in_attic, $attic_path) {
-	global $attic_share;
-	if (isset($attic_share)) {
-		$filepath_in_attic = clean_dir($filepath_in_attic);
-		$filepath_in_attic_share = str_replace($attic_path, $attic_share['landing_zone'], $filepath_in_attic);
-		if (file_exists($filepath_in_attic_share)) {
-			$new_filepath = $filepath_in_attic_share;
+function create_trash_share_symlink($filepath_in_trash, $trash_path) {
+	global $trash_share;
+	if (isset($trash_share)) {
+		$filepath_in_trash = clean_dir($filepath_in_trash);
+		$filepath_in_trash_share = str_replace($trash_path, $trash_share['landing_zone'], $filepath_in_trash);
+		if (file_exists($filepath_in_trash_share)) {
+			$new_filepath = $filepath_in_trash_share;
 			$i = 1;
 			while (file_exists($new_filepath)) {
-				if (@readlink($new_filepath) == $filepath_in_attic) {
-					// There's already a symlink to that file in the attic share; let's not make a second one!
+				if (@readlink($new_filepath) == $filepath_in_trash) {
+					// There's already a symlink to that file in the trash share; let's not make a second one!
 					return;
 				}
-				$new_filepath = "$filepath_in_attic_share copy $i";
+				$new_filepath = "$filepath_in_trash_share copy $i";
 				$i++;
 			}
-			$filepath_in_attic_share = $new_filepath;
-			list($original_path, $filename) = explode_full_path($filepath_in_attic_share);
+			$filepath_in_trash_share = $new_filepath;
+			list($original_path, $filename) = explode_full_path($filepath_in_trash_share);
 		} else {
-			list($original_path, $filename) = explode_full_path($filepath_in_attic);
-			list($path, $filename) = explode_full_path($filepath_in_attic_share);
+			list($original_path, $filename) = explode_full_path($filepath_in_trash);
+			list($path, $filename) = explode_full_path($filepath_in_trash_share);
 
 			$dir_infos = (object) array(
 				'fileowner' => (int) gh_fileowner($original_path),
@@ -3804,8 +3830,8 @@ function create_attic_share_symlink($filepath_in_attic, $attic_path) {
 			);
 			gh_mkdir($path, $dir_infos);
 		}
-		symlink($filepath_in_attic, $filepath_in_attic_share);
-		gh_log(DEBUG, "  Created symlink to deleted file in {$attic_share['name']} share ($filename).");
+		symlink($filepath_in_trash, $filepath_in_trash_share);
+		gh_log(DEBUG, "  Created symlink to deleted file in {$trash_share['name']} share ($filename).");
 	}
 }
 
@@ -3820,7 +3846,7 @@ function process_command_line() {
 		'postrotate',
 		'stats',
 		'status',
-		'empty-attic',
+		'empty-trash',
 		'view-queue',
 		'iostat',
 		'getuid'
@@ -3838,7 +3864,7 @@ function process_command_line() {
 	$opts_options = 'eyucoj';
 	$longopts_options = array(
 		'email-report',
-		'dont-walk-graveyard',
+		'dont-walk-metadata-store',
 		'disk-usage-report',
 		'if-conf-changed',
 		'find-orphaned-files',
@@ -3934,7 +3960,7 @@ function print_usage() {
 	echo "  -s, --stats           Display storage pool statistics.\n";
 	echo "  -S, --status          Display what the Greyhole daemon is currently doing.\n";
 	echo "  -q, --view-queue      Display the current work queue.\n";
-	echo "  -a, --empty-attic     Empty the attic.\n";
+	echo "  -a, --empty-trash     Empty the trash.\n";
 	echo "  -b, --debug=filename  Debug past file operations.\n";
 	echo "  -p, --prerotate       Pre-rotate task (for logrotate).\n";
 	echo "  -P, --postrotate      Post-rotate task (for logrotate).\n";
@@ -3961,9 +3987,9 @@ function print_usage() {
 	echo "For --fsck, the available OPTIONS are:\n";
 	echo "  -e, --email-report    Send an email when fsck completes, to report on what was\n";
 	echo "                        checked, and any error that was found.\n";
-	echo "  -y, --dont-walk-graveyard\n";
-	echo "                        Speed up fsck by skipping the scan of the graveyard\n";
-	echo "                        directories. Scanning the graveyards is only required to\n";
+	echo "  -y, --dont-walk-metadata-store\n";
+	echo "                        Speed up fsck by skipping the scan of the metadata store\n";
+	echo "                        directories. Scanning the metadata stores is only required to\n";
 	echo "                        re-create symbolic links that might be missing from your\n";
 	echo "                        shared directories.\n";
 	echo "  -c, --if-conf-changed Only fsck if greyhole.conf or smb.conf paths changed since\n";
@@ -3976,7 +4002,7 @@ function print_usage() {
 	echo "                        of a share on a storage pool volume.\n";
 	echo "  -o, --find-orphaned-files\n";
 	echo "                        Scan for orphaned files in the storage pool volumes\n";
-	echo "                        while running the fsck and create tombstones for\n";
+	echo "                        while running the fsck and create Metadata files for\n";
 	echo "                        the found files.\n";
 	exit(1);
 }
