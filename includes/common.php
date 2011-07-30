@@ -78,7 +78,6 @@ function parse_config() {
 			if ($name[0] == '#') {
 				continue;
 			}
-			$parsing_dir_selection_groups = FALSE;
 			switch($name) {
 				case 'log_level':
 					global ${$name};
@@ -118,10 +117,10 @@ function parse_config() {
 					$memory_limit = $value;
 					break;
 				case 'dir_selection_groups':
-				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
-    				    global $dir_selection_groups;
-				        $group_name = trim($regs[1]);
-				        $dirs = array_map('trim', explode(',', $regs[2]));
+				    	if (preg_match("/(.+):(.+)/", $value, $regs)) {
+    				    		global $dir_selection_groups;
+				        	$group_name = trim($regs[1]);
+				        	$dirs = array_map('trim', explode(',', $regs[2]));
 						$dir_selection_groups[$group_name] = $dirs;
 						$parsing_dir_selection_groups = TRUE;
 					}
@@ -1043,19 +1042,19 @@ class DirectorySelection {
     		kshuffle($sorted_target_drives);
     		kshuffle($last_resort_sorted_target_drives);
         } else if ($this->selection_algorithm == 'most_available_space') {
-        	krsort($sorted_target_drives);
-    		krsort($last_resort_sorted_target_drives);
+        	arsort($sorted_target_drives);
+    		arsort($last_resort_sorted_target_drives);
 		}
 		// Only keep directories that are in $this->directories
         $this->sorted_target_drives = array();
 		foreach ($sorted_target_drives as $k => $v) {
-		    if (array_search($v, $this->directories) !== FALSE) {
+		    if (array_search($k, $this->directories) !== FALSE) {
 		        $this->sorted_target_drives[$k] = $v;
 		    }
 		}
         $this->last_resort_sorted_target_drives = array();
 		foreach ($last_resort_sorted_target_drives as $k => $v) {
-		    if (array_search($v, $this->directories) !== FALSE) {
+		    if (array_search($k, $this->directories) !== FALSE) {
 		        $this->last_resort_sorted_target_drives[$k] = $v;
 		    }
 		}
