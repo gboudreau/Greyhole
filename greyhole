@@ -2225,22 +2225,13 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 		$available_space = (float) $free_space - $minimum_free_space;
 		if ($available_space <= $filesize_kb) {
 			if ($free_space > $filesize_kb) {
-				while (isset($last_resort_sorted_target_drives[$free_space])) {
-					$free_space -= 0.001;
-				}
-				$last_resort_sorted_target_drives[$available_space] = $target_drive;
+				$last_resort_sorted_target_drives[$target_drive] = $available_space;
 			} else {
-				while (isset($full_drives[$free_space])) {
-					$free_space -= 0.001;
-				}
-				$full_drives[$free_space] = $target_drive;
+				$full_drives[$target_drive] = $free_space;
 			}
 			continue;
 		}
-		while (isset($sorted_target_drives[$available_space])) {
-			$available_space -= 0.001;
-		}
-		$sorted_target_drives[$available_space] = $target_drive;
+		$sorted_target_drives[$target_drive] = $available_space;
 	}
 
 	foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
@@ -2300,7 +2291,7 @@ It appears all the defined storage pool directories are over-capacity.
 You probably want to do something about this!
 
 ";
-			foreach ($last_resort_sorted_target_drives as $free_space => $target_drive) {
+			foreach ($last_resort_sorted_target_drives as $target_drive => $free_space) {
 				$minimum_free_space = (int) (isset($minimum_free_space_pool_directories[$target_drive]) ? $minimum_free_space_pool_directories[$target_drive] : 0);
 				$body .= "$target_drive has " . number_format($free_space/1024/1024, 2) . " GB free; minimum specified in greyhole.conf: $minimum_free_space GB.\n";
 			}
@@ -2316,30 +2307,30 @@ You probably want to do something about this!
 	if ($log_level >= DEBUG) {
 		if (count($sorted_target_drives) > 0) {
 			$log = $log_prefix ."Drives with available space: ";
-			foreach ($sorted_target_drives as $s => $d) {
+			foreach ($sorted_target_drives as $d => $s) {
 				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " avail) - ";
 			}
 			gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
 		}
 		if (count($last_resort_sorted_target_drives) > 0) {
 			$log = $log_prefix ."Drives with enough free space, but no available space: ";
-			foreach ($last_resort_sorted_target_drives as $s => $d) {
+			foreach ($last_resort_sorted_target_drives as $d => $s) {
 				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " avail) - ";
 			}
 			gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
 		}
 		if (count($full_drives) > 0) {
 			$log = $log_prefix ."Drives full: ";
-			foreach ($full_drives as $s => $d) {
+			foreach ($full_drives as $d => $s) {
 				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " free) - ";
 			}
 			gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
 		}
 	}
 	
-	$drives = array_merge($sorted_target_drives, $last_resort_sorted_target_drives);
+	$drives = array_merge(array_keys($sorted_target_drives), array_keys($last_resort_sorted_target_drives));
 	if ($include_full_drives) {
-		$drives = array_merge($drives, $full_drives);
+		$drives = array_merge($drives, array_keys($full_drives));
 	}
 
 	if (isset($sticky_files)) {
