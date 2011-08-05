@@ -64,8 +64,8 @@ if (!isset($smb_config_file)) {
 $attic_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks, $memory_limit;
-
+	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $attic_share_names, $max_queued_tasks, $memory_limit, $all_samba_shares;
+	
 	$parsing_dir_selection_groups = FALSE;
 	$shares_options = array();
 	$storage_pool_directories = array();
@@ -177,7 +177,7 @@ function parse_config() {
 			}
 	    }
 	}
-	
+
 	if (is_array($storage_pool_directories) && count($storage_pool_directories) > 0) {
 		$df_command = "df -k";
 		foreach ($storage_pool_directories as $key => $target_drive) {
@@ -191,16 +191,24 @@ function parse_config() {
 	}
 
 	$config_text = file_get_contents($smb_config_file);
+	$all_samba_shares = array();
 	foreach (explode("\n", $config_text) as $line) {
 		$line = trim($line);
 		if (mb_strlen($line) == 0) { continue; }
 		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
 			$share_name = $regs[1];
 		}
-		if (isset($share_name) && !isset($shares_options[$share_name]) && array_search($share_name, $attic_share_names) === FALSE) { continue; }
 		if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
+    		if (array_search($share_name, $attic_share_names) === FALSE) { 
+    		    $all_samba_shares[] = $share_name;
+    		    if (!isset($shares_options[$share_name])) {
+        		    unset($share_name);
+        		    continue;
+    		    }
+    		}
 			$shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
 			$shares_options[$share_name]['name'] = $share_name;
+			unset($share_name);
 		}
 	}
 	

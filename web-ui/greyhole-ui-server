@@ -255,6 +255,10 @@ class Socket {
 				array_push($this->threads, $child);
 				if (DEBUG) glog("Accepted child, " . $child->getInfo() . PHP_EOL);
 			}
+			
+			if (count($this->threads) == 0) {
+			    usleep(100000);
+			}
 
 			// Loop through children, listen for read
 			foreach ($this->threads as $index => $child) {
