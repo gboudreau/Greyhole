@@ -78,6 +78,11 @@ function parse_config() {
 			if ($name[0] == '#') {
 				continue;
 			}
+		    if (mb_strpos($name, 'delete_moves_to_attic') !== FALSE) {
+			    $new_name = str_replace('attic', 'trash', $name);
+			    gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $new_name");
+			    $name = $new_name;
+			}
 			$parsing_dir_selection_groups = FALSE;
 			switch($name) {
 				case 'log_level':

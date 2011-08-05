@@ -611,6 +611,13 @@ function terminology_conversion() {
 function convert_database() {
 	$query = "UPDATE settings SET name = 'metastore_backup_directory' WHERE name = 'graveyard_backup_directory'";
 	db_query($query) or gh_log(CRITICAL, "Can't convert graveyard_backup_directory in the settings table: " . db_error());
+	
+	$result = db_query("SELECT value FROM settings WHERE name = 'metastore_backup_directory' AND value LIKE '%graveyard%'");
+	$setting = db_fetch_object($result);
+	if ($setting) {
+    	$new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting->value);
+    	db_query("UPDATE settings SET value = '$new_value' WHERE name = 'metastore_backup_directory'");
+	}
 }
 
 function convert_folders($old,$new) {
