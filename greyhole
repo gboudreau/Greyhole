@@ -2265,7 +2265,6 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	    if ($num_empty_ds == count($shares_options[$share]['dir_selection_algorithm'])) {
 	        // All DS are empty; exit.
 	        $got_all_drives = TRUE;
-	        var_dump('stopping; got all drives');
 	        break;
 	    }
 	}
