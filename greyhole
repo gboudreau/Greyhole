@@ -3544,8 +3544,16 @@ function gh_balance() {
 					gh_log(DEBUG, "  Moving sticky file, even if that means it won't help balancing available space.");
 				} else if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize
 						|| $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
-						|| $pool_drives_avail_space[$target_drive] < $target_avail_space) {
+						|| $pool_drives_avail_space[$target_drive] > $target_avail_space) {
 					gh_log(DEBUG, "  Moving this file wouldn't help balancing available space. Skipping.");
+					gh_log(DEBUG, "    Reason 1: " . var_export($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize, TRUE));
+					gh_log(DEBUG, "    Reason 2: " . var_export($pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space, TRUE));
+					gh_log(DEBUG, "    Reason 3: " . var_export($pool_drives_avail_space[$target_drive] > $target_avail_space, TRUE));
+					gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize+1GB = " . ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024));
+					gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize = " . ($pool_drives_avail_space[$source_drive]+$filesize));
+					gh_log(DEBUG, "    pool_drives_avail_space[target_drive] = " . ($pool_drives_avail_space[$target_drive]));
+					gh_log(DEBUG, "    pool_drives_avail_space[target_drive]-filesize = " . ($pool_drives_avail_space[$target_drive]-$filesize));
+					gh_log(DEBUG, "    target_avail_space = " . ($target_avail_space));
 					continue;
 				}
 
@@ -3599,10 +3607,6 @@ function gh_balance() {
 				gh_log(DEBUG, "Balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 			}
 			gh_log(DEBUG, "Done balancing storage pool directory: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
-			
-			if (@$skip_stickies) {
-				break;
-			}
 		}
 		gh_log(DEBUG, "Done balancing share: $share_name");
 	}
