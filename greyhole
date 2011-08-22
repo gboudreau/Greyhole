@@ -3467,6 +3467,13 @@ function gh_balance() {
 			$pool_drives_avail_space[$drive] = $available_space;
 		}
 		$num_total_drives = count($sorted_pool_drives);
+		
+		$balance_direction_asc = array();
+		foreach ($sorted_pool_drives as $available_space => $drive) {
+			$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
+    		$balance_direction_asc[$drive] = $pool_drives_avail_space[$drive] < $target_avail_space;
+		}
+		gh_log(DEBUG, "Balance direction (ASC): " . var_export($balance_direction_asc, TRUE));
 
 		foreach ($sorted_pool_drives as $source_drive) {
 			$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
@@ -3544,16 +3551,19 @@ function gh_balance() {
 					gh_log(DEBUG, "  Moving sticky file, even if that means it won't help balancing available space.");
 				} else if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize
 						|| $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
-						|| $pool_drives_avail_space[$target_drive] > $target_avail_space) {
+						|| ($balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] > $target_avail_space)
+						|| (!$balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] < $target_avail_space)) {
 					gh_log(DEBUG, "  Moving this file wouldn't help balancing available space. Skipping.");
 					gh_log(DEBUG, "    Reason 1: " . var_export($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize, TRUE));
 					gh_log(DEBUG, "    Reason 2: " . var_export($pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space, TRUE));
-					gh_log(DEBUG, "    Reason 3: " . var_export($pool_drives_avail_space[$target_drive] > $target_avail_space, TRUE));
+					gh_log(DEBUG, "    Reason 3: " . var_export($balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] > $target_avail_space, TRUE));
+					gh_log(DEBUG, "    Reason 4: " . var_export(!$balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] < $target_avail_space, TRUE));
 					gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize+1GB = " . ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024));
 					gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize = " . ($pool_drives_avail_space[$source_drive]+$filesize));
 					gh_log(DEBUG, "    pool_drives_avail_space[target_drive] = " . ($pool_drives_avail_space[$target_drive]));
 					gh_log(DEBUG, "    pool_drives_avail_space[target_drive]-filesize = " . ($pool_drives_avail_space[$target_drive]-$filesize));
 					gh_log(DEBUG, "    target_avail_space = " . ($target_avail_space));
+					gh_log(DEBUG, "    balance_direction_asc[target_drive] = " . var_export($balance_direction_asc[$target_drive], TRUE));
 					continue;
 				}
 
