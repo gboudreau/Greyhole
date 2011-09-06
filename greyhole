@@ -143,7 +143,7 @@ if ($action == 'gone' || $action == 'going') {
 	}
 
 	// Remove $going_dir from config file and restart (if it was running)
-	$escaped_dir = str_replace('/', '\/', $going_dir);
+	$escaped_dir = str_replace('/', '\/', $options['dir']);
 	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf");
 	if (is_file('/sbin/restart')) {
 	    $running = (int) exec('status greyhole | grep running | wc -l');
