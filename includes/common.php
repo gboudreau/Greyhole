@@ -153,7 +153,7 @@ function parse_config() {
 					} else if (mb_strpos($name, 'dir_selection_algorithm') === 0) {
 						$share = mb_substr($name, 24, mb_strlen($name)-25);
 						if (!isset($shares_options[$share]['dir_selection_groups'])) {
-						    $shares_options[$share]['dir_selection_groups'] = $dir_selection_groups;
+						    $shares_options[$share]['dir_selection_groups'] = @$dir_selection_groups;
 						}
 						$shares_options[$share]['dir_selection_algorithm'] = DirectorySelection::parse($value, $shares_options[$share]['dir_selection_groups']);
 					} else {
@@ -208,7 +208,16 @@ function parse_config() {
 			$shares_options[$share_name]['name'] = $share_name;
 		}
 	}
-	
+
+    global $dir_selection_algorithm;
+    if (isset($dir_selection_algorithm)) {
+        foreach ($dir_selection_algorithm as $ds) {
+            $ds->update();
+        }
+    } else {
+        // Default dir_selection_algorithm
+        $dir_selection_algorithm = DirectorySelection::parse('most_available_space', null);
+    }
 	foreach ($shares_options as $share_name => $share_options) {
 		if (array_search($share_name, $trash_share_names) !== FALSE) {
 			global $trash_share;
@@ -227,7 +236,11 @@ function parse_config() {
 		if (!isset($share_options['delete_moves_to_trash'])) {
 		    $share_options['delete_moves_to_trash'] = $delete_moves_to_trash;
 		}
-		if (!isset($share_options['dir_selection_algorithm']) && isset($dir_selection_algorithm)) {
+		if (isset($share_options['dir_selection_algorithm'])) {
+            foreach ($share_options['dir_selection_algorithm'] as $ds) {
+                $ds->update();
+            }
+		} else {
 		    $share_options['dir_selection_algorithm'] = $dir_selection_algorithm;
 		}
 		if (isset($share_options['dir_selection_groups'])) {
@@ -1032,14 +1045,16 @@ class DirectorySelection {
     var $num_dirs_per_draft;
     var $selection_algorithm;
     var $directories;
+    var $is_custom;
     
     var $sorted_target_drives;
     var $last_resort_sorted_target_drives;
     
-    function __construct($num_dirs_per_draft, $selection_algorithm, $directories) {
+    function __construct($num_dirs_per_draft, $selection_algorithm, $directories, $is_custom) {
         $this->num_dirs_per_draft = $num_dirs_per_draft;
         $this->selection_algorithm = $selection_algorithm;
         $this->directories = $directories;
+        $this->is_custom = $is_custom;
     }
     
     function init(&$sorted_target_drives, &$last_resort_sorted_target_drives) {
@@ -1094,7 +1109,7 @@ class DirectorySelection {
         $ds = array();
         if ($config_string == 'random' || $config_string == 'most_available_space') {
             global $storage_pool_directories;
-            $ds[] = new DirectorySelection(count($storage_pool_directories), $config_string, $storage_pool_directories);
+            $ds[] = new DirectorySelection(count($storage_pool_directories), $config_string, $storage_pool_directories, FALSE);
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(random|most_available_space)/i', $config_string, $regs)) {
@@ -1109,9 +1124,18 @@ class DirectorySelection {
             if ($num_dirs == 'all' || $num_dirs > count($dir_selection_groups[$group_name])) {
                 $num_dirs = count($dir_selection_groups[$group_name]);
             }
-            $ds[] = new DirectorySelection($num_dirs, $selection_algorithm, $dir_selection_groups[$group_name]);
+            $ds[] = new DirectorySelection($num_dirs, $selection_algorithm, $dir_selection_groups[$group_name], TRUE);
         }
         return $ds;
+    }
+
+    function update() {
+        // Make sure num_dirs_per_draft and directories have been set, in case storage_pool_directory lines appear after dir_selection_algorithm line(s) in the config file
+        if (!$this->is_custom && ($this->selection_algorithm == 'random' || $this->selection_algorithm == 'most_available_space')) {
+            global $storage_pool_directories;
+            $this->num_dirs_per_draft = count($storage_pool_directories);
+            $this->directories = $storage_pool_directories;
+        }
     }
 }
 ?>
