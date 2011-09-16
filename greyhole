@@ -3042,10 +3042,11 @@ function gh_recycle($real_path) {
 			$full_path = trim($share_options['name'] . "/" . str_replace($share_options['landing_zone'], '', $real_path), '/');
 			$share = $share_options['name'];
 		} else {
+		    $storage_volume = get_storage_volume_from_path($real_path);
 			foreach ($storage_pool_directories as $dir) {
-				if (get_storage_volume_from_path($real_path) == $dir) {
+				if ($dir == $storage_volume) {
 					$trash_path = "$dir/.gh_trash";
-					$full_path = trim(str_replace($dir, '', $real_path), '/');
+					$full_path = trim(substr($real_path, strlen($dir)), '/');
 					break;
 				}
 			}
