@@ -87,7 +87,7 @@ if [ -f /etc/logrotate.d/syslog ]; then
 	# Undo changes to /etc/logrotate.d/syslog
 	grep -v greyhole /etc/logrotate.d/syslog > /etc/logrotate.d/syslog.new
 	mv -f /etc/logrotate.d/syslog.new /etc/logrotate.d/syslog
-	[ -f /etc/init.d/syslog ] && service syslog reload > /dev/null || service rsyslog reload > /dev/null
+	[ -f /etc/init.d/syslog ] && service syslog reload > /dev/null || service rsyslog restart > /dev/null
 fi
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
