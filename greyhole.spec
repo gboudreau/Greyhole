@@ -59,6 +59,7 @@ rm -rf $RPM_BUILD_ROOT
 %pre
 
 %post
+echo "Executing post-install script..."
 mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
 
@@ -66,14 +67,18 @@ LIBDIR=/usr/lib
 if [ "`uname -i`" = "x86_64" ]; then
         LIBDIR=/usr/lib64
 fi
+echo "  Found LIB_DIR = ${LIBDIR}"
 if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
+	echo "  Removing old ${LIBDIR}/samba/vfs/greyhole.so library"
 	rm ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
 if [ "$SMB_VERSION" = "3 5" ]; then
+	echo "  Detected Samba 3.5; creating symlink pointing to greyhole-samba35.so"
 	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
 else
+	echo "  Detected Samba 3.4; creating symlink pointing to greyhole-samba.so"
 	ln -s ${LIBDIR}/greyhole/greyhole-samba.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
@@ -102,6 +107,8 @@ fi
 /sbin/chkconfig greyhole on
 /sbin/service greyhole condrestart 2>&1 > /dev/null
 
+echo "Post-install script completed."
+echo
 echo "==========================================================================="
 echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
 echo "==========================================================================="
