@@ -1,5 +1,4 @@
-VERSION=0.9.13
-ARCH=amd64
+# VERSION & ARCH are now specified in build_greyhole.sh, using export
 PACKAGE=greyhole
 
 deb: dist
