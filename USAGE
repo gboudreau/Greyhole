@@ -52,11 +52,7 @@ to become root, if you're not already.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
 		mysql -u greyhole_user -p89y63jdwe greyhole < /usr/share/greyhole/schema-mysql.sql
 
-3. Cutomize the Greyhole configuration file:
-
-	cp /usr/share/greyhole/greyhole.example.conf /etc/greyhole.conf
-	
-	Cutomize /etc/greyhole.conf as needed.
+3. Cutomize the Greyhole configuration file, /etc/greyhole.conf, as needed.
 
 4. For each directory you defined as 'storage_pool_directories', execute the following command, to create a hidden file in the root directory of each partition:
 
