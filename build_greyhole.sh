@@ -166,7 +166,7 @@ cd ..
 
 /usr/local/bin/twitter set "New version available: $VERSION - ChangeLog: http://t.co/hZheYwg"
 /usr/local/bin/fbcmd PPOST Greyhole "New version available: $VERSION - Downloads: http://www.greyhole.net/download/ or just use your package manager to update." 'ChangeLog' "${CHANGELOG_URL}"
-./irc_notif.sh $VERSION
+./irc_notif.sh "New version available $VERSION - Changelog: http://www.greyhole.net/releases/CHANGELOG" $VERSION
 
 # Email
 cat > /tmp/gh_email <<EOF
