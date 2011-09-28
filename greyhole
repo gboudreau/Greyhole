@@ -146,7 +146,7 @@ if ($action == 'gone' || $action == 'going') {
 	$escaped_dir = str_replace('/', '\/', $options['dir']);
 	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf");
 	if (is_file('/sbin/restart')) {
-		$running = (int) exec('status greyhole | grep running | wc -l');
+		$running = (int) exec('/sbin/status greyhole | grep running | wc -l');
 		if ($running) {
 			exec("/sbin/restart greyhole");
 		}
@@ -161,8 +161,8 @@ if ($action == 'gone' || $action == 'going') {
 
 	mark_gone_ok($options['dir'], 'remove');
 	mark_gone_drive_fscked($options['dir'], 'remove');
-	gh_log(INFO, "Storage pool directory " . $options['dir'] . " has been marked Gone");
-	echo "Storage pool directory " . $options['dir'] . " has been marked Gone, which means the missing file copies that are in this directory will be re-created during the next fsck.\n";
+	gh_log(INFO, "Storage pool directory " . $options['dir'] . " has been removed.");
+	echo "Storage pool directory " . $options['dir'] . " has been removed from your pool, which means the missing file copies that are in this directory will be re-created during the next fsck.\n";
 
 	if ($action == 'going') {
 		// Schedule fsck for all shares to re-create missing copies on other shares
@@ -386,30 +386,20 @@ if ($action == 'view-queue') {
 }
 
 if ($action == 'status') {
-	$last_log_line = exec("tail -2 " . escapeshellarg($greyhole_log_file) . ' | head -1');
+	$task = get_next_task($temp_rs);
+	echo "\nCurrently working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : '') . "\n";
+	
+	exec("tail -10 " . escapeshellarg($greyhole_log_file), $last_log_lines);
+	echo "\nRecent log entries:\n";
+	echo "  " . implode("\n  ", $last_log_lines) . "\n";
+	
+	$last_log_line = $last_log_lines[count($last_log_lines)-1];
 	$last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
 	$raw_last_log_line = mb_substr($last_log_line, 16);
 	$last_log_line = explode(' ', $raw_last_log_line);
 	$last_action = str_replace(':', '', $last_log_line[1]);
 	echo "\nLast logged action: $last_action\n";
-	echo "  on " . date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . " ago)\n";
-	echo "\nDetails:\n";
-	$details = array();
-	switch($last_action) {
-		case 'balance':
-			$details[] = exec("grep 'Balancing storage pool directory' " . escapeshellarg($greyhole_log_file) . " | tail -1");
-			$details[] = exec("grep 'Working on file' " . escapeshellarg($greyhole_log_file) . " | tail -1");
-			break;
-		case 'fsck':
-			$details[] = exec("tail -200 " . escapeshellarg($greyhole_log_file) . " | grep -v 'fsck: Found' | tail -1");
-			break;
-		default:
-			$details[] = "... .. ..:..:.. .$raw_last_log_line";
-			break;
-	}
-	foreach ($details as $line) {
-		echo "  " . trim(mb_substr($line, 20 + mb_strlen($last_action))) . "\n";
-	}
+	echo "  on " . date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")\n";
 	echo "\n";
 	exit(0);
 }
@@ -617,13 +607,26 @@ function convert_folders($old,$new) {
 	}
 }
 
+function get_next_task(&$result_new_tasks, $update_idle=TRUE) {
+	$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed') ORDER BY id ASC LIMIT 20";
+	$result_new_tasks = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
+	$task = db_fetch_object($result_new_tasks);
+
+	if ($task === FALSE && $update_idle) {
+		// No more complete = yes|thawed; let's look for complete = 'idle' tasks.
+		$query = "UPDATE tasks SET complete = 'yes' WHERE complete = 'idle'";
+		db_query($query) or gh_log(CRITICAL, "Can't update idle tasks to complete tasks: " . db_error());
+		$task = get_next_task($result_new_tasks, FALSE);
+	}
+	return $task;
+}
 
 function execute_next_task() {
 	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
 
 	if (isset($next_task)) {
 		$task = $next_task;
-		$next_task = null;
+		unset($next_task);
 	} else {
 		$task = FALSE;
 		if (isset($result_new_tasks)) {
@@ -633,20 +636,12 @@ function execute_next_task() {
 			}
 		}
 		if ($task === FALSE) {
-			$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed') ORDER BY id ASC LIMIT 20";
-			$result_new_tasks = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
-			$task = db_fetch_object($result_new_tasks);
-		}
-		if ($task === FALSE) {
-			// No more complete = yes|thawed; let's look for complete = idle tasks.
-			$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete = 'idle' ORDER BY id ASC LIMIT 1";
-			$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
-			$task = db_fetch_object($result);
+			$task = get_next_task($result_new_tasks);
 			if ($task === FALSE) {
 				$action = 'sleep';
 				gh_log(DEBUG, "Nothing to do... Sleeping.");
 				sleep($log_level == DEBUG ? 10 : ($log_level == TEST || PERF ? 1 : 600));
-				db_free_result($result);
+				db_free_result($result_new_tasks);
 				$locked_files = array();
 				return;
 			}
@@ -4085,7 +4080,10 @@ function how_long_ago($past_time) {
 		$ago = $ago . $m . "m ";
 	}
 	$ago = $ago . $s . "s";
-	return $ago;
+	if ($ago == '0s') {
+		return 'just now';
+	}
+	return "$ago ago";
 }
 
 // This unique identifier will be used when Greyhole calls home, to uniquely identify this Greyhole instance.
