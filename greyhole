@@ -2058,7 +2058,8 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 	$act = FALSE;
 	while (TRUE) {
 		$files = array();
-		exec('ls -1 /var/spool/greyhole | sort -n 2> /dev/null | head -1000', $files);
+		$space_left_in_queue = $max_queued_tasks - $num_rows - $new_tasks;
+		exec('ls -1 /var/spool/greyhole | sort -n 2> /dev/null | head -' . $space_left_in_queue, $files);
 		if (count($files) == 0) {
 			break;
 		}
