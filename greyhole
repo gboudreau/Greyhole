@@ -79,9 +79,9 @@ if ($action == 'iostat') {
 }
 
 if ($action == 'thaw') {
-    if (isset($options['dir']) && array_search($options['dir'], $frozen_directories) === FALSE) {
-	    $options['dir'] = '/' . trim($options['dir'], '/');
-    }
+	if (isset($options['dir']) && array_search($options['dir'], $frozen_directories) === FALSE) {
+		$options['dir'] = '/' . trim($options['dir'], '/');
+	}
 	if (!isset($options['dir']) || array_search($options['dir'], $frozen_directories) === FALSE) {
 		echo "Frozen directories:\n";
 		foreach ($frozen_directories as $frozen_directory) {
@@ -106,8 +106,8 @@ if ($action == 'thaw') {
 if ($action == 'gone' || $action == 'going') {
 	global $storage_pool_directories;
 	if (array_search($options['dir'], $storage_pool_directories) === FALSE) {
-	    $options['dir'] = '/' . trim($options['dir'], '/');
-    }
+		$options['dir'] = '/' . trim($options['dir'], '/');
+	}
 	if (array_search($options['dir'], $storage_pool_directories) === FALSE) {
 		if (!empty($options['dir'])) {
 			echo "Directory " . $options['dir'] . " is not one of your defined storage pool directories.\n";
@@ -146,12 +146,12 @@ if ($action == 'gone' || $action == 'going') {
 	$escaped_dir = str_replace('/', '\/', $options['dir']);
 	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf");
 	if (is_file('/sbin/restart')) {
-	    $running = (int) exec('status greyhole | grep running | wc -l');
-	    if ($running) {
-	        exec("/sbin/restart greyhole");
-	    }
+		$running = (int) exec('status greyhole | grep running | wc -l');
+		if ($running) {
+			exec("/sbin/restart greyhole");
+		}
 	} else {
-	    exec("/sbin/service greyhole condrestart");
+		exec("/sbin/service greyhole condrestart");
 	}
 
 	// For Amahi users
@@ -523,7 +523,7 @@ if ($action == 'cancel-fsck') {
 	if (is_file('/etc/init.d/greyhole')) {
 		exec("/etc/init.d/greyhole condrestart");
 	} else if (is_file('/etc/init/greyhole.conf')) {
-		exec("restart greyhole");
+		exec("/sbin/restart greyhole");
 	} else {
 		echo "You should now restart the Greyhole daemon to stop any ongoing fsck.\n";
 	}
@@ -600,8 +600,8 @@ function convert_database() {
 	$result = db_query("SELECT value FROM settings WHERE name = 'metastore_backup_directory' AND value LIKE '%graveyard%'");
 	$setting = db_fetch_object($result);
 	if ($setting) {
-    	$new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting->value);
-    	db_query("UPDATE settings SET value = '$new_value' WHERE name = 'metastore_backup_directory'");
+		$new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting->value);
+		db_query("UPDATE settings SET value = '$new_value' WHERE name = 'metastore_backup_directory'");
 	}
 }
 
@@ -809,7 +809,7 @@ function execute_next_task() {
 			gh_write($task->share, $task->full_path, $task->id);
 			break;
 		case 'rename':
-		    $fix_symlinks_scanned_dirs = array();
+			$fix_symlinks_scanned_dirs = array();
 			gh_mv($task->share, $task->full_path, $task->additional_info, $task->id);
 			break;
 		case 'unlink':
@@ -1103,7 +1103,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
 	global $storage_pool_directories, $fix_symlinks_scanned_dirs;
 	if (isset($fix_symlinks_scanned_dirs[$landing_zone])) {
-	    return;
+		return;
 	}
 	gh_log(INFO, "  Scanning $landing_zone for broken links... This can take a while!");
 	exec("find -L " . escapeshellarg($landing_zone) . " -type l", $broken_links);
@@ -1489,7 +1489,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 				);
 				return;
 			}
-		    continue;
+			continue;
 		}
 
 		if ($link_next && !$metafile->is_linked) {
@@ -1575,9 +1575,9 @@ function create_metafiles($share, $full_path, $num_copies_required, $filesize, $
 	$num_ok = count($metafiles);
 	foreach ($metafiles as $key => $metafile) {
 		if (!file_exists($metafile->path)) {
-		    // Re-use paths to old file copies that are now gone.
-		    // This will allow us to use a new drive that has been installed where an old drive was previously.
-		    $metafile->state = 'Pending';
+			// Re-use paths to old file copies that are now gone.
+			// This will allow us to use a new drive that has been installed where an old drive was previously.
+			$metafile->state = 'Pending';
 		}
 		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
 		if (!is_greyhole_owned_dir($root_path)) {
@@ -2229,31 +2229,31 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	}
 
 	foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
-	    $ds->init($sorted_target_drives, $last_resort_sorted_target_drives);
+		$ds->init($sorted_target_drives, $last_resort_sorted_target_drives);
 	}
 
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
 	$got_all_drives = FALSE;
 	while (!$got_all_drives) {
-    	$num_empty_ds = 0;
-    	foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
-    	    list($drives, $drives_last_resort) = $ds->draft();
-    	    foreach ($drives as $k => $v) {
-    	        $sorted_target_drives[$k] = $v;
-    	    }
-    	    foreach ($drives_last_resort as $k => $v) {
-    	        $last_resort_sorted_target_drives[$k] = $v;
-    	    }
-    	    if (count($drives) == 0 && count($drives_last_resort) == 0) {
-    	        $num_empty_ds++;
-    	    }
-    	}
-	    if ($num_empty_ds == count($shares_options[$share]['dir_selection_algorithm'])) {
-	        // All DS are empty; exit.
-	        $got_all_drives = TRUE;
-	        break;
-	    }
+		$num_empty_ds = 0;
+		foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
+			list($drives, $drives_last_resort) = $ds->draft();
+			foreach ($drives as $k => $v) {
+				$sorted_target_drives[$k] = $v;
+			}
+			foreach ($drives_last_resort as $k => $v) {
+				$last_resort_sorted_target_drives[$k] = $v;
+			}
+			if (count($drives) == 0 && count($drives_last_resort) == 0) {
+				$num_empty_ds++;
+			}
+		}
+		if ($num_empty_ds == count($shares_options[$share]['dir_selection_algorithm'])) {
+			// All DS are empty; exit.
+			$got_all_drives = TRUE;
+			break;
+		}
 	}
 	
 	// Email notification when all dirs are over-capacity
@@ -3004,7 +3004,7 @@ Trash size:\n";
   If this directory is gone for good, you should execute the following command, and remove the directory from your configuration file:
     greyhole --gone=path
   where path is one of:\n";
-	    	$report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
+			$report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
 		}
 	}
 
@@ -3029,7 +3029,7 @@ function gh_recycle($real_path) {
 			$full_path = trim($share_options['name'] . "/" . str_replace($share_options['landing_zone'], '', $real_path), '/');
 			$share = $share_options['name'];
 		} else {
-		    $storage_volume = get_storage_volume_from_path($real_path);
+			$storage_volume = get_storage_volume_from_path($real_path);
 			foreach ($storage_pool_directories as $dir) {
 				if ($dir == $storage_volume) {
 					$trash_path = "$dir/.gh_trash";
@@ -3092,9 +3092,9 @@ function gh_recycle($real_path) {
 function repair_tables() {
 	global $db_use_mysql, $action;
 	if (@$db_use_mysql) {
-	    if ($action == 'daemon') {
-		    gh_log(INFO, "Optimizing MySQL tables...");
-	    }
+		if ($action == 'daemon') {
+			gh_log(INFO, "Optimizing MySQL tables...");
+		}
 		db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
 		db_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . db_error());
 		// Let's repair tasks_completed only if it's broken!
@@ -3174,14 +3174,14 @@ Here are your options:
 
 A fsck will now start, to fix the symlinks found in your shares, when possible.
 You'll receive a report email once that fsck run completes.
-";                      
+";
 			$subject = "Missing storage pool directories on " . exec ('hostname') . ": ";
 			$drive_string = join(",",$missing_drives);
 			$subject = $subject . $drive_string;
-			if(strlen($subject) > 255){
-				$subject = substr($subject,0,255);
+			if (strlen($subject) > 255) {
+				$subject = substr($subject, 0, 255);
 			}
-                        mail($email_to, $subject, $body);
+			mail($email_to, $subject, $body);
 	}
 	if ($needs_fsck !== FALSE) {
 		set_metastore_backup();
@@ -3250,8 +3250,8 @@ function get_gone_ok_dirs() {
 function mark_gone_ok($target_drive, $action='add') {
 	global $storage_pool_directories;
 	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
-	    $target_drive = '/' . trim($target_drive, '/');
-    }
+		$target_drive = '/' . trim($target_drive, '/');
+	}
 	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
 		return FALSE;
 	}
@@ -3459,9 +3459,8 @@ function gh_balance() {
 		$balance_direction_asc = array();
 		foreach ($sorted_pool_drives as $available_space => $drive) {
 			$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
-    		$balance_direction_asc[$drive] = $pool_drives_avail_space[$drive] < $target_avail_space;
+			$balance_direction_asc[$drive] = $pool_drives_avail_space[$drive] < $target_avail_space;
 		}
-		gh_log(DEBUG, "Balance direction (ASC): " . var_export($balance_direction_asc, TRUE));
 
 		foreach ($sorted_pool_drives as $source_drive) {
 			$target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
@@ -3542,16 +3541,16 @@ function gh_balance() {
 						|| ($balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] > $target_avail_space)
 						|| (!$balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] < $target_avail_space)) {
 					gh_log(DEBUG, "  Moving this file wouldn't help balancing available space. Skipping.");
-					gh_log(DEBUG, "    Reason 1: " . var_export($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize, TRUE));
-					gh_log(DEBUG, "    Reason 2: " . var_export($pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space, TRUE));
-					gh_log(DEBUG, "    Reason 3: " . var_export($balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] > $target_avail_space, TRUE));
-					gh_log(DEBUG, "    Reason 4: " . var_export(!$balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] < $target_avail_space, TRUE));
-					gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize+1GB = " . ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024));
-					gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize = " . ($pool_drives_avail_space[$source_drive]+$filesize));
-					gh_log(DEBUG, "    pool_drives_avail_space[target_drive] = " . ($pool_drives_avail_space[$target_drive]));
-					gh_log(DEBUG, "    pool_drives_avail_space[target_drive]-filesize = " . ($pool_drives_avail_space[$target_drive]-$filesize));
-					gh_log(DEBUG, "    target_avail_space = " . ($target_avail_space));
-					gh_log(DEBUG, "    balance_direction_asc[target_drive] = " . var_export($balance_direction_asc[$target_drive], TRUE));
+					#gh_log(DEBUG, "    Reason 1: " . var_export($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$target_drive]-$filesize, TRUE));
+					#gh_log(DEBUG, "    Reason 2: " . var_export($pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space, TRUE));
+					#gh_log(DEBUG, "    Reason 3: " . var_export($balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] > $target_avail_space, TRUE));
+					#gh_log(DEBUG, "    Reason 4: " . var_export(!$balance_direction_asc[$target_drive] && $pool_drives_avail_space[$target_drive] < $target_avail_space, TRUE));
+					#gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize+1GB = " . ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024));
+					#gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize = " . ($pool_drives_avail_space[$source_drive]+$filesize));
+					#gh_log(DEBUG, "    pool_drives_avail_space[target_drive] = " . ($pool_drives_avail_space[$target_drive]));
+					#gh_log(DEBUG, "    pool_drives_avail_space[target_drive]-filesize = " . ($pool_drives_avail_space[$target_drive]-$filesize));
+					#gh_log(DEBUG, "    target_avail_space = " . ($target_avail_space));
+					#gh_log(DEBUG, "    balance_direction_asc[target_drive] = " . var_export($balance_direction_asc[$target_drive], TRUE));
 					continue;
 				}
 
