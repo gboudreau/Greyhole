@@ -1603,6 +1603,15 @@ function get_temp_filename($full_path) {
 	return "$path/.$filename." . mb_substr(md5($filename), 0, 5);
 }
 
+function is_temp_file($full_path) {
+	list($path, $filename) = explode_full_path($full_path);
+	if (preg_match("/^\.(.+)\.([0-9a-f]{5})$/", $filename, $regs)) {
+		$md5_stem = mb_substr(md5($regs[1]), 0, 5);
+		return ($md5_stem == $regs[2]);
+	}
+	return FALSE;
+}
+
 function create_metafiles($share, $full_path, $num_copies_required, $filesize, $metafiles=array()) {
 	$found_link_metafile = FALSE;
 
@@ -2565,13 +2574,24 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	$file_metafiles = array();
 	$num_ok = 0;
 	$file_copies_inodes = array();
-	if(get_metafile_data_filename($share,$file_path,$filename) === FALSE){
-		if($storage_path !== FALSE && $find_orphans !== FALSE){
-			gh_log(INFO, "$path/$filename is an orphaned file, will proceed to find all copies and symlink file appropriately.");
-			$fsck_report['orphaned']['num_orphans']++;
-		}elseif($storage_path !== FALSE && $find_orphans === FALSE){
-			gh_log(INFO, "$path/$filename is an orphaned file, but we're not looking for orphans, to get greyhole to recognized this file initiate an fsck with the --find-orphaned-files option.");
+	if (get_metafile_data_filename($share, $file_path, $filename) === FALSE) {
+		$full_path = "$path/$filename";
+
+		// Check if this is a temporary file; if so, just delete it.
+		if (is_temp_file($full_path)) {
+			$fsck_report['temp_files'][] = $full_path;
+			gh_recycle($full_path);
 			return;
+		}
+
+		if ($storage_path !== FALSE) {
+			if ($find_orphans !== FALSE) {
+				gh_log(INFO, "$full_path is an orphaned file; we'll proceed to find all copies and symlink this file appropriately.");
+				$fsck_report['orphaned']['num_orphans']++;
+			} else {
+				gh_log(INFO, "$full_path is an orphaned file, but we're not looking for orphans. For Greyhole to recognize this file, initiate a --fsck with the --find-orphaned-files option.");
+				return;
+			}
 		}
 	}
 			
