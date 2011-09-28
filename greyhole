@@ -1570,7 +1570,7 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
 		
 		$i = 0;
 		$parent_directory = clean_dir('/' . $dir_parts[$i++]);
-		while (is_dir($parent_directory)) {
+		while (is_dir($parent_directory) && $i < count($dir_parts)) {
 			$parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
 		}
 		while ($i <= count($dir_parts)) {
