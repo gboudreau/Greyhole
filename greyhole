@@ -509,21 +509,6 @@ if ($action == 'wait-for') {
 	exit(0);
 }
 
-if ($action == 'prerotate') {
-	parse_samba_spool(FALSE);
-	gh_log(INFO, "Samba log parsed using --prerotate");
-	echo "Samba log parsed successfully. You can now rotate the log, then reset the read pointer using --postrotate\n";
-	exit(0);
-}
-
-if ($action == 'postrotate') {
-	$query = sprintf("UPDATE settings SET value = '0' WHERE name = '%s'", 'last_read_log_smbd_line');
-	db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . db_error());
-	gh_log(INFO, "Samba log read pointer reset using --postrotate");
-	echo "Samba log read pointer reset to 0.\n";
-	exit(0);
-}
-
 if ($action == 'balance') {
 	$query = "INSERT INTO tasks (action, share, complete) VALUES ('balance', '', 'yes')";
 	db_query($query) or gh_log(CRITICAL, "Can't insert balance task: " . db_error());
@@ -3850,14 +3835,12 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DfClpPsSaqiU';
+	$opts_actions = 'DfClsSaqiU';
 	$longopts_actions = array(
 		'daemon',
 		'fsck',
 		'cancel-fsck',
 		'balance',
-		'prerotate',
-		'postrotate',
 		'stats',
 		'status',
 		'empty-trash',
@@ -3976,8 +3959,6 @@ function print_usage() {
 	echo "  -q, --view-queue      Display the current work queue.\n";
 	echo "  -a, --empty-trash     Empty the trash.\n";
 	echo "  -b, --debug=filename  Debug past file operations.\n";
-	echo "  -p, --prerotate       Pre-rotate task (for logrotate).\n";
-	echo "  -P, --postrotate      Post-rotate task (for logrotate).\n";
 	echo "  -t, --thaw[=path]     Thaw a frozen directory. Greyhole will start working on\n";
 	echo "                        files inside <path>. If you don't supply an option, the list\n";
 	echo "                        of frozen directories will be displayed.\n";
