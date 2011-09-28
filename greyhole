@@ -1436,7 +1436,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 		
 		$it_worked = FALSE;
 		if (is_link("$landing_zone/$full_path")) {
-			exec("rsync -t " . escapeshellarg(readlink("$landing_zone/$full_path")) . " " . escapeshellarg($temp_path));
+			exec(get_copy_cmd(readlink("$landing_zone/$full_path"), $temp_path));
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == gh_filesize(readlink("$landing_zone/$full_path"));
 		} else if (gh_is_file("$landing_zone/$full_path")) {
 			$source_size = gh_filesize("$landing_zone/$full_path");
@@ -1447,7 +1447,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 				gh_rename("$landing_zone/$full_path", $temp_path);
 				$copied = FALSE;
 			} else {
-				exec("rsync -t " . escapeshellarg("$landing_zone/$full_path") . " " . escapeshellarg($temp_path));
+				exec(get_copy_cmd("$landing_zone/$full_path", $temp_path));
 				$copied = TRUE;
 			}
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == $source_size;
@@ -2778,7 +2778,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				if ($metafile->state == 'Pending') {
 					gh_log(DEBUG, "  Copying file to $metafile->path");
 					$temp_path = get_temp_filename($metafile->path);
-					exec("rsync -t " . escapeshellarg($original_file_path) . " " . escapeshellarg($temp_path));
+					exec(get_copy_cmd($original_file_path, $temp_path));
 					$it_worked = file_exists($temp_path) && file_exists($original_file_path) && gh_filesize($temp_path) == gh_filesize($original_file_path);
 					if ($it_worked) {
 						gh_rename($temp_path, $metafile->path);
@@ -4062,5 +4062,14 @@ function set_uniq_id() {
 	}
 	
 	return $uniq_id;
+}
+
+function get_copy_cmd($source, $destination) {
+	global $copy_method;
+	if (@$copy_method == 'rsync') {
+		return "rsync -t " . escapeshellarg($source) . " " . escapeshellarg($destination);
+	} else {
+		return "cp " . escapeshellarg($source) . " " . escapeshellarg($destination);
+	}
 }
 ?>
