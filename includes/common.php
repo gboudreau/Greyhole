@@ -138,6 +138,9 @@ function parse_config() {
 				default:
 					if (mb_strpos($name, 'num_copies') === 0) {
 						$share = mb_substr($name, 11, mb_strlen($name)-12);
+						if (mb_stripos($value, 'max') === 0) {
+							$value = 9999;
+						}
 						$shares_options[$share]['num_copies'] = (int) $value;
 					} else if (mb_strpos($name, 'delete_moves_to_trash') === 0) {
 						$share = mb_substr($name, 22, mb_strlen($name)-23);
