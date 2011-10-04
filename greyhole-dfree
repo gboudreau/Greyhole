@@ -25,7 +25,10 @@ parse_config();
 $total_space = 0;
 $total_free_space = 0;
 foreach ($storage_pool_directories as $target_drive) {
-	$response = explode(' ', exec("df -k ".escapeshellarg($target_drive)." | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'"));
+	$response = explode(' ', exec("df -k ".escapeshellarg($target_drive)." 2>/tmp/greyhole_df_error.log | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'"));
+	if (count($response) != 2) {
+		continue;
+	}
 	$total_space += $response[0];
 	$total_free_space += $response[1];
 }
