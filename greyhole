@@ -354,22 +354,33 @@ if ($action == 'view-queue') {
 	} else {
 		echo "\nGreyhole Work Queue Statistics\n==============================\n\n";
 		echo "This table gives you the number of pending operations queued for the Greyhole daemon, per share.\n\n";
-		printf("%$max_share_strlen"."s  Write   Delete  Rename  Repair (fsck)\n", '');
+
+		$col_size = 7;
+		foreach ($queues['Total'] as $type => $num) {
+			$num = number_format($num, 0);
+			if (strlen($num) > $col_size) {
+				$col_size = strlen($num);
+			}
+		}
+		$col_format = '%' . $col_size . 's';
+
+		printf("%$max_share_strlen"."s  $col_format  $col_format  $col_format  $col_format\n", '', 'Write', 'Delete', 'Rename', 'Check');
 
 		foreach ($queues as $share_name => $queue) {
 			if ($share_name == 'Spooled') continue;
 			if ($share_name == 'Total') {
-				for ($i=0; $i<$max_share_strlen; $i++) {
+				for ($i=0; $i<$max_share_strlen+2+(4*$col_size)+(3*2); $i++) {
 					echo "=";
 				}
 				echo "\n";
 			}
 			echo sprintf("%-$max_share_strlen"."s", $share_name) . "  ";
-			echo sprintf('%-7s', $queue->num_writes_pending) . " ";
-			echo sprintf('%-7s', $queue->num_delete_pending) . " ";
-			echo sprintf('%-7s', $queue->num_rename_pending) . " ";
-			echo sprintf('%-7s', $queue->num_fsck_pending) . "\n";
+			echo sprintf($col_format, number_format($queue->num_writes_pending, 0)) . "  ";
+			echo sprintf($col_format, number_format($queue->num_delete_pending, 0)) . "  ";
+			echo sprintf($col_format, number_format($queue->num_rename_pending, 0)) . "  ";
+			echo sprintf($col_format, number_format($queue->num_fsck_pending, 0)) . "\n";
 		}
+		printf("%$max_share_strlen"."s  $col_format  $col_format  $col_format  $col_format\n", '', 'Write', 'Delete', 'Rename', 'Check');
 
 		echo "\nThe following is the number of pending operations that the Greyhole daemon still needs to parse.\n";
 		echo "Until it does, the nature of those operations is unknown.\n";
