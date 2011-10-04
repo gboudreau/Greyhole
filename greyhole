@@ -20,7 +20,6 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 include('includes/common.php');
-include('includes/sql.php');
 
 list($action, $options) = process_command_line();
 
@@ -31,7 +30,6 @@ if ($action == 'unknown') {
 process_config();
 
 db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
-repair_tables();
 db_migrate();
 
 if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status' && $action != 'getuid') {
@@ -564,6 +562,7 @@ if ($num_daemon_processes > 1) {
 }
 
 gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
+repair_tables();
 terminology_conversion();
 set_metastore_backup();
 set_uniq_id();
@@ -641,6 +640,9 @@ function execute_next_task() {
 			if ($task === FALSE) {
 				$action = 'sleep';
 				gh_log(DEBUG, "Nothing to do... Sleeping.");
+
+				repair_tables();
+				
 				sleep($log_level == DEBUG ? 10 : ($log_level == TEST || PERF ? 1 : 600));
 				db_free_result($result_new_tasks);
 				$result_new_tasks = null;
@@ -683,6 +685,7 @@ function execute_next_task() {
 			gh_log(INFO, "Available space balancing completed.");
 			break;
 		case 'fsck_file':
+			set_fsck_options($task);
 			$task->full_path = get_share_landing_zone($task->share) . '/' . $task->full_path;
 			$file_type = @filetype($task->full_path);
 			list($path, $filename) = explode_full_path($task->full_path);
@@ -690,7 +693,7 @@ function execute_next_task() {
 			break;
 		case 'fsck':
 			$new_conf_md5 = get_conf_md5();
-			if (mb_strpos($task->additional_info, 'if-conf-changed') !== FALSE) {
+			if (task_has_option($task, 'if-conf-changed')) {
 				// Let's check if the conf file changed since the last fsck
 
 				// Last value
@@ -743,14 +746,14 @@ function execute_next_task() {
 				foreach ($shares_options as $share_name => $share_options) {
 					gh_fsck($share_options['landing_zone'], $share_name);
 				}
-				if (mb_strpos($task->additional_info, 'metastore') !== FALSE) {
+				if (task_has_option($task, 'metastore')) {
 					foreach (get_metastores() as $metastore) {
 						foreach ($shares_options as $share_name => $share_options) {
 							gh_fsck_metastore($metastore, "/$share_name", $share_name);
 						}
 					}
 				}
-				if ($orphaned !== FALSE) {
+				if (task_has_option($task, 'orphaned')) {
 					foreach ($storage_pool_directories as $target_drive) {
 						foreach ($shares_options as $share_name => $share_options) {
 							gh_fsck("$target_drive/$share_name", $share_name, $target_drive, TRUE);
@@ -772,7 +775,7 @@ function execute_next_task() {
 						//Only kick off an fsck on the passed dir if it's not a metastore
 						gh_fsck($task->share, $share, $storage_volume, $orphaned);
 					}
-					if (mb_strpos($task->additional_info, 'metastore') !== FALSE) {
+					if (task_has_option($task, 'metastore') !== FALSE) {
 						if($metastore === FALSE){
 							//This isn't a metastore dir so we'll check the metastore of this path on all volumes
 							if($storage_volume !== FALSE){
@@ -803,15 +806,15 @@ function execute_next_task() {
 			);
 			db_query($query) or gh_log(CRITICAL, "Can't insert 'last_fsck_conf_md5' settings: " . db_error());
 			
-			if (mb_strpos($task->additional_info, 'email') !== FALSE) {
+			if (task_has_option($task, 'email')) {
 				// Email report for daily fsck
 				$fsck_report = get_fsck_report();
 				gh_log(DEBUG, "Sending fsck report to $email_to");
 				mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report);
 			}
-			if (mb_strpos($task->additional_info, 'du') !== FALSE) {
+			if (task_has_option($task, 'du')) {
 				// Save disk-usage report to disk
-				$fp = fopen('/usr/local/greyhole/gh-disk-usage.log', 'w');
+				$fp = fopen('/usr/share/greyhole/gh-disk-usage.log', 'w');
 				if ($fp) {
 					global $du;
 					foreach ($du as $path => $size) {
@@ -1410,14 +1413,6 @@ function gh_write_process_metafiles($num_copies_required,$existing_metafiles,$sh
 	create_copies_from_metafiles($metafiles, $share, $full_path, $source_file);
 }
 
-function is_greyhole_owned_dir($path) {
-	global $going_dir;
-	if (isset($going_dir) && $path == $going_dir) {
-		return FALSE;
-	}
-	return file_exists("$path/.greyhole_uses_this");
-}
-
 function create_copies_from_metafiles($metafiles, $share, $full_path, $source_file) {
 	$landing_zone = get_share_landing_zone($share);
 	
@@ -1573,7 +1568,7 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
 			$parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
 		}
 		while ($i <= count($dir_parts)) {
-			if (!is_dir($parent_directory) && !mkdir($parent_directory, $dir_infos->fileperms)) {
+			if (!is_dir($parent_directory) && !@mkdir($parent_directory, $dir_infos->fileperms)) {
 				if (gh_is_file($parent_directory)) {
 					gh_rename($parent_directory, "$parent_directory (file copy)");
 				}
@@ -2048,7 +2043,9 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 	$num_rows = (int) $row->num_rows;
 	if ($num_rows >= ($max_queued_tasks * 0.9)) {
 		$action = $old_action;
-		gh_log(DEBUG, "  More than " . ($max_queued_tasks * 0.9) . " tasks queued... Won't queue any more at this time.");
+		if (time() % 10 == 0) {
+			gh_log(DEBUG, "  More than " . ($max_queued_tasks * 0.9) . " tasks queued... Won't queue any more at this time.");
+		}
 		return;
 	}
 
@@ -2560,9 +2557,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				if ($action != 'fsck_file') {
 					// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
 					// We'll queue this file fsck (to restore the symlink) for when all other file operations have been executed.
-					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('fsck_file', '%s', '%s', 'idle')",
+					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete, additional_info) VALUES ('fsck_file', '%s', '%s', 'idle', '%s')",
 						db_escape_string($share),
-						db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+						db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename")),
+						@$options['all-fsck-options']
 					);
 					db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
 					return;
@@ -2585,7 +2583,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		}
 
 		if ($storage_path !== FALSE) {
-			if ($find_orphans !== FALSE) {
+			if (@$options['find-orphans']) {
 				gh_log(INFO, "$full_path is an orphaned file; we'll proceed to find all copies and symlink this file appropriately.");
 				$fsck_report['orphaned']['num_orphans']++;
 			} else {
@@ -2683,7 +2681,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			$original_file_path = $first_metafile->path;
 		}
 		
-		if (isset($options['disk-usage-report'])) {
+		if (@$options['disk-usage-report']) {
 			global $du;
 			$du_path = '/' . trim(clean_dir("/$share/$file_path"), '/');
 			do {
@@ -4135,5 +4133,18 @@ function get_copy_cmd($source, $destination) {
 	} else {
 		return "cp " . escapeshellarg($source) . " " . escapeshellarg($destination);
 	}
+}
+
+function task_has_option($task, $option) {
+	return (mb_strpos($task->additional_info, $option)) !== FALSE ? TRUE : FALSE;
+}
+
+function set_fsck_options($task) {
+	global $options;
+	$options['all-fsck-options'] = $task->additional_info;
+	$options['disk-usage-report'] = task_has_option($task, 'du');
+	$options['find-orphans'] = task_has_option($task, 'orphaned');
+	$options['verify-checksums'] = task_has_option($task, 'checksums');
+	$options['del-orphaned-metadata'] = task_has_option($task, 'del-orphaned-metadata');
 }
 ?>

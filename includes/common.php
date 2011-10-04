@@ -303,6 +303,9 @@ function parse_config() {
 		$db_options->name = $db_name;
 	}
 	
+	include('includes/sql.php');
+    
+	
 	if (!isset($balance_modified_files)) {
 		global $balance_modified_files;
 		$balance_modified_files = FALSE;
@@ -361,7 +364,7 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 	}
 }
 
-function gh_error_handler($errno, $errstr, $errfile, $errline) {
+function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
 	if (error_reporting() === 0) {
 		// Ignored (@) warning
 		return TRUE;
@@ -1140,5 +1143,208 @@ class DirectorySelection {
             $this->directories = $storage_pool_directories;
         }
     }
+}
+
+function is_greyhole_owned_dir($path) {
+	global $going_dir;
+	if (isset($going_dir) && $path == $going_dir) {
+		return FALSE;
+	}
+	return file_exists("$path/.greyhole_uses_this");
+}
+
+// Is it OK for a drive to be gone?
+function gone_ok($target_drive, $refresh=FALSE) {
+	global $gone_ok_drives;
+	if ($refresh || !isset($gone_ok_drives)) {
+		$gone_ok_drives = get_gone_ok_dirs();
+	}
+	if (isset($gone_ok_drives[$target_drive])) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function get_gone_ok_dirs() {
+	global $gone_ok_drives;
+	$query = "SELECT value FROM settings WHERE name = 'Gone-OK-Drives'";
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-OK-Drives: " . db_error());
+	$row = db_fetch_object($result);
+	if ($row !== FALSE) {
+		$gone_ok_drives = unserialize($row->value);
+	} else {
+		$query = "INSERT INTO settings (name, value) VALUES ('Gone-OK-Drives', 'a:0:{}')";
+		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-OK-Drives: " . db_error());
+		$gone_ok_drives = array();
+	}
+	return $gone_ok_drives;
+}
+
+function mark_gone_ok($target_drive, $action='add') {
+	global $storage_pool_directories;
+	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
+		$target_drive = '/' . trim($target_drive, '/');
+	}
+	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
+		return FALSE;
+	}
+
+	global $gone_ok_drives;
+	$gone_ok_drives = get_gone_ok_dirs();
+	if ($action == 'add') {
+		$gone_ok_drives[$target_drive] = TRUE;
+	} else {
+		unset($gone_ok_drives[$target_drive]);
+	}
+
+	$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'Gone-OK-Drives'",
+		db_escape_string(serialize($gone_ok_drives))
+	);
+	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-OK-Drives: " . db_error());
+	return TRUE;
+}
+
+function gone_fscked($target_drive, $refresh=FALSE) {
+	global $fscked_gone_drives;
+	if ($refresh || !isset($fscked_gone_drives)) {
+		$fscked_gone_drives = get_fsck_gone_drives();
+	}
+	if (isset($fscked_gone_drives[$target_drive])) {
+		return TRUE;
+	}
+	return FALSE;
+}
+
+function get_fsck_gone_drives() {
+	global $fscked_gone_drives;
+	$query = "SELECT value FROM settings WHERE name = 'Gone-FSCKed-Drives'";
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-FSCKed-Drives: " . db_error());
+	$row = db_fetch_object($result);
+	if ($row !== FALSE) {
+		$fscked_gone_drives = unserialize($row->value);
+	} else {
+		$query = "INSERT INTO settings (name, value) VALUES ('Gone-FSCKed-Drives', 'a:0:{}')";
+		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-FSCKed-Drives: " . db_error());
+		$fscked_gone_drives = array();
+	}
+	return $fscked_gone_drives;
+}
+
+function mark_gone_drive_fscked($target_drive, $action='add') {
+	global $fscked_gone_drives;
+	$fscked_gone_drives = get_fsck_gone_drives();
+	if ($action == 'add') {
+		$fscked_gone_drives[$target_drive] = TRUE;
+	} else {
+		unset($fscked_gone_drives[$target_drive]);
+	}
+
+	$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'Gone-FSCKed-Drives'",
+		db_escape_string(serialize($fscked_gone_drives))
+	);
+	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-FSCKed-Drives: " . db_error());
+}
+
+function check_storage_pool_dirs($skip_fsck=FALSE) {
+	global $storage_pool_directories, $email_to, $gone_ok_drives;
+	$needs_fsck = FALSE;
+	$returned_drives = array();
+	$missing_drives = array();
+	$i = 0; $j = 0;
+	foreach ($storage_pool_directories as $target_drive) {
+		if (!is_greyhole_owned_dir($target_drive) && !gone_fscked($target_drive, $i++ == 0) && !file_exists("$target_drive/.greyhole_used_this")) {
+			if($needs_fsck !== 2){	
+				$needs_fsck = 1;
+			}
+			mark_gone_drive_fscked($target_drive);
+			$missing_drives[] = $target_drive;
+			gh_log(WARN, "Warning! It seems $target_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
+			gh_log(DEBUG, "Email sent for gone dir: $target_drive");
+			$gone_ok_drives[$target_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
+		} else if ((gone_ok($target_drive, $j++ == 0) || gone_fscked($target_drive, $i++ == 0)) && is_greyhole_owned_dir($target_drive)) {
+			// $target_drive is now back
+			$needs_fsck = 2;
+			$returned_drives[] = $target_drive;
+			gh_log(DEBUG, "Email sent for revived dir: $target_drive");
+
+			mark_gone_ok($target_drive, 'remove');
+			mark_gone_drive_fscked($target_drive, 'remove');
+			$i = 0; $j = 0;
+		}
+	}
+	if(count($returned_drives) > 0){
+		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool directories came back:\n";
+		foreach ($returned_drives as $target_drive) {
+  			$body .= "$target_drive was missing; it's now available again.\n";
+		}
+		if (!$skip_fsck) {
+			$body .= "\nA fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
+		}
+		$drive_string = join(",",$returned_drives);
+		$subject = "Storage pool directories now online on " . exec ('hostname') . ": ";
+		$subject = $subject . $drive_string;
+		if (strlen($subject) > 255) {
+			$subject = substr($subject, 0, 255);
+		}
+		mail($email_to, $subject, $body);
+	}
+	if(count($missing_drives) > 0){
+		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool directories are missing their \".greyhole_uses_this\" file:\n";
+		foreach ($missing_drives as $target_drive) {
+  			$body .= "$target_drive/.greyhole_uses_this: File not found\n";
+		}
+		$target_drive = $missing_drives[0];
+		$body .= "\nThis either means these mount(s) are currently unmounted, or you forgot to create this file.\n\n";
+		$body .= "Here are your options:\n\n";
+		$body .= "- If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this directory will not be part of your storage pool.\n\n";
+		$body .= "- If the drive(s) are gone, you should either re-mount them manually (if possible), or remove them from your storage pool. To do so, use the following command:\n  greyhole --gone=".escapeshellarg($target_drive)."\n  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.\n\n";
+		$body .= "- If you know these drive(s) will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:\n  greyhole --wait-for=".escapeshellarg($target_drive)."\n\n";
+		if (!$skip_fsck) {
+			$body .= "A fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
+		}
+		$subject = "Missing storage pool directories on " . exec ('hostname') . ": ";
+		$drive_string = join(",",$missing_drives);
+		$subject = $subject . $drive_string;
+		if (strlen($subject) > 255) {
+			$subject = substr($subject, 0, 255);
+		}
+		mail($email_to, $subject, $body);
+	}
+	if ($needs_fsck !== FALSE) {
+		set_metastore_backup();
+		get_metastores(FALSE); // FALSE => Resets the metastores cache
+		clearstatcache();
+
+		if (!$skip_fsck) {
+			global $shares_options;
+			initialize_fsck_report('All shares');
+			if($needs_fsck === 2){
+				foreach ($returned_drives as $drive){
+					$metastores = get_metastores_from_storage_volume($drive);
+					gh_log(INFO, "Starting fsck for metadata store on $drive which came back online.");
+					foreach($metastores as $metastore){
+						foreach($shares_options as $share_name => $share_options){
+							gh_fsck_metastore($metastore,"/$share_name", $share_name);
+						}
+					}
+					gh_log(INFO, "fsck for returning drive $drive's metadata store completed.");
+				}
+				gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
+			}else{
+				gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
+			}
+			foreach ($shares_options as $share_name => $share_options) {
+				gh_fsck($share_options['landing_zone'], $share_name);
+			}
+			gh_log(INFO, "fsck for all shares completed.");
+			
+			$fsck_report = get_fsck_report();
+			gh_log(DEBUG, "Sending fsck report to $email_to");
+			mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report);
+		}
+
+		// Refresh $gone_ok_drives to it's real value (from the DB)
+		get_gone_ok_dirs();
+	}
 }
 ?>
