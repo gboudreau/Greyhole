@@ -656,7 +656,7 @@ function execute_next_task() {
 		foreach ($frozen_directories as $frozen_directory) {
 			if (mb_strpos("$task->share/$task->full_path", $frozen_directory) === 0) {
 				$action = $task->action;
-				gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+				gh_log(DEBUG, "Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 				gh_log(DEBUG, "  This directory is frozen. Will postpone this task until it is thawed.");
 				postpone_task($task->id, 'frozen');
 				archive_task($task->id);
@@ -674,7 +674,7 @@ function execute_next_task() {
 	}
 	
 	$action = $task->action;
-	gh_log(DEBUG, "Now working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+	gh_log(INFO, "Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 
 	switch ($task->action) {
 		case 'balance':
@@ -788,7 +788,7 @@ function execute_next_task() {
 							//This is a metastore directory, so only kick off a metastore fsck for the indicated directory (this will not fsck the corresponding metastore path on other volumes)
 							$subdir = str_replace("$metastore", '', $task->share);
 							gh_log(DEBUG, "Starting metastore fsck for $metastore/$subdir");
-							gh_fsck_metastore($metastore,$subdir,$share);
+							gh_fsck_metastore($metastore, $subdir, $share);
 						}
 					}
 				}
@@ -1422,6 +1422,8 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 	$landing_zone = get_share_landing_zone($share);
 	
 	list($path, $filename) = explode_full_path($full_path);
+	
+	$source_file = clean_dir($source_file);
 
 	$link_next = FALSE;
 	$file_infos = gh_get_file_infos("$landing_zone/$full_path");
@@ -1682,7 +1684,7 @@ function get_metafile_data_filename($share, $path, $filename) {
 function get_metafile_data_filenames($share, $path, $filename, $how_many=9999) {
 	$filenames = array();
 	foreach (get_metastores() as $metastore) {
-		$f = "$metastore/$share/$path/$filename";
+		$f = clean_dir("$metastore/$share/$path/$filename");
 		if (is_file($f)) {
 			$filenames[] = $f;
 			if (count($filenames) == $how_many) {
@@ -1786,16 +1788,16 @@ function save_metafiles($share, $path, $filename, $metafiles) {
 		return;
 	}
 
-	gh_log(DEBUG, "  Saving " . count($metafiles) . " Metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+	gh_log(DEBUG, "  Saving " . count($metafiles) . " Metadata files for " . clean_dir($share . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : "")));
 	$paths_used = array();
 	foreach (get_metastores() as $metastore) {
 		$target_drive = str_replace('/.gh_metastore', '', $metastore);
-		$data_filepath = "$metastore/$share/$path";
+		$data_filepath = clean_dir("$metastore/$share/$path");
 		$has_metafile = FALSE;
 		foreach ($metafiles as $metafile) {
 			if (get_storage_volume_from_path($metafile->path) == $target_drive) {
 				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
-				gh_log(DEBUG, "    Saving Metadata files in $data_filepath/$filename");
+				gh_log(DEBUG, "    Saving Metadata files in " . clean_dir("$data_filepath/$filename"));
 				if (is_dir("$data_filepath/$filename")) {
 					exec("rm -rf " . escapeshellarg("$data_filepath/$filename"));
 				}

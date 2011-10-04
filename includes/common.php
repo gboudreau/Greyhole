@@ -314,7 +314,7 @@ function clean_dir($dir) {
 	if ($dir[0] == '.' && $dir[1] == '/') {
 		$dir = mb_substr($dir, 2);
 	}
-	if (mb_strpos($dir, '//') !== FALSE) {
+	while (mb_strpos($dir, '//') !== FALSE) {
 		$dir = str_replace("//", "/", $dir);
 	}
 	return $dir;
@@ -562,12 +562,12 @@ if ($arch != 'x86_64') {
 
 function memory_check(){
 	global $memory_limit;
-        $usage = memory_get_usage();
-        $used = $usage/$memory_limit;
-        $used = $used * 100;
-        if($used > 95){
-		gh_log(CRITICAL,$used.'% memory usage, exiting. Please increase memory_limit in greyhole.conf.');
-        }
+	$usage = memory_get_usage();
+	$used = $usage/$memory_limit;
+	$used = $used * 100;
+	if ($used > 95) {
+		gh_log(CRITICAL, $used . '% memory usage, exiting. Please increase memory_limit in /etc/greyhole.conf');
+	}
 }
 
 class metafile_iterator implements Iterator {
