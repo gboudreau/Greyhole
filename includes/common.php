@@ -272,7 +272,7 @@ function parse_config() {
 		if ($db_engine == 'sqlite') {
 			$max_queued_tasks = 1000;
 		} else {
-			$max_queued_tasks = 100000;
+			$max_queued_tasks = 10000000;
 		}
 	}
 
