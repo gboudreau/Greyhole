@@ -395,8 +395,18 @@ if ($action == 'view-queue') {
 }
 
 if ($action == 'status') {
-	$task = get_next_task($temp_rs);
-	echo "\nCurrently working on task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : '') . "\n";
+	$num_dproc = (int) exec('ps ax | grep "^.*greyhole --daemon" | grep -v grep | wc -l');
+	if ($num_dproc == 0) {
+		echo "\nGreyhole daemon is currently stopped.\n\n";
+		exit(1);
+	}
+
+	$task = get_next_task($temp_rs, TRUE);
+	if ($task === FALSE) {
+		echo "\nCurrently idle.\n";
+	} else {
+		echo "\nCurrently working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : '') . "\n";
+	}
 	
 	exec("tail -10 " . escapeshellarg($greyhole_log_file), $last_log_lines);
 	echo "\nRecent log entries:\n";
