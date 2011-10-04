@@ -207,5 +207,34 @@ function db_migrate() {
 			db_query("ALTER TABLE tasks DROP INDEX find_next_task ADD INDEX find_next_task (complete, id)");
 		}
     }
+
+	// Migration #6 (new indexes for md5_worker_thread/gh_check_md5 functions)
+	if (@$db_use_mysql) {
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'md5_worker'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result) === FALSE) {
+			// migrate
+			db_query("ALTER TABLE tasks ADD INDEX md5_worker (action, complete, additional_info(100), id)");
+		}
+
+		$query = "SHOW INDEX FROM tasks WHERE Key_name = 'md5_checker'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result) === FALSE) {
+			// migrate
+			db_query("ALTER TABLE tasks ADD INDEX md5_checker (action, share(64), full_path(255), complete)");
+		}
+		
+		$query = "DESCRIBE tasks";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if ($row->Field == 'additional_info') {
+				if ($row->Type == "tinytext") {
+					// migrate
+					db_query("ALTER TABLE tasks CHANGE additional_info additional_info TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL");
+				}
+				break;
+			}
+		}
+	}
 }
 ?>

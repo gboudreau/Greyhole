@@ -27,6 +27,21 @@ if ($action == 'unknown') {
 	print_usage();
 }
 
+// Any forking needs to happen before db_connect, or the parent exiting will close the child's DB connection!
+if ($action == 'md5-worker') {
+	$pid = pcntl_fork();
+	if ($pid == -1) {
+		die("Error spawning child md5-worker!");
+	}
+	if ($pid == 0) {
+		// Child
+	} else {
+		// Parent
+		echo $pid;
+		exit(0);
+	}
+}
+
 process_config();
 
 db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
@@ -328,7 +343,7 @@ if ($action == 'view-queue') {
 		$num_rename_pending = (int) $row->num;
 		$total_num_rename_pending += $num_rename_pending;
 
-		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file') AND share = '%s' AND complete IN ('yes', 'thawed')", db_escape_string($share_name))) or die("Can't find # of fsck in tasks table: " . db_error());
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of fsck in tasks table: " . db_error());
 		$row = db_fetch_object($result);
 		$num_fsck_pending = (int) $row->num;
 		$total_num_fsck_pending += $num_fsck_pending;
@@ -528,7 +543,9 @@ if ($action == 'balance') {
 
 if ($action == 'cancel-fsck') {
 	db_query("DELETE FROM tasks WHERE action = 'fsck'") or gh_log(CRITICAL, "Can't delete fsck tasks: " . db_error());
+	db_query("DELETE FROM tasks WHERE action = 'md5'") or gh_log(CRITICAL, "Can't delete md5 tasks: " . db_error());
 	echo "All scheduled fsck tasks have now been deleted.\n";
+	echo "Specific files checks might have been queued for problematic files, and those (fsck_file) tasks will still be executed, once other tasks have been processed.\n";
 	if (is_file('/etc/init.d/greyhole')) {
 		exec("/etc/init.d/greyhole condrestart");
 	} else if (is_file('/etc/init/greyhole.conf')) {
@@ -565,6 +582,9 @@ if ($action == 'fsck') {
 	if (isset($options['find-orphaned-files'])){
 		$fsck_options[] = 'orphaned';
 	}
+	if (isset($options['checksums'])){
+		$fsck_options[] = 'checksums';
+	}
 	if (isset($options['delete-orphaned-metadata'])){
 		$fsck_options[] = 'del-orphaned-metadata';
 	}
@@ -577,6 +597,20 @@ if ($action == 'fsck') {
 		$full_path = 'all shares';
 	}
 	echo "fsck of $full_path has been scheduled. It will start after all currently pending tasks have been completed.\n";
+	if (isset($options['checksums'])){
+		echo "Any mismatch in checksums will be logged in both /var/log/greyhole.log and /usr/share/greyhole/fsck_checksums.log\n";
+	}
+	
+	exit(0);
+}
+
+if ($action == 'md5-worker') {
+	if (is_array($options['dir'])) {
+		$dirs = $options['dir'];
+	} else {
+		$dirs = array($options['dir']);
+	}
+	md5_worker_thread($dirs);
 	exit(0);
 }
 
@@ -630,8 +664,8 @@ function convert_folders($old,$new) {
 	}
 }
 
-function get_next_task(&$result_new_tasks, $update_idle=TRUE) {
-	$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed') ORDER BY id ASC LIMIT 20";
+function get_next_task(&$result_new_tasks, $incl_md5=FALSE, $update_idle=TRUE) {
+	$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed')" . (!$incl_md5 ? " AND action != 'md5'" : "") . " ORDER BY id ASC LIMIT 20";
 	$result_new_tasks = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
 	$task = db_fetch_object($result_new_tasks);
 
@@ -639,13 +673,13 @@ function get_next_task(&$result_new_tasks, $update_idle=TRUE) {
 		// No more complete = yes|thawed; let's look for complete = 'idle' tasks.
 		$query = "UPDATE tasks SET complete = 'yes' WHERE complete = 'idle'";
 		db_query($query) or gh_log(CRITICAL, "Can't update idle tasks to complete tasks: " . db_error());
-		$task = get_next_task($result_new_tasks, FALSE);
+		$task = get_next_task($result_new_tasks, $incl_md5, FALSE);
 	}
 	return $task;
 }
 
 function execute_next_task() {
-	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
+	global $options,$log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
 
 	if (isset($next_task)) {
 		$task = $next_task;
@@ -660,7 +694,7 @@ function execute_next_task() {
 			}
 		}
 		if ($task === FALSE) {
-			$task = get_next_task($result_new_tasks);
+			$task = get_next_task($result_new_tasks, TRUE);
 			if ($task === FALSE) {
 				$action = 'sleep';
 				gh_log(DEBUG, "Nothing to do... Sleeping.");
@@ -671,6 +705,46 @@ function execute_next_task() {
 				db_free_result($result_new_tasks);
 				$result_new_tasks = null;
 				$locked_files = array();
+				
+				$query = "SELECT * from tasks WHERE action = 'md5' AND complete = 'no' LIMIT 1";
+				$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks for incomplete md5: " . db_error());
+				if ($row = db_fetch_object($result)) {
+					$num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
+					if ($num_worker_threads == 0) {
+						gh_log(DEBUG, "Will spawn new worker threads to work on incomplete checksums calculations.");
+						foreach ($storage_pool_directories as $target_drive) {
+							spawn_thread('md5-worker', array($target_drive));
+						}
+					}
+				}
+				db_free_result($result);
+				
+				// Email any unsent fsck reports found in /usr/share/greyhole/
+				$logfile = '/usr/share/greyhole/fsck_checksums.log';
+				$logfilename = basename($logfile);
+				if (file_exists($logfile)) {
+					$last_email_sent = 0;
+					$query = "SELECT value from settings WHERE name = 'last_email_$logfilename'";
+					$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for last_email_$logfilename: " . db_error());
+					if ($row = db_fetch_object($result)) {
+						$last_email_sent = (int) $row->value;
+					}
+					
+					$last_mod_date = filemtime($logfile);
+
+					if ($last_mod_date > $last_email_sent) {
+						global $email_to;
+						gh_log(WARN, "Sending $logfile by email to $email_to");
+						$content = file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
+						mail($email_to, 'Mismatched checksums in Greyhole file copies', $content);
+						
+						$query = "DELETE FROM settings WHERE name = 'last_email_$logfilename'";
+						db_query($query) or gh_log(CRITICAL, "Can't delete 'last_email_$logfilename' settings: " . db_error());
+						$query = "INSERT INTO settings (name, value) VALUES ('last_email_$logfilename', '$last_mod_date')";
+						db_query($query) or gh_log(CRITICAL, "Can't insert last_email_$logfilename settings: " . db_error());
+					}
+				}
+				
 				return;
 			}
 		}
@@ -715,6 +789,9 @@ function execute_next_task() {
 			list($path, $filename) = explode_full_path($task->full_path);
 			gh_fsck_file($path, $filename, $file_type, 'landing_zone', $task->share);
 			break;
+		case 'md5':
+			gh_check_md5($task);
+			break;
 		case 'fsck':
 			$new_conf_md5 = get_conf_md5();
 			if (task_has_option($task, 'if-conf-changed')) {
@@ -735,20 +812,26 @@ function execute_next_task() {
 					break;
 				}
 			}
+
+   			$where_clause = "";
 			if ($task->share == '') {
 	   			$fsck_what_dir = 'All shares';
-
-	   			$query = "UPDATE tasks SET complete = 'yes' WHERE action = 'fsck_file' AND complete = 'idle'";
-	   			$where_clause = "";
 			} else {
 	   			$fsck_what_dir = $task->share;
-
-	   			$fsck_what_share = trim(substr($task->share, 0, strpos($task->share, '/')), '/');
-	   			$where_clause = sprintf("AND share = '%s'", $fsck_what_share);
-	   			$query = "UPDATE tasks SET complete = 'yes' WHERE action = 'fsck_file' AND complete = 'idle' $where_clause";
+				$max_lz_length = 0;
+				foreach ($shares_options as $share_name => $share_options) {
+					if (strpos($fsck_what_dir, $share_options['landing_zone']) === 0 && strlen($share_options['landing_zone']) > $max_lz_length) {
+						$max_lz_length = strlen($share_options['landing_zone']);
+			   			$where_clause = sprintf("AND share = '%s'", $share_name);
+					}
+				}
 			}
 
-			// First, let's make sure all fsck_file operations marked idle get executed.
+			// First, let's remove all md5 tasks that would be duplicates of the ones we'll create during this fsck
+			db_query("DELETE FROM tasks WHERE action = 'md5' $where_clause") or gh_log(CRITICAL, "Can't delete deprecated md5 tasks: " . db_error());
+
+			// Second, let's make sure all fsck_file tasks marked idle get executed.
+   			$query = "UPDATE tasks SET complete = 'yes' WHERE action = 'fsck_file' AND complete = 'idle' $where_clause";
 			db_query($query) or gh_log(CRITICAL, "Can't update fsck_file/idle tasks to fsck_file/complete: " . db_error());
 			$result = db_query("SELECT COUNT(*) AS num_updated_rows FROM tasks WHERE action = 'fsck_file' AND complete = 'yes' $where_clause") or gh_log(CRITICAL, "Can't find number of updated tasks for fsck_file/complete tasks: " . db_error());
 			$row = db_fetch_object($result);
@@ -761,11 +844,17 @@ function execute_next_task() {
 			gh_log(INFO, "Starting fsck for $fsck_what_dir");
 			initialize_fsck_report($fsck_what_dir);
 			clearstatcache();
-			if (mb_strpos($task->additional_info, 'du') !== FALSE) {
-				global $options;
-				$options['disk-usage-report'] = TRUE;
+
+			if (task_has_option($task, 'checksums')) {
+				// Spawn md5 worker threads; those will calculate files MD5, and save the result in the DB.
+				// The Greyhole daemon will then read those, and check them against each other to make sure all is fine.
+				$checksums_thread_ids = array();
+				foreach ($storage_pool_directories as $target_drive) {
+					$checksums_thread_ids[] = spawn_thread('md5-worker', array($target_drive));
+				}
+				gh_log(DEBUG, "Spawned " . count($checksums_thread_ids) . " worker threads to calculate MD5 checksums. Will now wait for results, and check them as they come in.");
 			}
-			$orphaned = mb_strpos($task->additional_info, 'orphaned');
+
 			set_fsck_options($task);
 
 			if ($task->share == '') {
@@ -1439,7 +1528,7 @@ function gh_write_process_metafiles($num_copies_required,$existing_metafiles,$sh
 	create_copies_from_metafiles($metafiles, $share, $full_path, $source_file);
 }
 
-function create_copies_from_metafiles($metafiles, $share, $full_path, $source_file) {
+function create_copies_from_metafiles($metafiles, $share, $full_path, $source_file, $missing_only=FALSE) {
 	$landing_zone = get_share_landing_zone($share);
 	
 	list($path, $filename) = explode_full_path($full_path);
@@ -1455,11 +1544,16 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 			gh_log(DEBUG, "  File copy at $metafile->path is already up to date.");
 			continue;
 		}
+		
+		if ($missing_only && gh_file_exists($metafile->path) && $metafile->state == 'OK' && gh_filesize($metafile->path) == gh_filesize($source_file)) {
+			gh_log(DEBUG, "  File copy at $metafile->path is already up to date.");
+			continue;
+		}
 
-		if (is_link("$landing_zone/$full_path")) {
-			$source_size = gh_filesize(readlink("$landing_zone/$full_path"));
-		} else if (gh_is_file("$landing_zone/$full_path")) {
-			$source_size = gh_filesize("$landing_zone/$full_path");
+		if (is_link($source_file)) {
+			$source_size = gh_filesize(readlink($source_file));
+		} else if (gh_is_file($source_file)) {
+			$source_size = gh_filesize($source_file);
 		}
 		if (isset($source_size)) {
 			gh_log(DEBUG, "  Copying " . bytes_to_human($source_size, FALSE) . " file to $metafile->path");
@@ -1486,26 +1580,24 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 
 		$temp_path = get_temp_filename($metafile->path);
 		
+		$copied = FALSE;
 		$it_worked = FALSE;
 		$start_time = time();
-		if (is_link("$landing_zone/$full_path")) {
-			exec(get_copy_cmd(readlink("$landing_zone/$full_path"), $temp_path));
+		if (is_link($source_file)) {
+			exec(get_copy_cmd(readlink($source_file), $temp_path));
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == $source_size;
-		} else if (gh_is_file("$landing_zone/$full_path")) {
-			$source_dev = gh_file_deviceid("$landing_zone/$full_path");
+		} else if (gh_is_file($source_file)) {
+			$source_dev = gh_file_deviceid($source_file);
 			$target_dev = gh_file_deviceid($metafile_dir_path);
 			if ($source_dev === $target_dev && $source_dev !== FALSE) {
 				gh_log(DEBUG, "  (using rename)");
-				gh_rename("$landing_zone/$full_path", $temp_path);
+				gh_rename($source_file, $temp_path);
 				$copied = FALSE;
 			} else {
-				exec(get_copy_cmd("$landing_zone/$full_path", $temp_path));
+				exec(get_copy_cmd($source_file, $temp_path));
 				$copied = TRUE;
 			}
 			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == $source_size;
-			if ($copied && $it_worked && file_exists("$landing_zone/$full_path")) {
-				unlink("$landing_zone/$full_path");
-			}
 		}
 		
 		if ($it_worked) {
@@ -2984,6 +3076,25 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
 		}
 	}
+	
+	// Queue all file copies checksum calculations, if --checksums was specified
+	if (@$options['verify-checksums']) {
+		foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
+			foreach ($metafile_block as $metafile) {
+				if ($metafile->state != 'OK') { continue; }
+				$inode_number = @gh_fileinode($metafile->path);
+				if ($inode_number !== FALSE) {
+					// Let's calculate this file's MD5 checksum to validate that all copies are valid.
+					$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) VALUES ('md5', '%s', '%s', '%s', 'no')",
+						db_escape_string($share),
+						db_escape_string(clean_dir("$file_path/$filename")),
+						db_escape_string($metafile->path)
+					);
+					db_query($query) or gh_log(CRITICAL, "Can't insert md5 task: " . db_error());
+				}
+			}
+		}
+	}
 }
 
 function initialize_fsck_report($what) {
@@ -3719,7 +3830,7 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DfClsSaqiU';
+	$opts_actions = 'DfClsSaqiU5';
 	$longopts_actions = array(
 		'daemon',
 		'fsck',
@@ -3730,7 +3841,8 @@ function process_command_line() {
 		'empty-trash',
 		'view-queue',
 		'iostat',
-		'getuid'
+		'getuid',
+		'md5-worker'
 	);
 
 	$opts_actions_with_values = 'w::g::n::t::b:';
@@ -3742,13 +3854,14 @@ function process_command_line() {
 		'debug:'
 	);
 
-	$opts_options = 'eyucomj';
+	$opts_options = 'eyucokmj';
 	$longopts_options = array(
 		'email-report',
 		'dont-walk-metadata-store',
 		'disk-usage-report',
 		'if-conf-changed',
 		'find-orphaned-files',
+		'checksums',
 		'delete-orphaned-metadata',
 		'json'
 	);
@@ -3884,6 +3997,11 @@ function print_usage() {
 	echo "                        Scan for orphaned files in the storage pool volumes\n";
 	echo "                        while running the fsck and create Metadata files for\n";
 	echo "                        the found files.\n";
+	echo "  -k, --checksums       Read ALL files in your storage pool, and check that\n";
+	echo "                        file copies are identical. This will identify any problem\n";
+	echo "                        you might have with your file-systems.\n";
+	echo "                        NOTE: this can take a LONG time to complete, since it will read\n";
+	echo "                        everything from all your drives!\n";
 	echo "  -m, --delete-orphaned-metadata\n";
 	echo "                        When fsck find metadata files with no file copies, delete those\n";
 	echo "                        metadata files. If the file copies re-appear later, you'll need\n";
@@ -3968,6 +4086,224 @@ function get_copy_cmd($source, $destination) {
 
 function task_has_option($task, $option) {
 	return (mb_strpos($task->additional_info, $option)) !== FALSE ? TRUE : FALSE;
+}
+
+function spawn_thread($action, $arguments) {
+	// Don't spawn duplicate threads
+	$num_worker_thread = (int) exec('ps ax | grep "/usr/bin/greyhole --' . $action . '" | grep "dir='. implode('" | grep "dir=', $arguments) . '" | grep -v grep | wc -l');
+	if ($num_worker_thread > 0) {
+		gh_log(DEBUG, "Won't span a duplicate thread; 'greyhole --$action --dir=$arguments[0]' is already running");
+		return 1;
+	}
+
+	$cmd = "/usr/bin/greyhole --$action --dir=" . implode(' --dir=', array_map('escapeshellarg', $arguments));
+	exec("$cmd 1>/var/run/greyhole_m5d_worker.pid 2>&1 &");
+	usleep(100000); // 1/10s
+	return (int) file_get_contents('/var/run/greyhole_m5d_worker.pid');
+}
+
+function md5_worker_thread($directories) {
+	$dirs_clause = '';
+	foreach ($directories as $dir) {
+		if ($dirs_clause != '') {
+			$dirs_clause .= ' OR ';
+		}
+		$dirs_clause .= sprintf("additional_info LIKE '%s%%'", db_escape_string($dir));
+	}
+
+	$query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND ($dirs_clause) ORDER BY id ASC LIMIT 10";
+	
+	$last_check_time = time();
+	while (TRUE) {
+		$task = FALSE;
+		if (!empty($result_new_tasks)) {
+			$task = db_fetch_object($result_new_tasks);
+			if ($task === FALSE) {
+				db_free_result($result_new_tasks);
+				$result_new_tasks = null;
+			}
+		}
+		if ($task === FALSE) {
+			$result_new_tasks = db_query($query) or gh_log(CRITICAL, "Can't query md5 tasks: " . db_error() . "$query");
+			$task = db_fetch_object($result_new_tasks);
+		}
+		if ($task === FALSE) {
+			// Nothing new to process
+			
+			// Stop this thread once we have nothing more to do, and fsck completed.
+			$task = get_next_task($tmp_rs);
+			if ($task === FALSE || ($task->action != 'fsck' && $task->action != 'fsck_file')) {
+				gh_log(DEBUG, "MD5 worker thread for " . implode(', ', $directories) . " will now exit; it has nothing more to do.");
+				#gh_log(DEBUG, "Current task: " . var_export($task, TRUE));
+				break;
+			}
+
+			sleep(5);
+			continue;
+		}
+		$last_check_time = time();
+
+		gh_log(INFO, "Working on MD5 task ID $task->id: $task->additional_info");
+		$md5 = md5_file($task->additional_info);
+		gh_log(DEBUG, "  MD5 for $task->additional_info = $md5");
+		
+		$update_query = sprintf("UPDATE tasks SET complete = 'yes', additional_info = '%s' WHERE id = $task->id", db_escape_string("$task->additional_info=$md5"));
+		db_query($update_query) or gh_log(CRITICAL, "Can't update md5 task: " . db_error());
+	}
+}
+
+function gh_check_md5($task) {
+	global $shares_options, $options;
+	$share_options = $shares_options[$task->share];
+
+	$query = sprintf("SELECT complete, COUNT(*) AS num, GROUP_CONCAT(id) AS ids FROM tasks WHERE action = 'md5' AND share = '%s' AND full_path = '%s' GROUP BY complete ORDER BY complete ASC",
+		db_escape_string($task->share),
+		db_escape_string($task->full_path)
+	);
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query complete md5 tasks: " . db_error());
+	$complete_tasks = db_fetch_object($result); // ORDER BY complete ASC in the above query will always return complete='yes' first, and there will always be at least one ($task)
+	$incomplete_tasks = db_fetch_object($result);
+	if ($incomplete_tasks === FALSE) {
+		$incomplete_tasks = array();
+	}
+	if (count($incomplete_tasks) > 0) {
+		// We don't have all of them yet. Let's post-pone this until we do.
+		$query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = %d", $task->id);
+		db_query($query) or gh_log(CRITICAL, "Can't postpone md5 task: " . db_error());
+
+		// If there's no worker thread alive, spawn all of them. The idle ones will just die.
+		$num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
+		if ($num_worker_threads == 0) {
+			gh_log(DEBUG, "  Will spawn new worker threads to work on this.");
+			global $storage_pool_directories;
+			foreach ($storage_pool_directories as $target_drive) {
+				spawn_thread('md5-worker', array($target_drive));
+			}
+		} else {
+			// Give the worker thread some time to catch up
+			gh_log(DEBUG, "  Will wait some to allow for MD5 worker threads to complete.");
+			sleep(5);
+		}
+		return;
+	}
+	
+	// We have all of them; let's check the MD5 checksums
+	gh_log(DEBUG, "Checking MD5 checksums for " . clean_dir("$task->share/$task->full_path"));
+	$result_tasks = db_query("SELECT * FROM tasks WHERE id IN ($complete_tasks->ids)") or gh_log(CRITICAL, "Can't fetch complete md5 tasks: " . db_error());
+	$md5s = array();
+	while ($t = db_fetch_object($result_tasks)) {
+		if (preg_match('/^(.+)=([0-9a-f]{32})$/', $t->additional_info, $regs)) {
+			$md5s[$regs[2]][] = clean_dir($regs[1]);
+		} else {
+			$md5s['unreadable files'][] = clean_dir($t->additional_info);
+		}
+	}
+	if (count($md5s) == 1) {
+		$md5s = array_keys($md5s);
+		$md5 = reset($md5s);
+		
+		if ($md5 == 'unreadable files') {
+			// Oopsy!
+			$logs = array(
+				"  The following file is unreadable: " . clean_dir($t->additional_info),
+				"  The underlying filesystem probably contains errors. You should unmount that partition, and check it using e2fsck -cfp"
+			);
+		} else {
+			gh_log(DEBUG, "  All copies have the same MD5 checksum: $md5");
+		}
+	}
+	else if (count($md5s) > 1) {
+		// Oopsy!
+		$logs = array("Mismatch in file copies checksums:");
+		foreach ($md5s as $md5 => $file_copies) {
+			$files = '';
+			foreach ($file_copies as $file_copy) {
+				if ($files != '') {
+					$files .= ', ';
+				}
+				$files .= $file_copy;
+			}
+	
+			// Automatically fix this if:
+			// - there's only 2 different MD5s for all file copies (i.e. one for all other files copies, and one for this file copy)
+			// - the current MD5 is only for one file copy (we assume this copy is in error, not the others)
+			// - that file copy isn't used as the share symlink target
+			$latest_file_copy = $file_copy;
+			$original_file_path = clean_dir(readlink(get_share_landing_zone($task->share) . "/" . $task->full_path));
+			if (count($md5s) == 2 && count($file_copies) == 1 && $latest_file_copy != $original_file_path) {
+				$original_md5 = 'Unknown';
+				foreach ($md5s as $this_md5 => $file_copies) {
+					foreach ($file_copies as $file_copy) {
+						if ($file_copy == $original_file_path) {
+							$original_md5 = $this_md5;
+							break;
+						}
+					}
+				}
+
+				gh_log(WARN, "  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5");
+				gh_log(WARN, "  This copy will be deleted, and replaced with a new copy from $original_file_path");
+				gh_recycle($latest_file_copy);
+
+				$metafiles = array();
+				list($path, $filename) = explode_full_path($task->full_path);
+				foreach (get_metafiles($task->share, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
+					foreach ($existing_metafiles as $key => $metafile) {
+						$metafiles[$key] = $metafile;
+					}
+				}
+				create_copies_from_metafiles($metafiles, $task->share, $task->full_path, $original_file_path, TRUE);
+
+				gh_log(DEBUG, "  Calculating MD5 for new file copy at $latest_file_copy ...");
+				$md5 = md5_file($latest_file_copy);
+				gh_log(DEBUG, "    MD5 = $md5");
+				if ($md5 == $original_md5) {
+					gh_log(DEBUG, "  All copies have the same MD5 checksum: $md5");
+					delete_tasks($complete_tasks->ids);
+					return;
+				}
+			}
+
+			$logs[] = "  [$md5] => $files";
+			if (count($file_copies) == 1) {
+				$logs[] = "    The above file is unreadable.";
+				$logs[] = "    The underlying filesystem probably contains errors. You should unmount that partition, and check it using e2fsck -cfp";
+			} else {
+				$logs[] = "    The above files are unreadable.";
+				$logs[] = "    The underlying filesystems probably contains errors. You should unmount those partitions, and check them using e2fsck -cfp";
+			}
+		}
+		
+		$logs[] = "You should manually check which file copy is invalid, and delete it. Re-create a valid copy with:";
+		$logs[] = "  greyhole --fsck --dir " . escapeshellarg(dirname(clean_dir($share_options['landing_zone'] . "/$task->full_path")));
+	}
+	
+	if (isset($logs)) {
+		// Write to greyhole.log
+		foreach ($logs as $log) {
+			gh_log(ERROR, $log);
+		}
+
+		// Write in fsck_checksums.log too
+		$flog = fopen('/usr/share/greyhole/fsck_checksums.log', 'a');
+		if (!$flog) {
+			gh_log(CRITICAL, "Couldn't open log file: /usr/share/greyhole/fsck_checksums.log");
+		}
+		fwrite($flog, $date = date("M d H:i:s") . ' ' . implode("\n", $logs) . "\n\n");
+		fclose($flog);
+
+		unset($logs);
+	}
+	
+	delete_tasks($complete_tasks->ids);
+}
+
+function delete_tasks($task_ids) {
+	db_query("DELETE FROM tasks WHERE id IN ($task_ids)") or gh_log(CRITICAL, "Can't delete tasks: " . db_error());
+
+	global $result_new_tasks;
+	db_free_result($result_new_tasks);
+	$result_new_tasks = null;
 }
 
 function set_fsck_options($task) {

@@ -350,11 +350,8 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 	if (isset($log_to_stdout)) {
 		echo $log_text;
 	} else {
-		@$fp_log = fopen($greyhole_log_file, 'a');
-		if ($fp_log) {
-			fwrite($fp_log, $log_text);
-			fclose($fp_log);
-		} else {
+		$worked = error_log($log_text, 3, $greyhole_log_file);
+		if (!$worked) {
 			error_log(trim($log_text));
 		}
 	}
