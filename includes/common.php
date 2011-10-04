@@ -388,7 +388,7 @@ function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
 			// What would have been logged will be echoed instead.
 			return TRUE;
 		}
-		gh_log(WARN, "PHP Warning [$errno]: $errstr in $errfile on line $errline");
+		gh_log(WARN, "PHP Warning [$errno]: $errstr in $errfile on line $errline; BT: " . get_debug_bt());
 		break;
 
 	default:
@@ -398,6 +398,22 @@ function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
 
 	// Don't execute PHP internal error handler
 	return TRUE;
+}
+
+function get_debug_bt() {
+	$bt = '';
+	foreach (debug_backtrace() as $d) {
+		if ($d['function'] == 'gh_error_handler' || $d['function'] == 'get_debug_bt') { continue; }
+		if ($bt != '') {
+			$bt = " => $bt";
+		}
+		$prefix = '';
+		if (isset($d['file'])) {
+			$prefix = basename($d['file']) . '[L' . $d['line'] . '] ';
+		}
+		$bt = $prefix . $d['function'] .'(' . implode(',', $d['args']) . ')' . $bt;
+	}
+	return $bt;
 }
 
 function bytes_to_human($bytes, $html=TRUE) {
