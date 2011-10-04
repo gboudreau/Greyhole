@@ -197,5 +197,15 @@ function db_migrate() {
 			db_query("ALTER TABLE tasks DROP INDEX unneeded_unlinks");
 		}
 	}
+
+	// Migration #5 (fix find_next_task index)
+	if (@$db_use_mysql) {
+	    $query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task' and Column_name = 'share'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result) !== FALSE) {
+			// migrate
+			db_query("ALTER TABLE tasks DROP INDEX find_next_task ADD INDEX find_next_task (complete, id)");
+		}
+    }
 }
 ?>
