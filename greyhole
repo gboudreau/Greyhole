@@ -1908,7 +1908,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
 		$data_filepath = clean_dir("$metastore/$share/$path");
 		$has_metafile = FALSE;
 		foreach ($metafiles as $metafile) {
-			if (get_storage_volume_from_path($metafile->path) == $target_drive) {
+			if (get_storage_volume_from_path($metafile->path) == $target_drive && is_greyhole_owned_dir($target_drive)) {
 				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 				gh_log(DEBUG, "    Saving Metadata files in " . clean_dir("$data_filepath/$filename"));
 				if (is_dir("$data_filepath/$filename")) {
