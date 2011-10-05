@@ -624,6 +624,7 @@ repair_tables();
 terminology_conversion();
 set_metastore_backup();
 set_uniq_id();
+Settings::backup();
 parse_samba_spool();
 simplify_tasks();
 while (TRUE) {
@@ -641,14 +642,11 @@ function terminology_conversion() {
 }
 
 function convert_database() {
-	$query = "UPDATE settings SET name = 'metastore_backup_directory' WHERE name = 'graveyard_backup_directory'";
-	db_query($query) or gh_log(CRITICAL, "Can't convert graveyard_backup_directory in the settings table: " . db_error());
-	
-	$result = db_query("SELECT value FROM settings WHERE name = 'metastore_backup_directory' AND value LIKE '%graveyard%'");
-	$setting = db_fetch_object($result);
+	Settings::rename('graveyard_backup_directory', 'metastore_backup_directory');
+	$setting = Settings::get('metastore_backup_directory', '%graveyard%');
 	if ($setting) {
 		$new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting->value);
-		db_query("UPDATE settings SET value = '$new_value' WHERE name = 'metastore_backup_directory'");
+		Settings::set('metastore_backup_directory', $new_value);
 	}
 }
 
@@ -799,12 +797,10 @@ function execute_next_task() {
 
 				// Last value
 				$last_md5 = '';
-				$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_fsck_conf_md5');
-				$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_fsck_conf_md5': " . db_error());
-				if ($row = db_fetch_object($result)) {
-					$last_md5 = $row->value;
+				$setting = Settings::get('last_fsck_conf_md5');
+				if ($setting) {
+					$last_md5 = $setting->value;
 				}
-				db_free_result($result);
 				
 				// New value
 				if ($new_conf_md5 == $last_md5) {
@@ -913,13 +909,7 @@ function execute_next_task() {
 			}
 			gh_log(INFO, "fsck for " . ($task->share == '' ? 'All shares' : $task->share) . " completed.");
 			
-			$query = sprintf("DELETE FROM settings WHERE name = '%s'", 'last_fsck_conf_md5');
-			db_query($query) or gh_log(CRITICAL, "Can't delete 'last_fsck_conf_md5' settings: " . db_error());
-			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s')",
-				'last_fsck_conf_md5',
-				db_escape_string($new_conf_md5)
-			);
-			db_query($query) or gh_log(CRITICAL, "Can't insert 'last_fsck_conf_md5' settings: " . db_error());
+			Settings::set('last_fsck_conf_md5', $new_conf_md5);
 			
 			if (task_has_option($task, 'email')) {
 				// Email report for daily fsck
@@ -1818,7 +1808,7 @@ function get_metafiles($share, $path, $filename=null, $load_nok_metafiles=FALSE,
 
 function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
 	if (!$quiet) {
-		gh_log(DEBUG, "Loading metafiles for " clean_dir($share . (!empty($path) ? "/$path" : "") . "/$filename") . ' ...');
+		gh_log(DEBUG, "Loading metafiles for " . clean_dir($share . (!empty($path) ? "/$path" : "") . "/$filename") . ' ...');
 	}
 	$metafiles_data_file = get_metafile_data_filename($share, $path, $filename);
 	clearstatcache();
@@ -1984,18 +1974,13 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 		return;
 	}
 
-	$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_read_log_smbd_line');
-	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_read_log_smbd_line': " . db_error());
-	$row = db_fetch_object($result);
-	if ($row === FALSE || db_fetch_object($result) !== FALSE) {
-		gh_log(WARN, "Received " . ($row === FALSE ? 'no rows' : 'more than one row') . " when querying settings for 'last_read_log_smbd_line'; expected one.");
-		$query = "INSERT INTO settings (name, value) VALUES ('last_read_log_smbd_line', '0')";
-		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for last_read_log_smbd_line: " . db_error());
-		$row = (object) array('value' => 0);
+	$setting = Settings::get('last_read_log_smbd_line');
+	if ($setting === FALSE) {
+		gh_log(WARN, "Received no rows when querying settings for 'last_read_log_smbd_line'; expected one.");
+		$setting = Settings::set('last_read_log_smbd_line', 0);
 	}
-	db_free_result($result);
 
-	$f_seek_point = (int) $row->value;
+	$f_seek_point = (int) $setting->value;
 
 	clearstatcache();
 	$samba_log_size = gh_filesize($samba_log_file);
@@ -2137,8 +2122,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 
 function update_last_read_log_smbd_line($fp) {
 	$f_seek_point = ftell($fp);
-	$query = sprintf("UPDATE settings SET value = '%d' WHERE name = '%s'", $f_seek_point, 'last_read_log_smbd_line');
-	db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_read_log_smbd_line': " . db_error());
+	Settings::set('last_read_log_smbd_line', $f_seek_point);
 }
 
 function parse_samba_spool($simplify_after_parse=TRUE) {
@@ -2420,17 +2404,12 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	if (count($sorted_target_drives) == 0) {
 		gh_log(WARN, "  Warning! All storage pool directories are over-capacity!");
 		if (!isset($last_OOS_notification)) {
-			$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'last_OOS_notification');
-			$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'last_OOS_notification': " . db_error());
-			$row = db_fetch_object($result);
-			if ($row === FALSE || db_fetch_object($result) !== FALSE) {
-				gh_log(WARN, "Received " . ($row === FALSE ? 'no rows' : 'more than one row') . " when querying settings for 'last_OOS_notification'; expected one.");
-				$query = "INSERT INTO settings (name, value) VALUES ('last_OOS_notification', '0')";
-				db_query($query) or gh_log(CRITICAL, "Can't insert new settings for last_OOS_notification: " . db_error());
-				$row = (object) array('value' => 0);
+			$setting = Settings::get('last_OOS_notification');
+			if ($setting === FALSE) {
+				gh_log(WARN, "Received no rows when querying settings for 'last_OOS_notification'; expected one.");
+				$setting = Settings::set('last_OOS_notification', 0);
 			}
-			db_free_result($result);
-			$last_OOS_notification = $row->value;
+			$last_OOS_notification = $setting->value;
 		}
 		if ($last_OOS_notification < strtotime('-1 day')) {
 			global $email_to;
@@ -2451,8 +2430,7 @@ You probably want to do something about this!
 			mail($email_to, "Greyhole is out of space on $hostname!", $body);
 			
 			$last_OOS_notification = time();
-			$query = sprintf("UPDATE settings SET value = '%s' WHERE name = '%s'", db_escape_string($last_OOS_notification), 'last_OOS_notification');
-			db_query($query) or gh_log(CRITICAL, "Can't update settings for 'last_OOS_notification': " . db_error());
+			Settings::set('last_OOS_notification', $last_OOS_notification);
 		}
 	}
 	
@@ -2532,13 +2510,10 @@ You probably want to do something about this!
 					}
 
 					// Stick files into any drives
-					$query = sprintf("SELECT value FROM settings WHERE name = 'stick_into-%s'",
-						db_escape_string($sticky_dir)
-					);
-					$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for stick_target-$sticky_dir: " . db_error());
-					$row = db_fetch_object($result);
-					if ($row !== FALSE) {
-						$stick_into = array_merge($stick_into, unserialize($row->value));
+					$setting_name = sprintf('stick_into-%s', $sticky_dir);
+					$setting = Settings::get($setting_name);
+					if ($setting !== FALSE) {
+						$stick_into = array_merge($stick_into, unserialize($setting->value));
 						// Let's check if those drives are listed in the config file!
 						$update_needed = FALSE;
 						foreach ($stick_into as $key => $stick_into_dir) {
@@ -2549,19 +2524,11 @@ You probably want to do something about this!
 						}
 						if ($update_needed) {
 							$value = serialize($stick_into);
-							$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'stick_into-%s'",
-								db_escape_string($value),
-								db_escape_string($sticky_dir)
-							);
-							db_query($query) or gh_log(CRITICAL, "Can't update settings for stick_into-$sticky_dir: " . db_error());
+							Settings::set($setting_name, $value);
 						}
 					} else {
-						$value = serialize(array_merge($stick_into, $drives));
-						$query = sprintf("INSERT INTO settings (name, value) VALUES ('stick_into-%s', '%s')",
-							db_escape_string($sticky_dir),
-							db_escape_string($value)
-						);
-						db_query($query) or gh_log(CRITICAL, "Can't insert new settings for stick_into-$sticky_dir: " . db_error());
+						$value = array_merge($stick_into, $drives);
+						Settings::set($setting_name, $value);
 					}
 				}
 				
@@ -3731,7 +3698,7 @@ function str_replace_first($search, $replace, $subject) {
 	}
 }
 
-function set_metastore_backup() {
+function set_metastore_backup($try_restore=TRUE) {
 	global $metastore_backup_directories, $storage_pool_directories;
 
 	$num_metastore_backups_needed = 2;
@@ -3743,13 +3710,16 @@ function set_metastore_backup() {
 	gh_log(DEBUG, "Loading metastore backup directories...");
 	if (empty($metastore_backup_directories)) {
 		// In the DB ?
-		$query = sprintf("SELECT value FROM settings WHERE name = '%s'", 'metastore_backup_directory');
-		$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for 'metastore_backup_directory': " . db_error());
-		$row = db_fetch_object($result);
-		db_free_result($result);
-		if ($row !== FALSE) {
-			$metastore_backup_directories = unserialize($row->value);
+		$setting = Settings::get('metastore_backup_directory');
+		if ($setting) {
+			$metastore_backup_directories = unserialize($setting->value);
 			gh_log(DEBUG, "  Found " . count($metastore_backup_directories) . " directories in the settings table.");
+		} else if ($try_restore) {
+			// Try to load a backup from the data drive, if we can find one.
+			if (Settings::restore()) {
+				set_metastore_backup(FALSE);
+				return;
+			}
 		}
 	}
 
@@ -3786,12 +3756,7 @@ function set_metastore_backup() {
 		$metastore_backup_directories = array_keys($metastore_backup_directories_hash);
 
 		// Got 2 directories now; save them in the DB
-		$query = "DELETE FROM settings WHERE name = 'metastore_backup_directory'";
-		db_query($query) or gh_log(CRITICAL, "Can't delete settings for metastore_backup_directory: " . db_error());
-		$query = sprintf("INSERT INTO settings (name, value) VALUES ('metastore_backup_directory', '%s')",
-			db_escape_string(serialize($metastore_backup_directories))
-		);
-		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for metastore_backup_directory: " . db_error());
+		Settings::set('metastore_backup_directory', $metastore_backup_directories);
 	}
 }
 

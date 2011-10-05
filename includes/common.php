@@ -1179,15 +1179,12 @@ function gone_ok($target_drive, $refresh=FALSE) {
 
 function get_gone_ok_dirs() {
 	global $gone_ok_drives;
-	$query = "SELECT value FROM settings WHERE name = 'Gone-OK-Drives'";
-	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-OK-Drives: " . db_error());
-	$row = db_fetch_object($result);
-	if ($row !== FALSE) {
-		$gone_ok_drives = unserialize($row->value);
+	$setting = Settings::get('Gone-OK-Drives');
+	if ($setting) {
+		$gone_ok_drives = unserialize($setting->value);
 	} else {
-		$query = "INSERT INTO settings (name, value) VALUES ('Gone-OK-Drives', 'a:0:{}')";
-		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-OK-Drives: " . db_error());
 		$gone_ok_drives = array();
+		Settings::set('Gone-OK-Drives', $gone_ok_drives);
 	}
 	return $gone_ok_drives;
 }
@@ -1209,10 +1206,7 @@ function mark_gone_ok($target_drive, $action='add') {
 		unset($gone_ok_drives[$target_drive]);
 	}
 
-	$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'Gone-OK-Drives'",
-		db_escape_string(serialize($gone_ok_drives))
-	);
-	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-OK-Drives: " . db_error());
+	Settings:set('Gone-OK-Drives', $gone_ok_drives);
 	return TRUE;
 }
 
@@ -1229,15 +1223,12 @@ function gone_fscked($target_drive, $refresh=FALSE) {
 
 function get_fsck_gone_drives() {
 	global $fscked_gone_drives;
-	$query = "SELECT value FROM settings WHERE name = 'Gone-FSCKed-Drives'";
-	$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for Gone-FSCKed-Drives: " . db_error());
-	$row = db_fetch_object($result);
-	if ($row !== FALSE) {
-		$fscked_gone_drives = unserialize($row->value);
+	$setting = Settings::get('Gone-FSCKed-Drives');
+	if ($setting) {
+		$fscked_gone_drives = unserialize($setting->value);
 	} else {
-		$query = "INSERT INTO settings (name, value) VALUES ('Gone-FSCKed-Drives', 'a:0:{}')";
-		db_query($query) or gh_log(CRITICAL, "Can't insert new settings for Gone-FSCKed-Drives: " . db_error());
 		$fscked_gone_drives = array();
+		Settings::set('Gone-FSCKed-Drives', $fscked_gone_drives);
 	}
 	return $fscked_gone_drives;
 }
@@ -1251,10 +1242,7 @@ function mark_gone_drive_fscked($target_drive, $action='add') {
 		unset($fscked_gone_drives[$target_drive]);
 	}
 
-	$query = sprintf("UPDATE settings SET value = '%s' WHERE name = 'Gone-FSCKed-Drives'",
-		db_escape_string(serialize($fscked_gone_drives))
-	);
-	db_query($query) or gh_log(CRITICAL, "Can't save settings for Gone-FSCKed-Drives: " . db_error());
+	Settings::set('Gone-FSCKed-Drives', $fscked_gone_drives);
 }
 
 function check_storage_pool_dirs($skip_fsck=FALSE) {
@@ -1357,6 +1345,76 @@ function check_storage_pool_dirs($skip_fsck=FALSE) {
 
 		// Refresh $gone_ok_drives to it's real value (from the DB)
 		get_gone_ok_dirs();
+	}
+}
+
+class Settings {
+	public static function get($name, $value=FALSE) {
+		$query = sprintf("SELECT * FROM settings WHERE name LIKE '%s'", $name);
+		if ($value !== FALSE) {
+			$query .= sprintf(" AND value LIKE '%s'", $value);
+		}
+		$result = db_query($query) or gh_log(CRITICAL, "Can't select setting '$name'/'$value' from settings table: " . db_error());
+		return db_fetch_object($result);
+	}
+
+	public static function set($name, $value) {
+		if (is_array($value)) {
+			$value = serialize($value);
+		}
+		global $db_use_mysql;
+		if (@$db_use_mysql) {
+			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE value = VALUES(value)", $name, $value);
+			db_query($query) or gh_log(CRITICAL, "Can't insert/update '$name' setting: " . db_error());
+		} else {
+			$query = sprintf("DELETE FROM settings WHERE name = '%s'", $name);
+			db_query($query) or gh_log(CRITICAL, "Can't delete '$name' setting: " . db_error());
+			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s')", $name, $value);
+			db_query($query) or gh_log(CRITICAL, "Can't insert '$name' setting: " . db_error());
+		}
+		return (object) array('name' => $name, 'value' => $value);
+	}
+
+	public static function rename($from, $to) {
+		$query = sprintf("UPDATE settings SET name = '%s' WHERE name = '%s'", $to, $from);
+		db_query($query) or gh_log(CRITICAL, "Can't rename setting '$from' to '$to': " . db_error());
+	}
+
+	public static function backup() {
+		global $storage_pool_directories;
+		$result = db_query("SELECT * FROM settings") or gh_log(CRITICAL, "Can't select settings for backup: " . db_error());
+		$settings = array();
+		while ($setting = db_fetch_object($result)) {
+			$settings[] = $setting;
+		}
+		foreach ($storage_pool_directories as $target_drive) {
+			$settings_backup_file = "$target_drive/.gh_settings.bak";
+			file_put_contents($settings_backup_file, serialize($settings));
+		}
+	}
+
+	public static function restore() {
+		global $storage_pool_directories;
+		foreach ($storage_pool_directories as $target_drive) {
+			$settings_backup_file = "$target_drive/.gh_settings.bak";
+			$latest_backup_time = 0;
+			if (file_exists($settings_backup_file)) {
+				$last_mod_date = filemtime($settings_backup_file);
+				if ($last_mod_date > $latest_backup_time) {
+					$backup_file = $settings_backup_file;
+					$latest_backup_time = $last_mod_date;
+				}
+			}
+		}
+		if (isset($backup_file)) {
+			gh_log(INFO, "Restoring settings from last backup: $backup_file");
+			$settings = unserialize(file_get_contents($backup_file));
+			foreach ($settings as $setting) {
+				Settings::set($setting->name, $setting->value);
+			}
+			return TRUE;
+		}
+		return FALSE;
 	}
 }
 ?>
