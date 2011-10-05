@@ -58,6 +58,7 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/common.php.2 >> greyhole-dfree.new)
 	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/common.php');" greyhole-dfree | awk -F':' '{print $$1+1}'` greyhole-dfree >> greyhole-dfree.new)
 	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole-dfree.new greyhole-dfree)
+
 	rm release/$(PACKAGE)-$(VERSION)/includes/common.php.[1,2]
 
 	# Inject includes/sql.php...
@@ -69,6 +70,13 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/sql.php.2 >> greyhole.new)
 	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/sql.php');" greyhole | awk -F':' '{print $$1+1}'` greyhole >> greyhole.new)
 	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole.new greyhole)
+
+	# ... in greyhole-dfree
+	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/sql.php');" greyhole-dfree | awk -F':' '{print $$1-1}'` greyhole-dfree > greyhole-dfree.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/sql.php.2 >> greyhole-dfree.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/sql.php');" greyhole-dfree | awk -F':' '{print $$1+1}'` greyhole-dfree >> greyhole-dfree.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole-dfree.new greyhole-dfree)
+
 	rm release/$(PACKAGE)-$(VERSION)/includes/sql.php.[1,2]
 
 	mv release/$(PACKAGE)-$(VERSION)/includes/ release/$(PACKAGE)-$(VERSION)/web-app/
