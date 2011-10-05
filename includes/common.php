@@ -1348,6 +1348,43 @@ function check_storage_pool_dirs($skip_fsck=FALSE) {
 	}
 }
 
+class FSCKLogFile {
+	private $path;
+	private $filename;
+	private $lastEmailSentTime = 0;
+
+	public function __construct($filename, $path='/usr/share/greyhole') {
+		$this->filename = $filename;
+		$this->path = $path;
+	}
+	
+	public function emailAsRequired() {
+		$logfile = "$this->path/$this->filename";
+		if (!file_exists($logfile)) { return; }
+
+		$last_mod_date = filemtime($logfile);
+		if ($last_mod_date > $this->getLastEmailSentTime()) {
+			global $email_to;
+			gh_log(WARN, "Sending $logfile by email to $email_to");
+			$content = file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
+			mail($email_to, 'Mismatched checksums in Greyhole file copies', $content);
+
+			$this->lastEmailSentTime = $last_mod_date;
+			Settings::set("last_email_$this->filename", $this->lastEmailSentTime);
+		}
+	}
+	
+	private function getLastEmailSentTime() {
+		if ($this->lastEmailSentTime == 0) {
+			$setting = Settings::get("last_email_$this->filename");
+			if ($setting) {
+				$this->lastEmailSentTime = (int) $setting->value;
+			}
+		}
+		return $this->lastEmailSentTime;
+	}
+}
+
 class Settings {
 	public static function get($name, $value=FALSE) {
 		$query = sprintf("SELECT * FROM settings WHERE name LIKE '%s'", $name);

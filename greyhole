@@ -718,31 +718,10 @@ function execute_next_task() {
 				db_free_result($result);
 				
 				// Email any unsent fsck reports found in /usr/share/greyhole/
-				$logfile = '/usr/share/greyhole/fsck_checksums.log';
-				$logfilename = basename($logfile);
-				if (file_exists($logfile)) {
-					$last_email_sent = 0;
-					$query = "SELECT value from settings WHERE name = 'last_email_$logfilename'";
-					$result = db_query($query) or gh_log(CRITICAL, "Can't query settings for last_email_$logfilename: " . db_error());
-					if ($row = db_fetch_object($result)) {
-						$last_email_sent = (int) $row->value;
-					}
-					
-					$last_mod_date = filemtime($logfile);
-
-					if ($last_mod_date > $last_email_sent) {
-						global $email_to;
-						gh_log(WARN, "Sending $logfile by email to $email_to");
-						$content = file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
-						mail($email_to, 'Mismatched checksums in Greyhole file copies', $content);
-						
-						$query = "DELETE FROM settings WHERE name = 'last_email_$logfilename'";
-						db_query($query) or gh_log(CRITICAL, "Can't delete 'last_email_$logfilename' settings: " . db_error());
-						$query = "INSERT INTO settings (name, value) VALUES ('last_email_$logfilename', '$last_mod_date')";
-						db_query($query) or gh_log(CRITICAL, "Can't insert last_email_$logfilename settings: " . db_error());
-					}
+				foreach (array('fsck_checksums.log') as $log_file) {
+					$log = new FSCKLogFile($log_file);
+					$log->emailAsRequired();
 				}
-				
 				return;
 			}
 		}
