@@ -1402,13 +1402,13 @@ function gh_write($share, $full_path, $task_id) {
 		if (!isset($source_file)) {
 			$source_file = clean_dir(readlink("$landing_zone/$full_path"));
 		}
-		gh_log(INFO, "File changed: $share/$full_path", FALSE);
 		clearstatcache();
 		$filesize = gh_filesize($source_file);
 		if ($log_level >= DEBUG) {
-			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
+			gh_log(INFO, "File changed: $share/$full_path - " . bytes_to_human($filesize, FALSE));
+		} else {
+			gh_log(INFO, "File changed: $share/$full_path");
 		}
-		gh_log(INFO, "");
 		gh_log(DEBUG, "  Will use source file: $source_file");
 
 		foreach (get_metafiles($share, $path, $filename) as $existing_metafiles){
@@ -1453,13 +1453,13 @@ function gh_write($share, $full_path, $task_id) {
 		if (!isset($source_file)) {
 			$source_file = clean_dir("$landing_zone/$full_path");
 		}
-		gh_log(INFO, "File created: $share/$full_path", FALSE);
 		clearstatcache();
 		$filesize = gh_filesize($source_file);
 		if ($log_level >= DEBUG) {
-			gh_log(DEBUG, " - " . bytes_to_human($filesize, FALSE), FALSE);
+			gh_log(INFO, "File created: $share/$full_path - " . bytes_to_human($filesize, FALSE));
+		} else {
+			gh_log(INFO, "File created: $share/$full_path");
 		}
-		gh_log(INFO, "");
 
 		if (is_dir($source_file)) {
 			gh_log(INFO, "$share/$full_path is now a directory! Aborting.");
@@ -1818,7 +1818,7 @@ function get_metafiles($share, $path, $filename=null, $load_nok_metafiles=FALSE,
 
 function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
 	if (!$quiet) {
-		gh_log(DEBUG, "Loading metafiles for $share" . (!empty($path) ? "/$path" : "") . "/$filename... ", FALSE);
+		gh_log(DEBUG, "Loading metafiles for " clean_dir($share . (!empty($path) ? "/$path" : "") . "/$filename") . ' ...');
 	}
 	$metafiles_data_file = get_metafile_data_filename($share, $path, $filename);
 	clearstatcache();
@@ -1839,14 +1839,14 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
 			if ($metafile->state == 'OK' && $share_file_link_to !== FALSE) {
 				if ($metafile->is_linked && $metafile->path != $share_file_link_to) {
 					if (!$quiet) {
-						gh_log(DEBUG, 'Changing is_linked to FALSE for ' . $metafile->path);
+						gh_log(DEBUG, '  Changing is_linked to FALSE for ' . $metafile->path);
 					}
 					$metafile->is_linked = FALSE;
 					$metafiles[$key] = $metafile;
 					save_metafiles($share, $path, $filename, array_values($metafiles));
 				} else if (!$metafile->is_linked && $metafile->path == $share_file_link_to) {
 					if (!$quiet) {
-						gh_log(DEBUG, 'Changing is_linked to TRUE for ' . $metafile->path);
+						gh_log(DEBUG, '  Changing is_linked to TRUE for ' . $metafile->path);
 					}
 					$metafile->is_linked = TRUE;
 					$metafiles[$key] = $metafile;

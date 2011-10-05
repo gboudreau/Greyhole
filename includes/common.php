@@ -50,7 +50,6 @@ foreach($constarray['user'] as $key => $val) {
 // Cached df results
 $last_df_time = 0;
 $last_dfs = array();
-$is_new_line = TRUE;
 $sleep_before_task = array();
 
 if (!isset($config_file)) {
@@ -327,8 +326,8 @@ function explode_full_path($full_path) {
 	return array(dirname($full_path), basename($full_path));
 }
 
-function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
-	global $greyhole_log_file, $log_level, $is_new_line, $log_memory_usage, $action, $log_to_stdout;
+function gh_log($local_log_level, $text) {
+	global $greyhole_log_file, $log_level, $log_memory_usage, $action, $log_to_stdout;
 	if ($local_log_level > $log_level) {
 		return;
 	}
@@ -339,13 +338,11 @@ function gh_log($local_log_level, $text, $add_line_feed=TRUE) {
 		$timestamp = floor($utimestamp);
 		$date .= '.' . round(($utimestamp - $timestamp) * 1000000);
 	}
-	$log_text = sprintf('%s%s%s%s', 
-		$is_new_line ? "$date $local_log_level $action: " : '',
+	$log_text = sprintf("%s%s%s\n", 
+		"$date $local_log_level $action: ",
 		$text,
-		$add_line_feed && $log_memory_usage ? " [" . memory_get_usage() . "]" : '',
-		$add_line_feed ? "\n": ''
+		$log_memory_usage ? " [" . memory_get_usage() . "]" : ''
 	);
-	$is_new_line = $add_line_feed;
 
 	if (isset($log_to_stdout)) {
 		echo $log_text;
@@ -624,8 +621,8 @@ class metafile_iterator implements Iterator {
 		$this->metafiles = array();
 		while(count($this->directory_stack)>0 && $this->directory_stack !== NULL){
 			$this->dir = array_pop($this->directory_stack);
-			if($this->quiet == FALSE){
-				gh_log(DEBUG,"Loading metadata files for (dir) " . $this->share . (!empty($this->dir) ? "/" . $this->dir : "") . "...");
+			if (!$this->quiet) {
+				gh_log(DEBUG, "Loading metadata files for (dir) " . clean_dir($this->share . (!empty($this->dir) ? "/" . $this->dir : "")) . " ...");
 			}
 			for( $i = 0; $i < count($this->metastores); $i++ ){
 				$metastore = $this->metastores[$i];
@@ -661,7 +658,9 @@ class metafile_iterator implements Iterator {
 			}
 			
 		}
-		gh_log(DEBUG,'Found ' . count($this->metafiles) . ' metadata files.');
+		if (!$this->quiet) {
+			gh_log(DEBUG, 'Found ' . count($this->metafiles) . ' metadata files.');
+		}
 		return $this->metafiles;
 	}
 	
