@@ -259,7 +259,7 @@ if ($action == 'debug') {
 		exec($command, $result);
 	}
 	foreach ($result as $rline) {
-		echo preg_replace('@^/var/log/greyhole.log[0-9\.gz-]*:@', '', $rline) . "\n";
+		echo preg_replace('@^' . $greyhole_log_file . '[0-9\.gz-]*:@', '', $rline) . "\n";
 	}
 	
 	echo "\nFrom filesystem\n===============\n";
@@ -598,7 +598,7 @@ if ($action == 'fsck') {
 	}
 	echo "fsck of $full_path has been scheduled. It will start after all currently pending tasks have been completed.\n";
 	if (isset($options['checksums'])){
-		echo "Any mismatch in checksums will be logged in both /var/log/greyhole.log and /usr/share/greyhole/fsck_checksums.log\n";
+		echo "Any mismatch in checksums will be logged in both " . $greyhole_log_file . " and " . FSCKLogFile::PATH . "/fsck_checksums.log\n";
 	}
 	
 	exit(0);
@@ -677,7 +677,7 @@ function get_next_task(&$result_new_tasks, $incl_md5=FALSE, $update_idle=TRUE) {
 }
 
 function execute_next_task() {
-	global $options,$log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
+	global $log_level, $fsck_report, $storage_pool_directories, $shares_options, $email_to, $sleep_before_task, $action, $frozen_directories, $next_task, $current_task_id, $locked_files, $result_new_tasks, $fix_symlinks_scanned_dirs;
 
 	if (isset($next_task)) {
 		$task = $next_task;
@@ -699,11 +699,6 @@ function execute_next_task() {
 
 				repair_tables();
 				
-				sleep($log_level == DEBUG ? 10 : ($log_level == TEST || PERF ? 1 : 600));
-				db_free_result($result_new_tasks);
-				$result_new_tasks = null;
-				$locked_files = array();
-				
 				$query = "SELECT * from tasks WHERE action = 'md5' AND complete = 'no' LIMIT 1";
 				$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks for incomplete md5: " . db_error());
 				if ($row = db_fetch_object($result)) {
@@ -718,10 +713,16 @@ function execute_next_task() {
 				db_free_result($result);
 				
 				// Email any unsent fsck reports found in /usr/share/greyhole/
-				foreach (array('fsck_checksums.log') as $log_file) {
+				foreach (array('fsck_checksums.log', 'fsck_files.log') as $log_file) {
 					$log = new FSCKLogFile($log_file);
 					$log->emailAsRequired();
 				}
+
+				sleep($log_level == DEBUG ? 10 : ($log_level == TEST || PERF ? 1 : 600));
+				db_free_result($result_new_tasks);
+				$result_new_tasks = null;
+				$locked_files = array();
+
 				return;
 			}
 		}
@@ -764,7 +765,12 @@ function execute_next_task() {
 			$task->full_path = get_share_landing_zone($task->share) . '/' . $task->full_path;
 			$file_type = @filetype($task->full_path);
 			list($path, $filename) = explode_full_path($task->full_path);
-			gh_fsck_file($path, $filename, $file_type, 'landing_zone', $task->share);
+			FSCKLogFile::loadFSCKReport('Missing files'); // Create or load the fsck_report from disk
+			gh_fsck_file($path, $filename, $file_type, 'metastore', $task->share);
+			if (task_has_option($task, 'email')) {
+				// Save the report to disk to be able to email it when we're done with all fsck_file tasks
+				FSCKLogFile::saveFSCKReport();
+			}
 			break;
 		case 'md5':
 			gh_check_md5($task);
@@ -891,10 +897,10 @@ function execute_next_task() {
 			Settings::set('last_fsck_conf_md5', $new_conf_md5);
 			
 			if (task_has_option($task, 'email')) {
-				// Email report for daily fsck
-				$fsck_report = get_fsck_report();
+				// Email report for fsck
+				$fsck_report_mail = get_fsck_report();
 				gh_log(DEBUG, "Sending fsck report to $email_to");
-				mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report);
+				mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report_mail);
 			}
 			if (task_has_option($task, 'du')) {
 				// Save disk-usage report to disk
@@ -2548,7 +2554,6 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
 			if ($file_type == 'dir') {
 				gh_fsck($full_path, $share, $storage_path);
 			} else {
-				$fsck_report['landing_zone']['num_files']++;
 				gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $storage_path);
 			}
 		}
@@ -2573,8 +2578,6 @@ function gh_fsck_metastore($root, $path, $share) {
 				gh_fsck_metastore($root, "$path/$filename", $share);
 			} else {
 				// Found a metafile
-				$fsck_report['metastore']['num_files']++;
-				
 				$path_parts = explode('/', $path);
 				array_shift($path_parts);
 				$share = array_shift($path_parts);
@@ -2600,6 +2603,12 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	}else{
 		$file_path = trim(mb_substr($path, mb_strlen("$storage_path/$share")+1), '/');
 	}
+	if ($source == 'metastore') {
+		$fsck_report['metastore']['num_files']++;
+	}
+	if ($file_type !== FALSE) {
+		$fsck_report['landing_zone']['num_files']++;
+	}
 	if ($file_type == 'file') {
 		if($storage_path === FALSE){
 			// Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
@@ -2612,7 +2621,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			return;
 		}
 	} else {
-		if($storage_path === FALSE){
+		if ($source == 'metastore') {
 			if ($file_type == 'link' && !file_exists(readlink("$path/$filename"))) {
 				// Link points to now gone copy; let's just remove it, and treat this as if the link was not there in the first place.
 				unlink("$path/$filename");
@@ -2628,6 +2637,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 						@$options['all-fsck-options']
 					);
 					db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
+					gh_log(DEBUG, "  Queuing a new fsck_file task for " . clean_dir("$share/$file_path/$filename"));
 					return;
 				}
 			}
@@ -2829,11 +2839,11 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		}
 	} else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
 		gh_log(WARN, '  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')));
+		if ($source == 'metastore' || get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
+			$fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
+		}
 		if (is_link("$landing_zone/$file_path/$filename")) {
 			gh_recycle("$landing_zone/$file_path/$filename");
-			if ($source == 'metastore' || get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
-				$fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
-			}
 		} else if (gh_is_file("$landing_zone/$file_path/$filename")) {
 			gh_log(INFO, "$share/$file_path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
@@ -3066,7 +3076,7 @@ function initialize_fsck_report($what) {
 }
 
 function get_fsck_report() {
-	global $fsck_report, $storage_pool_directories, $gone_ok_drives;
+	global $fsck_report, $storage_pool_directories, $gone_ok_drives, $options;
 	
 	$fsck_report['end'] = time();
 	
@@ -3108,10 +3118,14 @@ Trash size:\n";
 
 		if (!empty($fsck_report['no_copies_found_files'])) {
 			ksort($fsck_report['no_copies_found_files']);
-			$report .= "  Found " . count($fsck_report['no_copies_found_files']) . " files in the metadata store for which no file copies were found.
-    Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.
-    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store.
-  Files with no copies:\n";
+			$report .= "  Found " . count($fsck_report['no_copies_found_files']) . " files in the metadata store for which no file copies were found.\n";
+			if (@$options['del-orphaned-metadata']) {
+				$report .= "    Those metadata files have been deleted, since you used the --delete-orphaned-metadata option. They will not re-appear in the future.\n";
+			} else {
+				$report .= "    Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.\n";
+				$report .= "    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store using \"greyhole --fsck --delete-orphaned-metadata\"\n";
+			}
+  			$report .= "  Files with no copies:\n";
 			$report .= "    " . implode("\n    ", array_keys($fsck_report['no_copies_found_files'])) . "\n\n";
 		}
 
@@ -4097,7 +4111,7 @@ function md5_worker_thread($directories) {
 }
 
 function gh_check_md5($task) {
-	global $shares_options, $options;
+	global $shares_options;
 	$share_options = $shares_options[$task->share];
 
 	$query = sprintf("SELECT complete, COUNT(*) AS num, GROUP_CONCAT(id) AS ids FROM tasks WHERE action = 'md5' AND share = '%s' AND full_path = '%s' GROUP BY complete ORDER BY complete ASC",
@@ -4229,9 +4243,9 @@ function gh_check_md5($task) {
 		}
 
 		// Write in fsck_checksums.log too
-		$flog = fopen('/usr/share/greyhole/fsck_checksums.log', 'a');
+		$flog = fopen(FSCKLogFile::PATH . '/fsck_checksums.log', 'a');
 		if (!$flog) {
-			gh_log(CRITICAL, "Couldn't open log file: /usr/share/greyhole/fsck_checksums.log");
+			gh_log(CRITICAL, "Couldn't open log file: " . FSCKLogFile::PATH . "/fsck_checksums.log");
 		}
 		fwrite($flog, $date = date("M d H:i:s") . ' ' . implode("\n", $logs) . "\n\n");
 		fclose($flog);

@@ -1349,11 +1349,13 @@ function check_storage_pool_dirs($skip_fsck=FALSE) {
 }
 
 class FSCKLogFile {
+	const PATH = '/usr/share/greyhole';
+
 	private $path;
 	private $filename;
 	private $lastEmailSentTime = 0;
-
-	public function __construct($filename, $path='/usr/share/greyhole') {
+	
+	public function __construct($filename, $path=self::PATH) {
 		$this->filename = $filename;
 		$this->path = $path;
 	}
@@ -1366,11 +1368,34 @@ class FSCKLogFile {
 		if ($last_mod_date > $this->getLastEmailSentTime()) {
 			global $email_to;
 			gh_log(WARN, "Sending $logfile by email to $email_to");
-			$content = file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
-			mail($email_to, 'Mismatched checksums in Greyhole file copies', $content);
+			mail($email_to, $this->getSubject(), $this->getBody());
 
 			$this->lastEmailSentTime = $last_mod_date;
 			Settings::set("last_email_$this->filename", $this->lastEmailSentTime);
+		}
+	}
+
+	private function getBody() {
+		$logfile = "$this->path/$this->filename";
+		if ($this->filename == 'fsck_checksums.log') {
+			return file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
+		} else if ($this->filename == 'fsck_files.log') {
+			global $fsck_report;
+			$fsck_report = unserialize(file_get_contents($logfile));
+			unlink($logfile);
+			return get_fsck_report() . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
+		} else {
+			return '[empty]';
+		}
+	}
+	
+	private function getSubject() {
+		if ($this->filename == 'fsck_checksums.log') {
+			return 'Mismatched checksums in Greyhole file copies';
+		} else if ($this->filename == 'fsck_files.log') {
+			return 'fsck_files of Greyhole shares on ' . exec('hostname');
+		} else {
+			return 'Unknown FSCK report';
 		}
 	}
 	
@@ -1382,6 +1407,22 @@ class FSCKLogFile {
 			}
 		}
 		return $this->lastEmailSentTime;
+	}
+	
+	public static function loadFSCKReport($what) {
+		$logfile = self::PATH . '/fsck_files.log';
+		if (file_exists($logfile)) {
+			global $fsck_report;
+			$fsck_report = unserialize(file_get_contents($logfile));
+		} else {
+			initialize_fsck_report($what);
+		}
+	}
+
+	public static function saveFSCKReport() {
+		global $fsck_report;
+		$logfile = self::PATH . '/fsck_files.log';
+		file_put_contents($logfile, serialize($fsck_report));
 	}
 }
 
