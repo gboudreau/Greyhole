@@ -47,7 +47,7 @@ process_config();
 db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
 db_migrate();
 
-if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status' && $action != 'getuid') {
+if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status' && $action != 'getuid' && $action != 'logs') {
 	if (exec("whoami") != 'root') {
 		echo "You need to execute this as root.\n";
 		exit(1);
@@ -58,6 +58,9 @@ if ($action == 'getuid') {
 	$uniq_id = set_uniq_id();
 	echo $uniq_id;
 	exit(0);
+}
+if ($action == 'logs') {
+	passthru("tail -f " . escapeshellarg($greyhole_log_file));
 }
 if ($action == 'iostat') {
 	$devices_drives = array();
@@ -3796,7 +3799,7 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DfClsSaqiU5';
+	$opts_actions = 'DfClsSLaqiU5';
 	$longopts_actions = array(
 		'daemon',
 		'fsck',
@@ -3804,6 +3807,7 @@ function process_command_line() {
 		'balance',
 		'stats',
 		'status',
+		'logs',
 		'empty-trash',
 		'view-queue',
 		'iostat',
@@ -3919,6 +3923,7 @@ function print_usage() {
 	echo "  -l, --balance         Balance available space on storage pool drives.\n";
 	echo "  -s, --stats           Display storage pool statistics.\n";
 	echo "  -i, --iostat          I/O statistices for your storage pool drives.\n";
+	echo "  -L, --logs            Display new greyhole.log entries as they are logged.\n";
 	echo "  -S, --status          Display what the Greyhole daemon is currently doing.\n";
 	echo "  -q, --view-queue      Display the current work queue.\n";
 	echo "  -a, --empty-trash     Empty the trash.\n";
