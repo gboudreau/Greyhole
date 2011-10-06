@@ -63,13 +63,14 @@ if (!isset($smb_config_file)) {
 $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit;
+	global $_CONSTANTS, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash;
 
 	$parsing_dir_selection_groups = FALSE;
 	$shares_options = array();
 	$storage_pool_drives = array();
 	$frozen_directories = array();
 	$config_text = file_get_contents($config_file);
+	$delete_moves_to_trash = TRUE;
 	foreach (explode("\n", $config_text) as $line) {
 		if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
 			$name = trim($regs[1]);
@@ -1264,13 +1265,13 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			mark_gone_drive_fscked($sp_drive);
 			$missing_drives[] = $sp_drive;
 			gh_log(WARN, "Warning! It seems $sp_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
-			gh_log(DEBUG, "Email sent for gone dir: $sp_drive");
+			gh_log(DEBUG, "Email sent for gone drive: $sp_drive");
 			$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
 		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_dir($sp_drive)) {
 			// $sp_drive is now back
 			$needs_fsck = 2;
 			$returned_drives[] = $sp_drive;
-			gh_log(DEBUG, "Email sent for revived dir: $sp_drive");
+			gh_log(DEBUG, "Email sent for revived drive: $sp_drive");
 
 			mark_gone_ok($sp_drive, 'remove');
 			mark_gone_drive_fscked($sp_drive, 'remove');
