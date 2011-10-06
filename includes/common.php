@@ -31,6 +31,7 @@ $action = 'initialize';
 date_default_timezone_set(date_default_timezone_get());
 
 set_error_handler("gh_error_handler");
+register_shutdown_function("gh_shutdown");
 
 umask(0);
 
@@ -361,6 +362,12 @@ function gh_log($local_log_level, $text) {
 	
 	if ($local_log_level === CRITICAL) {
 		exit(1);
+	}
+}
+
+function gh_shutdown() {
+	if ($err = error_get_last()) {
+		gh_log(ERROR, "PHP Fatal Error: " . $err['message'] . "; BT: " . basename($err['file']) . '[L' . $err['line'] . '] ');
 	}
 }
 
