@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009 Guillaume Boudreau
+Copyright 2009-2011 Guillaume Boudreau, Andrew Hopkinson
 
 This file is part of Greyhole.
 
@@ -63,11 +63,11 @@ if (!isset($smb_config_file)) {
 $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_directories, $shares_options, $minimum_free_space_pool_directories, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit;
+	global $_CONSTANTS, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit;
 
 	$parsing_dir_selection_groups = FALSE;
 	$shares_options = array();
-	$storage_pool_directories = array();
+	$storage_pool_drives = array();
 	$frozen_directories = array();
 	$config_text = file_get_contents($config_file);
 	foreach (explode("\n", $config_text) as $line) {
@@ -79,7 +79,12 @@ function parse_config() {
 			}
 		    if (mb_strpos($name, 'delete_moves_to_attic') !== FALSE) {
 			    $new_name = str_replace('attic', 'trash', $name);
-			    gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $new_name");
+			    #gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $new_name");
+			    $name = $new_name;
+			}
+		    if ($name == 'storage_pool_directory') {
+			    $new_name = 'storage_pool_drive';
+			    #gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $new_name");
 			    $name = $new_name;
 			}
 			$parsing_dir_selection_groups = FALSE;
@@ -88,17 +93,17 @@ function parse_config() {
 					global ${$name};
 					${$name} = $_CONSTANTS[$value];
 					break;
-				case 'delete_moves_to_trash':
+				case 'delete_moves_to_trash': // or delete_moves_to_attic
 				case 'log_memory_usage':
 				case 'balance_modified_files':
 				case 'check_for_open_files':
 					global ${$name};
 					${$name} = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
 					break;
-				case 'storage_pool_directory':
+				case 'storage_pool_drive': // or storage_pool_directory
 					if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?gb?/i", $value, $regs)) {
-						$storage_pool_directories[] = trim($regs[1]);
-						$minimum_free_space_pool_directories[trim($regs[1])] = (float) trim($regs[2]);
+						$storage_pool_drives[] = trim($regs[1]);
+						$minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]);
 					}
 					break;
 				case 'wait_for_exclusive_file_access':
@@ -185,15 +190,15 @@ function parse_config() {
 	    }
 	}
 	
-	if (is_array($storage_pool_directories) && count($storage_pool_directories) > 0) {
+	if (is_array($storage_pool_drives) && count($storage_pool_drives) > 0) {
 		$df_command = "df -k";
-		foreach ($storage_pool_directories as $key => $target_drive) {
-			$df_command .= " " . escapeshellarg($target_drive);
-			$storage_pool_directories[$key] = '/' . trim($target_drive, '/');
+		foreach ($storage_pool_drives as $key => $sp_drive) {
+			$df_command .= " " . escapeshellarg($sp_drive);
+			$storage_pool_drives[$key] = '/' . trim($sp_drive, '/');
 		}
 		$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\"";
 	} else {
-		gh_log(WARN, "You have no storage_pool_directory defined. Greyhole can't run.");
+		gh_log(WARN, "You have no storage_pool_drive defined. Greyhole can't run.");
 		return FALSE;
 	}
 
@@ -227,8 +232,8 @@ function parse_config() {
 			unset($shares_options[$share_name]);
 			continue;
 		}
-		if ($share_options['num_copies'] > count($storage_pool_directories)) {
-			$share_options['num_copies'] = count($storage_pool_directories);
+		if ($share_options['num_copies'] > count($storage_pool_drives)) {
+			$share_options['num_copies'] = count($storage_pool_drives);
 		}
 		if (!isset($share_options['landing_zone'])) {
 			global $config_file, $smb_config_file;
@@ -250,10 +255,10 @@ function parse_config() {
 		}
 		$shares_options[$share_name] = $share_options;
 		
-		// Validate that the landing zone is NOT a subdirectory of a storage pool directory!
-		foreach ($storage_pool_directories as $key => $target_drive) {
-			if (mb_strpos($share_options['landing_zone'], $target_drive) === 0) {
-				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pool directory ($target_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+		// Validate that the landing zone is NOT a subdirectory of a storage pool drive!
+		foreach ($storage_pool_drives as $key => $sp_drive) {
+			if (mb_strpos($share_options['landing_zone'], $sp_drive) === 0) {
+				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pool drive ($sp_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
 			}
 		}
 	}
@@ -1062,16 +1067,16 @@ function kshuffle(&$array) {
 class DirectorySelection {
     var $num_dirs_per_draft;
     var $selection_algorithm;
-    var $directories;
+    var $drives;
     var $is_custom;
     
     var $sorted_target_drives;
     var $last_resort_sorted_target_drives;
     
-    function __construct($num_dirs_per_draft, $selection_algorithm, $directories, $is_custom) {
+    function __construct($num_dirs_per_draft, $selection_algorithm, $drives, $is_custom) {
         $this->num_dirs_per_draft = $num_dirs_per_draft;
         $this->selection_algorithm = $selection_algorithm;
-        $this->directories = $directories;
+        $this->drives = $drives;
         $this->is_custom = $is_custom;
     }
     
@@ -1084,16 +1089,16 @@ class DirectorySelection {
         	arsort($sorted_target_drives);
     		arsort($last_resort_sorted_target_drives);
 		}
-		// Only keep directories that are in $this->directories
+		// Only keep drives that are in $this->drives
         $this->sorted_target_drives = array();
 		foreach ($sorted_target_drives as $k => $v) {
-		    if (array_search($k, $this->directories) !== FALSE) {
+		    if (array_search($k, $this->drives) !== FALSE) {
 		        $this->sorted_target_drives[$k] = $v;
 		    }
 		}
         $this->last_resort_sorted_target_drives = array();
 		foreach ($last_resort_sorted_target_drives as $k => $v) {
-		    if (array_search($k, $this->directories) !== FALSE) {
+		    if (array_search($k, $this->drives) !== FALSE) {
 		        $this->last_resort_sorted_target_drives[$k] = $v;
 		    }
 		}
@@ -1126,8 +1131,8 @@ class DirectorySelection {
     static function parse($config_string, $dir_selection_groups) {
         $ds = array();
         if ($config_string == 'random' || $config_string == 'most_available_space') {
-            global $storage_pool_directories;
-            $ds[] = new DirectorySelection(count($storage_pool_directories), $config_string, $storage_pool_directories, FALSE);
+            global $storage_pool_drives;
+            $ds[] = new DirectorySelection(count($storage_pool_drives), $config_string, $storage_pool_drives, FALSE);
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(random|most_available_space)/i', $config_string, $regs)) {
@@ -1148,11 +1153,11 @@ class DirectorySelection {
     }
 
     function update() {
-        // Make sure num_dirs_per_draft and directories have been set, in case storage_pool_directory lines appear after dir_selection_algorithm line(s) in the config file
+        // Make sure num_dirs_per_draft and drives have been set, in case storage_pool_drive lines appear after dir_selection_algorithm line(s) in the config file
         if (!$this->is_custom && ($this->selection_algorithm == 'random' || $this->selection_algorithm == 'most_available_space')) {
-            global $storage_pool_directories;
-            $this->num_dirs_per_draft = count($storage_pool_directories);
-            $this->directories = $storage_pool_directories;
+            global $storage_pool_drives;
+            $this->num_dirs_per_draft = count($storage_pool_drives);
+            $this->drives = $storage_pool_drives;
         }
     }
 }
@@ -1166,12 +1171,12 @@ function is_greyhole_owned_dir($path) {
 }
 
 // Is it OK for a drive to be gone?
-function gone_ok($target_drive, $refresh=FALSE) {
+function gone_ok($sp_drive, $refresh=FALSE) {
 	global $gone_ok_drives;
 	if ($refresh || !isset($gone_ok_drives)) {
 		$gone_ok_drives = get_gone_ok_dirs();
 	}
-	if (isset($gone_ok_drives[$target_drive])) {
+	if (isset($gone_ok_drives[$sp_drive])) {
 		return TRUE;
 	}
 	return FALSE;
@@ -1189,33 +1194,33 @@ function get_gone_ok_dirs() {
 	return $gone_ok_drives;
 }
 
-function mark_gone_ok($target_drive, $action='add') {
-	global $storage_pool_directories;
-	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
-		$target_drive = '/' . trim($target_drive, '/');
+function mark_gone_ok($sp_drive, $action='add') {
+	global $storage_pool_drives;
+	if (array_search($sp_drive, $storage_pool_drives) === FALSE) {
+		$sp_drive = '/' . trim($sp_drive, '/');
 	}
-	if (array_search($target_drive, $storage_pool_directories) === FALSE) {
+	if (array_search($sp_drive, $storage_pool_drives) === FALSE) {
 		return FALSE;
 	}
 
 	global $gone_ok_drives;
 	$gone_ok_drives = get_gone_ok_dirs();
 	if ($action == 'add') {
-		$gone_ok_drives[$target_drive] = TRUE;
+		$gone_ok_drives[$sp_drive] = TRUE;
 	} else {
-		unset($gone_ok_drives[$target_drive]);
+		unset($gone_ok_drives[$sp_drive]);
 	}
 
 	Settings:set('Gone-OK-Drives', $gone_ok_drives);
 	return TRUE;
 }
 
-function gone_fscked($target_drive, $refresh=FALSE) {
+function gone_fscked($sp_drive, $refresh=FALSE) {
 	global $fscked_gone_drives;
 	if ($refresh || !isset($fscked_gone_drives)) {
 		$fscked_gone_drives = get_fsck_gone_drives();
 	}
-	if (isset($fscked_gone_drives[$target_drive])) {
+	if (isset($fscked_gone_drives[$sp_drive])) {
 		return TRUE;
 	}
 	return FALSE;
@@ -1233,55 +1238,55 @@ function get_fsck_gone_drives() {
 	return $fscked_gone_drives;
 }
 
-function mark_gone_drive_fscked($target_drive, $action='add') {
+function mark_gone_drive_fscked($sp_drive, $action='add') {
 	global $fscked_gone_drives;
 	$fscked_gone_drives = get_fsck_gone_drives();
 	if ($action == 'add') {
-		$fscked_gone_drives[$target_drive] = TRUE;
+		$fscked_gone_drives[$sp_drive] = TRUE;
 	} else {
-		unset($fscked_gone_drives[$target_drive]);
+		unset($fscked_gone_drives[$sp_drive]);
 	}
 
 	Settings::set('Gone-FSCKed-Drives', $fscked_gone_drives);
 }
 
-function check_storage_pool_dirs($skip_fsck=FALSE) {
-	global $storage_pool_directories, $email_to, $gone_ok_drives;
+function check_storage_pool_drives($skip_fsck=FALSE) {
+	global $storage_pool_drives, $email_to, $gone_ok_drives;
 	$needs_fsck = FALSE;
 	$returned_drives = array();
 	$missing_drives = array();
 	$i = 0; $j = 0;
-	foreach ($storage_pool_directories as $target_drive) {
-		if (!is_greyhole_owned_dir($target_drive) && !gone_fscked($target_drive, $i++ == 0) && !file_exists("$target_drive/.greyhole_used_this")) {
+	foreach ($storage_pool_drives as $sp_drive) {
+		if (!is_greyhole_owned_dir($sp_drive) && !gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this")) {
 			if($needs_fsck !== 2){	
 				$needs_fsck = 1;
 			}
-			mark_gone_drive_fscked($target_drive);
-			$missing_drives[] = $target_drive;
-			gh_log(WARN, "Warning! It seems $target_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
-			gh_log(DEBUG, "Email sent for gone dir: $target_drive");
-			$gone_ok_drives[$target_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
-		} else if ((gone_ok($target_drive, $j++ == 0) || gone_fscked($target_drive, $i++ == 0)) && is_greyhole_owned_dir($target_drive)) {
-			// $target_drive is now back
+			mark_gone_drive_fscked($sp_drive);
+			$missing_drives[] = $sp_drive;
+			gh_log(WARN, "Warning! It seems $sp_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
+			gh_log(DEBUG, "Email sent for gone dir: $sp_drive");
+			$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
+		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_dir($sp_drive)) {
+			// $sp_drive is now back
 			$needs_fsck = 2;
-			$returned_drives[] = $target_drive;
-			gh_log(DEBUG, "Email sent for revived dir: $target_drive");
+			$returned_drives[] = $sp_drive;
+			gh_log(DEBUG, "Email sent for revived dir: $sp_drive");
 
-			mark_gone_ok($target_drive, 'remove');
-			mark_gone_drive_fscked($target_drive, 'remove');
+			mark_gone_ok($sp_drive, 'remove');
+			mark_gone_drive_fscked($sp_drive, 'remove');
 			$i = 0; $j = 0;
 		}
 	}
 	if(count($returned_drives) > 0){
-		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool directories came back:\n";
-		foreach ($returned_drives as $target_drive) {
-  			$body .= "$target_drive was missing; it's now available again.\n";
+		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool drives came back:\n";
+		foreach ($returned_drives as $sp_drive) {
+  			$body .= "$sp_drive was missing; it's now available again.\n";
 		}
 		if (!$skip_fsck) {
 			$body .= "\nA fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
 		}
 		$drive_string = join(",",$returned_drives);
-		$subject = "Storage pool directories now online on " . exec ('hostname') . ": ";
+		$subject = "Storage pool drives now online on " . exec ('hostname') . ": ";
 		$subject = $subject . $drive_string;
 		if (strlen($subject) > 255) {
 			$subject = substr($subject, 0, 255);
@@ -1289,20 +1294,20 @@ function check_storage_pool_dirs($skip_fsck=FALSE) {
 		mail($email_to, $subject, $body);
 	}
 	if(count($missing_drives) > 0){
-		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool directories are missing their \".greyhole_uses_this\" file:\n";
-		foreach ($missing_drives as $target_drive) {
-  			$body .= "$target_drive/.greyhole_uses_this: File not found\n";
+		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool drives are missing their \".greyhole_uses_this\" file:\n";
+		foreach ($missing_drives as $sp_drive) {
+  			$body .= "$sp_drive/.greyhole_uses_this: File not found\n";
 		}
-		$target_drive = $missing_drives[0];
+		$sp_drive = $missing_drives[0];
 		$body .= "\nThis either means these mount(s) are currently unmounted, or you forgot to create this file.\n\n";
 		$body .= "Here are your options:\n\n";
-		$body .= "- If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this directory will not be part of your storage pool.\n\n";
-		$body .= "- If the drive(s) are gone, you should either re-mount them manually (if possible), or remove them from your storage pool. To do so, use the following command:\n  greyhole --gone=".escapeshellarg($target_drive)."\n  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.\n\n";
-		$body .= "- If you know these drive(s) will come back soon, and do NOT want Greyhole to re-create missing file copies for this directory until it reappears, you should execute this command:\n  greyhole --wait-for=".escapeshellarg($target_drive)."\n\n";
+		$body .= "- If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this drive will not be part of your storage pool.\n\n";
+		$body .= "- If the drive(s) are gone, you should either re-mount them manually (if possible), or remove them from your storage pool. To do so, use the following command:\n  greyhole --gone=".escapeshellarg($sp_drive)."\n  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.\n\n";
+		$body .= "- If you know these drive(s) will come back soon, and do NOT want Greyhole to re-create missing file copies for this drive until it reappears, you should execute this command:\n  greyhole --wait-for=".escapeshellarg($sp_drive)."\n\n";
 		if (!$skip_fsck) {
 			$body .= "A fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
 		}
-		$subject = "Missing storage pool directories on " . exec ('hostname') . ": ";
+		$subject = "Missing storage pool drives on " . exec ('hostname') . ": ";
 		$drive_string = join(",",$missing_drives);
 		$subject = $subject . $drive_string;
 		if (strlen($subject) > 255) {
@@ -1459,24 +1464,24 @@ class Settings {
 	}
 
 	public static function backup() {
-		global $storage_pool_directories;
+		global $storage_pool_drives;
 		$result = db_query("SELECT * FROM settings") or gh_log(CRITICAL, "Can't select settings for backup: " . db_error());
 		$settings = array();
 		while ($setting = db_fetch_object($result)) {
 			$settings[] = $setting;
 		}
-		foreach ($storage_pool_directories as $target_drive) {
-			if (is_greyhole_owned_dir($target_drive)) {
-				$settings_backup_file = "$target_drive/.gh_settings.bak";
+		foreach ($storage_pool_drives as $sp_drive) {
+			if (is_greyhole_owned_dir($sp_drive)) {
+				$settings_backup_file = "$sp_drive/.gh_settings.bak";
 				file_put_contents($settings_backup_file, serialize($settings));
 			}
 		}
 	}
 
 	public static function restore() {
-		global $storage_pool_directories;
-		foreach ($storage_pool_directories as $target_drive) {
-			$settings_backup_file = "$target_drive/.gh_settings.bak";
+		global $storage_pool_drives;
+		foreach ($storage_pool_drives as $sp_drive) {
+			$settings_backup_file = "$sp_drive/.gh_settings.bak";
 			$latest_backup_time = 0;
 			if (file_exists($settings_backup_file)) {
 				$last_mod_date = filemtime($settings_backup_file);
