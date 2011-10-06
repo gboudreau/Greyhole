@@ -1466,8 +1466,10 @@ class Settings {
 			$settings[] = $setting;
 		}
 		foreach ($storage_pool_directories as $target_drive) {
-			$settings_backup_file = "$target_drive/.gh_settings.bak";
-			file_put_contents($settings_backup_file, serialize($settings));
+			if (is_greyhole_owned_dir($target_drive)) {
+				$settings_backup_file = "$target_drive/.gh_settings.bak";
+				file_put_contents($settings_backup_file, serialize($settings));
+			}
 		}
 	}
 
