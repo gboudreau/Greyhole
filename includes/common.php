@@ -1212,7 +1212,7 @@ function mark_gone_ok($sp_drive, $action='add') {
 		unset($gone_ok_drives[$sp_drive]);
 	}
 
-	Settings:set('Gone-OK-Drives', $gone_ok_drives);
+	Settings::set('Gone-OK-Drives', $gone_ok_drives);
 	return TRUE;
 }
 
