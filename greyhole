@@ -81,11 +81,13 @@ if ($action == 'iostat') {
 				continue;
 			}
 			$drive = $devices_drives[$device];
-			$iostat[$drive] = (float) $read_kBps + $write_kBps;
+			$iostat[$drive] = (int) round($read_kBps + $write_kBps);
 		}
+		#ksort($iostat); // Let keep the order in which the drives were mounted
 		foreach ($iostat as $dir => $io_kBps) {
-			echo "$dir: $io_kBps kBps\n";
+			printf("$dir: %7s kBps\n", $io_kBps);
 		}
+		echo "---\n";
 	}
 	
 	exit(0);
@@ -3916,6 +3918,7 @@ function print_usage() {
 	echo "  -C, --cancel-fsck     Cancel all scheduled fsck.\n";
 	echo "  -l, --balance         Balance available space on storage pool drives.\n";
 	echo "  -s, --stats           Display storage pool statistics.\n";
+	echo "  -i, --iostat          I/O statistices for your storage pool drives.\n";
 	echo "  -S, --status          Display what the Greyhole daemon is currently doing.\n";
 	echo "  -q, --view-queue      Display the current work queue.\n";
 	echo "  -a, --empty-trash     Empty the trash.\n";
