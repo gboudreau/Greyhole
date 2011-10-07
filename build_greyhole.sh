@@ -112,6 +112,8 @@ scp release/greyhole-$VERSION-*.deb ${HOST}:${PATH_TO_RELEASES}/deb/.
 
 ssh ${HOST} ${PATH_TO_REPOS_UPDATER}/update_yum_repodata.sh
 ssh ${HOST} ${PATH_TO_REPOS_UPDATER}/update_deb_repodata.sh $VERSION
+# update_deb_repodata.sh needs to be called from an interactive session on $HOST, because it needs the GPG secret key passphrase to work!
+# A reminder to do that will be echoed at the end of this script.
 
 
 ############################################################
@@ -180,3 +182,11 @@ Changes from the previous version are:
 EOF
 cat /tmp/gh_changelog >> /tmp/gh_email
 mail -s "New Greyhole build available: $VERSION" $ANNOUNCE_EMAIL < /tmp/gh_email
+
+###
+
+echo
+echo "*******************"
+echo "You now need to ssh ${HOST} and manually execute the following command:"
+echo "  ${PATH_TO_REPOS_UPDATER}/update_deb_repodata.sh $VERSION"
+echo "*******************"
