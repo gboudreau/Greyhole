@@ -692,7 +692,7 @@ function execute_next_task() {
 
 	if (isset($next_task)) {
 		$task = $next_task;
-		unset($next_task);
+		unset($GLOBALS['next_task']);
 	} else {
 		$task = FALSE;
 		if (!empty($result_new_tasks)) {
@@ -1370,7 +1370,7 @@ function gh_write($share, $full_path, $task_id) {
 			}
 		} else {
 			gh_log(INFO, "  Skipping.");
-			if (!gh_file_exists($landing_zone, '  Share "'.$share.'" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {
+			if (!gh_file_exists($landing_zone, '  Share "' . $share . '" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {
 				postpone_task($task_id);
 			}
 			return;
@@ -1486,7 +1486,7 @@ function gh_write_process_metafiles($num_copies_required,$existing_metafiles,$sh
 		global $locked_files;
 		if (isset($locked_files[clean_dir("$share/$full_path")]) || ($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
 			gh_log(DEBUG, "  File $landing_zone/$full_path is locked by another process. Will wait until it's unlocked to work on it.");
-			postpone_task($task_id, 'yes');
+			postpone_task($task_id);
 			$locked_files[clean_dir("$share/$full_path")] = TRUE;
 			return;
 		}
