@@ -1091,7 +1091,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 		}
 
 		foreach (get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles){
-			gh_log(DEBUG, "Existing Metadata files: " . count($existing_metafiles));
+			gh_log(DEBUG, "Existing metadata files: " . count($existing_metafiles));
 			foreach ($existing_metafiles as $file_path => $file_metafiles) {
 				gh_log(DEBUG, "  File metafiles: " . count($file_metafiles));
 				$new_file_metafiles = array();
@@ -1099,7 +1099,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 				foreach ($file_metafiles as $key => $metafile) {
 					$old_path = $metafile->path;
 					$metafile->path = str_replace("/$share/$full_path/$file_path", "/$share/$target_full_path/$file_path", $metafile->path);
-					gh_log(DEBUG, "  Changing Metadata file: $old_path -> $metafile->path");
+					gh_log(DEBUG, "  Changing metadata file: $old_path -> $metafile->path");
 					$new_file_metafiles[$metafile->path] = $metafile;
 
 					// is_linked = is the target of the existing symlink
@@ -1273,8 +1273,14 @@ function get_num_copies($share) {
 	if ($num_copies < 1) {
 		$num_copies = 1;
 	}
-	if ($num_copies > count($storage_pool_drives)) {
-		$num_copies = count($storage_pool_drives);
+	$max_copies = 0;
+	foreach ($storage_pool_drives as $sp_drive) {
+		if (is_greyhole_owned_dir($sp_drive)) {
+			$max_copies++;
+		}
+	}
+	if ($num_copies > $max_copies) {
+		$num_copies = $max_copies;
 	}
 	return $num_copies;
 }
@@ -1398,7 +1404,7 @@ function gh_write($share, $full_path, $task_id) {
 		gh_log(DEBUG, "  Will use source file: $source_file");
 
 		foreach (get_metafiles($share, $path, $filename) as $existing_metafiles){
-			gh_log(DEBUG, count($existing_metafiles) . " Metadata files loaded.");
+			gh_log(DEBUG, count($existing_metafiles) . " metadata files loaded.");
 			// Will keep existing copies at their location if balance_modified_files = no
 			// This will allow us to use rsync instead of blindly copying the complete files.
 			if ($balance_modified_files) {
@@ -1496,7 +1502,7 @@ function gh_write_process_metafiles($num_copies_required,$existing_metafiles,$sh
 	$metafiles = create_metafiles($share, $full_path, $num_copies_required, $filesize, $existing_metafiles);
 
 	if (count($metafiles) == 0) {
-		gh_log(WARN, "  No Metadata files could be created. Will wait until Metadata files can be created to work on this file.");
+		gh_log(WARN, "  No metadata files could be created. Will wait until metadata files can be created to work on this file.");
 		postpone_task($task_id);
 		return;
 	}
@@ -1594,7 +1600,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 			gh_rename($temp_path, $metafile->path);
 			gh_chperm($metafile->path, $file_infos);
 		} else {
-			gh_log(WARN, "    Failed file copy. Will mark this Metadata file 'Gone'.");
+			gh_log(WARN, "    Failed file copy. Will mark this metadata file 'Gone'.");
 			@unlink($temp_path);
 			if ($metafile->is_linked) {
 				$metafile->is_linked = FALSE;
@@ -1859,24 +1865,24 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
 				$metafiles[$key] = $metafile;
 				save_metafiles($share, $path, $filename, array_values($metafiles));
 			} else {
-				#gh_log(DEBUG, "Found a Metadata file, pointing to '$metafile->path', with state = '$metafile->state'. We just want 'OK' Metadata files; will not use this Metadata file.");
+				#gh_log(DEBUG, "Found a metadata file, pointing to '$metafile->path', with state = '$metafile->state'. We just want 'OK' metadata files; will not use this metadata file.");
 			}
 		}
 	}
 	$metafiles = $ok_metafiles;
 	
 	if (!$quiet) {
-		gh_log(DEBUG, "Got " . count($metafiles) . " Metadata files.");
+		gh_log(DEBUG, "  Got " . count($metafiles) . " metadata files.");
 	}
 	return $metafiles;
 }
 
 function remove_metafiles($share, $path, $filename) {
-	gh_log(DEBUG, "  Removing Metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+	gh_log(DEBUG, "  Removing metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
 	
 	foreach (get_metafile_data_filenames($share, $path, $filename) as $f) {
 		@unlink($f);
-		gh_log(DEBUG, "    Removed Metadata file at $f");
+		gh_log(DEBUG, "    Removed metadata file at $f");
 		clearstatcache();
 	}
 }
@@ -1920,7 +1926,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
 				$metastore_backup_drive = $metastore_backup_drives[1];
 			}
 			$data_filepath = "$metastore_backup_drive/$share/$path";
-			gh_log(DEBUG, "    Saving Metadata files (backup) in $data_filepath/$filename");
+			gh_log(DEBUG, "    Saving backup metadata file in $data_filepath/$filename");
 			gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 			file_put_contents("$data_filepath/$filename", serialize($metafiles));
 		}
@@ -3005,7 +3011,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 						$metafile = $file_metafiles[$key];
 					}
 					if (gh_file_exists($key) || $metafile->state == 'OK') {
-						gh_log(DEBUG, "    Found file copy at $key, or Metadata file is marked OK.");
+						gh_log(DEBUG, "    Found file copy at $key, or metadata file is marked OK.");
 						if (real_file_is_locked($key) !== FALSE) {
 							gh_log(DEBUG, "    File copy is locked. Won't remove it.");
 							continue;
