@@ -66,7 +66,14 @@ $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle
 function parse_config() {
 	global $_CONSTANTS, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash;
 
-	$parsing_dir_selection_groups = FALSE;
+	$deprecated_options = array(
+		'delete_moves_to_attic' => 'delete_moves_to_trash',
+		'storage_pool_directory' => 'storage_pool_drive',
+		'dir_selection_groups' => 'drive_selection_groups',
+		'dir_selection_algorithm' => 'drive_selection_algorithm'
+	);
+
+	$parsing_drive_selection_groups = FALSE;
 	$shares_options = array();
 	$storage_pool_drives = array();
 	$frozen_directories = array();
@@ -79,17 +86,16 @@ function parse_config() {
 			if ($name[0] == '#') {
 				continue;
 			}
-		    if (mb_strpos($name, 'delete_moves_to_attic') !== FALSE) {
-			    $new_name = str_replace('attic', 'trash', $name);
-			    #gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $new_name");
-			    $name = $new_name;
+			
+			foreach ($deprecated_options as $old_name => $new_name) {
+			    if (mb_strpos($name, $old_name) !== FALSE) {
+				    $fixed_name = str_replace($old_name, $new_name, $name);
+				    #gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
+				    $name = $fixed_name;
+				}
 			}
-		    if ($name == 'storage_pool_directory') {
-			    $new_name = 'storage_pool_drive';
-			    #gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $new_name");
-			    $name = $new_name;
-			}
-			$parsing_dir_selection_groups = FALSE;
+
+			$parsing_drive_selection_groups = FALSE;
 			switch($name) {
 				case 'log_level':
 					global ${$name};
@@ -128,18 +134,17 @@ function parse_config() {
 					ini_set('memory_limit',$value);
 					$memory_limit = $value;
 					break;
-				case 'dir_selection_groups':
+				case 'drive_selection_groups': // or dir_selection_groups
 				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
-    				    global $dir_selection_groups;
+    				    global $drive_selection_groups;
 				        $group_name = trim($regs[1]);
-				        $dirs = array_map('trim', explode(',', $regs[2]));
-						$dir_selection_groups[$group_name] = $dirs;
-						$parsing_dir_selection_groups = TRUE;
+						$drive_selection_groups[$group_name] = array_map('trim', explode(',', $regs[2]));
+						$parsing_drive_selection_groups = TRUE;
 					}
 					break;
-				case 'dir_selection_algorithm':
-				    global $dir_selection_algorithm;
-				    $dir_selection_algorithm = DirectorySelection::parse($value, @$dir_selection_groups);
+				case 'drive_selection_algorithm': // or dir_selection_algorithm
+				    global $drive_selection_algorithm;
+				    $drive_selection_algorithm = DriveSelection::parse($value, @$drive_selection_groups);
 				    break;
 				default:
 					if (mb_strpos($name, 'num_copies') === 0) {
@@ -151,20 +156,19 @@ function parse_config() {
 					} else if (mb_strpos($name, 'delete_moves_to_trash') === 0) {
 						$share = mb_substr($name, 22, mb_strlen($name)-23);
 						$shares_options[$share]['delete_moves_to_trash'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
-					} else if (mb_strpos($name, 'dir_selection_groups') === 0) {
-						$share = mb_substr($name, 21, mb_strlen($name)-22);
+					} else if (mb_strpos($name, 'drive_selection_groups') === 0) { // or dir_selection_groups
+						$share = mb_substr($name, 24, mb_strlen($name)-25);
     				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
     						$group_name = trim($regs[1]);
-    						$dirs = array_map('trim', explode(',', $regs[2]));
-    						$shares_options[$share]['dir_selection_groups'][$group_name] = $dirs;
-    						$parsing_dir_selection_groups = $share;
+    						$shares_options[$share]['drive_selection_groups'][$group_name] = array_map('trim', explode(',', $regs[2]));
+    						$parsing_drive_selection_groups = $share;
     					}
-					} else if (mb_strpos($name, 'dir_selection_algorithm') === 0) {
-						$share = mb_substr($name, 24, mb_strlen($name)-25);
-						if (!isset($shares_options[$share]['dir_selection_groups'])) {
-						    $shares_options[$share]['dir_selection_groups'] = @$dir_selection_groups;
+					} else if (mb_strpos($name, 'drive_selection_algorithm') === 0) { // or dir_selection_algorithm
+						$share = mb_substr($name, 27, mb_strlen($name)-28);
+						if (!isset($shares_options[$share]['drive_selection_groups'])) {
+						    $shares_options[$share]['drive_selection_groups'] = @$drive_selection_groups;
 						}
-						$shares_options[$share]['dir_selection_algorithm'] = DirectorySelection::parse($value, $shares_options[$share]['dir_selection_groups']);
+						$shares_options[$share]['drive_selection_algorithm'] = DriveSelection::parse($value, $shares_options[$share]['drive_selection_groups']);
 					} else {
 						global ${$name};
 						if (is_numeric($value)) {
@@ -174,19 +178,19 @@ function parse_config() {
 						}
 					}
 			}
-		} else if ($parsing_dir_selection_groups !== FALSE) {
+		} else if ($parsing_drive_selection_groups !== FALSE) {
 			$value = trim($line);
 			if (strlen($value) == 0 || $value[0] == '#') {
 			    continue;
 			}
 		    if (preg_match("/(.+):(.+)/", $value, $regs)) {
 				$group_name = trim($regs[1]);
-				$dirs = array_map('trim', explode(',', $regs[2]));
-				if (is_string($parsing_dir_selection_groups)) {
-				    $share = $parsing_dir_selection_groups;
-    				$shares_options[$share]['dir_selection_groups'][$group_name] = $dirs;
+				$drives = array_map('trim', explode(',', $regs[2]));
+				if (is_string($parsing_drive_selection_groups)) {
+				    $share = $parsing_drive_selection_groups;
+    				$shares_options[$share]['drive_selection_groups'][$group_name] = $drives;
 				} else {
-    				$dir_selection_groups[$group_name] = $dirs;
+    				$drive_selection_groups[$group_name] = $drives;
 				}
 			}
 	    }
@@ -218,14 +222,14 @@ function parse_config() {
 		}
 	}
 
-    global $dir_selection_algorithm;
-    if (isset($dir_selection_algorithm)) {
-        foreach ($dir_selection_algorithm as $ds) {
+    global $drive_selection_algorithm;
+    if (isset($drive_selection_algorithm)) {
+        foreach ($drive_selection_algorithm as $ds) {
             $ds->update();
         }
     } else {
-        // Default dir_selection_algorithm
-        $dir_selection_algorithm = DirectorySelection::parse('most_available_space', null);
+        // Default drive_selection_algorithm
+        $drive_selection_algorithm = DriveSelection::parse('most_available_space', null);
     }
 	foreach ($shares_options as $share_name => $share_options) {
 		if (array_search($share_name, $trash_share_names) !== FALSE) {
@@ -245,15 +249,15 @@ function parse_config() {
 		if (!isset($share_options['delete_moves_to_trash'])) {
 		    $share_options['delete_moves_to_trash'] = $delete_moves_to_trash;
 		}
-		if (isset($share_options['dir_selection_algorithm'])) {
-            foreach ($share_options['dir_selection_algorithm'] as $ds) {
+		if (isset($share_options['drive_selection_algorithm'])) {
+            foreach ($share_options['drive_selection_algorithm'] as $ds) {
                 $ds->update();
             }
 		} else {
-		    $share_options['dir_selection_algorithm'] = $dir_selection_algorithm;
+		    $share_options['drive_selection_algorithm'] = $drive_selection_algorithm;
 		}
-		if (isset($share_options['dir_selection_groups'])) {
-    		unset($share_options['dir_selection_groups']);
+		if (isset($share_options['drive_selection_groups'])) {
+    		unset($share_options['drive_selection_groups']);
 		}
 		$shares_options[$share_name] = $share_options;
 		
@@ -1079,8 +1083,8 @@ function kshuffle(&$array) {
     $array = $random;
 }
 
-class DirectorySelection {
-    var $num_dirs_per_draft;
+class DriveSelection {
+    var $num_drives_per_draft;
     var $selection_algorithm;
     var $drives;
     var $is_custom;
@@ -1088,8 +1092,8 @@ class DirectorySelection {
     var $sorted_target_drives;
     var $last_resort_sorted_target_drives;
     
-    function __construct($num_dirs_per_draft, $selection_algorithm, $drives, $is_custom) {
-        $this->num_dirs_per_draft = $num_dirs_per_draft;
+    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_custom) {
+        $this->num_drives_per_draft = $num_drives_per_draft;
         $this->selection_algorithm = $selection_algorithm;
         $this->drives = $drives;
         $this->is_custom = $is_custom;
@@ -1123,65 +1127,65 @@ class DirectorySelection {
         $drives = array();
         $drives_last_resort = array();
         
-        while (count($drives)<$this->num_dirs_per_draft) {
+        while (count($drives)<$this->num_drives_per_draft) {
             $arr = kshift($this->sorted_target_drives);
             if ($arr === FALSE) {
                 break;
             }
             list($sp_drive, $available_space) = $arr;
-			if (!is_greyhole_owned_dir($sp_drive)) { continue; }
+			if (!is_greyhole_owned_drive($sp_drive)) { continue; }
             $drives[$sp_drive] = $available_space;
         }
-        while (count($drives)+count($drives_last_resort)<$this->num_dirs_per_draft) {
+        while (count($drives)+count($drives_last_resort)<$this->num_drives_per_draft) {
             $arr = kshift($this->last_resort_sorted_target_drives);
             if ($arr === FALSE) {
                 break;
             }
             list($sp_drive, $available_space) = $arr;
-			if (!is_greyhole_owned_dir($sp_drive)) { continue; }
+			if (!is_greyhole_owned_drive($sp_drive)) { continue; }
             $drives_last_resort[$sp_drive] = $available_space;
         }
         
         return array($drives, $drives_last_resort);
     }
     
-    static function parse($config_string, $dir_selection_groups) {
+    static function parse($config_string, $drive_selection_groups) {
         $ds = array();
         if ($config_string == 'random' || $config_string == 'most_available_space') {
             global $storage_pool_drives;
-            $ds[] = new DirectorySelection(count($storage_pool_drives), $config_string, $storage_pool_drives, FALSE);
+            $ds[] = new DriveSelection(count($storage_pool_drives), $config_string, $storage_pool_drives, FALSE);
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(random|most_available_space)/i', $config_string, $regs)) {
-            gh_log(CRITICAL, "Can't understand the dir_selection_algorithm value: $config_string");
+            gh_log(CRITICAL, "Can't understand the drive_selection_algorithm value: $config_string");
         }
         $selection_algorithm = $regs[2];
         $groups = array_map('trim', explode(',', $regs[1]));
         foreach ($groups as $group) {
             $group = explode(' ', preg_replace('/^([0-9]+)x/', '\\1 ', $group));
-            $num_dirs = trim($group[0]);
+            $num_drives = trim($group[0]);
             $group_name = trim($group[1]);
-            if ($num_dirs == 'all' || $num_dirs > count($dir_selection_groups[$group_name])) {
-                $num_dirs = count($dir_selection_groups[$group_name]);
+            if ($num_drives == 'all' || $num_drives > count($drive_selection_groups[$group_name])) {
+                $num_drives = count($drive_selection_groups[$group_name]);
             }
-            $ds[] = new DirectorySelection($num_dirs, $selection_algorithm, $dir_selection_groups[$group_name], TRUE);
+            $ds[] = new DriveSelection($num_drives, $selection_algorithm, $drive_selection_groups[$group_name], TRUE);
         }
         return $ds;
     }
 
     function update() {
-        // Make sure num_dirs_per_draft and drives have been set, in case storage_pool_drive lines appear after dir_selection_algorithm line(s) in the config file
+        // Make sure num_drives_per_draft and drives have been set, in case storage_pool_drive lines appear after drive_selection_algorithm line(s) in the config file
         if (!$this->is_custom && ($this->selection_algorithm == 'random' || $this->selection_algorithm == 'most_available_space')) {
             global $storage_pool_drives;
-            $this->num_dirs_per_draft = count($storage_pool_drives);
+            $this->num_drives_per_draft = count($storage_pool_drives);
             $this->drives = $storage_pool_drives;
         }
     }
 }
 
-function is_greyhole_owned_dir($path) {
-	global $going_dir;
-	if (isset($going_dir) && $path == $going_dir) {
+function is_greyhole_owned_drive($path) {
+	global $going_drive;
+	if (isset($going_drive) && $path == $going_drive) {
 		return FALSE;
 	}
 	return file_exists("$path/.greyhole_uses_this");
@@ -1191,7 +1195,7 @@ function is_greyhole_owned_dir($path) {
 function gone_ok($sp_drive, $refresh=FALSE) {
 	global $gone_ok_drives;
 	if ($refresh || !isset($gone_ok_drives)) {
-		$gone_ok_drives = get_gone_ok_dirs();
+		$gone_ok_drives = get_gone_ok_drives();
 	}
 	if (isset($gone_ok_drives[$sp_drive])) {
 		return TRUE;
@@ -1199,7 +1203,7 @@ function gone_ok($sp_drive, $refresh=FALSE) {
 	return FALSE;
 }
 
-function get_gone_ok_dirs() {
+function get_gone_ok_drives() {
 	global $gone_ok_drives;
 	$setting = Settings::get('Gone-OK-Drives');
 	if ($setting) {
@@ -1221,7 +1225,7 @@ function mark_gone_ok($sp_drive, $action='add') {
 	}
 
 	global $gone_ok_drives;
-	$gone_ok_drives = get_gone_ok_dirs();
+	$gone_ok_drives = get_gone_ok_drives();
 	if ($action == 'add') {
 		$gone_ok_drives[$sp_drive] = TRUE;
 	} else {
@@ -1274,7 +1278,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 	$missing_drives = array();
 	$i = 0; $j = 0;
 	foreach ($storage_pool_drives as $sp_drive) {
-		if (!is_greyhole_owned_dir($sp_drive) && !gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this")) {
+		if (!is_greyhole_owned_drive($sp_drive) && !gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this")) {
 			if($needs_fsck !== 2){	
 				$needs_fsck = 1;
 			}
@@ -1283,7 +1287,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			gh_log(WARN, "Warning! It seems $sp_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
 			gh_log(DEBUG, "Email sent for gone drive: $sp_drive");
 			$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
-		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_dir($sp_drive)) {
+		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_drive($sp_drive)) {
 			// $sp_drive is now back
 			$needs_fsck = 2;
 			$returned_drives[] = $sp_drive;
@@ -1366,7 +1370,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 		}
 
 		// Refresh $gone_ok_drives to it's real value (from the DB)
-		get_gone_ok_dirs();
+		get_gone_ok_drives();
 	}
 }
 
@@ -1488,7 +1492,7 @@ class Settings {
 			$settings[] = $setting;
 		}
 		foreach ($storage_pool_drives as $sp_drive) {
-			if (is_greyhole_owned_dir($sp_drive)) {
+			if (is_greyhole_owned_drive($sp_drive)) {
 				$settings_backup_file = "$sp_drive/.gh_settings.bak";
 				file_put_contents($settings_backup_file, serialize($settings));
 			}

@@ -1,0 +1,12 @@
+.svn/
+.git/
+DEBIAN/
+release/
+.build_excluded_files.txt
+announce.sh
+build_greyhole.sh
+github-auto-post-downloads.php
+irc_notif.sh
+Logo.psd
+README.md
+test_cases.php

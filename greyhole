@@ -96,8 +96,8 @@ if ($action == 'iostat') {
 			$iostat[$drive] = (int) round($read_kBps + $write_kBps);
 		}
 		#ksort($iostat); // Let keep the order in which the drives were mounted
-		foreach ($iostat as $dir => $io_kBps) {
-			printf("$dir: %7s kBps\n", $io_kBps);
+		foreach ($iostat as $drive => $io_kBps) {
+			printf("$drive: %7s kBps\n", $io_kBps);
 		}
 		echo "---\n";
 	}
@@ -132,12 +132,12 @@ if ($action == 'thaw') {
 
 if ($action == 'gone' || $action == 'going') {
 	global $storage_pool_drives;
-	if (array_search($options['dir'], $storage_pool_drives) === FALSE) {
-		$options['dir'] = '/' . trim($options['dir'], '/');
+	if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
+		$options['drive'] = '/' . trim($options['drive'], '/');
 	}
-	if (array_search($options['dir'], $storage_pool_drives) === FALSE) {
-		if (!empty($options['dir'])) {
-			echo "Directory " . $options['dir'] . " is not one of your defined storage pool drives.\n";
+	if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
+		if (!empty($options['drive'])) {
+			echo "Directory " . $options['drive'] . " is not one of your defined storage pool drives.\n";
 		}
 		echo "Please use one of the following with the --$action option:\n  ";
 		echo implode("\n  ", $storage_pool_drives) . "\n";
@@ -149,16 +149,16 @@ if ($action == 'gone' || $action == 'going') {
 
 	if ($action == 'going') {
 		set_metastore_backup();
-		gh_log(INFO, "Storage pool drive " . $options['dir'] . " will be removed from the storage pool.");
-		echo("Storage pool drive " . $options['dir'] . " will be removed from the storage pool.\n");
+		gh_log(INFO, "Storage pool drive " . $options['drive'] . " will be removed from the storage pool.");
+		echo("Storage pool drive " . $options['drive'] . " will be removed from the storage pool.\n");
 
-		// global $going_dir; // Used in function is_greyhole_owned_dir()
-		$going_dir = $options['dir'];
+		// global $going_drive; // Used in function is_greyhole_owned_drive()
+		$going_drive = $options['drive'];
 
 		// Renaming that file will insure this drive won't be used while we're moving files away
-		gh_rename("$going_dir/.greyhole_uses_this", "$going_dir/.greyhole_used_this");
+		gh_rename("$going_drive/.greyhole_uses_this", "$going_drive/.greyhole_used_this");
 
-		// fsck shares with only 1 file copy to remove those from $options['dir']
+		// fsck shares with only 1 file copy to remove those from $options['drive']
 		initialize_fsck_report('Shares with only 1 copy');
 		foreach ($shares_options as $share_name => $share_options) {
 			if ($share_options['num_copies'] == 1) {
@@ -168,12 +168,12 @@ if ($action == 'gone' || $action == 'going') {
 			} else {
 				echo "Looking for soon-to-be-broken symbolic links in the share '$share_name'... Please be patient... ";
 				chdir($share_options['landing_zone']);
-				exec("find . -type l -lname " . escapeshellarg("$going_dir/*"), $result);
+				exec("find . -type l -lname " . escapeshellarg("$going_drive/*"), $result);
 				foreach ($result as $file_to_relink) {
 					if (is_link($file_to_relink)) {
 						$file_to_relink = substr($file_to_relink, 2);
 						foreach ($storage_pool_drives as $sp_drive) {
-							if (!is_greyhole_owned_dir($sp_drive)) { continue; }
+							if (!is_greyhole_owned_drive($sp_drive)) { continue; }
 							$new_link_target = clean_dir("$sp_drive/$share_name/$file_to_relink");
 							if (gh_is_file($new_link_target)) {
 								unlink($file_to_relink);
@@ -188,10 +188,10 @@ if ($action == 'gone' || $action == 'going') {
 		}
 	}
 
-	// Remove $going_dir from config file and restart (if it was running)
-	$escaped_dir = str_replace('/', '\/', $options['dir']);
-	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_dir.*$//' /etc/greyhole.conf"); // Deprecated notation
-	exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_dir.*$//' /etc/greyhole.conf");
+	// Remove $going_drive from config file and restart (if it was running)
+	$escaped_drive = str_replace('/', '\/', $options['drive']);
+	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' /etc/greyhole.conf"); // Deprecated notation
+	exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' /etc/greyhole.conf");
 	if (is_file('/sbin/restart')) {
 		$running = (int) exec('/sbin/status greyhole | grep running | wc -l');
 		if ($running) {
@@ -206,15 +206,15 @@ if ($action == 'gone' || $action == 'going') {
 		echo "You should de-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page.\n";
 	}
 
-	mark_gone_ok($options['dir'], 'remove');
-	mark_gone_drive_fscked($options['dir'], 'remove');
-	gh_log(INFO, "Storage pool drive " . $options['dir'] . " has been removed.");
-	echo "Storage pool drive " . $options['dir'] . " has been removed from your pool, which means the missing file copies that are in this drive will be re-created during the next fsck.\n";
+	mark_gone_ok($options['drive'], 'remove');
+	mark_gone_drive_fscked($options['drive'], 'remove');
+	gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been removed.");
+	echo "Storage pool drive " . $options['drive'] . " has been removed from your pool, which means the missing file copies that are in this drive will be re-created during the next fsck.\n";
 
 	if ($action == 'going') {
 		// Schedule fsck for all shares to re-create missing copies on other shares
 		db_query("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '', NULL, 'yes')") or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
-		echo "All the files that were only on $going_dir have been copied somewhere else.\n";
+		echo "All the files that were only on $going_drive have been copied somewhere else.\n";
 		echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.\n";
 	} else { // $action == 'gone'
 		echo "Sadly, file copies that were only on this drive, if any, are now lost!\n";
@@ -559,16 +559,16 @@ if ($action == 'stats') {
 }
 
 if ($action == 'wait-for') {
-	if (!mark_gone_ok($options['dir'])) {
-		if (!empty($options['dir'])) {
-			echo "Drive " . $options['dir'] . " is not one of your defined storage pool drive.\n";
+	if (!mark_gone_ok($options['drive'])) {
+		if (!empty($options['drive'])) {
+			echo "Drive " . $options['drive'] . " is not one of your defined storage pool drive.\n";
 		}
 		echo "Please use one of the following with the --wait-for option:\n  ";
 		echo implode("\n  ", $storage_pool_drives) . "\n";
 		exit(1);
 	}
-	gh_log(INFO, "Storage pool drive " . $options['dir'] . " has been marked Temporarily-Gone");
-	echo "Storage pool drive " . $options['dir'] . " has been marked Temporarily-Gone, which means the missing file copies that are in this drive will not be re-created until it reappears.\n";
+	gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been marked Temporarily-Gone");
+	echo "Storage pool drive " . $options['drive'] . " has been marked Temporarily-Gone, which means the missing file copies that are in this drive will not be re-created until it reappears.\n";
 	exit(0);
 }
 
@@ -644,12 +644,12 @@ if ($action == 'fsck') {
 }
 
 if ($action == 'md5-worker') {
-	if (is_array($options['dir'])) {
-		$dirs = $options['dir'];
+	if (is_array($options['drive'])) {
+		$drives = $options['drive'];
 	} else {
-		$dirs = array($options['dir']);
+		$drives = array($options['drive']);
 	}
-	md5_worker_thread($dirs);
+	md5_worker_thread($drives);
 	exit(0);
 }
 
@@ -1001,7 +1001,7 @@ function gh_rmdir($share, $full_path) {
 	gh_log(INFO, "Directory deleted: $landing_zone/$full_path");
 	
 	if (array_search($share, $trash_share_names) !== FALSE) {
-		// Remove that directory from all trashs
+		// Remove that directory from all trashes
 		foreach ($storage_pool_drives as $sp_drive) {
 			if (@rmdir("$sp_drive/.gh_trash/$full_path")) {
 				gh_log(DEBUG, "  Removed copy from trash at $sp_drive/.gh_trash/$full_path");
@@ -1303,7 +1303,7 @@ function get_num_copies($share) {
 	}
 	$max_copies = 0;
 	foreach ($storage_pool_drives as $sp_drive) {
-		if (is_greyhole_owned_dir($sp_drive)) {
+		if (is_greyhole_owned_drive($sp_drive)) {
 			$max_copies++;
 		}
 	}
@@ -1582,7 +1582,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 		}
 
 		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
-		if (!is_greyhole_owned_dir($root_path)) {
+		if (!is_greyhole_owned_drive($root_path)) {
 			gh_log(WARN, "  Warning! It seems $root_path is missing it's \".greyhole_uses_this\" file. This either means this mount is currently unmounted, or you forgot to create this file.");
 			$metafile->state = 'Gone';
 			$metafiles[$key] = $metafile;
@@ -1757,7 +1757,7 @@ function create_metafiles($share, $full_path, $num_copies_required, $filesize, $
 			$metafile->state = 'Pending';
 		}
 		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
-		if (!is_greyhole_owned_dir($root_path)) {
+		if (!is_greyhole_owned_drive($root_path)) {
 			$metafile->state = 'Gone';
 		}
 		if ($metafile->state != 'OK' && $metafile->state != 'Pending') {
@@ -1880,8 +1880,8 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
 	foreach ($metafiles as $key => $metafile) {
 		$valid_path = FALSE;
 		
-		$dir = get_storage_volume_from_path($metafile->path);
-		if ($dir !== FALSE) {
+		$drive = get_storage_volume_from_path($metafile->path);
+		if ($drive !== FALSE) {
 			$valid_path = TRUE;
 		}
 		if ($valid_path && ($load_nok_metafiles || $metafile->state == 'OK')) {
@@ -1928,7 +1928,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
 		$data_filepath = clean_dir("$metastore/$share/$path");
 		$has_metafile = FALSE;
 		foreach ($metafiles as $metafile) {
-			if (get_storage_volume_from_path($metafile->path) == $sp_drive && is_greyhole_owned_dir($sp_drive)) {
+			if (get_storage_volume_from_path($metafile->path) == $sp_drive && is_greyhole_owned_drive($sp_drive)) {
 				gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
 				gh_log(DEBUG, "    Saving metadata in " . clean_dir("$data_filepath/$filename"));
 				if (is_dir("$data_filepath/$filename")) {
@@ -2334,13 +2334,13 @@ function get_free_space_in_storage_pool_drives() {
 	}
 	$responses = $responses_arr;
 	foreach ($storage_pool_drives as $sp_drive) {
-		$target_dir = '';
+		$target_drive = '';
 		for ($i=0; $i<count($responses); $i++) {
 			$response = explode(' ', $responses[$i]);
 			$free_space = (float) array_pop($response);
 			$mount = implode(' ', $response);
-			if (mb_strpos($sp_drive, $mount) === 0 && mb_strlen($mount) > mb_strlen($target_dir)) {
-				$target_dir = $mount;
+			if (mb_strpos($sp_drive, $mount) === 0 && mb_strlen($mount) > mb_strlen($target_drive)) {
+				$target_drive = $mount;
 				$target_freespace = $free_space;
 			}
 		}
@@ -2362,7 +2362,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	foreach ($storage_pool_drives as $sp_drive) {
 		if (!isset($dfs[$sp_drive])) {
 			if (!is_dir($sp_drive)) {
-				gh_log(ERROR, "The directory at $sp_drive doesn't exist. This partition will never be used!");
+				gh_log(ERROR, "The directory at $sp_drive doesn't exist. This drive will never be used!");
 				if (file_exists('/usr/bin/hdactl')) {
 					gh_log(ERROR, "You should de-select, then re-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page, to fix this problem.");
 				} else {
@@ -2385,7 +2385,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 			}
 			continue;
 		}
-		if (!is_greyhole_owned_dir($sp_drive)) {
+		if (!is_greyhole_owned_drive($sp_drive)) {
 			continue;
 		}
 		$free_space = $dfs[$sp_drive];
@@ -2402,7 +2402,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 		$sorted_target_drives[$sp_drive] = $available_space;
 	}
 
-	foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
+	foreach ($shares_options[$share]['drives_selection_algorithm'] as $ds) {
 		$ds->init($sorted_target_drives, $last_resort_sorted_target_drives);
 	}
 
@@ -2411,7 +2411,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	$got_all_drives = FALSE;
 	while (!$got_all_drives) {
 		$num_empty_ds = 0;
-		foreach ($shares_options[$share]['dir_selection_algorithm'] as $ds) {
+		foreach ($shares_options[$share]['drives_selection_algorithm'] as $ds) {
 			list($drives, $drives_last_resort) = $ds->draft();
 			foreach ($drives as $k => $v) {
 				$sorted_target_drives[$k] = $v;
@@ -2423,14 +2423,14 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 				$num_empty_ds++;
 			}
 		}
-		if ($num_empty_ds == count($shares_options[$share]['dir_selection_algorithm'])) {
+		if ($num_empty_ds == count($shares_options[$share]['drives_selection_algorithm'])) {
 			// All DS are empty; exit.
 			$got_all_drives = TRUE;
 			break;
 		}
 	}
 	
-	// Email notification when all dirs are over-capacity
+	// Email notification when all drives are over-capacity
 	if (count($sorted_target_drives) == 0) {
 		gh_log(WARN, "  Warning! All storage pool drives are over-capacity!");
 		if (!isset($last_OOS_notification)) {
@@ -2609,11 +2609,10 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
 function gh_fsck_metastore($root, $path, $share) {
 	global $fsck_report;
 	
-	gh_log(DEBUG, "Entering metastore $root$path");
 	if (!is_dir("$root$path")) {
-		gh_log(DEBUG, "  Not a directory... Aborting.");
 		return;
 	}
+	gh_log(DEBUG, "Entering metastore $root$path");
 
 	$handle = opendir("$root$path");
 	while (($filename = readdir($handle)) !== FALSE) {
@@ -2726,7 +2725,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
 			gh_log(DEBUG, "Found $clean_full_path");
 
-			if (!is_greyhole_owned_dir($sp_drive)) {
+			if (!is_greyhole_owned_drive($sp_drive)) {
 				gh_log(DEBUG, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
 				$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'Gone');
 				if (!isset($original_file_path)) {
@@ -2914,8 +2913,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		// Re-copy the file everywhere, and re-create the symlink
 		$symlink_created = FALSE;
 		$num_copies_current = 1; # the source file
-		global $going_dir;
-		if (!empty($going_dir)) {
+		global $going_drive;
+		if (!empty($going_drive)) {
 			// Let's not count the source file here, since it will be gone soon!
 			$num_copies_current = 0;
 		}
@@ -2931,7 +2930,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
 				if ($metafile->state == 'Gone') {
 					foreach ($storage_pool_drives as $sp_drive) {
-						if (get_storage_volume_from_path($metafile_dir_path) == $sp_drive && is_greyhole_owned_dir($sp_drive)) {
+						if (get_storage_volume_from_path($metafile_dir_path) == $sp_drive && is_greyhole_owned_drive($sp_drive)) {
 							$metafile->state = 'Pending';
 							$file_metafiles[$key] = $metafile;
 							break;
@@ -2980,7 +2979,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				}
 			}
 			if ($original_file_path == $metafile->path || $metafile->is_linked) {
-				if (!empty($going_dir) && get_storage_volume_from_path($original_file_path) == $going_dir) {
+				if (!empty($going_drive) && get_storage_volume_from_path($original_file_path) == $going_drive) {
 					$metafile->is_linked = FALSE;
 					$metafile->state = 'Gone';
 					$file_metafiles[$key] = $metafile;
@@ -3146,8 +3145,8 @@ Landing Zone (shares):
 
 Trash size:\n";
 
-	foreach ($storage_pool_drives as $dir) {
-		$trash_path = clean_dir("$dir/.gh_trash");
+	foreach ($storage_pool_drives as $sp_drive) {
+		$trash_path = clean_dir("$sp_drive/.gh_trash");
 		if (is_dir($trash_path)) {
 			$report .= "  $trash_path = " . trim(exec("du -sh " . escapeshellarg($trash_path) . " | awk '{print $1}'"))."\n";
 		} else {
@@ -3208,7 +3207,7 @@ Trash size:\n";
 	
 		if ($fsck_report['gone_ok'] > 0) {
 			$report .= "  Found " . $fsck_report['gone_ok'] . " missing files that are in a storage pool drive marked Temporarily-Gone.
-  If this directory is gone for good, you should execute the following command, and remove the directory from your configuration file:
+  If this drive is gone for good, you should execute the following command, and remove the drive from your configuration file:
     greyhole --gone=path
   where path is one of:\n";
 			$report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
@@ -3237,10 +3236,10 @@ function gh_recycle($real_path) {
 			$share = $share_options['name'];
 		} else {
 			$storage_volume = get_storage_volume_from_path($real_path);
-			foreach ($storage_pool_drives as $dir) {
-				if ($dir == $storage_volume) {
-					$trash_path = "$dir/.gh_trash";
-					$full_path = trim(substr($real_path, strlen($dir)), '/');
+			foreach ($storage_pool_drives as $sp_drive) {
+				if ($sp_drive == $storage_volume) {
+					$trash_path = "$sp_drive/.gh_trash";
+					$full_path = trim(substr($real_path, strlen($sp_drive)), '/');
 					break;
 				}
 			}
@@ -3328,12 +3327,12 @@ function get_metastores($use_cache=TRUE) {
 	if (!isset($global_metastores) || !$use_cache) {
 		$metastores = array();
 		foreach ($storage_pool_drives as $sp_drive) {
-			if (is_greyhole_owned_dir($sp_drive)) {
+			if (is_greyhole_owned_drive($sp_drive)) {
 				$metastores[] = "$sp_drive/.gh_metastore";
 			}
 		}
 		foreach ($metastore_backup_drives as $metastore_backup_drive) {
-			if (is_greyhole_owned_dir(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
+			if (is_greyhole_owned_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
 				$metastores[] = $metastore_backup_drive;
 			}
 		}
@@ -3450,7 +3449,7 @@ function gh_balance() {
  		gh_log(DEBUG, "Balancing share: $share_name");
 
 		// Move files from the drive with the less available space to the drive with the most available space.
-		$sorted_pool_drives = sort_storage_dirs_available_space();
+		$sorted_pool_drives = sort_storage_drives_available_space();
 		$pool_drives_avail_space = array();
 		foreach ($sorted_pool_drives as $available_space => $drive) {
 			$pool_drives_avail_space[$drive] = $available_space;
@@ -3646,7 +3645,7 @@ function compare_share_balance($a, $b) {
 	return strcasecmp($a['name'], $b['name']);
 }
 
-function sort_storage_dirs_available_space() {
+function sort_storage_drives_available_space() {
 	global $storage_pool_drives, $minimum_free_space_pool_drives;
 	$dfs = get_free_space_in_storage_pool_drives();
 	foreach ($storage_pool_drives as $sp_drive) {
@@ -3745,7 +3744,7 @@ function set_metastore_backup($try_restore=TRUE) {
 		return;
 	}
 
-	gh_log(DEBUG, "Loading metastore backup directories...");
+	gh_log(DEBUG, "Loading metadata store backup directories...");
 	if (empty($metastore_backup_drives)) {
 		// In the DB ?
 		$setting = Settings::get('metastore_backup_directory');
@@ -3764,9 +3763,9 @@ function set_metastore_backup($try_restore=TRUE) {
 	// Verify the drives, if any
 	if (!empty($metastore_backup_drives)) {
 		foreach ($metastore_backup_drives as $key => $metastore_backup_drive) {
-			if (!is_greyhole_owned_dir(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
+			if (!is_greyhole_owned_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
 				// Directory is now invalid; stop using it.
-				gh_log(DEBUG, "Removing $metastore_backup_drive from available 'metastore_backup_directories' - this directory isn't a greyhole storage pool drive (anymore?)");
+				gh_log(DEBUG, "Removing $metastore_backup_drive from available 'metastore_backup_directories' - this directory isn't a Greyhole storage pool drive (anymore?)");
 				unset($metastore_backup_drives[$key]);
 			} else if (!is_dir($metastore_backup_drive)) {
 				// Directory is invalid, but needs to be created (was rm'ed?)
@@ -3918,6 +3917,10 @@ function process_command_line() {
 			$action = $longopt_action;
 			if ($action == 'debug') {
 				$options['debug_filename'] = $command_line_options[$longopt_action];
+			} else if ($action == 'gone' || $action == 'going' || $action == 'wait-for') {
+				if ($command_line_options[$longopt_action] !== FALSE) {
+					$options['drive'] = $command_line_options[$longopt_action];
+				}
 			} else {
 				if ($command_line_options[$longopt_action] !== FALSE) {
 					$options['dir'] = $command_line_options[$longopt_action];
@@ -4094,28 +4097,28 @@ function task_has_option($task, $option) {
 
 function spawn_thread($action, $arguments) {
 	// Don't spawn duplicate threads
-	$num_worker_thread = (int) exec('ps ax | grep "/usr/bin/greyhole --' . $action . '" | grep "dir='. implode('" | grep "dir=', $arguments) . '" | grep -v grep | wc -l');
+	$num_worker_thread = (int) exec('ps ax | grep "/usr/bin/greyhole --' . $action . '" | grep "drive='. implode('" | grep "drive=', $arguments) . '" | grep -v grep | wc -l');
 	if ($num_worker_thread > 0) {
-		gh_log(DEBUG, "Won't span a duplicate thread; 'greyhole --$action --dir=$arguments[0]' is already running");
+		gh_log(DEBUG, "Won't span a duplicate thread; 'greyhole --$action --drive=$arguments[0]' is already running");
 		return 1;
 	}
 
-	$cmd = "/usr/bin/greyhole --$action --dir=" . implode(' --dir=', array_map('escapeshellarg', $arguments));
+	$cmd = "/usr/bin/greyhole --$action --drive=" . implode(' --drive=', array_map('escapeshellarg', $arguments));
 	exec("$cmd 1>/var/run/greyhole_m5d_worker.pid 2>&1 &");
 	usleep(100000); // 1/10s
 	return (int) file_get_contents('/var/run/greyhole_m5d_worker.pid');
 }
 
 function md5_worker_thread($drives) {
-	$dirs_clause = '';
-	foreach ($drives as $dir) {
-		if ($dirs_clause != '') {
-			$dirs_clause .= ' OR ';
+	$drives_clause = '';
+	foreach ($drives as $drive) {
+		if ($drives_clause != '') {
+			$drives_clause .= ' OR ';
 		}
-		$dirs_clause .= sprintf("additional_info LIKE '%s%%'", db_escape_string($dir));
+		$drives_clause .= sprintf("additional_info LIKE '%s%%'", db_escape_string($drive));
 	}
 
-	$query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND ($dirs_clause) ORDER BY id ASC LIMIT 10";
+	$query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND ($drives_clause) ORDER BY id ASC LIMIT 10";
 	
 	$last_check_time = time();
 	while (TRUE) {
