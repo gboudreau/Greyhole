@@ -311,6 +311,9 @@ function parse_config() {
 	
 	include('includes/sql.php');
     
+	if (strtolower($greyhole_log_file) == 'syslog') {
+		openlog("Greyhole", LOG_PID, LOG_USER);
+	}
 	
 	if (!isset($balance_modified_files)) {
 		global $balance_modified_files;
@@ -354,7 +357,11 @@ function gh_log($local_log_level, $text) {
 	if (isset($log_to_stdout)) {
 		echo $log_text;
 	} else {
-		$worked = error_log($log_text, 3, $greyhole_log_file);
+		if (strtolower($greyhole_log_file) == 'syslog') {
+			$worked = syslog($local_log_level, $log_text);
+		} else {
+			$worked = error_log($log_text, 3, $greyhole_log_file);
+		}
 		if (!$worked) {
 			error_log(trim($log_text));
 		}

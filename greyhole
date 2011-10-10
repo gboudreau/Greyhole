@@ -60,7 +60,16 @@ if ($action == 'getuid') {
 	exit(0);
 }
 if ($action == 'logs') {
-	passthru("tail -f " . escapeshellarg($greyhole_log_file));
+	if (strtolower($greyhole_log_file) == 'syslog') {
+		if (gh_is_file('/var/log/syslog')) {
+			passthru("tail -f /var/log/syslog | grep --line-buffered Greyhole");
+		} else {
+			passthru("tail -f /var/log/messages | grep --line-buffered Greyhole");
+		}
+	} else {
+		passthru("tail -f " . escapeshellarg($greyhole_log_file));
+	}
+	exit(0);
 }
 if ($action == 'iostat') {
 	$devices_drives = array();
