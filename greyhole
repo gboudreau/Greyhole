@@ -165,6 +165,25 @@ if ($action == 'gone' || $action == 'going') {
 				echo "Moving file copies for share '$share_name'... Please be patient... ";
 				gh_fsck($share_options['landing_zone'], $share_name);
 				echo "Done.\n";
+			} else {
+				echo "Looking for soon-to-be-broken symbolic links in the share '$share_name'... Please be patient... ";
+				chdir($share_options['landing_zone']);
+				exec("find . -type l -lname " . escapeshellarg("$going_dir/*"), $result);
+				foreach ($result as $file_to_relink) {
+					if (is_link($file_to_relink)) {
+						$file_to_relink = substr($file_to_relink, 2);
+						foreach ($storage_pool_drives as $sp_drive) {
+							if (!is_greyhole_owned_dir($sp_drive)) { continue; }
+							$new_link_target = clean_dir("$sp_drive/$share_name/$file_to_relink");
+							if (gh_is_file($new_link_target)) {
+								unlink($file_to_relink);
+								symlink($new_link_target, $file_to_relink);
+								break;
+							}
+						}
+					}
+				}
+				echo "Done.\n";
 			}
 		}
 	}
@@ -1243,10 +1262,10 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
 	gh_log(DEBUG, "    Found " . count($broken_links) . " broken links.");
 	foreach ($broken_links as $broken_link) {
 		$fixed_link_target = readlink($broken_link);
-		foreach ($storage_pool_drives as $dir) {
-			$fixed_link_target = str_replace(clean_dir("$dir/$share/$full_path/"), clean_dir("$dir/$share/$target_full_path/"), $fixed_link_target);
-			if ($fixed_link_target == "$dir/$share/$full_path") {
-				$fixed_link_target = "$dir/$share/$target_full_path";
+		foreach ($storage_pool_drives as $sp_drive) {
+			$fixed_link_target = str_replace(clean_dir("$sp_drive/$share/$full_path/"), clean_dir("$sp_drive/$share/$target_full_path/"), $fixed_link_target);
+			if ($fixed_link_target == "$sp_drive/$share/$full_path") {
+				$fixed_link_target = "$sp_drive/$share/$target_full_path";
 				break;
 			}
 		}
@@ -1479,9 +1498,9 @@ function gh_write($share, $full_path, $task_id) {
 				$existing_metafiles = array();
 				// Maybe there's other file copies, that weren't metafiles, or were NOK metafiles!
 				global $storage_pool_drives;
-				foreach ($storage_pool_drives as $dir) {
-					if (file_exists("$dir/$share/$path/$filename")) {
-						gh_recycle("$dir/$share/$path/$filename");
+				foreach ($storage_pool_drives as $sp_drive) {
+					if (file_exists("$sp_drive/$share/$path/$filename")) {
+						gh_recycle("$sp_drive/$share/$path/$filename");
 					}
 				}
 			}
