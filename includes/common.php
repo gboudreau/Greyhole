@@ -1106,15 +1106,15 @@ class DirectorySelection {
 		}
 		// Only keep drives that are in $this->drives
         $this->sorted_target_drives = array();
-		foreach ($sorted_target_drives as $k => $v) {
-		    if (array_search($k, $this->drives) !== FALSE) {
-		        $this->sorted_target_drives[$k] = $v;
+		foreach ($sorted_target_drives as $sp_drive => $available_space) {
+		    if (array_search($sp_drive, $this->drives) !== FALSE) {
+		        $this->sorted_target_drives[$sp_drive] = $available_space;
 		    }
 		}
         $this->last_resort_sorted_target_drives = array();
-		foreach ($last_resort_sorted_target_drives as $k => $v) {
-		    if (array_search($k, $this->drives) !== FALSE) {
-		        $this->last_resort_sorted_target_drives[$k] = $v;
+		foreach ($last_resort_sorted_target_drives as $sp_drive => $available_space) {
+		    if (array_search($sp_drive, $this->drives) !== FALSE) {
+		        $this->last_resort_sorted_target_drives[$sp_drive] = $available_space;
 		    }
 		}
     }
@@ -1123,21 +1123,23 @@ class DirectorySelection {
         $drives = array();
         $drives_last_resort = array();
         
-        for ($i=0; $i<$this->num_dirs_per_draft; $i++) {
+        while (count($drives)<$this->num_dirs_per_draft) {
             $arr = kshift($this->sorted_target_drives);
             if ($arr === FALSE) {
                 break;
             }
-            list($k, $v) = $arr;
-            $drives[$k] = $v;
+            list($sp_drive, $available_space) = $arr;
+			if (!is_greyhole_owned_dir($sp_drive)) { continue; }
+            $drives[$sp_drive] = $available_space;
         }
-        for ($i=$i; $i<$this->num_dirs_per_draft; $i++) {
+        while (count($drives)+count($drives_last_resort)<$this->num_dirs_per_draft) {
             $arr = kshift($this->last_resort_sorted_target_drives);
             if ($arr === FALSE) {
                 break;
             }
-            list($k, $v) = $arr;
-            $drives_last_resort[$k] = $v;
+            list($sp_drive, $available_space) = $arr;
+			if (!is_greyhole_owned_dir($sp_drive)) { continue; }
+            $drives_last_resort[$sp_drive] = $available_space;
         }
         
         return array($drives, $drives_last_resort);
