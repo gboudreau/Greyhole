@@ -2402,7 +2402,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 		$sorted_target_drives[$sp_drive] = $available_space;
 	}
 
-	foreach ($shares_options[$share]['drives_selection_algorithm'] as $ds) {
+	foreach ($shares_options[$share]['drive_selection_algorithm'] as $ds) {
 		$ds->init($sorted_target_drives, $last_resort_sorted_target_drives);
 	}
 
@@ -2411,7 +2411,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	$got_all_drives = FALSE;
 	while (!$got_all_drives) {
 		$num_empty_ds = 0;
-		foreach ($shares_options[$share]['drives_selection_algorithm'] as $ds) {
+		foreach ($shares_options[$share]['drive_selection_algorithm'] as $ds) {
 			list($drives, $drives_last_resort) = $ds->draft();
 			foreach ($drives as $k => $v) {
 				$sorted_target_drives[$k] = $v;
@@ -2423,7 +2423,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 				$num_empty_ds++;
 			}
 		}
-		if ($num_empty_ds == count($shares_options[$share]['drives_selection_algorithm'])) {
+		if ($num_empty_ds == count($shares_options[$share]['drive_selection_algorithm'])) {
 			// All DS are empty; exit.
 			$got_all_drives = TRUE;
 			break;
