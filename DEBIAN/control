@@ -5,7 +5,7 @@ Homepage: http://www.greyhole.net
 Package: greyhole
 Version: 0.9.3-1
 Architecture: i386
-Depends: libc6 (>= 2.4), samba (>= 3.4.3), samba-common, samba-common-bin, php5-cli (>= 5), php5-mysql, php-pear, mysql-server, rsync
+Depends: libc6 (>= 2.4), samba (>= 3.4.3), samba-common, samba-common-bin, php5-cli (>= 5), php5-mysql, php-pear, mysql-server, rsync, sysstat
 Description: Drive pooling technology for Samba
  Allows you to create a storage pool, accessible from
  Samba shares, that offers data redundancy and JBOD concatenation.

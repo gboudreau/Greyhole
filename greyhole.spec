@@ -6,7 +6,7 @@ Group:          System Environment/Daemons
 Source:         http://greyhole.googlecode.com/files/%{name}-%{version}.tar.gz
 License:        GPL
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
-Requires:       samba >= 3.4.3, php >= 5, php-mysql, php-mbstring, mysql-server, rsync
+Requires:       samba >= 3.4.3, php >= 5, php-mysql, php-mbstring, mysql-server, rsync, sysstat
 
 %description
 Greyhole allows you to create a storage pool, accessible from 
