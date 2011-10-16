@@ -430,6 +430,11 @@ function get_debug_bt() {
 		if (isset($d['file'])) {
 			$prefix = basename($d['file']) . '[L' . $d['line'] . '] ';
 		}
+		foreach ($d['args'] as $k => $v) {
+			if (is_object($v)) {
+				$d['args'][$k] = 'stdClass';
+			}
+		}
 		$bt = $prefix . $d['function'] .'(' . implode(',', $d['args']) . ')' . $bt;
 	}
 	return $bt;
