@@ -105,8 +105,9 @@ function parse_config() {
 				case 'log_memory_usage':
 				case 'balance_modified_files':
 				case 'check_for_open_files':
+				case 'allow_multiple_sp_per_device':
 					global ${$name};
-					${$name} = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
+					${$name} = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
 					break;
 				case 'storage_pool_drive': // or storage_pool_directory
 					if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?gb?/i", $value, $regs)) {
@@ -1183,12 +1184,18 @@ class DriveSelection {
     }
 }
 
-function is_greyhole_owned_drive($path) {
+function is_greyhole_owned_drive($sp_drive) {
 	global $going_drive;
-	if (isset($going_drive) && $path == $going_drive) {
+	if (isset($going_drive) && $sp_drive == $going_drive) {
 		return FALSE;
 	}
-	return file_exists("$path/.greyhole_uses_this");
+	
+	$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
+	if (!$drives_definitions) {
+		$drives_definitions = convert_sp_drives_tag_files();
+	}
+	
+	return @$drives_definitions[$sp_drive] === gh_file_deviceid($sp_drive);
 }
 
 // Is it OK for a drive to be gone?
@@ -1205,10 +1212,8 @@ function gone_ok($sp_drive, $refresh=FALSE) {
 
 function get_gone_ok_drives() {
 	global $gone_ok_drives;
-	$setting = Settings::get('Gone-OK-Drives');
-	if ($setting) {
-		$gone_ok_drives = unserialize($setting->value);
-	} else {
+	$gone_ok_drives = Settings::get('Gone-OK-Drives', TRUE);
+	if (!$gone_ok_drives) {
 		$gone_ok_drives = array();
 		Settings::set('Gone-OK-Drives', $gone_ok_drives);
 	}
@@ -1249,10 +1254,8 @@ function gone_fscked($sp_drive, $refresh=FALSE) {
 
 function get_fsck_gone_drives() {
 	global $fscked_gone_drives;
-	$setting = Settings::get('Gone-FSCKed-Drives');
-	if ($setting) {
-		$fscked_gone_drives = unserialize($setting->value);
-	} else {
+	$fscked_gone_drives = Settings::get('Gone-FSCKed-Drives', TRUE);
+	if (!$fscked_gone_drives) {
 		$fscked_gone_drives = array();
 		Settings::set('Gone-FSCKed-Drives', $fscked_gone_drives);
 	}
@@ -1284,7 +1287,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			}
 			mark_gone_drive_fscked($sp_drive);
 			$missing_drives[] = $sp_drive;
-			gh_log(WARN, "Warning! It seems $sp_drive is missing it's \".greyhole_uses_this\" file. This either means this drive is currently unmounted, or you forgot to create this file.");
+			gh_log(WARN, "Warning! It seems the device ID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 			gh_log(DEBUG, "Email sent for gone drive: $sp_drive");
 			$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
 		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_drive($sp_drive)) {
@@ -1299,15 +1302,15 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 		}
 	}
 	if(count($returned_drives) > 0){
-		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool drives came back:\n";
+		$body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives came back:\n";
 		foreach ($returned_drives as $sp_drive) {
   			$body .= "$sp_drive was missing; it's now available again.\n";
 		}
 		if (!$skip_fsck) {
 			$body .= "\nA fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
 		}
-		$drive_string = join(",",$returned_drives);
-		$subject = "Storage pool drives now online on " . exec ('hostname') . ": ";
+		$drive_string = join(", ", $returned_drives);
+		$subject = "Storage pool drive now online on " . exec ('hostname') . ": ";
 		$subject = $subject . $drive_string;
 		if (strlen($subject) > 255) {
 			$subject = substr($subject, 0, 255);
@@ -1315,20 +1318,26 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 		mail($email_to, $subject, $body);
 	}
 	if(count($missing_drives) > 0){
-		$body = "This is an automated email from Greyhole.\n\nIt appears one or more of your storage pool drives are missing their \".greyhole_uses_this\" file:\n";
+		$body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives has disappeared:\n";
+
+		$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
 		foreach ($missing_drives as $sp_drive) {
-  			$body .= "$sp_drive/.greyhole_uses_this: File not found\n";
+			if (!is_dir($sp_drive)) {
+	  			$body .= "$sp_drive: directory doesn't exists\n";
+			} else {
+				$body .= "$sp_drive: expected device ID: " . $drives_definitions[$sp_drive] . "; current device ID: " . gh_file_deviceid($sp_drive) . "\n";
+			}
 		}
 		$sp_drive = $missing_drives[0];
-		$body .= "\nThis either means these mount(s) are currently unmounted, or you forgot to create this file.\n\n";
+		$body .= "\nThis either means this mount is currently unmounted, or you forgot to use 'greyhole --replace' when you changed this drive.\n\n";
 		$body .= "Here are your options:\n\n";
-		$body .= "- If you forgot to create this file, you should create it ASAP, as per the INSTALL instructions. Until you do, this drive will not be part of your storage pool.\n\n";
-		$body .= "- If the drive(s) are gone, you should either re-mount them manually (if possible), or remove them from your storage pool. To do so, use the following command:\n  greyhole --gone=".escapeshellarg($sp_drive)."\n  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.\n\n";
-		$body .= "- If you know these drive(s) will come back soon, and do NOT want Greyhole to re-create missing file copies for this drive until it reappears, you should execute this command:\n  greyhole --wait-for=".escapeshellarg($sp_drive)."\n\n";
+		$body .= "- If you forgot to use 'greyhole --replace', you should do so now. Until you do, this drive will not be part of your storage pool.\n\n";
+		$body .= "- If the drive is gone, you should either re-mount it manually (if possible), or remove it from your storage pool. To do so, use the following command:\n  greyhole --gone=" . escapeshellarg($sp_drive) . "\n  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.\n\n";
+		$body .= "- If you know this drive will come back soon, and do NOT want Greyhole to re-create missing file copies for this drive until it reappears, you should execute this command:\n  greyhole --wait-for=" . escapeshellarg($sp_drive) . "\n\n";
 		if (!$skip_fsck) {
 			$body .= "A fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
 		}
-		$subject = "Missing storage pool drives on " . exec ('hostname') . ": ";
+		$subject = "Missing storage pool drives on " . exec('hostname') . ": ";
 		$drive_string = join(",",$missing_drives);
 		$subject = $subject . $drive_string;
 		if (strlen($subject) > 255) {
@@ -1429,7 +1438,7 @@ class FSCKLogFile {
 		if ($this->lastEmailSentTime == 0) {
 			$setting = Settings::get("last_email_$this->filename");
 			if ($setting) {
-				$this->lastEmailSentTime = (int) $setting->value;
+				$this->lastEmailSentTime = (int) $setting;
 			}
 		}
 		return $this->lastEmailSentTime;
@@ -1453,13 +1462,17 @@ class FSCKLogFile {
 }
 
 class Settings {
-	public static function get($name, $value=FALSE) {
+	public static function get($name, $unserialize=FALSE, $value=FALSE) {
 		$query = sprintf("SELECT * FROM settings WHERE name LIKE '%s'", $name);
 		if ($value !== FALSE) {
 			$query .= sprintf(" AND value LIKE '%s'", $value);
 		}
 		$result = db_query($query) or gh_log(CRITICAL, "Can't select setting '$name'/'$value' from settings table: " . db_error());
-		return db_fetch_object($result);
+		$setting = db_fetch_object($result);
+		if ($setting === FALSE) {
+			return FALSE;
+		}
+		return $unserialize ? unserialize($setting->value) : $setting->value;
 	}
 
 	public static function set($name, $value) {

@@ -155,8 +155,8 @@ if ($action == 'gone' || $action == 'going') {
 		// global $going_drive; // Used in function is_greyhole_owned_drive()
 		$going_drive = $options['drive'];
 
-		// Renaming that file will insure this drive won't be used while we're moving files away
-		gh_rename("$going_drive/.greyhole_uses_this", "$going_drive/.greyhole_used_this");
+		// Removing this drive here will insure it won't be used for new files while we're moving files away
+		remove_drive_definition($going_drive);
 
 		// fsck shares with only 1 file copy to remove those from $options['drive']
 		initialize_fsck_report('Shares with only 1 copy');
@@ -192,14 +192,7 @@ if ($action == 'gone' || $action == 'going') {
 	$escaped_drive = str_replace('/', '\/', $options['drive']);
 	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' /etc/greyhole.conf"); // Deprecated notation
 	exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' /etc/greyhole.conf");
-	if (is_file('/sbin/restart')) {
-		$running = (int) exec('/sbin/status greyhole | grep running | wc -l');
-		if ($running) {
-			exec("/sbin/restart greyhole");
-		}
-	} else {
-		exec("/sbin/service greyhole condrestart");
-	}
+	restart_service();
 
 	// For Amahi users
 	if (file_exists('/usr/bin/hdactl')) {
@@ -558,6 +551,36 @@ if ($action == 'stats') {
 	exit(0);
 }
 
+if ($action == 'replace') {
+	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
+		if (!empty($options['drive'])) {
+			echo "Drive " . $options['drive'] . " is not one of your defined storage pool drive.\n";
+		}
+		echo "Please use one of the following with the --replace option:\n  ";
+		echo implode("\n  ", $storage_pool_drives) . "\n";
+		echo "Note that the correct syntax for this command is:\n";
+		echo "  greyhole --$action=<drive>\n";
+		echo "The '=' character is mandatory.\n";
+		exit(1);
+	}
+	/*
+	if (!is_dir($options['drive'])) {
+		gh_log(ERROR, "The directory " . $options['drive'] . " does not exists. Greyhole can't --replace directories that don't exits.");
+		echo "The directory " . $options['drive'] . " does not exists. Greyhole can't --replace directories that don't exits.\n";
+		exit(2);
+	}
+	*/
+
+	$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
+	unset($drives_definitions[$options['drive']]);
+	Settings::set('sp_drives_definitions', $drives_definitions);
+
+	gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.");
+	echo "Storage pool drive " . $options['drive'] . " has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.\n";
+	restart_service();
+	exit(0);
+}
+
 if ($action == 'wait-for') {
 	if (!mark_gone_ok($options['drive'])) {
 		if (!empty($options['drive'])) {
@@ -565,6 +588,9 @@ if ($action == 'wait-for') {
 		}
 		echo "Please use one of the following with the --wait-for option:\n  ";
 		echo implode("\n  ", $storage_pool_drives) . "\n";
+		echo "Note that the correct syntax for this command is:\n";
+		echo "  greyhole --$action=<drive>\n";
+		echo "The '=' character is mandatory.\n";
 		exit(1);
 	}
 	gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been marked Temporarily-Gone");
@@ -585,13 +611,7 @@ if ($action == 'cancel-fsck') {
 	db_query("DELETE FROM tasks WHERE action = 'md5'") or gh_log(CRITICAL, "Can't delete md5 tasks: " . db_error());
 	echo "All scheduled fsck tasks have now been deleted.\n";
 	echo "Specific files checks might have been queued for problematic files, and those (fsck_file) tasks will still be executed, once other tasks have been processed.\n";
-	if (is_file('/etc/init.d/greyhole')) {
-		exec("/etc/init.d/greyhole condrestart");
-	} else if (is_file('/etc/init/greyhole.conf')) {
-		exec("/sbin/restart greyhole");
-	} else {
-		echo "You should now restart the Greyhole daemon to stop any ongoing fsck.\n";
-	}
+	restart_service();
 	exit(0);
 }
 
@@ -660,9 +680,9 @@ if ($num_daemon_processes > 1) {
 
 gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
 repair_tables();
+set_uniq_id();
 terminology_conversion();
 set_metastore_backup();
-set_uniq_id();
 Settings::backup();
 parse_samba_spool();
 simplify_tasks();
@@ -678,13 +698,54 @@ function terminology_conversion() {
 	convert_folders('.gh_graveyard_backup','.gh_metastore_backup');
 	convert_folders('.gh_attic','.gh_trash');
 	convert_database();
+	convert_sp_drives_tag_files();
+}
+
+function convert_sp_drives_tag_files() {
+	global $storage_pool_drives, $going_drive, $allow_multiple_sp_per_device;
+
+	$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
+	if (!$drives_definitions) {
+		$drives_definitions = array();
+	}
+	foreach ($storage_pool_drives as $sp_drive) {
+		if (isset($going_drive) && $sp_drive == $going_drive) { continue; }
+		if (!isset($drives_definitions[$sp_drive])) {
+			if (is_dir($sp_drive)) {
+				$drives_definitions[$sp_drive] = gh_file_deviceid($sp_drive);
+			}
+		} else if ($drives_definitions[$sp_drive] != gh_file_deviceid($sp_drive)) {
+			gh_log(WARN, "Warning! It seems the device ID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+		}
+		if (file_exists("$sp_drive/.greyhole_uses_this")) {
+			unlink("$sp_drive/.greyhole_uses_this");
+		}
+	}
+
+	// Check that the user is not using two sp drives on the same device
+	$devices = array();
+	foreach ($drives_definitions as $sp_drive => $device_id) {
+		$devices[$device_id][] = $sp_drive;
+	}
+	foreach ($devices as $device_id => $sp_drives) {
+		if (count($sp_drives) > 1) {
+			if ($allow_multiple_sp_per_device) {
+				gh_log(INFO, "The following storage pool drives are all on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf 'allow_multiple_sp_per_device' options, you chose to ignore this normally critical error.");
+			} else {
+				gh_log(CRITICAL, "The following storage pool drives are all on the same partition: " . implode(", ", $sp_drives) . ". ");
+			}
+		}
+	}
+
+	Settings::set('sp_drives_definitions', $drives_definitions);
+	return $drives_definitions;
 }
 
 function convert_database() {
 	Settings::rename('graveyard_backup_directory', 'metastore_backup_directory');
-	$setting = Settings::get('metastore_backup_directory', '%graveyard%');
+	$setting = Settings::get('metastore_backup_directory', FALSE, '%graveyard%');
 	if ($setting) {
-		$new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting->value);
+		$new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting);
 		Settings::set('metastore_backup_directory', $new_value);
 	}
 }
@@ -820,11 +881,7 @@ function execute_next_task() {
 				// Let's check if the conf file changed since the last fsck
 
 				// Last value
-				$last_md5 = '';
-				$setting = Settings::get('last_fsck_conf_md5');
-				if ($setting) {
-					$last_md5 = $setting->value;
-				}
+				$last_md5 = Settings::get('last_fsck_conf_md5');
 				
 				// New value
 				if ($new_conf_md5 == $last_md5) {
@@ -1583,7 +1640,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 
 		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
 		if (!is_greyhole_owned_drive($root_path)) {
-			gh_log(WARN, "  Warning! It seems $root_path is missing it's \".greyhole_uses_this\" file. This either means this mount is currently unmounted, or you forgot to create this file.");
+			gh_log(WARN, "  Warning! It seems the device ID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 			$metafile->state = 'Gone';
 			$metafiles[$key] = $metafile;
 			continue;
@@ -2541,9 +2598,9 @@ You probably want to do something about this!
 
 					// Stick files into any drives
 					$setting_name = sprintf('stick_into-%s', $sticky_dir);
-					$setting = Settings::get($setting_name);
-					if ($setting !== FALSE) {
-						$stick_into = array_merge($stick_into, unserialize($setting->value));
+					$setting = Settings::get($setting_name, TRUE);
+					if ($setting) {
+						$stick_into = array_merge($stick_into, $setting);
 						// Let's check if those drives are listed in the config file!
 						$update_needed = FALSE;
 						foreach ($stick_into as $key => $stick_into_dir) {
@@ -3747,9 +3804,8 @@ function set_metastore_backup($try_restore=TRUE) {
 	gh_log(DEBUG, "Loading metadata store backup directories...");
 	if (empty($metastore_backup_drives)) {
 		// In the DB ?
-		$setting = Settings::get('metastore_backup_directory');
-		if ($setting) {
-			$metastore_backup_drives = unserialize($setting->value);
+		$metastore_backup_drives = Settings::get('metastore_backup_directory', TRUE);
+		if ($metastore_backup_drives) {
 			gh_log(DEBUG, "  Found " . count($metastore_backup_drives) . " directories in the settings table.");
 		} else if ($try_restore) {
 			// Try to load a backup from the data drive, if we can find one.
@@ -3848,8 +3904,9 @@ function process_command_line() {
 		'md5-worker'
 	);
 
-	$opts_actions_with_values = 'w::g::n::t::b:';
+	$opts_actions_with_values = 'r::w::g::n::t::b:';
 	$longopts_actions_with_values = array(
+		'replace::',
 		'wait-for::',
 		'gone::',
 		'going::',
@@ -3917,7 +3974,7 @@ function process_command_line() {
 			$action = $longopt_action;
 			if ($action == 'debug') {
 				$options['debug_filename'] = $command_line_options[$longopt_action];
-			} else if ($action == 'gone' || $action == 'going' || $action == 'wait-for') {
+			} else if ($action == 'gone' || $action == 'going' || $action == 'wait-for' || $action == 'replace') {
 				if ($command_line_options[$longopt_action] !== FALSE) {
 					$options['drive'] = $command_line_options[$longopt_action];
 				}
@@ -3981,6 +4038,8 @@ function print_usage() {
 	echo "                        correct number of file copies are created to replace the\n";
 	echo "                        missing drive. If you don't supply an option, the available\n";
 	echo "                        options (paths) will be displayed.\n";
+	echo "  -r, --replace[=path]  Tell Greyhole that you replaced the drive at <path>.\n";
+	
 	echo "\n";
 	echo "For --stats and --view-queue, the available OPTIONS are:\n";
 	echo "  -j, --json            Output the result as JSON, instead of human-readable text.\n";
@@ -4044,39 +4103,28 @@ function how_long_ago($past_time) {
 	return "$ago ago";
 }
 
-// This unique identifier will be used when Greyhole calls home, to uniquely identify this Greyhole instance.
-function get_uniq_id() {
-	global $storage_pool_drives;
-
-	foreach ($storage_pool_drives as $sp_drive) {
-		$f = "$sp_drive/.greyhole_uses_this";
-		if (file_exists($f) && filesize($f) == 23) {
-			// Found a valid uid
-			$uniq_id = file_get_contents($f);
-			break;
-		}
-	}
-
-	if (!isset($uniq_id)) {
-		// No uid found; generate a new one.
-		$uniq_id = uniqid('', TRUE);
-	}
-	
-	return $uniq_id;
-}
-
-// Save a uid in all .greyhole_uses_this files
+// This unique identifier will be used when Greyhole calls home, to uniquely (and anonymously) identify this Greyhole instance.
 function set_uniq_id() {
-	global $storage_pool_drives;
+	$uniq_id = Settings::get('uniq_id');
 
-	$uniq_id = get_uniq_id();
-
-	// Save the old/new uid into all .greyhole_uses_this files
-	foreach ($storage_pool_drives as $sp_drive) {
-		$f = "$sp_drive/.greyhole_uses_this";
-		if (file_exists($f)) {
-			file_put_contents($f, $uniq_id);
+	if (!$uniq_id) {
+		// No uid found in DB; look on filesystem
+		global $storage_pool_drives;
+		foreach ($storage_pool_drives as $sp_drive) {
+			$f = "$sp_drive/.greyhole_uses_this";
+			if (file_exists($f) && filesize($f) == 23) {
+				// Found a valid uid
+				$uniq_id = file_get_contents($f);
+				break;
+			}
 		}
+
+		if (!$uniq_id) {
+			// No uid found; generate a new one
+			$uniq_id = uniqid('', TRUE);
+		}
+
+		Settings::set('uniq_id', $uniq_id);
 	}
 	
 	return $uniq_id;
@@ -4320,5 +4368,24 @@ function set_fsck_options($task) {
 	$options['find-orphans'] = task_has_option($task, 'orphaned');
 	$options['verify-checksums'] = task_has_option($task, 'checksums');
 	$options['del-orphaned-metadata'] = task_has_option($task, 'del-orphaned-metadata');
+}
+
+function remove_drive_definition($going_drive) {
+	$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
+	if (!$drives_definitions) {
+		$drives_definitions = convert_sp_drives_tag_files();
+	}
+	unset($drives_definitions[$going_drive]);
+	Settings::set('sp_drives_definitions', $drives_definitions);
+}
+
+function restart_service() {
+	if (is_file('/etc/init.d/greyhole')) {
+		exec("/etc/init.d/greyhole condrestart");
+	} else if (is_file('/etc/init/greyhole.conf')) {
+		exec("/sbin/restart greyhole");
+	} else {
+		echo "You should now restart the Greyhole daemon to stop any ongoing fsck.\n";
+	}
 }
 ?>
