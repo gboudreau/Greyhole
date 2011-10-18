@@ -131,8 +131,7 @@ if ($action == 'thaw') {
 }
 
 if ($action == 'gone' || $action == 'going') {
-	global $storage_pool_drives;
-	if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
+	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
 		$options['drive'] = '/' . trim($options['drive'], '/');
 	}
 	if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
@@ -147,6 +146,9 @@ if ($action == 'gone' || $action == 'going') {
 		exit(1);
 	}
 
+	// Removing this drive here will insure it won't be used for new files while we're moving files away, and that it can later be replaced.
+	remove_drive_definition($options['drive']);
+
 	if ($action == 'going') {
 		set_metastore_backup();
 		gh_log(INFO, "Storage pool drive " . $options['drive'] . " will be removed from the storage pool.");
@@ -154,9 +156,6 @@ if ($action == 'gone' || $action == 'going') {
 
 		// global $going_drive; // Used in function is_greyhole_owned_drive()
 		$going_drive = $options['drive'];
-
-		// Removing this drive here will insure it won't be used for new files while we're moving files away
-		remove_drive_definition($going_drive);
 
 		// fsck shares with only 1 file copy to remove those from $options['drive']
 		initialize_fsck_report('Shares with only 1 copy');
@@ -553,6 +552,9 @@ if ($action == 'stats') {
 
 if ($action == 'replace') {
 	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
+		$options['drive'] = '/' . trim($options['drive'], '/');
+	}
+	if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
 		if (!empty($options['drive'])) {
 			echo "Drive " . $options['drive'] . " is not one of your defined storage pool drive.\n";
 		}
@@ -563,17 +565,13 @@ if ($action == 'replace') {
 		echo "The '=' character is mandatory.\n";
 		exit(1);
 	}
-	/*
 	if (!is_dir($options['drive'])) {
 		gh_log(ERROR, "The directory " . $options['drive'] . " does not exists. Greyhole can't --replace directories that don't exits.");
 		echo "The directory " . $options['drive'] . " does not exists. Greyhole can't --replace directories that don't exits.\n";
 		exit(2);
 	}
-	*/
 
-	$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
-	unset($drives_definitions[$options['drive']]);
-	Settings::set('sp_drives_definitions', $drives_definitions);
+	remove_drive_definition($options['drive']);
 
 	gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.");
 	echo "Storage pool drive " . $options['drive'] . " has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.\n";
