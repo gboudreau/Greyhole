@@ -1200,7 +1200,7 @@ function is_greyhole_owned_drive($sp_drive) {
 		$drives_definitions = convert_sp_drives_tag_files();
 	}
 	
-	return @$drives_definitions[$sp_drive] === gh_file_deviceid($sp_drive);
+	return @$drives_definitions[$sp_drive] === gh_dir_uuid($sp_drive);
 }
 
 // Is it OK for a drive to be gone?
@@ -1292,7 +1292,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			}
 			mark_gone_drive_fscked($sp_drive);
 			$missing_drives[] = $sp_drive;
-			gh_log(WARN, "Warning! It seems the device ID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+			gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 			gh_log(DEBUG, "Email sent for gone drive: $sp_drive");
 			$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
 		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_drive($sp_drive)) {
@@ -1330,7 +1330,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			if (!is_dir($sp_drive)) {
 	  			$body .= "$sp_drive: directory doesn't exists\n";
 			} else {
-				$body .= "$sp_drive: expected device ID: " . $drives_definitions[$sp_drive] . "; current device ID: " . gh_file_deviceid($sp_drive) . "\n";
+				$body .= "$sp_drive: expected partition UUID: " . $drives_definitions[$sp_drive] . "; current partition UUID: " . gh_dir_uuid($sp_drive) . "\n";
 			}
 		}
 		$sp_drive = $missing_drives[0];
@@ -1540,5 +1540,13 @@ class Settings {
 		}
 		return FALSE;
 	}
+}
+
+function gh_dir_uuid($dir) {
+	$dev = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | tail -1 | awk \'{print $1}\'');
+	if (empty($dev) || strpos($dev, '/dev/') !== 0) {
+		return FALSE;
+	}
+	return trim(exec('blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
 }
 ?>

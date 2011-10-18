@@ -712,10 +712,10 @@ function convert_sp_drives_tag_files() {
 		if (isset($going_drive) && $sp_drive == $going_drive) { continue; }
 		if (!isset($drives_definitions[$sp_drive])) {
 			if (is_dir($sp_drive)) {
-				$drives_definitions[$sp_drive] = gh_file_deviceid($sp_drive);
+				$drives_definitions[$sp_drive] = gh_dir_uuid($sp_drive);
 			}
-		} else if ($drives_definitions[$sp_drive] != gh_file_deviceid($sp_drive)) {
-			gh_log(WARN, "Warning! It seems the device ID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+		} else if ($drives_definitions[$sp_drive] != gh_dir_uuid($sp_drive)) {
+			gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 		}
 		if (file_exists("$sp_drive/.greyhole_uses_this")) {
 			unlink("$sp_drive/.greyhole_uses_this");
@@ -1640,7 +1640,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 
 		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
 		if (!is_greyhole_owned_drive($root_path)) {
-			gh_log(WARN, "  Warning! It seems the device ID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+			gh_log(WARN, "  Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 			$metafile->state = 'Gone';
 			$metafiles[$key] = $metafile;
 			continue;
