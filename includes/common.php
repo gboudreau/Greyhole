@@ -64,7 +64,7 @@ if (!isset($smb_config_file)) {
 $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function parse_config() {
-	global $_CONSTANTS, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash;
+	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $balance_modified_files;
 
 	$deprecated_options = array(
 		'delete_moves_to_attic' => 'delete_moves_to_trash',
@@ -78,7 +78,19 @@ function parse_config() {
 	$storage_pool_drives = array();
 	$frozen_directories = array();
 	$config_text = file_get_contents($config_file);
+	
+	// Defaults
+	$log_level = DEBUG;
+	$greyhole_log_file = '/var/log/greyhole.log';
+	$email_to = 'root';
+	$log_memory_usage = FALSE;
+	$check_for_open_files = TRUE;
+	$allow_multiple_sp_per_device = FALSE;
+	$df_cache_time = 15;
 	$delete_moves_to_trash = TRUE;
+	$balance_modified_files = FALSE;
+	$memory_limit = '128M';
+	
 	foreach (explode("\n", $config_text) as $line) {
 		if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
 			$name = trim($regs[1]);
@@ -98,8 +110,7 @@ function parse_config() {
 			$parsing_drive_selection_groups = FALSE;
 			switch($name) {
 				case 'log_level':
-					global ${$name};
-					${$name} = $_CONSTANTS[$value];
+					$log_level = $_CONSTANTS[$value];
 					break;
 				case 'delete_moves_to_trash': // or delete_moves_to_attic
 				case 'log_memory_usage':
@@ -288,8 +299,7 @@ function parse_config() {
 	}
 
 	if (!isset($memory_limit)) {
-		$memory_limit = '128M';
-		ini_set('memory_limit',$memory_limit);
+		ini_set('memory_limit', $memory_limit);
 	}
 	if (isset($memory_limit)){
 		if(preg_match('/M$/',$memory_limit)){
@@ -320,10 +330,6 @@ function parse_config() {
 		openlog("Greyhole", LOG_PID, LOG_USER);
 	}
 	
-	if (!isset($balance_modified_files)) {
-		global $balance_modified_files;
-		$balance_modified_files = FALSE;
-	}
 	return TRUE;
 }
 
@@ -356,7 +362,7 @@ function gh_log($local_log_level, $text) {
 	$log_text = sprintf("%s%s%s\n", 
 		"$date $local_log_level $action: ",
 		$text,
-		$log_memory_usage ? " [" . memory_get_usage() . "]" : ''
+		@$log_memory_usage ? " [" . memory_get_usage() . "]" : ''
 	);
 
 	if (isset($log_to_stdout)) {

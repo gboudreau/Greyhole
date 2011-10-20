@@ -38,12 +38,14 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
 	install -m 0755 -D -p greyhole /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
-	install -m 0750 -D -p greyhole-config-update /usr/bin
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	install -m 0644 -D -p greyhole.example.conf /etc/greyhole.conf
 	install -m 0755 -D -p greyhole.cron.weekly /etc/cron.weekly/greyhole
 	install -m 0755 -D -p greyhole.cron.daily /etc/cron.daily/greyhole
+	install -m 0644 -D -p docs/greyhole.1.gz /usr/share/man/man1/
+	install -m 0644 -D -p docs/greyhole-dfree.1.gz /usr/share/man/man1/
+	install -m 0644 -D -p docs/greyhole.conf.5.gz /usr/share/man/man5/
 	if [ -f includes/common.php ]; then
 		include_path=`php -i | grep include_path | awk -F':' '{print $NF}'`
 		mkdir "$include_path/includes"

@@ -1,0 +1,158 @@
+.TH greyhole 1  "10/16/2011" "Greyhole %VERSION%" "Greyhole - Redundant Storage Pool using Samba"
+.SH NAME
+greyhole \- control your Greyhole storage pool
+.SH SYNOPSIS
+.B greyhole
+[ACTION] [OPTIONS]
+.SH DESCRIPTION
+Greyhole is an application that uses Samba to create a storage pool of 
+all your available hard drives (whatever their size, however they're 
+connected), and allows you to create redundant copies of the files you 
+store, in order to prevent data loss when part of your hardware fails.
+.PP
+The greyhole command allows you to monitor and interact with the 
+Greyhole daemon, and thus control your Greyhole storage pool.
+.SH ACTIONS
+.TP
+\-?, \-\-help
+Display this help and exit.
+.TP
+\-D, \-\-daemon
+Start the daemon.
+.TP
+\-f, \-\-fsck
+Schedule a fsck.
+.TP
+\-C, \-\-cancel\-fsck
+Cancel all scheduled fsck.
+.TP
+\-l, \-\-balance
+Balance available space on storage pool drives.
+.TP
+\-s, \-\-stats
+Display storage pool statistics.
+.TP
+\-i, \-\-iostat
+I/O statistices for your storage pool drives.
+.TP
+\-L, \-\-logs
+Display new greyhole.log entries as they are logged.
+.TP
+\-S, \-\-status
+Display what the Greyhole daemon is currently doing.
+.TP
+\-q, \-\-view\-queue
+Display the current work queue.
+.TP
+\-a, \-\-empty\-trash
+Empty the trash.
+.TP
+\-b, \-\-debug=filename
+Debug past file operations.
+.TP
+\-t, \-\-thaw[=path]
+Thaw a frozen directory. Greyhole will start working on files 
+inside <path>. If you don't supply an option, the list of frozen 
+directories will be displayed.
+.TP
+\-w, \-\-wait\-for[=path]
+Tell Greyhole that the missing drive at <path> will return soon, 
+and that it shouldn't re\-create additional file copies to 
+replace it. If you don't supply an option, the available options 
+(paths) will be displayed.
+.TP
+\-g, \-\-gone[=path]
+Tell Greyhole that the missing drive at <path> is gone for good. 
+Greyhole will start replacing the missing file copies instantly. 
+If you don't supply an option, the available options (paths) 
+will be displayed.
+.TP
+\-n, \-\-going[=path]
+Tell Greyhole that you want to remove a drive. Greyhole will
+then make sure you don't loose any files, and that the correct
+number of file copies are created to replace the missing drive. 
+If you don't supply an option, the available options (paths) 
+will be displayed.
+.TP
+\-r, \-\-replace[=path]
+Tell Greyhole that you replaced the drive at <path>. This is not 
+necessary if you used \-\-gone or \-\-going to remove the drive.
+.SH OPTIONS
+.TP
+For \-\-stats and \-\-view-queue, the available OPTIONS are:
+.TP
+\-j, \-\-json
+Output the result as JSON, instead of human-readable text.
+
+.TP
+For \-\-fsck, the available OPTIONS are:
+.TP
+\-e, \-\-email\-report
+Send an email when fsck completes, to report on what was
+checked, and any error that was found.
+.TP
+\-y, \-\-dont\-walk\-metadata\-store
+Speed up fsck by skipping the scan of the metadata store
+directories. Scanning the metadata stores is only required to
+re\-create symbolic links that might be missing from your shared 
+directories.
+.TP
+\-c, \-\-if\-conf\-changed
+Only fsck if greyhole.conf or smb.conf paths changed since the 
+last fsck. Used in the daily cron to prevent unneccesary fsck 
+runs.
+.TP
+\-d, \-\-dir=path
+Only scan a specific directory, and all sub\-directories. The
+specified directory should be a Samba share, a sub\-directory of 
+a Samba share, or any directory on a storage pool drive.
+.TP
+\-o, \-\-find\-orphaned\-files
+Scan for files with no metadata in the storage pool drives.
+This will allow you to include existing files on a drive in your 
+storage pool without having to copy them manually.
+.TP
+\-k, \-\-checksums
+Read ALL files in your storage pool, and check that file copies 
+are identical. This will identify any problem you might have 
+with your file\-systems.
+.RS 7
+NOTE: this can take a LONG time to complete, since it will read
+everything from all your drives!
+.RE 0
+.TP
+\-m, \-\-delete\-orphaned\-metadata
+When fsck find metadata files with no file copies, delete those
+metadata files. If the file copies re\-appear later, you'll need
+to run fsck with \-\-find\-orphaned\-files to have them reappear in
+your shares.
+.SH EXAMPLES
+.TP
+Remove a drive from your pool, to later replace it:
+.B greyhole
+\-\-going=/mnt/hdd4/gh
+.PP
+.TP
+Monitor the Greyhole daemon by looking at the log entries:
+.B greyhole
+\-\-logs
+.PP
+.TP
+Schedule a fsck for the Movies folder found in the Videos share:
+.B greyhole
+\-\-email-report \-\-dir=/shares/Videos/Movies
+.PP
+.SH EXIT STATUS
+greyhole returns a zero exit status if the command succeeds.
+.RS 0
+Non zero is returned in case of failure.
+.SH AUTHORS
+Guillaume Boudreau	<guillaume (at) greyhole.net>
+.RS 0
+Andrew Hopkinson	<andrew (at) greyhole.net>
+.SH SEE ALSO
+greyhole.conf(5)
+.RS 0
+/usr/share/greyhole/USAGE
+.SH WEBSITE
+\fIhttp://www.greyhole.net\fR

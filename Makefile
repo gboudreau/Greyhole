@@ -5,7 +5,7 @@ deb: dist
 	(cd release && rm -rf $(PACKAGE)-$(VERSION))
 	(cd release && tar -xzf $(PACKAGE)-$(VERSION).tar.gz)
 	rm release/$(PACKAGE)-$(VERSION)/greyhole.spec
-	(cp -r DEBIAN release/$(PACKAGE)-$(VERSION)/)
+	cp -r DEBIAN release/$(PACKAGE)-$(VERSION)/
 	sed -i 's/^Version:.*/Version: $(VERSION)-1/' release/$(PACKAGE)-$(VERSION)/DEBIAN/control
 	sed -i 's/^Architecture:.*/Architecture: $(ARCH)/' release/$(PACKAGE)-$(VERSION)/DEBIAN/control
 	sed -i 's/__VERSION__/$(VERSION)-1/' release/$(PACKAGE)-$(VERSION)/DEBIAN/changelog
@@ -42,6 +42,10 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && git clone git@github.com:gboudreau/Greyhole.git; cd Greyhole; git log --pretty=oneline --reverse | cut -d ' ' -f2-  | grep -v '^Tag: ' > ../CHANGES; cd ..; rm -rf Greyhole)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' greyhole)
+	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole.1)
+	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole-dfree.1)
+	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole.conf.5)
+	(cd release/$(PACKAGE)-$(VERSION)/docs/ && gzip -9 greyhole.1 && gzip -9 greyhole-dfree.1 && gzip -9 greyhole.conf.5)
 
 	# Inject includes/common.php...
 	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "\*/" includes/common.php | head -1 | awk -F':' '{print $$1+2}'` includes/common.php > includes/common.php.1)

@@ -1,5 +1,5 @@
 greyhole (__VERSION__) unstable; urgency=high
 
-  * See /usr/share/greyhole/CHANGES for details.
+  * See http://www.greyhole.net/releases/CHANGELOG for details.
 
- -- Guillaume Boudreau <gb@greyhole.net>  __DATE__
+ -- Guillaume Boudreau <guillaume (at) greyhole.net>  __DATE__

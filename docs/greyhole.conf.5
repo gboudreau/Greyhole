@@ -1,0 +1,426 @@
+.TH greyhole.conf 5  "10/16/2011" "Greyhole %VERSION%" "File Formats and Conventions"
+.SH NAME
+greyhole.conf \- The configuration file for the Greyhole daemon
+.SH SYNOPSIS
+The greyhole.conf file is the configuration file for the Greyhole daemon.
+The complete description of the file format and possible parameters held within are here for reference purposes.
+.SH FILE FORMAT
+.TP
+The file consists of a list of paramaters. The order of the parameters in the file is not important, unless noted otherewise. Parameters use the form:
+.PP
+.RS
+\fIname\fR = \fIvalue\fR
+.RE
+.TP
+The file is line-based - that is, each newline-terminated line represents either a comment, a parameter or parameter values (exceptionally).
+.PP
+Any line beginning with a hash (#) character is ignored, as are lines containing only whitespace.
+.PP
+The values following the equals sign in parameters are all either a string (no quotes needed) or a boolean, which may be given as \fByes\fR/\fBno\fR, \fB1\fR/\fB0\fR or \fBtrue\fR/\fBfalse\fR. Case is not significant in boolean values, but is preserved in string values. Some items are numeric.
+.SH PARAMETERS
+	
+.RS 0
+db_engine
+.RE
+.RS 0
+db_host
+.RE
+.RS 0
+db_user
+.RE
+.RS 0
+db_pass
+.RE
+.RS 0
+db_name
+.RE
+.RS 0
+db_path
+.RE
+.PP
+.RS 4
+The database to use for the Greyhole tasks queue & settings. Available engines: \fBmysql\fR (recommended), \fBsqlite\fR
+.RS 0
+\fINo defaults\fR.
+.RE
+.PP
+When using \fBmysql\fR, you will need to specify a \fBdb_host\fR (normally localhost), \fBdb_user\fR, \fBdb_pass\fR and \fBdb_name\fR. The user and database should already exist, per the USAGE instructions.
+.PP
+When using \fBsqlite\fR, only \fBdb_path\fR is used, and it should be the full path to a sqlite file that will be created by Greyhole.
+.PP
+Example: \fIdb_engine = mysql\fR
+.RS 9
+\fIdb_host	= localhost\fR
+.RE
+.RS 9
+\fIdb_user	= greyhole_user\fR
+.RE
+.RS 9
+\fIdb_pass	= 89y63jdwe\fR
+.RE
+.RS 9
+\fIdb_name	= greyhole\fR
+.RE
+.RE
+
+email_to
+.PP
+.RS 4
+Will receive email reports for daily fsck, or when all drives are out of available space.
+When specifying no @hostname, the email will be delivered to the local mailbox of that user.
+To send emails to a remote mail server, you'll need to make sure you can send emails from the command line, for example using the \fBmail\fR command.
+.RS 0
+Default is \fBroot\fR.
+.RE
+.PP
+Examples: \fIemail_to = you@gmail.com\fR
+.RS 10
+\fIemail_to = root\fR
+.RE
+.RE
+
+daemon_niceness
+.PP
+.RS 4
+(Numeric) Niceness of the background daemon that handle most of the heavy lifting.
+Number between -20 and 19.
+The higher the number, the more 'nice' the daemon will be, i.e. the less
+resources it will get, versus other processes with a lower niceness.
+.RS 0
+Default is \fB1\fR.
+.RE
+.RE
+
+greyhole_log_file
+.PP
+.RS 4
+Where the Greyhole daemon will log what it does.
+.RS 0
+You can specify \fBsyslog\fR to have the daemon log using (r)syslogd instead of logging to a file.
+.RE
+.RS 0
+Default is \fB/var/log/greyhole.log\fR.
+.RE
+.PP
+Examples: \fIgreyhole_log_file = /var/log/greyhole.log\fR
+.RS 10
+\fIgreyhole_log_file = syslog\fR
+.RE
+.RE
+
+log_level
+.PP
+.RS 4
+Available verbosity levels: DEBUG, INFO, WARN, ERROR
+.RS 0
+Note that for --status to work correctly, you'll need to keep this to DEBUG.
+.RE
+.RS 0
+Default is \fBDEBUG\fR.
+.RE
+.RE
+
+log_memory_usage
+.PP
+.RS 4
+(Boolean) Log Greyhole memory usage on each log line.
+.RS 0
+Default is \fBno\fR.
+.RE
+.RE
+
+check_for_open_files
+.PP
+.RS 4
+(Boolean) Look for other processes working on files on the Greyhole shares.
+Disable to get more speed, but this might break some files, if any application change your files while Greyhole tries to work on them.
+.RS 0
+Default is \fByes\fR.
+.RE
+.RE
+
+storage_pool_drive
+.PP
+.RS 4
+Where the file copies will be stored.
+You probably want to list all your physical hard drives here.
+.RS 0
+Also specify how much free space you want to reserve on each drive. This is 
+a soft limit that will be ignored if the necessary hard drives are below 
+their minimum.
+.RE
+.RS 0
+For example, if you specify a 100 GB limit on all drives, and only one still 
+have more than 100 GB of free space, and you save a new file on a share for 
+which you specified you want multiple copies, this drive will be used first, 
+but the other drives that have less free space will be used to store the 
+additional copies.
+.RE
+.PP
+The syntax for the value is:
+.RS 4
+\fIpath\fR, min_free: \fI##\fRgb
+.RE
+.PP
+Example: \fIstorage_pool_drive = /mnt/hdd0/gh, min_free: 10gb\fR
+.RE
+
+allow_multiple_sp_per_device
+.PP
+.RS 4
+(Boolean) This can help you test Greyhole by defining multiple storage_pool_drive that are in fact just empty directories on the same drive.
+WARNING! Do NOT enable that option when you're not testing Greyhole. Doing so could result is lost data when a drive will fail.
+.RS 0
+Default is \fBno\fR.
+.RE
+.RE
+
+num_copies[ShareName]
+.PP
+.RS 4
+(Numeric) Number of copies of each file you want Greyhole to keep, for files in \fBShareName\fR.
+This is not the number of duplicates! 2 copies = 1 duplicate.
+.RS 0
+If you change one of those, you should run fsck manually, or wait for the daily fsck, to have the additional copies created, or extra copies deleted.
+.RE
+.RS 0
+You can use the special keyword \fBmax\fR to have copies of those files on all your drives.
+.RE
+.PP
+Examples: \fInum_copies[RecordedTV] = 1\fR
+.RS 10
+\fInum_copies[Music]	   = 2\fR
+.RE
+.RS 10
+\fInum_copies[Photos]	   = max\fR
+.RE
+.RE
+
+drive_selection_groups
+.PP
+.RS 4
+The groups you define here will be available to use in the drive_selection_algorithm option(s) below.
+The group names (OK, NEW, BROKEN, REMOTE in the example below) can be anything you'd like.
+Use one line per group, with the following syntax:
+.PP
+.RS 4
+\fIgroup_name\fR: \fIstorage_pool_drive\fR[,\fIstorage_pool_drive\fR[,...]]
+.RE
+.PP
+Define the first group on the same line as \fBdrive_selection_groups\fR, and other groups below it, without the parameter name.
+.PP
+If you ommit any storage pool drive from your groups, this drive will NOT be used by Greyhole!
+.PP
+See \fIhttp://greyhole.net/wiki/drive_selection_groups\fR on how we suggest you use this feature.
+.PP
+Examples: \fIdrive_selection_groups = OK: /mnt/hdd0/gh, /mnt/hdd2/gh\fR
+.RS 35
+\fINEW: /mnt/hdd1/gh\fR
+.RE
+.RS 35
+\fIBROKEN: /mnt/hdd3/gh\fR
+.RE
+.RS 35
+\fIREMOTE: /mnt/remote1/gh\fR
+.RE
+.PP
+You can also define drive_selection_groups for specific shares:
+.PP
+.RS 3
+\fIdrive_selection_groups[Photos] = SATA: /mnt/hdd0/gh\fR
+.RE
+.RS 36
+\fIIDE: /mnt/hdd1/gh, /mnt/hdd2/gh\fR
+.RE
+.RS 36
+\fIUSB: /mnt/hdd3/gh\fR
+.RE
+.RE
+
+drive_selection_algorithm
+.PP
+.RS 4
+Available algorithms: most_available_space, random, forced
+.TP
+\fBmost_available_space\fR: use the drives with the most available space 
+first, so that available space on all drives should become and stay balanced.
+.TP
+\fBrandom\fR: use a random drive with available space
+.TP
+\fBforced\fR: use the drive_selection_groups you defined previously. The syntax for using \fBforced\fR is:
+.PP
+.RS 4
+\fIforced\fR (\fI#\fRx\fIgroup_name\fR[, \fI#\fRx\fIgroup_name\fR[, ...]]) [\fImost_available_space\fR|\fIrandom\fR]
+.RE
+.PP
+Use the \fBforced\fR keyword, then list the groups you want to use, in order, and 
+prefix each \fBgroup_name\fR with the number of drives you want to use from 
+that group before using the next group.
+Use the \fBall\fR keyword to indicate you want Greyhole to use all drives 
+from a specific group before starting to use drives from the next group.
+You'll need to indicate how Greyhole should pick drives within a group by 
+ending your line with either \fBmost_available_space\fR or \fBrandom\fR.
+.PP
+Examples: \fIdrive_selection_algorithm = forced (1xOK, 1xNEW, 1xBROKEN, 1xREMOTE) most_available_space\fR
+.PP
+You can also define drive_selection_algorithm for specific shares:
+.PP
+.RS 4
+\fIdrive_selection_algorithm[Videos] = random\fR
+.RE
+.RS 4
+\fIdrive_selection_algorithm[Photos] = forced (all SATA, 1xIDE, 1xUSB) random\fR
+.RE
+.RE
+
+sticky_files
+.RS 0
+stick_into
+.RE
+.PP
+.RS 4
+Sticky files are files that will always \fIlive\fR together, in the storage pool. That is, 
+each copy of the files will be stored on the same storage pool drive(s).
+.PP
+This will allow you to read (and read-only!) those files by using the 
+storage pool drives themselves, instead of using the mounted shares.
+To see when that might be useful, see \fIhttp://code.google.com/p/greyhole/issues/detail?id=3\fR
+.PP
+Each \fBsticky_files\fR line should start with the name of a share, followed by a 
+directory inside that share. All files in the specified directory, and all sub-directories, will then be kept together.
+.PP
+One or more \fBstick_into\fR lines should follow each \fBsticky_files\fR line, if you 
+want the files to go on specific hard drive(s).
+If you don't specify any \fBstick_into\fR, the drive with the most free space will 
+be use to hold your files together.
+.PP
+Note that if you already have files in the specified directory, you'll need to use 
+\fB--balance\fR to move the file copies together.
+.PP
+Example: \fIsticky_files = Videos/Movies/Kids/\fR
+.RS 11
+\fIstick_into = /mnt/hdd1/gh\fR
+.RE
+.RS 11
+\fIstick_into = /mnt/hdd5/gh\fR
+.RE
+.RE
+
+df_cache_time
+.PP
+.RS 4
+(Numeric) How long should free space calculations be cached (in seconds).
+.RS 0
+When selecting drives using their available / free space, the last cached 
+value will be used.
+.RE
+.RS 0
+Use 0 to disable caching.
+.RE
+.RS 0
+Default is \fB15\fR.
+.RE
+.RE
+
+delete_moves_to_trash
+.PP
+.RS 4
+(Boolean) Move deleted files to trash, instead of deleting them.
+You can specify per-share preferences that will override the global 
+preference.
+.RS 0
+Default is \fByes\fR.
+.RE
+.PP
+Examples: \fIdelete_moves_to_trash = yes\fR
+.RS 10
+\fIdelete_moves_to_trash[CrashPlan] = no\fR
+.RE
+.RE
+
+balance_modified_files
+.PP
+.RS 4
+(Boolean) Use modified files copies to help balance the 
+available space in your storage pool drives.
+Note that this will force Greyhole to remove outdated copies, and 
+re-create them on the drive(s) with the most available space.
+When disabled, existing copies will be kept where they were, and updated using cp.
+.RS 0
+Default is \fBno\fR.
+.RE
+.RE
+
+frozen_directory
+.PP
+.RS 4
+Directories listed in \fBfrozen_directory\fR will not be touched by Greyhole until the user 
+\fIthaw\fR them using \fIgreyhole --thaw=<dir>\fR.
+.PP
+This can be used to process often-updated files at regular intervals, 
+instead of having Greyhole process them as soon as they change.
+.PP
+Each frozen_directory line should start with the name of a share, followed 
+by a optional directory inside that share.
+.PP
+Examples: \fIfrozen_directory = Data/mysql\fR
+.RS 10
+\fIfrozen_directory = VirtualMachines\fR
+.RE
+.RE
+
+max_queued_tasks
+.PP
+.RS 4
+(Numeric) Maximum number of queued tasks to store in MySQL/SQLite, when parsing the 
+spool directory. Use a lower number if you experience slowness while parsing 
+spooled operations.
+.RS 0
+Default is \fB10000000\fR when using Mysql (\fBdb_engine\fR), and \fI1000\fR when using SQLite.
+.RE
+.RE
+
+memory_limit
+.PP
+.RS 4
+Maximum amount of memory that the Greyhole daemon can consume while running.
+.RS 0
+This can be higher than the memory_limit set in php.ini.
+.RE
+.RS 0
+If the Greyhole daemon reaches this limit, it will log an error and stop.
+.RE
+.RS 0
+It is NOT advisable to lower the memory limit below 128M.
+.RE
+.RS 0
+Default is \fB128M\fR.
+.RE
+.RE
+
+copy_method
+.PP
+.RS 4
+This defines what command-line tool is used to create file copies.
+.RS 0
+Possible values: \fBcp\fR, \fBrsync\fR
+.RE
+.RS 0
+cp is less CPU-intensive, and generally faster than rsync, which is still 
+available for historic reasons.
+.RE
+.RS 0
+Default is \fBcp\fR.
+.RE
+.RE
+
+.SH AUTHORS
+Guillaume Boudreau	<guillaume (at) greyhole.net>
+.RS 0
+Andrew Hopkinson	<andrew (at) greyhole.net>
+.SH SEE ALSO
+greyhole(1)
+.RS 0
+/usr/share/greyhole/USAGE
+.SH WEBSITE
+\fIhttp://www.greyhole.net\fR

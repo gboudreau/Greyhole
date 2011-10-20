@@ -1,0 +1,26 @@
+.TH greyhole-dfree 1  "10/16/2011" "Greyhole %VERSION%" "Greyhole - Redundant Storage Pool using Samba"
+.SH NAME
+greyhole-dfree \- dfree command script for Greyhole Samba shares
+.SH SYNOPSIS
+.B greyhole-dfree
+.SH DESCRIPTION
+Greyhole shares defined in smb.conf include a custom \fBdfree command\fR that is used 
+to return the total and available disk space in your Greyhole storage pool.
+This allows Samba to report correct values to connected clients.
+.SH OUTPUT
+When greyhole-dfree is run, it will output three numbers.
+.RS 0
+The first represent the total disk space, in blocks. The second represent the number of available blocks. The third value is the block size, in bytes.
+.SH EXIT STATUS
+greyhole-dfree always returns a zero exit status.
+.SH AUTHORS
+Guillaume Boudreau	<guillaume (at) greyhole.net>
+.SH SEE ALSO
+greyhole(1)
+.RS 0
+greyhole.conf(5)
+.RE
+.RS 0
+/usr/share/greyhole/USAGE
+.SH WEBSITE
+\fIhttp://www.greyhole.net\fR

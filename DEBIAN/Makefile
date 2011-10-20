@@ -19,8 +19,7 @@ deb: build
 	rm COPYING
 	rm INSTALL
 	rm USAGE
-	rm test_cases.php
-	rm -rf samba-module
+	rm -rf samba-module/ docs/
 	
 build:
 	mkdir -p $(DESTDIR)etc/init.d/
@@ -32,6 +31,8 @@ build:
 	mkdir -p $(DESTDIR)etc/cron.d/
 	mkdir -p $(DESTDIR)etc/cron.daily/
 	mkdir -p $(DESTDIR)etc/cron.weekly/
+	mkdir -p $(DESTDIR)usr/share/man/man1/
+	mkdir -p $(DESTDIR)usr/share/man/man5/
 
 	install -m 0755 -D -p initd_script.sh $(DESTDIR)etc/init.d/greyhole
 	install -m 0644 -D -p upstart.conf $(DESTDIR)etc/init/greyhole.conf
@@ -47,9 +48,12 @@ build:
 	install -m 0755 -D -p greyhole.cron.weekly $(DESTDIR)etc/cron.weekly/greyhole
 	install -m 0755 -D -p greyhole.cron.daily $(DESTDIR)etc/cron.daily/greyhole
 	
-	install -m 0755 -D -p test_cases.php $(DESTDIR)usr/share/greyhole/
 	install -m 0644 -D -p CHANGES $(DESTDIR)usr/share/greyhole/
 	install -m 0644 -D -p USAGE $(DESTDIR)usr/share/greyhole/
+	
+	install -m 0644 -D -p docs/greyhole.1.gz $(DESTDIR)usr/share/man/man1/
+	install -m 0644 -D -p docs/greyhole-dfree.1.gz $(DESTDIR)usr/share/man/man1/
+	install -m 0644 -D -p docs/greyhole.conf.5.gz $(DESTDIR)usr/share/man/man5/
 	
 ifeq ($(ARCH), amd64)
 		mkdir -p $(DESTDIR)usr/lib64/samba/vfs/
