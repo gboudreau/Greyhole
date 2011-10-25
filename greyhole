@@ -4135,7 +4135,7 @@ function get_copy_cmd($source, $destination) {
 	if (@$copy_method == 'rsync') {
 		return "rsync -t " . escapeshellarg($source) . " " . escapeshellarg($destination);
 	} else {
-		return "cp " . escapeshellarg($source) . " " . escapeshellarg($destination);
+		return "cp -p " . escapeshellarg($source) . " " . escapeshellarg($destination);
 	}
 }
 
