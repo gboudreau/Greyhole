@@ -728,9 +728,9 @@ function convert_sp_drives_tag_files() {
 	foreach ($devices as $device_id => $sp_drives) {
 		if (count($sp_drives) > 1) {
 			if ($allow_multiple_sp_per_device) {
-				gh_log(INFO, "The following storage pool drives are all on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf 'allow_multiple_sp_per_device' options, you chose to ignore this normally critical error.");
+				gh_log(INFO, "The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf 'allow_multiple_sp_per_device' options, you chose to ignore this normally critical error.");
 			} else {
-				gh_log(CRITICAL, "The following storage pool drives are all on the same partition: " . implode(", ", $sp_drives) . ". ");
+				gh_log(CRITICAL, "ERROR: The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ". The Greyhole daemon will now stop.");
 			}
 		}
 	}
@@ -1148,8 +1148,10 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 	if (is_dir("$landing_zone/$target_full_path") || is_a_metastore_dir($share, $full_path)) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
-
 		foreach ($storage_pool_drives as $sp_drive) {
+			if (!is_greyhole_owned_drive($sp_drive)) {
+				continue;
+			}
 			list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
 
 			if (is_dir("$sp_drive/$share/$full_path")) {
