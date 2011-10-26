@@ -2716,7 +2716,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			gh_log(INFO, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
 				db_escape_string($share),
-				db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename"))
+				db_escape_string(clean_dir("$file_path/$filename"))
 			);
 			db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
 			return;
@@ -2806,11 +2806,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block){
 		foreach ($metafile_block as $metafile) {
 			$inode_number = @gh_fileinode($metafile->path);
-			if ($inode_number === FALSE) {
+			$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
+			if ($inode_number === FALSE || !is_greyhole_owned_drive($root_path)) {
 				$metafile->state = 'Gone';
 				$metafile->is_linked = FALSE;
-
-				$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
 				if (gone_ok($root_path)) {
 					// Let's not replace this copy yet...
 					$file_copies_inodes[$metafile->path] = $metafile->path;
@@ -2835,7 +2834,6 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	}
 
 	if (count($file_copies_inodes) > 0) {
-		// If no metafile is linked, link the 1st one
 		$found_linked_metafile = FALSE;
 		foreach ($file_metafiles as $key => $metafile) {
 			if ($metafile->is_linked) {
@@ -2850,11 +2848,17 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				}
 			}
 		}
+		// If no metafile is linked, link the 1st one (that is OK)
 		if (!$found_linked_metafile) {
-			$first_metafile = reset($file_metafiles);
-			$first_metafile->is_linked = TRUE;
-			$expected_file_size = gh_filesize($first_metafile->path);
-			$original_file_path = $first_metafile->path;
+			foreach ($file_metafiles as $first_metafile) {
+				$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $first_metafile->path);
+				if ($first_metafile->state == 'OK' && is_greyhole_owned_drive($root_path)) {
+					$first_metafile->is_linked = TRUE;
+					$expected_file_size = gh_filesize($first_metafile->path);
+					$original_file_path = $first_metafile->path;
+					break;
+				}
+			}
 		}
 		
 		if (@$options['disk-usage-report']) {
