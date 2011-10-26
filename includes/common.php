@@ -1336,7 +1336,11 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			if (!is_dir($sp_drive)) {
 	  			$body .= "$sp_drive: directory doesn't exists\n";
 			} else {
-				$body .= "$sp_drive: expected partition UUID: " . $drives_definitions[$sp_drive] . "; current partition UUID: " . gh_dir_uuid($sp_drive) . "\n";
+				$current_uuid = gh_dir_uuid($sp_drive);
+				if (empty($current_uuid)) {
+					$current_uuid = 'N/A';
+				}
+				$body .= "$sp_drive: expected partition UUID: " . $drives_definitions[$sp_drive] . "; current partition UUID: $current_uuid\n";
 			}
 		}
 		$sp_drive = $missing_drives[0];
