@@ -19,6 +19,11 @@ else
 	ln -s ${LIBDIR}/greyhole/greyhole-samba.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
+# For Ubuntu 11.10, where even x86_64 install use /usr/lib
+if [ "`uname -m`" = "x86_64" ]; then
+	ln -s ${LIBDIR}/samba/vfs/greyhole.so /usr/lib/samba/vfs/greyhole.so
+fi
+
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
 	# cifs client workaround
 	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
