@@ -130,6 +130,11 @@ if ($action == 'thaw') {
 	exit(0);
 }
 
+if ($action == 'fix-symlinks') {
+	fix_all_symlinks();
+	exit(0);
+}
+
 if ($action == 'gone' || $action == 'going') {
 	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
 		$options['drive'] = '/' . trim($options['drive'], '/');
@@ -162,27 +167,12 @@ if ($action == 'gone' || $action == 'going') {
 		foreach ($shares_options as $share_name => $share_options) {
 			if ($share_options['num_copies'] == 1) {
 				echo "Moving file copies for share '$share_name'... Please be patient... ";
-				gh_fsck($share_options['landing_zone'], $share_name);
-				echo "Done.\n";
-			} else {
-				echo "Looking for soon-to-be-broken symbolic links in the share '$share_name'... Please be patient... ";
-				chdir($share_options['landing_zone']);
-				exec("find . -type l -lname " . escapeshellarg("$going_drive/*"), $result);
-				foreach ($result as $file_to_relink) {
-					if (is_link($file_to_relink)) {
-						$file_to_relink = substr($file_to_relink, 2);
-						foreach ($storage_pool_drives as $sp_drive) {
-							if (!is_greyhole_owned_drive($sp_drive)) { continue; }
-							$new_link_target = clean_dir("$sp_drive/$share_name/$file_to_relink");
-							if (gh_is_file($new_link_target)) {
-								unlink($file_to_relink);
-								symlink($new_link_target, $file_to_relink);
-								break;
-							}
-						}
-					}
+				if (is_dir("$going_drive/$share_name")) {
+					gh_fsck($share_options['landing_zone'], $share_name);
 				}
 				echo "Done.\n";
+			} else {
+				fix_symlinks_on_share($share_name);
 			}
 		}
 	}
@@ -3892,7 +3882,7 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DfClsSLaqiU5';
+	$opts_actions = 'DfClsSLaqiU5X';
 	$longopts_actions = array(
 		'daemon',
 		'fsck',
@@ -3905,7 +3895,8 @@ function process_command_line() {
 		'view-queue',
 		'iostat',
 		'getuid',
-		'md5-worker'
+		'md5-worker',
+		'fix-symlinks'
 	);
 
 	$opts_actions_with_values = 'r::w::g::n::t::b:';
@@ -4043,6 +4034,8 @@ function print_usage() {
 	echo "                        missing drive. If you don't supply an option, the available\n";
 	echo "                        options (paths) will be displayed.\n";
 	echo "  -r, --replace[=path]  Tell Greyhole that you replaced the drive at <path>.\n";
+	echo "  -X, --fix-symlinks    Try to find a good file copy to point to for all broken\n";
+	echo "                        symlinks found on your shares.\n";
 	
 	echo "\n";
 	echo "For --stats and --view-queue, the available OPTIONS are:\n";

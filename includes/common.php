@@ -1382,6 +1382,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 				gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
 			}else{
 				gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
+				fix_all_symlinks();
 			}
 			foreach ($shares_options as $share_name => $share_options) {
 				gh_fsck($share_options['landing_zone'], $share_name);
@@ -1558,5 +1559,36 @@ function gh_dir_uuid($dir) {
 		return FALSE;
 	}
 	return trim(exec('blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
+}
+
+function fix_all_symlinks() {
+	global $shares_options;
+	foreach ($shares_options as $share_name => $share_options) {
+		fix_symlinks_on_share($share_name);
+	}
+}
+
+function fix_symlinks_on_share($share_name) {
+	global $shares_options, $storage_pool_drives;
+	$share_options = $shares_options[$share_name];
+	echo "Looking for broken symbolic links in the share '$share_name'... Please be patient...\n";
+	chdir($share_options['landing_zone']);
+	exec("find -L . -type l", $result);
+	foreach ($result as $file_to_relink) {
+		if (is_link($file_to_relink)) {
+			$file_to_relink = substr($file_to_relink, 2);
+			foreach ($storage_pool_drives as $sp_drive) {
+				if (!is_greyhole_owned_drive($sp_drive)) { continue; }
+				$new_link_target = clean_dir("$sp_drive/$share_name/$file_to_relink");
+				if (gh_is_file($new_link_target)) {
+					unlink($file_to_relink);
+					symlink($new_link_target, $file_to_relink);
+					echo ".";
+					break;
+				}
+			}
+		}
+	}
+	echo " Done.\n";
 }
 ?>
