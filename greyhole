@@ -2648,6 +2648,16 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
 		if ($filename != '.' && $filename != '..') {
 			$full_path = "$path/$filename";
 			$file_type = @filetype($full_path);
+			if ($file_type === FALSE) {
+				// Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+				$file_type = @filetype(normalize_utf8_characters($full_path));
+				if ($file_type !== FALSE) {
+					// Bingo!
+					$full_path = normalize_utf8_characters($full_path);
+					$path = normalize_utf8_characters($path);
+					$filename = normalize_utf8_characters($filename);
+				}
+			}
 			if ($file_type == 'dir') {
 				gh_fsck($full_path, $share, $storage_path);
 			} else {
@@ -2664,7 +2674,7 @@ function gh_fsck_metastore($root, $path, $share) {
 	if (!is_dir("$root$path")) {
 		return;
 	}
-	gh_log(DEBUG, "Entering metastore $root$path");
+	gh_log(DEBUG, "Entering metastore " . clean_dir($root . $path));
 
 	$handle = opendir("$root$path");
 	while (($filename = readdir($handle)) !== FALSE) {
@@ -2699,6 +2709,16 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	}else{
 		$file_path = trim(mb_substr($path, mb_strlen("$storage_path/$share")+1), '/');
 	}
+	if ($file_type === FALSE) {
+		// Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+		$file_type = @filetype(normalize_utf8_characters("$path/$filename"));
+		if ($file_type !== FALSE) {
+			// Bingo!
+			$file_path = normalize_utf8_characters($file_path);
+			$path = normalize_utf8_characters($path);
+			$filename = normalize_utf8_characters($filename);
+		}
+	}
 	if ($source == 'metastore') {
 		$fsck_report['metastore']['num_files']++;
 	}
@@ -2727,23 +2747,20 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				if ($action != 'fsck_file') {
 					// Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
 					// We'll queue this file fsck (to restore the symlink) for when all other file operations have been executed.
+					gh_log(DEBUG, "  Queuing a new fsck_file task for " . clean_dir("$share/$file_path/$filename"));
 					$query = sprintf("INSERT INTO tasks (action, share, full_path, complete, additional_info) VALUES ('fsck_file', '%s', '%s', 'idle', '%s')",
 						db_escape_string($share),
 						db_escape_string(empty($file_path) ? $filename : clean_dir("$file_path/$filename")),
 						@$options['all-fsck-options']
 					);
 					db_query($query) or gh_log(CRITICAL, "Can't insert write task: " . db_error());
-					gh_log(DEBUG, "  Queuing a new fsck_file task for " . clean_dir("$share/$file_path/$filename"));
 					return;
 				}
 			}
 		}
 	}
 	
-	$file_metafiles = array();
-	$num_ok = 0;
-	$file_copies_inodes = array();
-	if (get_metafile_data_filename($share, $file_path, $filename) === FALSE) {
+	if (get_metafile_data_filename($share, $file_path, $filename) === FALSE && get_metafile_data_filename($share, normalize_utf8_characters($file_path), normalize_utf8_characters($filename)) === FALSE) {
 		$full_path = "$path/$filename";
 
 		// Check if this is a temporary file; if so, just delete it.
@@ -2765,39 +2782,26 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	}
 			
 	// Look for this file on all available drives
-	foreach ($storage_pool_drives as $sp_drive) {
-		$clean_full_path = clean_dir("$sp_drive/$share/$file_path/$filename");
-		$inode_number = @gh_fileinode($clean_full_path);
-		if ($inode_number !== FALSE) {
-			if (is_dir($clean_full_path)) {
-				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
-				@rmdir($clean_full_path);
-				continue;
-			}
-
-			gh_log(DEBUG, "Found $clean_full_path");
-
-			if (!is_greyhole_owned_drive($sp_drive)) {
-				gh_log(DEBUG, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
-				$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'Gone');
-				if (!isset($original_file_path)) {
-					$original_file_path = $clean_full_path;
-				}
-			} else {
-				$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => 'OK');
-				$file_copies_inodes[$inode_number] = $clean_full_path;
-				$num_ok++;
-			}
-			
-			// Temp files leftovers of stopped Greyhole executions
-			$temp_filename = get_temp_filename($clean_full_path);
-			if (file_exists($temp_filename) && gh_is_file($temp_filename)) {
-				gh_log(INFO, "  Found temporary file $temp_filename ... deleting.");
-				$fsck_report['temp_files'][] = $temp_filename;
-				gh_recycle($temp_filename);
-			}
+	$file_metafiles = array();
+	$file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles);
+	if (count($file_metafiles) == 0) {
+		// If we found 0 file copies the first time, we normalize the file path (using NFC) and try again.
+		// Ref: http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
+		$file_copies_inodes = get_file_inodes($share, normalize_utf8_characters($file_path), normalize_utf8_characters($filename), $file_metafiles);
+		if (count($file_metafiles) > 0) {
+			// Bingo!
+			$file_path = normalize_utf8_characters($file_path);
+			$filename = normalize_utf8_characters($filename);
 		}
 	}
+	
+	$num_ok = count($file_copies_inodes);
+	if ($num_ok == 0 && count($file_metafiles) > 0) {
+		// We found 1+ files, but none or them are on a defined storage drive; we can still use them as the source to create additional copies.
+		$metadata = reset($file_metafiles);
+		$original_file_path = $metadata->path;
+	}
+
 	foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block){
 		foreach ($metafile_block as $metafile) {
 			$inode_number = @gh_fileinode($metafile->path);
@@ -3205,6 +3209,8 @@ Trash size:\n";
 		$trash_path = clean_dir("$sp_drive/.gh_trash");
 		if (is_dir($trash_path)) {
 			$report .= "  $trash_path = " . trim(exec("du -sh " . escapeshellarg($trash_path) . " | awk '{print $1}'"))."\n";
+		} else if (!file_exists($sp_drive)) {
+			$report .= "  $sp_drive = N/A\n";
 		} else {
 			$report .= "  $trash_path = empty\n";
 		}
@@ -4396,4 +4402,46 @@ function restart_service() {
 	}
 }
 
+function get_file_inodes($share, $file_path, $filename, &$file_metafiles) {
+	global $storage_pool_drives;
+	$file_copies_inodes = array();
+	
+	foreach ($storage_pool_drives as $sp_drive) {
+		$clean_full_path = clean_dir("$sp_drive/$share/$file_path/$filename");
+		$inode_number = @gh_fileinode($clean_full_path);
+		if ($inode_number !== FALSE) {
+			if (is_dir($clean_full_path)) {
+				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
+				@rmdir($clean_full_path);
+				continue;
+			}
+
+			gh_log(DEBUG, "Found $clean_full_path");
+
+			if (!is_greyhole_owned_drive($sp_drive)) {
+				$state = 'Gone';
+				gh_log(DEBUG, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
+			} else {
+				$state = 'OK';
+				$file_copies_inodes[$inode_number] = $clean_full_path;
+			}
+			$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => $state);
+			
+			// Temp files leftovers of stopped Greyhole executions
+			$temp_filename = get_temp_filename($clean_full_path);
+			if (file_exists($temp_filename) && gh_is_file($temp_filename)) {
+				gh_log(INFO, "  Found temporary file $temp_filename ... deleting.");
+				$fsck_report['temp_files'][] = $temp_filename;
+				gh_recycle($temp_filename);
+			}
+		}
+	}
+
+	return $file_copies_inodes;
+}
+
+function normalize_utf8_characters($string) {
+	// Requires intl PHP extension (php-intl)
+	return normalizer_normalize($string);
+}
 ?>
