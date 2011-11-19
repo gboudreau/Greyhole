@@ -135,6 +135,20 @@ if ($action == 'fix-symlinks') {
 	exit(0);
 }
 
+if ($action == 'delete-metadata') {
+	$share = trim(mb_substr($options['dir'], 0, mb_strpos($options['dir'], '/')+1), '/');
+	$full_path = trim(mb_substr($options['dir'], mb_strpos($options['dir'], '/')+1), '/');
+	list($path, $filename) = explode_full_path($full_path);
+	foreach (get_metafile_data_filenames($share, $path, $filename, 1) as $file) {
+		if (file_exists($file)) {
+			echo "Deleting $file\n";
+			unlink($file);
+		}
+	}
+	echo "Done.\n";
+	exit(0);
+}
+
 if ($action == 'gone' || $action == 'going') {
 	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
 		$options['drive'] = '/' . trim($options['drive'], '/');
@@ -334,12 +348,7 @@ if ($action == 'view-queue') {
 	$shares_names = array_keys($shares_options);
 	natcasesort($shares_names);
 
-	$max_share_strlen = 7;
-	foreach ($shares_names as $share_name) {
-		if (mb_strlen($share_name) > $max_share_strlen) {
-			$max_share_strlen = mb_strlen($share_name);
-		}
-	}
+	$max_share_strlen = max(array_merge(array_map('mb_strlen', $shares_names), array(7)));
 
 	$queues = array();
 	$total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = $total_num_fsck_pending = 0;
@@ -3214,7 +3223,7 @@ Trash size:\n";
 				$report .= "    Those metadata files have been deleted, since you used the --delete-orphaned-metadata option. They will not re-appear in the future.\n";
 			} else {
 				$report .= "    Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.\n";
-				$report .= "    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store using \"greyhole --fsck --delete-orphaned-metadata\"\n";
+				$report .= "    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store using \"greyhole --delete-metadata=<path>, where <path> is one of the vsalue listed below.\"\n";
 			}
   			$report .= "  Files with no copies:\n";
 			$report .= "    " . implode("\n    ", array_keys($fsck_report['no_copies_found_files'])) . "\n\n";
@@ -3895,14 +3904,15 @@ function process_command_line() {
 		'fix-symlinks'
 	);
 
-	$opts_actions_with_values = 'r::w::g::n::t::b:';
+	$opts_actions_with_values = 'r::w::g::n::t::b:p:';
 	$longopts_actions_with_values = array(
 		'replace::',
 		'wait-for::',
 		'gone::',
 		'going::',
 		'thaw::',
-		'debug:'
+		'debug:',
+		'delete-metadata:'
 	);
 
 	$opts_options = 'eyucokmj';
@@ -4032,6 +4042,10 @@ function print_usage() {
 	echo "  -r, --replace[=path]  Tell Greyhole that you replaced the drive at <path>.\n";
 	echo "  -X, --fix-symlinks    Try to find a good file copy to point to for all broken\n";
 	echo "                        symlinks found on your shares.\n";
+	echo "  -p, --delete-metadata<=path>\n";
+	echo "                        Delete all metadata files for <path>, which should be a\n";
+	echo "                        share name, followed by the path to a file that is gone\n";
+	echo "                        from your storage pool.\n";
 	
 	echo "\n";
 	echo "For --stats and --view-queue, the available OPTIONS are:\n";

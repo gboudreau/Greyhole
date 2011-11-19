@@ -77,6 +77,15 @@ will be displayed.
 \-r, \-\-replace[=path]
 Tell Greyhole that you replaced the drive at <path>. This is not 
 necessary if you used \-\-gone or \-\-going to remove the drive.
+.TP
+\-X, \-\-fix-symlinks
+Try to find a good file copy to point to for all broken
+symlinks found on your shares.
+.TP
+\-p, \-\-delete-metadata<=path>
+Delete all metadata files for <path>, which should be a
+share name, followed by the path to a file that is gone
+from your storage pool.
 .SH OPTIONS
 .TP
 For \-\-stats and \-\-view-queue, the available OPTIONS are:
