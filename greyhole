@@ -455,13 +455,7 @@ if ($action == 'status') {
 }
 
 if ($action == 'stats') {
-	$max_drive_strlen = 0;
-	foreach ($storage_pool_drives as $sp_drive) {
-		if (mb_strlen($sp_drive) > $max_drive_strlen) {
-			$max_drive_strlen = mb_strlen($sp_drive);
-		}
-	}
-	$max_drive_strlen++;
+	$max_drive_strlen = max(array_map('mb_strlen', $storage_pool_drives)) + 1;
 
 	$totals = array(
 		'total_space' => 0,
@@ -474,7 +468,7 @@ if ($action == 'stats') {
 	$dfs = get_free_space_in_storage_pool_drives();
 	$stats = array();
 	foreach ($storage_pool_drives as $sp_drive) {
-		if (!isset($dfs[$sp_drive])) {
+		if (!isset($dfs[$sp_drive]) || !file_exists($sp_drive)) {
 			$stats[$sp_drive] = (object) array();
 			continue;
 		}
@@ -528,7 +522,7 @@ if ($action == 'stats') {
 		foreach ($stats as $sp_drive => $stat) {
 			if ($sp_drive == 'Total') printf("  %-$max_drive_strlen"."s ==========================================\n", "");
 			printf("  %-$max_drive_strlen"."s ", "$sp_drive:");
-			if (empty($stat) || $stat->total_space === 0) {
+			if (empty($stat->total_space)) {
 				echo "                 Offline                  \n";
 			} else {
 				echo sprintf('%5.0f', $stat->total_space/1024/1024) . "G - " . sprintf('%5.0f', $stat->used_space/1024/1024) . "G = " . sprintf('%5.0f', $stat->free_space/1024/1024) . "G + " . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G = " . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G\n";
