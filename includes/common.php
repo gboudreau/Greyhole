@@ -1384,14 +1384,8 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 				gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
 				fix_all_symlinks();
 			}
-			foreach ($shares_options as $share_name => $share_options) {
-				gh_fsck($share_options['landing_zone'], $share_name);
-			}
-			gh_log(INFO, "fsck for all shares completed.");
-			
-			$fsck_report = get_fsck_report();
-			gh_log(DEBUG, "Sending fsck report to $email_to");
-			mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report);
+			schedule_fsck_all_shares(array('email'));
+			gh_log(INFO, "  fsck for all shares scheduled.");
 		}
 
 		// Refresh $gone_ok_drives to it's real value (from the DB)
@@ -1590,5 +1584,17 @@ function fix_symlinks_on_share($share_name) {
 		}
 	}
 	echo " Done.\n";
+}
+
+function schedule_fsck_all_shares($fsck_options=array()) {
+	global $shares_options;
+	foreach ($shares_options as $share_name => $share_options) {
+		$full_path = $share_options['landing_zone'];
+		$query = sprintf("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '%s', %s, 'yes')",
+			db_escape_string($full_path),
+			(!empty($fsck_options) ? "'" . implode('|', $fsck_options) . "'" : "NULL")
+		);
+		db_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
+	}
 }
 ?>
