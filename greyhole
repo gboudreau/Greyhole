@@ -169,6 +169,7 @@ if ($action == 'gone' || $action == 'going') {
 	remove_drive_definition($options['drive']);
 
 	if ($action == 'going') {
+		file_put_contents($options['drive'] . "/.greyhole_used_this", "Flag to prevent Greyhole from thinking this drive disappeared for no reason...");
 		set_metastore_backup();
 		gh_log(INFO, "Storage pool drive " . $options['drive'] . " will be removed from the storage pool.");
 		echo("Storage pool drive " . $options['drive'] . " will be removed from the storage pool.\n");
@@ -212,6 +213,7 @@ if ($action == 'gone' || $action == 'going') {
 		schedule_fsck_all_shares();
 		echo "All the files that were only on $going_drive have been copied somewhere else.\n";
 		echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.\n";
+		unlink($options['drive'] . "/.greyhole_used_this");
 	} else { // $action == 'gone'
 		echo "Sadly, file copies that were only on this drive, if any, are now lost!\n";
 	}
