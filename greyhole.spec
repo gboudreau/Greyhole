@@ -47,15 +47,18 @@ install -m 0644 -D -p docs/greyhole-dfree.1.gz ${RPM_BUILD_ROOT}/usr/share/man/m
 install -m 0644 -D -p docs/greyhole.conf.5.gz ${RPM_BUILD_ROOT}/usr/share/man/man5/
 
 %ifarch x86_64
-	install -m 0644 -D -p samba-module/bin/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba.so
+	install -m 0644 -D -p samba-module/bin/3.4/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
 	install -m 0644 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
+	install -m 0644 -D -p samba-module/bin/3.6/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
 %else
 	%ifarch %{arm}
-		install -m 0644 -D -p samba-module/bin/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba.so
+		install -m 0644 -D -p samba-module/bin/3.4/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
 		install -m 0644 -D -p samba-module/bin/3.5/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
+		#install -m 0644 -D -p samba-module/bin/3.6/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
 	%else
-		install -m 0644 -D -p samba-module/bin/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba.so
+		install -m 0644 -D -p samba-module/bin/3.4/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
 		install -m 0644 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
+		install -m 0644 -D -p samba-module/bin/3.6/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
 	%endif
 %endif
 
@@ -83,9 +86,12 @@ SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -
 if [ "$SMB_VERSION" = "3 5" ]; then
 	echo "  Detected Samba 3.5; creating symlink pointing to greyhole-samba35.so"
 	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
+elif [ "$SMB_VERSION" = "3 6" ]; then
+	echo "  Detected Samba 3.6; creating symlink pointing to greyhole-samba36.so"
+	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 else
-	echo "  Detected Samba 3.4; creating symlink pointing to greyhole-samba.so"
-	ln -s ${LIBDIR}/greyhole/greyhole-samba.so ${LIBDIR}/samba/vfs/greyhole.so
+	echo "  Detected Samba 3.4; creating symlink pointing to greyhole-samba34.so"
+	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
 if [ ! -f ${LIBDIR}/samba/vfs/greyhole.so ]; then

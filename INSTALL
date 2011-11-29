@@ -69,8 +69,13 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Ubuntu: /etc/init.d/samba restart, or restart smbd
 	Debian: service samba restart
 
-3. For Samba other than 3.4/3.5: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba other than 3.4/3.5/3.6: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
+	
+	Note: if, for some reason, you need to compile the VFS module with Samba 3.4 or 3.6, you'll need to use the proper version number in the cp and patch commands below.
+	For example, for Samba 3.6:
+		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.6.c modules/vfs_greyhole.c
+		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.6.patch
 
 	Fedora:
 	yumdownloader --source samba
@@ -90,16 +95,13 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
 	make
-	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; else cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
+	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; fi
+	if [ -x /usr/lib/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
 	Fedora: service smb restart
 	Ubuntu (< 10): /etc/init.d/samba restart
 	Ubuntu (10+): restart smbd
 	Debian: service samba restart
-	
-	Note: if, for some reason, you need to compile the VFS module with Samba 3.4, use the following instead of the above cp & patch commands, after running ./configure, then continue with make:
-		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole.c modules/
-		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile.patch
 
 4. Add Greyhole to services that start on boot:
 

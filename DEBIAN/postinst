@@ -15,12 +15,14 @@ fi
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
 if [ "$SMB_VERSION" = "3 5" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
+elif [ "$SMB_VERSION" = "3 6" ]; then
+	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 else
-	ln -s ${LIBDIR}/greyhole/greyhole-samba.so ${LIBDIR}/samba/vfs/greyhole.so
+	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
 # For Ubuntu 11.10, where even x86_64 install use /usr/lib
-if [ "`uname -m`" = "x86_64" ]; then
+if [ "`uname -m`" = "x86_64" -a -x /usr/lib/samba/vfs/ ]; then
 	ln -s ${LIBDIR}/samba/vfs/greyhole.so /usr/lib/samba/vfs/greyhole.so
 fi
 
