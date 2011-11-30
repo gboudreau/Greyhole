@@ -370,8 +370,10 @@ function gh_log($local_log_level, $text) {
 	} else {
 		if (strtolower($greyhole_log_file) == 'syslog') {
 			$worked = syslog($local_log_level, $log_text);
-		} else {
+		} else if (!empty($greyhole_log_file)) {
 			$worked = error_log($log_text, 3, $greyhole_log_file);
+		} else {
+			$worked = FALSE;
 		}
 		if (!$worked) {
 			error_log(trim($log_text));
@@ -439,6 +441,9 @@ function get_debug_bt() {
 		foreach ($d['args'] as $k => $v) {
 			if (is_object($v)) {
 				$d['args'][$k] = 'stdClass';
+			}
+			if (is_array($v)) {
+				$d['args'][$k] = str_replace("\n", "", var_export($v, TRUE));
 			}
 		}
 		$bt = $prefix . $d['function'] .'(' . implode(',', $d['args']) . ')' . $bt;
@@ -1177,6 +1182,10 @@ class DriveSelection {
             $group = explode(' ', preg_replace('/^([0-9]+)x/', '\\1 ', $group));
             $num_drives = trim($group[0]);
             $group_name = trim($group[1]);
+			if (!isset($drive_selection_groups[$group_name])) {
+				//gh_log(WARN, "Warning: drive selection group named '$group_name' is undefined.");
+				continue;
+			}
             if ($num_drives == 'all' || $num_drives > count($drive_selection_groups[$group_name])) {
                 $num_drives = count($drive_selection_groups[$group_name]);
             }
