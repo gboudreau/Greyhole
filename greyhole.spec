@@ -152,6 +152,7 @@ fi
 %{_sysconfdir}/
 %{_libdir}
 /usr/share/greyhole/*
+/usr/share/man/*
 
 %changelog
 * Sun Jan 02 2011 Guillaume Boudreau
