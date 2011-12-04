@@ -14,20 +14,17 @@ NICK $NICK
 USER gboudreau +Zi $NICK :$0
 PRIVMSG NickServ :IDENTIFY $PASSWORD
 JOIN $CHANNEL
-PRIVMSG #greyhole :$MSG
+PRIVMSG $CHANNEL :$MSG
 EOF
 
 tail -n 10 -f /tmp/shellbot.input | telnet $SERVER $PORT | \
   while true
   do read LINE || break
-    echo $LINE
+    echo "`date +"%Y-%m-%d %H:%M:%S"` $LINE"
     if echo $LINE | grep -i "MODE $CHANNEL +o $NICK" &> /dev/null
     then
-      if [ $# -gt 1 ]
-	  then
-        echo "TOPIC #greyhole :Greyhole - Storage Pooling on Samba - Latest version: $VERSION - Homepage: http://greyhole.net - Support: http://support.greyhole.net - Twitter: @greyholeapp" >> /tmp/shellbot.input
-        sleep 1
-      fi
+      echo "TOPIC $CHANNEL :Greyhole - Storage Pooling on Samba - Latest version: $VERSION - Homepage: http://greyhole.net - Support: http://support.greyhole.net - Twitter: @greyholeapp" >> /tmp/shellbot.input
+      sleep 1
       echo "QUIT" >> /tmp/shellbot.input
       sleep 1
       killall telnet

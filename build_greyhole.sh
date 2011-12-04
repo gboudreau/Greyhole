@@ -94,7 +94,10 @@ for arch in $archs; do
 	export ARCH=$arch
 	make deb
 done
-               
+
+if [ `whoami` != "gb" ]; then
+	exit
+fi
 
 #########################################
 # Transfer files to HOST:PATH_TO_RELEASES
