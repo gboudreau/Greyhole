@@ -26,8 +26,9 @@
 #   3. Update the APT & YUM repositories
 #   4. Install the new version locally (using apt-get or yum, depending on what's available)
 #   5. Upload the new files to GitHub
-#   6. Update the CHANGELOG on http://www.greyhole.net/releases/CHANGELOG
-#   7. Send 'New version available' notifications by email, Twitter (@GreyholeApp), Facebook (Greyhole) and IRC (#greyhole on Freenode).
+#	6. Tag the git branch
+#   7. Update the CHANGELOG on http://www.greyhole.net/releases/CHANGELOG
+#   8. Send 'New version available' notifications by email, Twitter (@GreyholeApp), Facebook (Greyhole) and IRC (#greyhole on Freenode).
 
 
 #######
@@ -141,6 +142,13 @@ fi
 # Upload new files to GitHub
 
 ./github-auto-post-downloads.php $VERSION
+
+
+####################
+# Tag the git branch
+git clone git@github.com:gboudreau/Greyhole.git /tmp/Greyhole.git
+(cd /tmp/Greyhole.git; git tag $VERSION; git push --tags)
+rm -rf /tmp/Greyhole.git
 
 
 ############################
