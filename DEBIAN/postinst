@@ -23,7 +23,16 @@ fi
 
 # For Ubuntu 11.10, where even x86_64 install use /usr/lib
 if [ "`uname -m`" = "x86_64" -a -x /usr/lib/samba/vfs/ ]; then
-	ln -s ${LIBDIR}/samba/vfs/greyhole.so /usr/lib/samba/vfs/greyhole.so
+	if [ -f /usr/lib/samba/vfs/greyhole.so ]; then
+		rm /usr/lib/samba/vfs/greyhole.so
+	fi
+	if [ "$SMB_VERSION" = "3 5" ]; then
+		ln -s ${LIBDIR}/greyhole/greyhole-samba35.so /usr/lib/samba/vfs/greyhole.so
+	elif [ "$SMB_VERSION" = "3 6" ]; then
+		ln -s ${LIBDIR}/greyhole/greyhole-samba36.so /usr/lib/samba/vfs/greyhole.so
+	else
+		ln -s ${LIBDIR}/greyhole/greyhole-samba34.so /usr/lib/samba/vfs/greyhole.so
+	fi
 fi
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
