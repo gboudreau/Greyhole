@@ -3824,7 +3824,9 @@ function set_metastore_backup($try_restore=TRUE) {
 	}
 
 	// Verify the drives, if any
-	if (!empty($metastore_backup_drives)) {
+	if (empty($metastore_backup_drives)) {
+		$metastore_backup_drives = array();
+	} else {
 		foreach ($metastore_backup_drives as $key => $metastore_backup_drive) {
 			if (!is_greyhole_owned_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
 				// Directory is now invalid; stop using it.
