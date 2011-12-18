@@ -121,9 +121,15 @@ function parse_config() {
 					${$name} = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
 					break;
 				case 'storage_pool_drive': // or storage_pool_directory
-					if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?gb?/i", $value, $regs)) {
+					if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?(gmk)b?/i", $value, $regs)) {
 						$storage_pool_drives[] = trim($regs[1]);
-						$minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]);
+						if (strtolower($regs[3]) == 'g') {
+							$minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]);
+						} else if (strtolower($regs[3]) == 'm') {
+							$minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]) / 1024.0;
+						} else if (strtolower($regs[3]) == 'k') {
+							$minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]) / 1024.0 / 1024.0;
+						}
 					}
 					break;
 				case 'wait_for_exclusive_file_access':
