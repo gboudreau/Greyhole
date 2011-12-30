@@ -1,6 +1,39 @@
 #!/bin/bash
 set -e
 
+# Remove 
+rm -f /usr/lib64/samba/vfs/greyhole.so
+rm -f /usr/lib/samba/vfs/greyhole.so
+
 if [ "$1" = purge ]; then
-	update-rc.d greyhole remove
+	# not an update, a complete uninstall
+	
+	# Service removal
+	if [ -f /sbin/start ]; then
+		# Using Upstart instead of SYSV init.d
+		if [ -f /etc/init/greyhole.conf ]; then
+			stop greyhole 2> /dev/null > /dev/null || true
+		fi
+	else
+		# (SYSV) Service stop & uninstall
+		if [ -f /etc/init.d/greyhole ]; then
+			/sbin/service greyhole stop 2>&1 > /dev/null || true
+		fi
+		update-rc.d greyhole remove
+	fi
+
+	# Remove Greyhole from /etc/samba/smb.conf
+	grep -v "dfree.*greyhole" /etc/samba/smb.conf > /etc/samba/smb.conf.new
+	sed --in-place -e 's@\(vfs objects.*\) greyhole@\1@' /etc/samba/smb.conf.new
+	sed --in-place -e 's@^[ \t]*vfs objects =$@@' /etc/samba/smb.conf.new
+	mv -f /etc/samba/smb.conf.new /etc/samba/smb.conf
+
+	if [ -f /etc/init/smbd.conf ]; then
+		# Using Upstart instead of SYSV init.d
+		restart smbd 2> /dev/null > /dev/null || true
+	else
+		# (SYSV) Service install & start
+		/sbin/service smb reload 2>&1 > /dev/null || true
+	fi
+else
 fi

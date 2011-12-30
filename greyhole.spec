@@ -127,6 +127,10 @@ echo "==========================================================================
 
 %preun
 
+# Delete VFS module symlinks, if any
+rm -f /usr/lib64/samba/vfs/greyhole.so
+rm -f /usr/lib/samba/vfs/greyhole.so
+
 if [ "$1" != 0 ]; then
 	/sbin/service greyhole condrestart 2>&1 > /dev/null
 else
