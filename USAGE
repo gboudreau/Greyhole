@@ -7,9 +7,16 @@ You need Greyhole installed for those instructions to make sense.
 See https://github.com/gboudreau/Greyhole/wiki/Installing for details.
 
 Most of the commands below require root access, so now would be a good time 
-to become root, if you're not already.
+to become root, if you're not already (use `sudo -i` if you don't have the root password).
 
-1. Setup Samba:
+1. Read the following documentation pages.
+   The first page will help you understand why you're doing the next steps.
+   The second page will help you choose your Landing Zones (/path/to/share_name, in the next step) correctly.
+
+   How Greyhole Works:     https://github.com/gboudreau/Greyhole/wiki/HowGreyholeWorks
+   About the Landing Zone: https://github.com/gboudreau/Greyhole/wiki/AboutLZ
+   
+2. Setup Samba:
 
 	Edit /etc/samba/smb.conf
 	Change or add the following values in the [global] section:
@@ -38,7 +45,7 @@ to become root, if you're not already.
 	Ubuntu (10+): restart smbd
 	Debian: service samba restart
 
-2. Setup the database:
+3. Setup the database:
 
 	If using MySQL:
 
@@ -52,9 +59,9 @@ to become root, if you're not already.
 		mysql -u root -p -e "create database greyhole; grant all on greyhole.* to greyhole_user@localhost identified by '89y63jdwe';"
 		mysql -u greyhole_user -p89y63jdwe greyhole < /usr/share/greyhole/schema-mysql.sql
 
-3. Customize the Greyhole configuration file, /etc/greyhole.conf, as needed.
+4. Customize the Greyhole configuration file, /etc/greyhole.conf, as needed.
 
-4. Start the Greyhole service:
+5. Start the Greyhole service:
 
 	Fedora: service greyhole start
 	Ubuntu (< 10): /etc/init.d/greyhole start
