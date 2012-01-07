@@ -1210,18 +1210,25 @@ class DriveSelection {
     }
 }
 
+$greyhole_owned_drives = array();
 function is_greyhole_owned_drive($sp_drive) {
-	global $going_drive;
+	global $going_drive, $df_cache_time, $greyhole_owned_drives;
 	if (isset($going_drive) && $sp_drive == $going_drive) {
 		return FALSE;
 	}
-	
-	$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
-	if (!$drives_definitions) {
-		$drives_definitions = convert_sp_drives_tag_files();
+	if (isset($greyhole_owned_drives[$sp_drive]) && $greyhole_owned_drives[$sp_drive] < time() - $df_cache_time) {
+		unset($greyhole_owned_drives[$sp_drive]);
 	}
-	
-	return @$drives_definitions[$sp_drive] === gh_dir_uuid($sp_drive);
+	if (!isset($greyhole_owned_drives[$sp_drive])) {
+		$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
+		if (!$drives_definitions) {
+			$drives_definitions = convert_sp_drives_tag_files();
+		}
+		if (@$drives_definitions[$sp_drive] === gh_dir_uuid($sp_drive)) {
+			$greyhole_owned_drives[$sp_drive] = time();
+		}
+	}
+	return isset($greyhole_owned_drives[$sp_drive]);
 }
 
 // Is it OK for a drive to be gone?
