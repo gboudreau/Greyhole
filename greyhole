@@ -1909,6 +1909,9 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
 		if (is_link($share_file)) {
 			$share_file_link_to = readlink($share_file);
 		}
+		if (!is_array($metafiles)) {
+			$metafiles = array();
+		}
 		foreach ($metafiles as $key => $metafile) {
 			if ($metafile->state == 'OK' && $share_file_link_to !== FALSE) {
 				if ($metafile->is_linked && $metafile->path != $share_file_link_to) {
