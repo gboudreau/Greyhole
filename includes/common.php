@@ -182,7 +182,7 @@ function parse_config() {
     						$parsing_drive_selection_groups = $share;
     					}
 					} else if (mb_strpos($name, 'drive_selection_algorithm') === 0) { // or dir_selection_algorithm
-						$share = mb_substr($name, 27, mb_strlen($name)-28);
+						$share = mb_substr($name, 26, mb_strlen($name)-27);
 						if (!isset($shares_options[$share]['drive_selection_groups'])) {
 						    $shares_options[$share]['drive_selection_groups'] = @$drive_selection_groups;
 						}
