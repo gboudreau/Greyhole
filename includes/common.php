@@ -226,8 +226,8 @@ function parse_config() {
 		return FALSE;
 	}
 
-	$config_text = file_get_contents($smb_config_file);
-	foreach (explode("\n", $config_text) as $line) {
+	exec('testparm -s ' . escapeshellarg($smb_config_file), $config_text);
+	foreach ($config_text as $line) {
 		$line = trim($line);
 		if (mb_strlen($line) == 0) { continue; }
 		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
