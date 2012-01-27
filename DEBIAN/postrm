@@ -35,5 +35,4 @@ if [ "$1" = purge ]; then
 		# (SYSV) Service install & start
 		/sbin/service smb reload 2>&1 > /dev/null || true
 	fi
-else
 fi
