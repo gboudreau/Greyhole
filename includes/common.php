@@ -78,6 +78,14 @@ function parse_config() {
 	$storage_pool_drives = array();
 	$frozen_directories = array();
 	$config_text = file_get_contents($config_file);
+
+	if (preg_match_all("/^[ \t]*include[ \t]*=[ \t]*(?P<filename>[^#]+)/im", $config_text, $config_includes) !== false) {
+		foreach ($config_includes['filename'] as $config_include_file) {
+			if (file_exists(trim($config_include_file))) {
+				$config_text .= file_get_contents(trim($config_include_file));
+			}
+		}
+	}
 	
 	// Defaults
 	$log_level = DEBUG;
