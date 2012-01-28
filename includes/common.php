@@ -235,7 +235,7 @@ function parse_config() {
 	}
 
 	exec('testparm -s ' . escapeshellarg($smb_config_file) . ' 2> /dev/null', $config_text);
-	foreach ($config_text) as $line) {
+	foreach ($config_text as $line) {
 		$line = trim($line);
 		if (mb_strlen($line) == 0) { continue; }
 		if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
