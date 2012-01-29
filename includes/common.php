@@ -74,7 +74,8 @@ function recursive_include_parser($file) {
 	$file = trim($file);
 
 	if (file_exists($file)) {
-		return preg_replace_callback($regex, 'recursive_include_parser', file_get_contents($file));
+		$contents = is_executable($file) ? shell_exec(escapeshellcmd($file)) : file_get_contents($file);
+		return preg_replace_callback($regex, 'recursive_include_parser', $contents);
 	} else {
 		return false;
 	}
