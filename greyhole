@@ -2067,7 +2067,7 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 		$setting = Settings::set('last_read_log_smbd_line', 0);
 	}
 
-	$f_seek_point = (int) $setting->value;
+	$f_seek_point = (int) $setting;
 
 	clearstatcache();
 	$samba_log_size = gh_filesize($samba_log_file);
@@ -2496,7 +2496,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 				gh_log(WARN, "Received no rows when querying settings for 'last_OOS_notification'; expected one.");
 				$setting = Settings::set('last_OOS_notification', 0);
 			}
-			$last_OOS_notification = $setting->value;
+			$last_OOS_notification = $setting;
 		}
 		if ($last_OOS_notification < strtotime('-1 day')) {
 			global $email_to;
