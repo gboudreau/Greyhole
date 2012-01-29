@@ -65,7 +65,7 @@ $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle
 
 function recursive_include_parser($file) {
 	
-	$regex = '/^[ \t]*include[ \t]*=[ \t]*([^#]+)$/im';
+	$regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
 
 	if (is_array($file) && count($file) > 1) {
 		$file = $file[1];
