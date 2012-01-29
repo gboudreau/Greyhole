@@ -2715,6 +2715,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		$file_path = trim(mb_substr($path, mb_strlen("$storage_path/$share")+1), '/');
 	}
 	if ($file_type === FALSE) {
+		clearstatcache();
 		// Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
 		$file_type = @filetype(normalize_utf8_characters("$path/$filename"));
 		if ($file_type !== FALSE) {
@@ -2785,7 +2786,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			}
 		}
 	}
-			
+
 	// Look for this file on all available drives
 	$file_metafiles = array();
 	$file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles);
@@ -2936,11 +2937,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			}
 			foreach ($file_metafiles as $key => $metafile) {
 				if ($metafile->is_linked) {
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
-					@unlink("$landing_zone/$file_path/$filename");
-					list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
-					gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
-					symlink($metafile->path, "$landing_zone/$file_path/$filename");
+					gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
 					break;
 				}
 			}
@@ -3055,11 +3052,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 					$file_metafiles[$key] = $metafile;
 					continue;
 				}
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
-				gh_recycle("$landing_zone/$file_path/$filename");
-				list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
-				gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
-				symlink($metafile->path, "$landing_zone/$file_path/$filename");
+				
+				gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
 				$symlink_created = TRUE;
 			}
 		}
@@ -3068,11 +3062,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				if ($metafile->state == 'OK') {
 					$metafile->is_linked = TRUE;
 					$file_metafiles[$key] = $metafile;
-					gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
-					gh_recycle("$landing_zone/$file_path/$filename");
-					list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
-					gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
-					symlink($metafile->path, "$landing_zone/$file_path/$filename");
+					gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
 					break;
 				}
 			}
@@ -3130,11 +3120,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			}
 			if (!$found_linked_metafile) {
 				$metafile = reset($file_metafiles);
-				gh_log(DEBUG, "  Updating symlink at $landing_zone/$file_path/$filename to point to $metafile->path");
-				gh_recycle("$landing_zone/$file_path/$filename");
-				list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
-				gh_mkdir("$landing_zone/$file_path", $metafile_dir_path);
-				symlink($metafile->path, "$landing_zone/$file_path/$filename");
+				gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
 				reset($file_metafiles)->is_linked = TRUE;
 			}
 
@@ -3160,6 +3146,29 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 			}
 		}
 	}
+}
+
+function gh_fsck_update_symlink($target, $symlink, $share, $file_path, $filename) {
+	clearstatcache();
+	if (!file_exists($symlink)) {
+		gh_log(DEBUG, "  Missing symlink... A pending unlink transaction maybe?");
+		parse_samba_spool(FALSE);
+		$query = sprintf("SELECT * FROM tasks WHERE action = 'unlink' AND share = '%s' AND full_path = '%s'",
+			db_escape_string($share),
+			db_escape_string(trim("$file_path/$filename", '/'))
+		);
+		$result = db_query($query) or gh_log(CRITICAL, "Can't select for pending unlink" . db_error());
+		if (db_fetch_object($result) !== FALSE) {
+			gh_log(DEBUG, "    Indeed! Pending unlink task found. Will not re-created this symlink.");
+			return;
+		}
+		gh_log(DEBUG, "    No... Found no good reason for the symlink to be missing! Let's re-create it.");
+	}
+	
+	gh_log(DEBUG, "  Updating symlink at $symlink to point to $target");
+	gh_recycle($symlink);
+	gh_mkdir(dirname($symlink), dirname($target));
+	symlink($target, $symlink);
 }
 
 function initialize_fsck_report($what) {
