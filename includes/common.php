@@ -63,6 +63,21 @@ if (!isset($smb_config_file)) {
 
 $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
+function recursive_include_parser($file) {
+	
+	$regex = '/^[ \t]*include[ \t]*=[ \t]*([^#]+)$/im';
+
+	if (is_array($file)) {
+		if (count($file) > 1 && file_exists(trim($file[1]))) {
+			$file = $file[1];
+		} else {
+			return false;
+		}
+	}
+
+	return preg_replace_callback($regex, 'recursive_include_parser', file_get_contents(trim($file)));
+}
+
 function parse_config() {
 	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $balance_modified_files;
 
@@ -77,15 +92,7 @@ function parse_config() {
 	$shares_options = array();
 	$storage_pool_drives = array();
 	$frozen_directories = array();
-	$config_text = file_get_contents($config_file);
-
-	if (preg_match_all("/^[ \t]*include[ \t]*=[ \t]*(?P<filename>[^#]+)/im", $config_text, $config_includes) !== false) {
-		foreach ($config_includes['filename'] as $config_include_file) {
-			if (file_exists(trim($config_include_file))) {
-				$config_text .= file_get_contents(trim($config_include_file));
-			}
-		}
-	}
+	$config_text = recursive_include_parser($config_file);
 	
 	// Defaults
 	$log_level = DEBUG;
