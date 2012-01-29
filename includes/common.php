@@ -170,7 +170,7 @@ function parse_config() {
 					$memory_limit = $value;
 					break;
 				case 'drive_selection_groups': // or dir_selection_groups
-				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
+				    if (preg_match("/(.+):(.*)/", $value, $regs)) {
     				    global $drive_selection_groups;
 				        $group_name = trim($regs[1]);
 						$drive_selection_groups[$group_name] = array_map('trim', explode(',', $regs[2]));
