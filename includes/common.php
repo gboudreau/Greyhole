@@ -67,15 +67,17 @@ function recursive_include_parser($file) {
 	
 	$regex = '/^[ \t]*include[ \t]*=[ \t]*([^#]+)$/im';
 
-	if (is_array($file)) {
-		if (count($file) > 1 && file_exists(trim($file[1]))) {
-			$file = $file[1];
-		} else {
-			return false;
-		}
+	if (is_array($file) && count($file) > 1) {
+		$file = $file[1];
 	}
 
-	return preg_replace_callback($regex, 'recursive_include_parser', file_get_contents(trim($file)));
+	$file = trim($file);
+
+	if (file_exists($file)) {
+		return preg_replace_callback($regex, 'recursive_include_parser', file_get_contents($file));
+	} else {
+		return false;
+	}
 }
 
 function parse_config() {
