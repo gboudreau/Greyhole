@@ -236,5 +236,21 @@ function db_migrate() {
 			}
 		}
 	}
+
+	// Migration #7 (full_path new size: 4096)
+	if (@$db_use_mysql) {
+		$query = "DESCRIBE tasks";
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		while ($row = db_fetch_object($result)) {
+			if ($row->Field == 'full_path') {
+				if ($row->Type == "tinytext") {
+					// migrate
+					db_query("ALTER TABLE tasks CHANGE full_path full_path TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL");
+					db_query("ALTER TABLE tasks_completed CHANGE full_path full_path TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL");
+				}
+				break;
+			}
+		}
+	}
 }
 ?>

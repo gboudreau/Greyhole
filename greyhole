@@ -3159,7 +3159,7 @@ function gh_fsck_update_symlink($target, $symlink, $share, $file_path, $filename
 		);
 		$result = db_query($query) or gh_log(CRITICAL, "Can't select for pending unlink" . db_error());
 		if (db_fetch_object($result) !== FALSE) {
-			gh_log(DEBUG, "    Indeed! Pending unlink task found. Will not re-created this symlink.");
+			gh_log(DEBUG, "    Indeed! Pending unlink task found. Will not re-create this symlink.");
 			return;
 		}
 		gh_log(DEBUG, "    No... Found no good reason for the symlink to be missing! Let's re-create it.");
