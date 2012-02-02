@@ -66,6 +66,7 @@ $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle
 function recursive_include_parser($file) {
 	
 	$regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
+	$ok_to_execute = FALSE;
 
 	if (is_array($file) && count($file) > 1) {
 		$file = $file[1];
@@ -74,7 +75,25 @@ function recursive_include_parser($file) {
 	$file = trim($file);
 
 	if (file_exists($file)) {
-		$contents = is_executable($file) ? shell_exec(escapeshellcmd($file)) : file_get_contents($file);
+		if (is_executable($file)) {
+			$perms = fileperms($file);
+
+			// Not user-writable, or owned by root
+			$ok_to_execute = !($perms & 0x0080) || fileowner($file) === 0;
+
+			// Not group-writable, or group owner is root
+			$ok_to_execute &= !($perms & 0x0010) || filegroup($file) === 0;
+
+			 // Not world-writable
+			$ok_to_execute &= !($perms & 0x0002);
+
+			if (!$ok_to_execute) {
+				gh_log(WARN, "Config file '{$file}' is executable but file permissions are insecure, only the file's contents will be included.");
+			}
+		}
+
+		$contents = $ok_to_execute ? shell_exec(escapeshellcmd($file)) : file_get_contents($file);
+		
 		return preg_replace_callback($regex, 'recursive_include_parser', $contents);
 	} else {
 		return false;
