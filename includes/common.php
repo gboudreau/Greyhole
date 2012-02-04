@@ -81,7 +81,7 @@ function recursive_include_parser($file) {
 }
 
 function parse_config() {
-	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $balance_modified_files;
+	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time;
 
 	$deprecated_options = array(
 		'delete_moves_to_attic' => 'delete_moves_to_trash',
@@ -105,7 +105,6 @@ function parse_config() {
 	$allow_multiple_sp_per_device = FALSE;
 	$df_cache_time = 15;
 	$delete_moves_to_trash = TRUE;
-	$balance_modified_files = FALSE;
 	$memory_limit = '128M';
 	
 	foreach (explode("\n", $config_text) as $line) {
@@ -131,7 +130,6 @@ function parse_config() {
 					break;
 				case 'delete_moves_to_trash': // or delete_moves_to_attic
 				case 'log_memory_usage':
-				case 'balance_modified_files':
 				case 'check_for_open_files':
 				case 'allow_multiple_sp_per_device':
 					global ${$name};

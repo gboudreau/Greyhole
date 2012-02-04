@@ -294,6 +294,7 @@ if ($action == 'debug') {
 	$result2 = array();
 	$i = 0;
 	foreach ($result as $rline) {
+		if ($rline == '--') { continue; }
 		$date_time = substr($rline, 0, 15);
 		$timestamp = strtotime($date_time);
 		$result2[$timestamp.sprintf("%04d", $i++)] = $rline;
@@ -1239,7 +1240,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 			// There might be old metafiles... for example, when a delete task was skipped.
 			// Let's remove the file copies if there are any leftovers; correct copies will be re-created below.
 			if (file_exists("$landing_zone/$target_full_path") && (count($existing_metafiles) > 0 || !is_link("$landing_zone/$target_full_path"))) {
-				foreach (get_metafiles($share, $target_path, $target_filename) as $existing_target_metafiles){
+				foreach (get_metafiles($share, $target_path, $target_filename, TRUE, FALSE, FALSE) as $existing_target_metafiles) {
 					if (count($existing_target_metafiles) > 0) {
 						foreach ($existing_target_metafiles as $metafile) {
 							gh_recycle($metafile->path);
@@ -1447,7 +1448,7 @@ function find_next_rename_task($share, $full_path, $task_id) {
 }
 
 function gh_write($share, $full_path, $task_id) {
-	global $storage_pool_drives, $log_level, $balance_modified_files, $sleep_before_task;
+	global $storage_pool_drives, $log_level, $sleep_before_task;
 	
 	$landing_zone = get_share_landing_zone($share);
 	if (!$landing_zone) {
@@ -1492,43 +1493,38 @@ function gh_write($share, $full_path, $task_id) {
 		}
 		gh_log(DEBUG, "  Will use source file: $source_file");
 
-		foreach (get_metafiles($share, $path, $filename) as $existing_metafiles){
-			gh_log(DEBUG, count($existing_metafiles) . " metadata files loaded.");
-			// Will keep existing copies at their location if balance_modified_files = no
-			// This will allow us to use rsync instead of blindly copying the complete files.
-			if ($balance_modified_files) {
-				// Remove old copies (but not the one that was updated!)
-				$keys_to_remove = array();
-				$found_source_file = FALSE;
-				foreach ($existing_metafiles as $key => $metafile) {
-					$metafile->path = clean_dir($metafile->path);
-					if ($metafile->path == $source_file) {
-						$metafile->is_linked = TRUE;
-						$metafile->state = 'OK';
-						$found_source_file = TRUE;
-					} else {
-						gh_log(DEBUG, "  Will remove copy at $metafile->path");
-						$keys_to_remove[] = $metafile->path;
-					}
-					// This will make sure the correct key is used in the $existing_metafiles array...
-					//   This is important because that key is what is used to check if there's already a copy on that drive.
-					unset($existing_metafiles[$key]);
-					$existing_metafiles[$metafile->path] = $metafile;
+		foreach (get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
+			// Remove old copies (but not the one that was updated!)
+			$keys_to_remove = array();
+			$found_source_file = FALSE;
+			foreach ($existing_metafiles as $key => $metafile) {
+				$metafile->path = clean_dir($metafile->path);
+				if ($metafile->path == $source_file) {
+					$metafile->is_linked = TRUE;
+					$metafile->state = 'OK';
+					$found_source_file = TRUE;
+				} else {
+					gh_log(DEBUG, "  Will remove copy at $metafile->path");
+					$keys_to_remove[] = $metafile->path;
 				}
-				if (!$found_source_file) {
-					// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
-					$key = array_shift($keys_to_remove);
-					$source_file = $existing_metafiles[$key]->path;
-					gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
-				}
-				foreach ($keys_to_remove as $key) {
-					if ($existing_metafiles[$key]->path != $source_file) {
-						gh_recycle($existing_metafiles[$key]->path);
-					}
-					unset($existing_metafiles[$key]);
-				}
+				// This will make sure the correct key is used in the $existing_metafiles array...
+				//   This is important because that key is what is used to check if there's already a copy on that drive.
+				unset($existing_metafiles[$key]);
+				$existing_metafiles[$metafile->path] = $metafile;
 			}
-			gh_write_process_metafiles($num_copies_required,$existing_metafiles,$share,$full_path,$source_file,$filesize,$task_id);
+			if (!$found_source_file) {
+				// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
+				$key = array_shift($keys_to_remove);
+				$source_file = $existing_metafiles[$key]->path;
+				gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
+			}
+			foreach ($keys_to_remove as $key) {
+				if ($existing_metafiles[$key]->path != $source_file) {
+					gh_recycle($existing_metafiles[$key]->path);
+				}
+				unset($existing_metafiles[$key]);
+			}
+			gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
 		}
 	} else {
 		if (!isset($source_file)) {
@@ -1565,13 +1561,13 @@ function gh_write($share, $full_path, $task_id) {
 					}
 				}
 			}
-			gh_write_process_metafiles($num_copies_required,$existing_metafiles,$share,$full_path,$source_file,$filesize,$task_id);
+			gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
 		}
 	}
 
 }
 
-function gh_write_process_metafiles($num_copies_required,$existing_metafiles,$share,$full_path,$source_file,$filesize,$task_id){
+function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id) {
 	$landing_zone = get_share_landing_zone($share);
 	list($path, $filename) = explode_full_path($full_path);
 
