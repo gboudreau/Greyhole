@@ -950,8 +950,10 @@ function execute_next_task() {
 				}
 				if (task_has_option($task, 'orphaned')) {
 					foreach ($storage_pool_drives as $sp_drive) {
-						foreach ($shares_options as $share_name => $share_options) {
-							gh_fsck("$sp_drive/$share_name", $share_name, $sp_drive);
+						if (is_greyhole_owned_drive($sp_drive)) {
+							foreach ($shares_options as $share_name => $share_options) {
+								gh_fsck("$sp_drive/$share_name", $share_name, $sp_drive);
+							}
 						}
 					}
 				}
@@ -987,6 +989,15 @@ function execute_next_task() {
 							$subdir = str_replace("$metastore", '', $task->share);
 							gh_log(DEBUG, "Starting metastore fsck for $metastore/$subdir");
 							gh_fsck_metastore($metastore, $subdir, $share);
+						}
+					}
+					if ($storage_volume === FALSE && task_has_option($task, 'orphaned')) {
+						$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
+						gh_log(DEBUG, "Starting orphans search for $subdir");
+						foreach ($storage_pool_drives as $sp_drive) {
+							if (is_greyhole_owned_drive($sp_drive)) {
+								gh_fsck("$sp_drive/$subdir", $share, $sp_drive);
+							}
 						}
 					}
 				}
@@ -2770,7 +2781,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	}
 	
 	if (get_metafile_data_filename($share, $file_path, $filename) === FALSE && get_metafile_data_filename($share, normalize_utf8_characters($file_path), normalize_utf8_characters($filename)) === FALSE) {
-		$full_path = "$path/$filename";
+		$full_path = clean_dir("$path/$filename");
 
 		// Check if this is a temporary file; if so, just delete it.
 		if (is_temp_file($full_path)) {
@@ -2784,7 +2795,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				gh_log(INFO, "$full_path is an orphaned file; we'll proceed to find all copies and symlink this file appropriately.");
 				$fsck_report['orphaned']['num_orphans']++;
 			} else {
-				gh_log(INFO, "$full_path is an orphaned file, but we're not looking for orphans. For Greyhole to recognize this file, initiate a --fsck with the --find-orphaned-files option.");
+				gh_log(INFO, "$full_path is an orphaned file, but we're not looking for orphans. For Greyhole to recognize this file, initiate a fsck with the --find-orphaned-files option.");
 				return;
 			}
 		}
