@@ -1,8 +1,8 @@
-.TH greyhole.conf 5  "10/16/2011" "Greyhole %VERSION%" "File Formats and Conventions"
+.TH greyhole.conf 5  "02/05/2012" "Greyhole %VERSION%" "File Formats and Conventions"
 .SH NAME
-greyhole.conf \- The configuration file for the Greyhole daemon
+greyhole.conf \- The configuration file for Greyhole
 .SH SYNOPSIS
-The greyhole.conf file is the configuration file for the Greyhole daemon.
+The greyhole.conf file is the configuration file for Greyhole.
 The complete description of the file format and possible parameters held within are here for reference purposes.
 .SH FILE FORMAT
 .TP
@@ -16,7 +16,7 @@ The file is line-based - that is, each newline-terminated line represents either
 .PP
 Any line beginning with a hash (#) character is ignored, as are lines containing only whitespace.
 .PP
-The values following the equals sign in parameters are all either a string (no quotes needed) or a boolean, which may be given as \fByes\fR/\fBno\fR, \fB1\fR/\fB0\fR or \fBtrue\fR/\fBfalse\fR. Case is not significant in boolean values, but is preserved in string values. Some items are numeric.
+The values following the equals sign in parameters are all either a string (no quotes needed) or a boolean, which may be given as \fByes\fR/\fBno\fR, \fB1\fR/\fB0\fR or \fBtrue\fR/\fBfalse\fR. Case is not significant in boolean values, but is preserved in string values. Some parameters values are numeric.
 .SH PARAMETERS
 	
 .RS 0
@@ -338,19 +338,6 @@ Examples: \fIdelete_moves_to_trash = yes\fR
 .RE
 .RE
 
-balance_modified_files
-.PP
-.RS 4
-(Boolean) Use modified files copies to help balance the 
-available space in your storage pool drives.
-Note that this will force Greyhole to remove outdated copies, and 
-re-create them on the drive(s) with the most available space.
-When disabled, existing copies will be kept where they were, and updated using cp.
-.RS 0
-Default is \fBno\fR.
-.RE
-.RE
-
 frozen_directory
 .PP
 .RS 4
@@ -411,6 +398,21 @@ available for historic reasons.
 .RE
 .RS 0
 Default is \fBcp\fR.
+.RE
+.RE
+
+include
+.PP
+.RS 4
+This allows you to include one config file inside another.
+If the included file is executable, and writable only by the root user, it will be executed, and the output will be included in greyhole.conf.
+Otherwise, the file will be included literally, as though typed in place.
+.RS 0
+An included config file can contain other include parameters, thus allowing recursive inclusions.
+.PP
+Examples: \fIinclude = /etc/greyhole.d/storage_drives\fR
+.RS 10
+\fIinclude = /etc/greyhole.d/greyhole_shares.sh\fR
 .RE
 .RE
 
