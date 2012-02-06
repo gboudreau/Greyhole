@@ -505,7 +505,7 @@ if ($action == 'stats') {
 			}
 		}
 
-		$free_space = (float) $dfs[$sp_drive];
+		$free_space = $dfs[$sp_drive]['free'];
 
 		$trash_path = clean_dir("$sp_drive/.gh_trash");
 		if (!file_exists($trash_path)) {
@@ -2399,23 +2399,25 @@ function get_free_space_in_storage_pool_drives() {
 	exec($df_command, $responses);
 	$responses_arr = array();
 	foreach ($responses as $line) {
-		if (preg_match("@\s+[0-9]+\s+[0-9]+\s+([0-9]+)\s+[0-9]+%\s+(.+)$@", $line, $regs)) {
-			$responses_arr[] = "$regs[2] $regs[1]";
+		if (preg_match("@\s+[0-9]+\s+([0-9]+)\s+([0-9]+)\s+[0-9]+%\s+(.+)$@", $line, $regs)) {
+				$responses_arr[] = array((float) $regs[1], (float) $regs[2], $regs[3]);
 		}
 	}
 	$responses = $responses_arr;
 	foreach ($storage_pool_drives as $sp_drive) {
 		$target_drive = '';
 		for ($i=0; $i<count($responses); $i++) {
-			$response = explode(' ', $responses[$i]);
-			$free_space = (float) array_pop($response);
-			$mount = implode(' ', $response);
+			$used_space = $responses[$i][0];
+			$free_space = $responses[$i][1];
+			$mount = $responses[$i][2];
 			if (mb_strpos($sp_drive, $mount) === 0 && mb_strlen($mount) > mb_strlen($target_drive)) {
 				$target_drive = $mount;
 				$target_freespace = $free_space;
+				$target_usedspace = $used_space;
 			}
 		}
-		$dfs[$sp_drive] = $target_freespace;
+		$dfs[$sp_drive]['free'] = $target_freespace;
+		$dfs[$sp_drive]['used'] = $target_usedspace;
 	}
 	$last_df_time = time();
 	$last_dfs = $dfs;
@@ -2428,8 +2430,15 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	$last_resort_sorted_target_drives = array();
 	$full_drives = array();
 
+	foreach ($shares_options[$share]['drive_selection_algorithm'] as $ds) {
+		$algo = $ds->selection_algorithm;
+		break;
+	}
+
 	$dfs = get_free_space_in_storage_pool_drives();
 
+	$sorted_target_drives = array('available_space' => array(), 'used_space' => array());
+	$last_resort_sorted_target_drives = array('available_space' => array(), 'used_space' => array());
 	foreach ($storage_pool_drives as $sp_drive) {
 		if (!isset($dfs[$sp_drive])) {
 			if (!is_dir($sp_drive)) {
@@ -2459,23 +2468,30 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 		if (!is_greyhole_owned_drive($sp_drive)) {
 			continue;
 		}
-		$free_space = $dfs[$sp_drive];
+		$free_space = $dfs[$sp_drive]['free'];
+		$used_space = $dfs[$sp_drive]['used'];
 		$minimum_free_space = (float) (isset($minimum_free_space_pool_drives[$sp_drive]) ? $minimum_free_space_pool_drives[$sp_drive]*1024*1024 : 0.0);
 		$available_space = (float) $free_space - $minimum_free_space;
 		if ($available_space <= $filesize_kb) {
 			if ($free_space > $filesize_kb) {
-				$last_resort_sorted_target_drives[$sp_drive] = $available_space;
+				$last_resort_sorted_target_drives['available_space'][$sp_drive] = $available_space;
+				$last_resort_sorted_target_drives['used_space'][$sp_drive] = $used_space;
 			} else {
 				$full_drives[$sp_drive] = $free_space;
 			}
 			continue;
 		}
-		$sorted_target_drives[$sp_drive] = $available_space;
+		$sorted_target_drives['available_space'][$sp_drive] = $available_space;
+		$sorted_target_drives['used_space'][$sp_drive] = $used_space;
 	}
 
 	foreach ($shares_options[$share]['drive_selection_algorithm'] as $ds) {
-		$ds->init($sorted_target_drives, $last_resort_sorted_target_drives);
+		$s = $sorted_target_drives;
+		$l = $last_resort_sorted_target_drives;
+		$ds->init($s, $l);
 	}
+	$sorted_target_drives = $s;
+	$last_resort_sorted_target_drives = $l;
 
 	$sorted_target_drives = array();
 	$last_resort_sorted_target_drives = array();
@@ -2484,11 +2500,11 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 		$num_empty_ds = 0;
 		foreach ($shares_options[$share]['drive_selection_algorithm'] as $ds) {
 			list($drives, $drives_last_resort) = $ds->draft();
-			foreach ($drives as $k => $v) {
-				$sorted_target_drives[$k] = $v;
+			foreach ($drives as $sp_drive => $space) {
+				$sorted_target_drives[$sp_drive] = $space;
 			}
-			foreach ($drives_last_resort as $k => $v) {
-				$last_resort_sorted_target_drives[$k] = $v;
+			foreach ($drives_last_resort as $sp_drive => $space) {
+				$last_resort_sorted_target_drives[$sp_drive] = $space;
 			}
 			if (count($drives) == 0 && count($drives_last_resort) == 0) {
 				$num_empty_ds++;
@@ -2539,22 +2555,22 @@ You probably want to do something about this!
 	if ($log_level >= DEBUG) {
 		if (count($sorted_target_drives) > 0) {
 			$log = $log_prefix ."Drives with available space: ";
-			foreach ($sorted_target_drives as $d => $s) {
-				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " avail) - ";
+			foreach ($sorted_target_drives as $sp_drive => $space) {
+				$log .= "$sp_drive (" . bytes_to_human($space*1024, FALSE) . " " . ($algo == 'most_available_space' ? 'avail' : 'used') . ") - ";
 			}
 			gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
 		}
 		if (count($last_resort_sorted_target_drives) > 0) {
 			$log = $log_prefix ."Drives with enough free space, but no available space: ";
-			foreach ($last_resort_sorted_target_drives as $d => $s) {
-				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " avail) - ";
+			foreach ($last_resort_sorted_target_drives as $sp_drive => $space) {
+				$log .= "$sp_drive (" . bytes_to_human($space*1024, FALSE) . " " . ($algo == 'most_available_space' ? 'avail' : 'used') . ") - ";
 			}
 			gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
 		}
 		if (count($full_drives) > 0) {
 			$log = $log_prefix ."Drives full: ";
-			foreach ($full_drives as $d => $s) {
-				$log .= "$d (" . bytes_to_human($s*1024, FALSE) . " free) - ";
+			foreach ($full_drives as $sp_drive => $free_space) {
+				$log .= "$sp_drive (" . bytes_to_human($free_space*1024, FALSE) . " free) - ";
 			}
 			gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
 		}
@@ -3742,7 +3758,7 @@ function sort_storage_drives_available_space() {
 		if (!isset($dfs[$sp_drive])) {
 			continue;
 		}
-		$free_space = $dfs[$sp_drive];
+		$free_space = $dfs[$sp_drive]['free'];
 		$minimum_free_space = (float) (isset($minimum_free_space_pool_drives[$sp_drive]) ? $minimum_free_space_pool_drives[$sp_drive]*1024*1024 : 0.0);
 		$available_space = (float) $free_space - $minimum_free_space;
 		while (isset($sorted_target_drives[$available_space])) {

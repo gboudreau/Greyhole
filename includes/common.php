@@ -1158,25 +1158,31 @@ class DriveSelection {
     }
     
     function init(&$sorted_target_drives, &$last_resort_sorted_target_drives) {
-        // Shuffle or sort by available space (desc)
-        if ($this->selection_algorithm == 'random') {
-    		kshuffle($sorted_target_drives);
-    		kshuffle($last_resort_sorted_target_drives);
+        // Sort by used space (asc) for least_used_space, or by available space (desc) for most_available_space
+        if ($this->selection_algorithm == 'least_used_space') {
+			$sorted_target_drives = $sorted_target_drives['used_space'];
+			$last_resort_sorted_target_drives = $last_resort_sorted_target_drives['used_space'];
+        	asort($sorted_target_drives);
+    		asort($last_resort_sorted_target_drives);
         } else if ($this->selection_algorithm == 'most_available_space') {
+			$sorted_target_drives = $sorted_target_drives['available_space'];
+			$last_resort_sorted_target_drives = $last_resort_sorted_target_drives['available_space'];
         	arsort($sorted_target_drives);
     		arsort($last_resort_sorted_target_drives);
+		} else {
+			gh_log(CRITICAL, "Unknown drive_selection_algorithm found: " . $this->selection_algorithm);
 		}
 		// Only keep drives that are in $this->drives
         $this->sorted_target_drives = array();
-		foreach ($sorted_target_drives as $sp_drive => $available_space) {
+		foreach ($sorted_target_drives as $sp_drive => $space) {
 		    if (array_search($sp_drive, $this->drives) !== FALSE) {
-		        $this->sorted_target_drives[$sp_drive] = $available_space;
+		        $this->sorted_target_drives[$sp_drive] = $space;
 		    }
 		}
         $this->last_resort_sorted_target_drives = array();
-		foreach ($last_resort_sorted_target_drives as $sp_drive => $available_space) {
+		foreach ($last_resort_sorted_target_drives as $sp_drive => $space) {
 		    if (array_search($sp_drive, $this->drives) !== FALSE) {
-		        $this->last_resort_sorted_target_drives[$sp_drive] = $available_space;
+		        $this->last_resort_sorted_target_drives[$sp_drive] = $space;
 		    }
 		}
     }
@@ -1190,18 +1196,18 @@ class DriveSelection {
             if ($arr === FALSE) {
                 break;
             }
-            list($sp_drive, $available_space) = $arr;
+            list($sp_drive, $space) = $arr;
 			if (!is_greyhole_owned_drive($sp_drive)) { continue; }
-            $drives[$sp_drive] = $available_space;
+            $drives[$sp_drive] = $space;
         }
         while (count($drives)+count($drives_last_resort)<$this->num_drives_per_draft) {
             $arr = kshift($this->last_resort_sorted_target_drives);
             if ($arr === FALSE) {
                 break;
             }
-            list($sp_drive, $available_space) = $arr;
+            list($sp_drive, $space) = $arr;
 			if (!is_greyhole_owned_drive($sp_drive)) { continue; }
-            $drives_last_resort[$sp_drive] = $available_space;
+            $drives_last_resort[$sp_drive] = $space;
         }
         
         return array($drives, $drives_last_resort);
@@ -1209,12 +1215,12 @@ class DriveSelection {
     
     static function parse($config_string, $drive_selection_groups) {
         $ds = array();
-        if ($config_string == 'random' || $config_string == 'most_available_space') {
+        if ($config_string == 'least_used_space' || $config_string == 'most_available_space') {
             global $storage_pool_drives;
             $ds[] = new DriveSelection(count($storage_pool_drives), $config_string, $storage_pool_drives, FALSE);
             return $ds;
         }
-        if (!preg_match('/forced ?\((.+)\) ?(random|most_available_space)/i', $config_string, $regs)) {
+        if (!preg_match('/forced ?\((.+)\) ?(least_used_space|most_available_space)/i', $config_string, $regs)) {
             gh_log(CRITICAL, "Can't understand the drive_selection_algorithm value: $config_string");
         }
         $selection_algorithm = $regs[2];
@@ -1237,7 +1243,7 @@ class DriveSelection {
 
     function update() {
         // Make sure num_drives_per_draft and drives have been set, in case storage_pool_drive lines appear after drive_selection_algorithm line(s) in the config file
-        if (!$this->is_custom && ($this->selection_algorithm == 'random' || $this->selection_algorithm == 'most_available_space')) {
+        if (!$this->is_custom && ($this->selection_algorithm == 'least_used_space' || $this->selection_algorithm == 'most_available_space')) {
             global $storage_pool_drives;
             $this->num_drives_per_draft = count($storage_pool_drives);
             $this->drives = $storage_pool_drives;
