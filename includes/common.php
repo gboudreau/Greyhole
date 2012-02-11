@@ -651,7 +651,7 @@ if ($arch != 'x86_64') {
 	}
 
 	function gh_rename($filename, $target_filename) {
-	    return rename($filename, $target_filename);
+	    return @rename($filename, $target_filename);
 	}
 }
 

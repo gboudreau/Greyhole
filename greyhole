@@ -1519,7 +1519,7 @@ function gh_write($share, $full_path, $task_id) {
 					$keys_to_remove[] = $metafile->path;
 				}
 			}
-			if (!$found_source_file) {
+			if (!$found_source_file && count($keys_to_remove) > 0) {
 				// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
 				$key = array_shift($keys_to_remove);
 				$source_file = $existing_metafiles[$key]->path;
@@ -3940,8 +3940,11 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 			);
 			gh_mkdir($path, $dir_infos);
 		}
-		symlink($filepath_in_trash, $filepath_in_trash_share);
-		gh_log(DEBUG, "  Created symlink to deleted file in {$trash_share['name']} share ($filename).");
+		if (@symlink($filepath_in_trash, $filepath_in_trash_share)) {
+			gh_log(DEBUG, "  Created symlink to deleted file in {$trash_share['name']} share ($filename).");
+		} else {
+			gh_log(WARN, "  Warning! Couldn't create symlink to deleted file in {$trash_share['name']} share ($filename).");
+		}
 	}
 }
 
