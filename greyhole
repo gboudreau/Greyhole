@@ -639,13 +639,13 @@ if ($action == 'fsck') {
 	if (isset($options['disk-usage-report'])) {
 		$fsck_options[] = 'du';
 	}
-	if (isset($options['find-orphaned-files'])){
+	if (isset($options['find-orphaned-files'])) {
 		$fsck_options[] = 'orphaned';
 	}
-	if (isset($options['checksums'])){
+	if (isset($options['checksums'])) {
 		$fsck_options[] = 'checksums';
 	}
-	if (isset($options['delete-orphaned-metadata'])){
+	if (isset($options['delete-orphaned-metadata'])) {
 		$fsck_options[] = 'del-orphaned-metadata';
 	}
 	if ($full_path == '') {
@@ -659,7 +659,7 @@ if ($action == 'fsck') {
 		db_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
 	}
 	echo "fsck of $full_path has been scheduled. It will start after all currently pending tasks have been completed.\n";
-	if (isset($options['checksums'])){
+	if (isset($options['checksums'])) {
 		echo "Any mismatch in checksums will be logged in both " . $greyhole_log_file . " and " . FSCKLogFile::PATH . "/fsck_checksums.log\n";
 	}
 	
@@ -960,7 +960,7 @@ function execute_next_task() {
 			} else {
 				$share_options = get_share_options_from_full_path($task->share);
 				$storage_volume = FALSE;
-				if ($share_options === FALSE){
+				if ($share_options === FALSE) {
 					//Since share_options is FALSE we didn't get a share path, maybe we got a storage volume path, let's check 
 					$storage_volume = get_storage_volume_from_path($task->share);
 					$share_options = get_share_options_from_storage_volume($task->share,$storage_volume);
@@ -968,14 +968,14 @@ function execute_next_task() {
 				if ($share_options !== FALSE) {
 					$share = $share_options['name'];
 					$metastore = get_metastore_from_path($task->share);
-					if($metastore === FALSE){
+					if($metastore === FALSE) {
 						//Only kick off an fsck on the passed dir if it's not a metastore
 						gh_fsck($task->share, $share, $storage_volume);
 					}
 					if (task_has_option($task, 'metastore') !== FALSE) {
-						if($metastore === FALSE){
+						if($metastore === FALSE) {
 							//This isn't a metastore dir so we'll check the metastore of this path on all volumes
-							if($storage_volume !== FALSE){
+							if($storage_volume !== FALSE) {
 								$subdir = str_replace($storage_volume, '', $task->share);
 							}else{
 								$subdir = "/$share" . str_replace($share_options['landing_zone'], '', $task->share);
@@ -1137,7 +1137,7 @@ function gh_unlink($share, $full_path, $task_id) {
 
 	list($path, $filename) = explode_full_path($full_path);
 
-	foreach (get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles){
+	foreach (get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
 		foreach ($existing_metafiles as $metafile) {
 			gh_recycle($metafile->path);
 		}
@@ -1191,7 +1191,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 			}
 		}
 
-		foreach (get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles){
+		foreach (get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles) {
 			gh_log(DEBUG, "Existing metadata files: " . count($existing_metafiles));
 			foreach ($existing_metafiles as $file_path => $file_metafiles) {
 				gh_log(DEBUG, "  File metafiles: " . count($file_metafiles));
@@ -1247,7 +1247,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 		list($path, $filename) = explode_full_path($full_path);
 		list($target_path, $target_filename) = explode_full_path($target_full_path);
 
-		foreach (get_metafiles($share, $path, $filename, FALSE, FALSE, FALSE) as $existing_metafiles){
+		foreach (get_metafiles($share, $path, $filename, FALSE, FALSE, FALSE) as $existing_metafiles) {
 			// There might be old metafiles... for example, when a delete task was skipped.
 			// Let's remove the file copies if there are any leftovers; correct copies will be re-created below.
 			if (file_exists("$landing_zone/$target_full_path") && (count($existing_metafiles) > 0 || !is_link("$landing_zone/$target_full_path"))) {
@@ -1263,7 +1263,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 		
 			if (count($existing_metafiles) == 0) {
 				// Any NOK metafiles that need to be removed?
-				foreach (get_metafiles($share, $path, $filename, TRUE, FALSE, FALSE) as $all_existing_metafiles){
+				foreach (get_metafiles($share, $path, $filename, TRUE, FALSE, FALSE) as $all_existing_metafiles) {
 					if (count($all_existing_metafiles) > 0) {
 						remove_metafiles($share, $path, $filename);
 					}
@@ -1518,10 +1518,6 @@ function gh_write($share, $full_path, $task_id) {
 					gh_log(DEBUG, "  Will remove copy at $metafile->path");
 					$keys_to_remove[] = $metafile->path;
 				}
-				// This will make sure the correct key is used in the $existing_metafiles array...
-				//   This is important because that key is what is used to check if there's already a copy on that drive.
-				unset($existing_metafiles[$key]);
-				$existing_metafiles[$metafile->path] = $metafile;
 			}
 			if (!$found_source_file) {
 				// This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
@@ -1556,7 +1552,7 @@ function gh_write($share, $full_path, $task_id) {
 
 		// There might be old metafiles... for example, when a delete task was skipped.
 		// Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_metafiles()
-		foreach (get_metafiles($share, $path, $filename) as $existing_metafiles){
+		foreach (get_metafiles($share, $path, $filename) as $existing_metafiles) {
 			gh_log(DEBUG, count($existing_metafiles) . " metafiles loaded.");
 			if (count($existing_metafiles) > 0) {
 				foreach ($existing_metafiles as $metafile) {
@@ -1705,7 +1701,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 			$metafile->state = 'Gone';
 			gh_recycle($metafile->path);
 			$metafiles[$key] = $metafile;
-			save_metafiles($share, $path, $filename, array_values($metafiles));
+			save_metafiles($share, $path, $filename, $metafiles);
 
 			if (file_exists("$landing_zone/$full_path")) {
 				global $current_task_id;
@@ -1747,7 +1743,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 			$metafile->state = 'OK';
 			$metafiles[$key] = $metafile;
 		}
-		save_metafiles($share, $path, $filename, array_values($metafiles));
+		save_metafiles($share, $path, $filename, $metafiles);
 	}
 }
 
@@ -1896,8 +1892,8 @@ function get_metafile_data_filenames($share, $path, $filename, $how_many=9999) {
 	return $filenames;
 }
 
-function get_metafiles($share, $path, $filename=null, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE){
-	if($filename === null){
+function get_metafiles($share, $path, $filename=null, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
+	if($filename === null) {
 		return new metafile_iterator($share, $path, $load_nok_metafiles, $quiet, $check_symlink);
 	}else{
 		return array(get_metafiles_for_file($share,$path,$filename,$load_nok_metafiles,$quiet,$check_symlink));
@@ -1934,14 +1930,14 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
 					}
 					$metafile->is_linked = FALSE;
 					$metafiles[$key] = $metafile;
-					save_metafiles($share, $path, $filename, array_values($metafiles));
+					save_metafiles($share, $path, $filename, $metafiles);
 				} else if (!$metafile->is_linked && $metafile->path == $share_file_link_to) {
 					if (!$quiet) {
 						gh_log(DEBUG, '  Changing is_linked to TRUE for ' . $metafile->path);
 					}
 					$metafile->is_linked = TRUE;
 					$metafiles[$key] = $metafile;
-					save_metafiles($share, $path, $filename, array_values($metafiles));
+					save_metafiles($share, $path, $filename, $metafiles);
 				}
 			}
 		}
@@ -1956,13 +1952,21 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
 			$valid_path = TRUE;
 		}
 		if ($valid_path && ($load_nok_metafiles || $metafile->state == 'OK')) {
+			$key = clean_dir($metafile->path);
+			if (isset($ok_metafiles[$key])) {
+				$previous_metafile = $ok_metafiles[$key];
+				if ($previous_metafile->state == 'OK' && $metafile->state != 'OK') {
+					// Don't overwrite previous OK metafiles with NOK metafiles that point to the same files!
+					continue;
+				}
+			}
 			$ok_metafiles[$key] = $metafile;
 		} else {
 			if (!$valid_path) {
 				gh_log(WARN, "Found a metadata file pointing to a drive not defined in your storage pool: '$metafile->path'. Will mark it as Gone.");
 				$metafile->state = 'Gone';
 				$metafiles[$key] = $metafile;
-				save_metafiles($share, $path, $filename, array_values($metafiles));
+				save_metafiles($share, $path, $filename, $metafiles);
 			} else {
 				#gh_log(DEBUG, "Found a metadata file, pointing to '$metafile->path', with state = '$metafile->state'. We just want 'OK' metadata files; will not use this metadata file.");
 			}
@@ -1991,6 +1995,9 @@ function save_metafiles($share, $path, $filename, $metafiles) {
 		remove_metafiles($share, $path, $filename);
 		return;
 	}
+	
+	// We don't care about the keys (we'll re-create them on load), so let's not waste disk space, and use numeric indexes.
+	$metafiles = array_values($metafiles);
 
 	gh_log(DEBUG, "  Saving " . count($metafiles) . " metadata files for " . clean_dir($share . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : "")));
 	$paths_used = array();
@@ -2739,7 +2746,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	global $storage_pool_drives, $fsck_report, $options, $action, $shares_options;
 	$share_options = $shares_options[$share];
 	$landing_zone = get_share_landing_zone($share);
-	if($storage_path === FALSE){
+	if($storage_path === FALSE) {
 		$file_path = trim(mb_substr($path, mb_strlen($landing_zone)+1), '/');
 	}else{
 		$file_path = trim(mb_substr($path, mb_strlen("$storage_path/$share")+1), '/');
@@ -2762,7 +2769,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		$fsck_report['landing_zone']['num_files']++;
 	}
 	if ($file_type == 'file') {
-		if($storage_path === FALSE){
+		if($storage_path === FALSE) {
 			// Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
 			gh_log(INFO, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
 			$query = sprintf("INSERT INTO tasks (action, share, full_path, complete) VALUES ('write', '%s', '%s', 'yes')",
@@ -2838,7 +2845,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		$original_file_path = $metadata->path;
 	}
 
-	foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block){
+	foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
 		foreach ($metafile_block as $metafile) {
 			$inode_number = @gh_fileinode($metafile->path);
 			$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
@@ -2971,7 +2978,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 					break;
 				}
 			}
-			save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
+			save_metafiles($share, $file_path, $filename, $file_metafiles);
 		}
 	} else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
 		gh_log(WARN, '  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')));
@@ -2991,7 +2998,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		if (@$options['del-orphaned-metadata']) {
 			remove_metafiles($share, $file_path, $filename);
 		} else {
-			save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
+			save_metafiles($share, $file_path, $filename, $file_metafiles);
 		}
 	} else if (count($file_copies_inodes) < $num_copies_required) {
 		// Create new copies
@@ -3097,7 +3104,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				}
 			}
 		}
-		save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
+		save_metafiles($share, $file_path, $filename, $file_metafiles);
 	} else {
 		# Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
 		foreach ($file_copies_inodes as $inode => $path) {
@@ -3154,7 +3161,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				reset($file_metafiles)->is_linked = TRUE;
 			}
 
-			save_metafiles($share, $file_path, $filename, array_values($file_metafiles));
+			save_metafiles($share, $file_path, $filename, $file_metafiles);
 		}
 	}
 	
@@ -3418,7 +3425,7 @@ function repair_tables() {
 	}
 }
 
-function get_metastores_from_storage_volume($storage_volume){
+function get_metastores_from_storage_volume($storage_volume) {
 	$volume_metastores = array();
 	foreach (get_metastores() as $metastore) {
 		if (get_storage_volume_from_path($metastore) == $storage_volume) {
@@ -3463,7 +3470,7 @@ function get_share_options_from_full_path($full_path) {
 
 }
 
-function get_storage_volume_from_path($full_path){
+function get_storage_volume_from_path($full_path) {
 	global $storage_pool_drives;
 	$storage_volume = FALSE;
 	$longest_path_found = 0;
@@ -3483,7 +3490,7 @@ function get_share_options_from_storage_volume($full_path,$storage_volume) {
 	$share = FALSE;
 	foreach ($shares_options as $share_name => $share_options) {
 		$metastore = get_metastore_from_path($full_path);
-		if($metastore !== FALSE){
+		if($metastore !== FALSE) {
 			if (mb_strpos($full_path, "$metastore/$share_name") === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
 				$land_zone = $share_options['landing_zone'];
 				$share = $share_options;
@@ -3500,10 +3507,10 @@ function get_share_options_from_storage_volume($full_path,$storage_volume) {
 	return $share;
 }
 
-function get_metastore_from_path($path){
+function get_metastore_from_path($path) {
 	$metastore_path = FALSE;
-	foreach(get_metastores() as $metastore){
-		if(mb_strpos($path, $metastore) === 0){
+	foreach(get_metastores() as $metastore) {
+		if(mb_strpos($path, $metastore) === 0) {
 			$metastore_path = $metastore;
 			break;
 		}	
@@ -3683,7 +3690,7 @@ function gh_balance() {
 				}
 
 				// Update metafiles
-				foreach (get_metafiles($share_name, $path, $filename, FALSE, TRUE, FALSE) as $existing_metafiles){
+				foreach (get_metafiles($share_name, $path, $filename, FALSE, TRUE, FALSE) as $existing_metafiles) {
 					foreach ($existing_metafiles as $key => $metafile) {
 						if ($metafile->path == $file) {
 							$metafile->path = "$sp_drive/$share_name/$full_path";

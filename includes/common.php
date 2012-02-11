@@ -342,11 +342,11 @@ function parse_config() {
 	if (!isset($memory_limit)) {
 		ini_set('memory_limit', $memory_limit);
 	}
-	if (isset($memory_limit)){
-		if(preg_match('/M$/',$memory_limit)){
+	if (isset($memory_limit)) {
+		if(preg_match('/M$/',$memory_limit)) {
 			$memory_limit = preg_replace('/M$/','',$memory_limit);
 			$memory_limit = $memory_limit * 1048576;
-		}elseif(preg_match('/K$/',$memory_limit)){
+		}elseif(preg_match('/K$/',$memory_limit)) {
 			$memory_limit = preg_replace('/K$/','',$memory_limit);
 			$memory_limit = $memory_limit * 1024;
 		}
@@ -655,7 +655,7 @@ if ($arch != 'x86_64') {
 	}
 }
 
-function memory_check(){
+function memory_check() {
 	global $memory_limit;
 	$usage = memory_get_usage();
 	$used = $usage/$memory_limit;
@@ -683,7 +683,7 @@ class metafile_iterator implements Iterator {
 		$this->load_nok_metafiles = $load_nok_metafiles;
 	}
 
-	public function rewind(){
+	public function rewind() {
 		$this->metastores = get_metastores();
 		$this->directory_stack = array($this->path);
 		$this->dir_handle = NULL;
@@ -691,7 +691,7 @@ class metafile_iterator implements Iterator {
 		$this->next();
 	}
 
-	public function current(){
+	public function current() {
 		return $this->metafiles;
 	}
 
@@ -701,23 +701,23 @@ class metafile_iterator implements Iterator {
 
 	public function next() {
 		$this->metafiles = array();
-		while(count($this->directory_stack)>0 && $this->directory_stack !== NULL){
+		while(count($this->directory_stack)>0 && $this->directory_stack !== NULL) {
 			$this->dir = array_pop($this->directory_stack);
 			if (!$this->quiet) {
 				gh_log(DEBUG, "Loading metadata files for (dir) " . clean_dir($this->share . (!empty($this->dir) ? "/" . $this->dir : "")) . " ...");
 			}
-			for( $i = 0; $i < count($this->metastores); $i++ ){
+			for( $i = 0; $i < count($this->metastores); $i++ ) {
 				$metastore = $this->metastores[$i];
 				$this->base = "$metastore/".$this->share."/";
-				if(!file_exists($this->base.$this->dir)){
+				if(!file_exists($this->base.$this->dir)) {
 					continue;
 				}	
-				if($this->dir_handle = opendir($this->base.$this->dir)){
-					while (false !== ($file = readdir($this->dir_handle))){
+				if($this->dir_handle = opendir($this->base.$this->dir)) {
+					while (false !== ($file = readdir($this->dir_handle))) {
 						memory_check();
 						if($file=='.' || $file=='..')
 							continue;
-						if(!empty($this->dir)){
+						if(!empty($this->dir)) {
 							$full_filename = $this->dir . '/' . $file;
 						}else
 							$full_filename = $file;
@@ -735,7 +735,7 @@ class metafile_iterator implements Iterator {
 					$this->directory_stack = array_unique($this->directory_stack);
 				}
 			}
-			if(count($this->metafiles) > 0){
+			if(count($this->metafiles) > 0) {
 				break;
 			}
 			
@@ -746,7 +746,7 @@ class metafile_iterator implements Iterator {
 		return $this->metafiles;
 	}
 	
-	public function valid(){
+	public function valid() {
 		return count($this->metafiles) > 0;
 	}
 }
@@ -1375,7 +1375,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			$i = 0; $j = 0;
 		}
 	}
-	if(count($returned_drives) > 0){
+	if(count($returned_drives) > 0) {
 		$body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives came back:\n";
 		foreach ($returned_drives as $sp_drive) {
   			$body .= "$sp_drive was missing; it's now available again.\n";
@@ -1391,7 +1391,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 		}
 		mail($email_to, $subject, $body);
 	}
-	if(count($missing_drives) > 0){
+	if(count($missing_drives) > 0) {
 		$body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives has disappeared:\n";
 
 		$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
@@ -1431,12 +1431,12 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 		if (!$skip_fsck) {
 			global $shares_options;
 			initialize_fsck_report('All shares');
-			if($needs_fsck === 2){
-				foreach ($returned_drives as $drive){
+			if($needs_fsck === 2) {
+				foreach ($returned_drives as $drive) {
 					$metastores = get_metastores_from_storage_volume($drive);
 					gh_log(INFO, "Starting fsck for metadata store on $drive which came back online.");
-					foreach($metastores as $metastore){
-						foreach($shares_options as $share_name => $share_options){
+					foreach($metastores as $metastore) {
+						foreach($shares_options as $share_name => $share_options) {
 							gh_fsck_metastore($metastore,"/$share_name", $share_name);
 						}
 					}
