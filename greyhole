@@ -3989,9 +3989,10 @@ function process_command_line() {
 		'json'
 	);
 
-	$opts_options_with_values = 'd:';
+	$opts_options_with_values = 'd:R:';
 	$longopts_options_with_values = array(
-		'dir:'
+		'dir:',
+		'drive:'
 	);
 
 	$command_line_options = _getopt($opts_actions.$opts_actions_with_values.$opts_options.$opts_options_with_values,
