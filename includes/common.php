@@ -210,7 +210,7 @@ function parse_config() {
 						$share = mb_substr($name, 22, mb_strlen($name)-23);
 						$shares_options[$share]['delete_moves_to_trash'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
 					} else if (mb_strpos($name, 'drive_selection_groups') === 0) { // or dir_selection_groups
-						$share = mb_substr($name, 24, mb_strlen($name)-25);
+						$share = mb_substr($name, 23, mb_strlen($name)-24);
     				    if (preg_match("/(.+):(.+)/", $value, $regs)) {
     						$group_name = trim($regs[1]);
     						$shares_options[$share]['drive_selection_groups'][$group_name] = array_map('trim', explode(',', $regs[2]));
