@@ -1257,19 +1257,32 @@ function is_greyhole_owned_drive($sp_drive) {
 	if (isset($going_drive) && $sp_drive == $going_drive) {
 		return FALSE;
 	}
-	if (isset($greyhole_owned_drives[$sp_drive]) && $greyhole_owned_drives[$sp_drive] < time() - $df_cache_time) {
+	$is_greyhole_owned_drive = isset($greyhole_owned_drives[$sp_drive]);
+	if ($is_greyhole_owned_drive && $greyhole_owned_drives[$sp_drive] < time() - $df_cache_time) {
 		unset($greyhole_owned_drives[$sp_drive]);
+		$is_greyhole_owned_drive = FALSE;
 	}
-	if (!isset($greyhole_owned_drives[$sp_drive])) {
+	if (!$is_greyhole_owned_drive) {
 		$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
 		if (!$drives_definitions) {
 			$drives_definitions = convert_sp_drives_tag_files();
 		}
-		if (@$drives_definitions[$sp_drive] === gh_dir_uuid($sp_drive)) {
+		$drive_uuid = gh_dir_uuid($sp_drive);
+		$is_greyhole_owned_drive = @$drives_definitions[$sp_drive] === $drive_uuid && $drive_uuid !== FALSE;
+		if (!$is_greyhole_owned_drive) {
+			// Maybe this is a remote mount? Those don't have UUIDs, so we use the .greyhole_uses_this technique.
+			$is_greyhole_owned_drive = file_exists("$sp_drive/.greyhole_uses_this");
+			if ($is_greyhole_owned_drive && isset($drives_definitions[$sp_drive])) {
+				// This remote drive was listed in MySQL; it shouldn't be. Let's remove it.
+				unset($drives_definitions[$sp_drive]);
+				Settings::set('sp_drives_definitions', $drives_definitions);
+			}
+		}
+		if ($is_greyhole_owned_drive) {
 			$greyhole_owned_drives[$sp_drive] = time();
 		}
 	}
-	return isset($greyhole_owned_drives[$sp_drive]);
+	return $is_greyhole_owned_drive;
 }
 
 // Is it OK for a drive to be gone?

@@ -717,11 +717,24 @@ function convert_sp_drives_tag_files() {
 			if (is_dir($sp_drive)) {
 				$drives_definitions[$sp_drive] = gh_dir_uuid($sp_drive);
 			}
-		} else if ($drives_definitions[$sp_drive] != gh_dir_uuid($sp_drive)) {
-			gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+		}
+		if (!isset($drives_definitions[$sp_drive])) {
+			continue;
+		}
+		if ($drives_definitions[$sp_drive] === FALSE) {
+			unset($drives_definitions[$sp_drive]);
+			continue;
 		}
 		if (file_exists("$sp_drive/.greyhole_uses_this")) {
 			unlink("$sp_drive/.greyhole_uses_this");
+		}
+		if ($drives_definitions[$sp_drive] != gh_dir_uuid($sp_drive)) {
+			gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+		}
+	}
+	foreach ($drives_definitions as $sp_drive => $uuid) {
+		if (array_search($sp_drive, $storage_pool_drives) === FALSE) {
+			unset($drives_definitions[$sp_drive]);
 		}
 	}
 
@@ -731,7 +744,7 @@ function convert_sp_drives_tag_files() {
 		$devices[$device_id][] = $sp_drive;
 	}
 	foreach ($devices as $device_id => $sp_drives) {
-		if (count($sp_drives) > 1) {
+		if (count($sp_drives) > 1 && $device_id !== 0) {
 			if ($allow_multiple_sp_per_device) {
 				gh_log(INFO, "The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf 'allow_multiple_sp_per_device' options, you chose to ignore this normally critical error.");
 			} else {
