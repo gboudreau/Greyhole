@@ -2860,8 +2860,17 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
 	foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
 		foreach ($metafile_block as $metafile) {
-			$inode_number = @gh_fileinode($metafile->path);
 			$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
+			$inode_number = @gh_fileinode($metafile->path);
+			if (is_link($metafile->path)) {
+				$link_target = readlink($metafile->path);
+				if (array_search($link_target, $file_copies_inodes) !== FALSE) {
+					// This link points to another file copy. Bad, bad!
+					gh_log(WARN, "Warning! Found a symlink in your storage pool: $metafile->path -> $link_target. Deleting.");
+					gh_recycle($metafile->path);
+				}
+				$inode_number = FALSE;
+			}
 			if ($inode_number === FALSE || !is_greyhole_owned_drive($root_path)) {
 				$metafile->state = 'Gone';
 				$metafile->is_linked = FALSE;
@@ -4478,10 +4487,13 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles) {
 	
 	foreach ($storage_pool_drives as $sp_drive) {
 		$clean_full_path = clean_dir("$sp_drive/$share/$file_path/$filename");
+		if (is_link($clean_full_path)) {
+			continue;
+		}
 		$inode_number = @gh_fileinode($clean_full_path);
 		if ($inode_number !== FALSE) {
 			if (is_dir($clean_full_path)) {
-				gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
+				gh_log(WARN, "Warning! Found a directory that should be a file! Will try to remove it, if it's empty.");
 				@rmdir($clean_full_path);
 				continue;
 			}
@@ -4490,7 +4502,7 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles) {
 
 			if (!is_greyhole_owned_drive($sp_drive)) {
 				$state = 'Gone';
-				gh_log(DEBUG, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
+				gh_log(INFO, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
 			} else {
 				$state = 'OK';
 				$file_copies_inodes[$inode_number] = $clean_full_path;
