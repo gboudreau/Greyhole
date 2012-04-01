@@ -149,6 +149,67 @@ if ($action == 'delete-metadata') {
 	exit(0);
 }
 
+if ($action == 'remove-share') {
+	$share = $options['dir'];
+	if (!isset($shares_options[$share])) {
+		echo "'$share' is not a known share.\n";
+		echo "If you removed it already from your Greyhole configuration, please re-add it, and retry.\n";
+		echo "Otherwise, please use one of the following share name:\n";
+		echo "  " . implode("\n  ", array_keys($shares_options)) . "\n";
+		exit(1);
+	}
+
+	$landing_zone = get_share_landing_zone($share);
+
+	echo "Will remove '$share' share from the Greyhole storage pool, by moving all the data files inside this share to it's landing zone: $landing_zone\n";
+	
+	// df the landing zone, to see how much free space it has
+	$free_space = 1024 * exec("df -k " . escapeshellarg($landing_zone) . " | awk '{print $4}' | tail -1");
+
+	// du the files to see if there's room in the landing zone
+	echo "  Finding how much space is needed, and if you have enough... Please wait...\n";
+	$space_needed = 1024 * exec("du -skL " . escapeshellarg($landing_zone) . " | awk '{print $1}'");
+	echo "    Space needed: " . bytes_to_human($space_needed, FALSE) . "\n";
+	echo "    Free space: " . bytes_to_human($free_space, FALSE) . "\n";
+	
+	if ($space_needed > $free_space) {
+		echo "Not enough free space available in $landing_zone. Aborting.\n";
+		exit(1);
+	}
+	echo "  OK! Let's do this.\n";
+
+	// Remove the symlinks from the landing zone
+	echo "  Deleting symlinks from landing zone... Please wait...\n";
+	exec("find " . escapeshellarg($landing_zone) . " -type l -delete");
+	echo "    Done.\n";
+
+	// Copy the data files from the storage pool into the landing zone
+	$storage_folders_with_files = array();
+	$num_files_total = 0;
+	foreach ($storage_pool_drives as $sp_drive) {
+		if (!file_exists("$sp_drive/$share")) {
+			echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
+		} else {
+			$storage_folders_with_files[] = "$sp_drive/$share";
+			unset($result);
+			echo "  Moving files from $sp_drive/$share into $landing_zone... Please wait...\n";
+			exec("rsync -rlptgoDuvW --remove-source-files " . escapeshellarg("$sp_drive/$share/") . " " . escapeshellarg('/' . trim($landing_zone, '/')), $result);
+			$num_files = count($result)-5;
+			if ($num_files < 0) {
+				$num_files = 0;
+			}
+			$num_files_total += $num_files;
+			exec("find " . escapeshellarg("$sp_drive/$share/") . " -type d -delete");
+			echo "    Done. Copied $num_files files.\n";
+		}
+	}
+	echo "All done. Copied $num_files_total files.\nYou should now remove the Greyhole options from the [$share] share in your smb.conf.\n";
+	
+	exec("/bin/sed -i 's/^.*num_copies\[".$share."\].*$//' " . escapeshellarg($config_file));
+	restart_service();
+	exit(0);
+}
+
 if ($action == 'gone' || $action == 'going') {
 	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
 		$options['drive'] = '/' . trim($options['drive'], '/');
@@ -194,8 +255,8 @@ if ($action == 'gone' || $action == 'going') {
 
 	// Remove $going_drive from config file and restart (if it was running)
 	$escaped_drive = str_replace('/', '\/', $options['drive']);
-	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' /etc/greyhole.conf"); // Deprecated notation
-	exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' /etc/greyhole.conf");
+	exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' " . escapeshellarg($config_file)); // Deprecated notation
+	exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' " . escapeshellarg($config_file));
 	restart_service();
 
 	// For Amahi users
@@ -3988,7 +4049,7 @@ function process_command_line() {
 		'fix-symlinks'
 	);
 
-	$opts_actions_with_values = 'r::w::g::n::t::b:p:';
+	$opts_actions_with_values = 'r::w::g::n::t::b:p:U:';
 	$longopts_actions_with_values = array(
 		'replace::',
 		'wait-for::',
@@ -3996,7 +4057,8 @@ function process_command_line() {
 		'going::',
 		'thaw::',
 		'debug:',
-		'delete-metadata:'
+		'delete-metadata:',
+		'remove-share:'
 	);
 
 	$opts_options = 'eyucokmj';
@@ -4131,6 +4193,10 @@ function print_usage() {
 	echo "                        Delete all metadata files for <path>, which should be a\n";
 	echo "                        share name, followed by the path to a file that is gone\n";
 	echo "                        from your storage pool.\n";
+	echo "  -U, --remove-share<=share_name>\n";
+	echo "                        Move the files currently inside the specified share from the\n";
+	echo "                        storage pool into the shared folder (landing zone),\n";
+	echo "                        effectively removing the share from Greyhole's storage pool.\n";
 	
 	echo "\n";
 	echo "For --stats and --view-queue, the available OPTIONS are:\n";
