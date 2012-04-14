@@ -1624,7 +1624,7 @@ class Settings {
 }
 
 function gh_dir_uuid($dir) {
-	$dev = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | tail -1 | awk \'{print $1}\'');
+	$dev = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | grep \'/dev\' | awk \'{print $1}\'');
 	if (empty($dev) || strpos($dev, '/dev/') !== 0) {
 		return FALSE;
 	}
