@@ -164,7 +164,7 @@ if ($action == 'remove-share') {
 	echo "Will remove '$share' share from the Greyhole storage pool, by moving all the data files inside this share to it's landing zone: $landing_zone\n";
 	
 	// df the landing zone, to see how much free space it has
-	$free_space = 1024 * exec("df -k " . escapeshellarg($landing_zone) . " | awk '{print $4}' | tail -1");
+	$free_space = 1024 * exec("df -k --total " . escapeshellarg($landing_zone) . " | awk '/^total/{print $4}'");
 
 	// du the files to see if there's room in the landing zone
 	echo "  Finding how much space is needed, and if you have enough... Please wait...\n";
