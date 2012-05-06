@@ -552,6 +552,10 @@ if ($action == 'stats') {
 			$stats[$sp_drive] = (object) array();
 			continue;
 		}
+		if (!is_greyhole_owned_drive($sp_drive)) {
+			$stats[$sp_drive] = (object) array();
+			continue;
+		}
 
 		$df_command = "df -k " . escapeshellarg($sp_drive) . " | tail -1";
 		unset($responses);
@@ -774,9 +778,10 @@ function convert_sp_drives_tag_files() {
 	}
 	foreach ($storage_pool_drives as $sp_drive) {
 		if (isset($going_drive) && $sp_drive == $going_drive) { continue; }
+		$drive_uuid = gh_dir_uuid($sp_drive);
 		if (!isset($drives_definitions[$sp_drive])) {
 			if (is_dir($sp_drive)) {
-				$drives_definitions[$sp_drive] = gh_dir_uuid($sp_drive);
+				$drives_definitions[$sp_drive] = $drive_uuid;
 			}
 		}
 		if (!isset($drives_definitions[$sp_drive])) {
@@ -786,10 +791,10 @@ function convert_sp_drives_tag_files() {
 			unset($drives_definitions[$sp_drive]);
 			continue;
 		}
-		if (file_exists("$sp_drive/.greyhole_uses_this")) {
+		if (file_exists("$sp_drive/.greyhole_uses_this") && $drive_uuid != 'remote') {
 			unlink("$sp_drive/.greyhole_uses_this");
 		}
-		if ($drives_definitions[$sp_drive] != gh_dir_uuid($sp_drive)) {
+		if ($drives_definitions[$sp_drive] != $drive_uuid) {
 			gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 		}
 	}
@@ -2502,6 +2507,9 @@ function get_free_space_in_storage_pool_drives() {
 	}
 	$responses = $responses_arr;
 	foreach ($storage_pool_drives as $sp_drive) {
+		if (!is_greyhole_owned_drive($sp_drive)) {
+			continue;
+		}
 		$target_drive = '';
 		for ($i=0; $i<count($responses); $i++) {
 			$used_space = $responses[$i][0];

@@ -1626,7 +1626,7 @@ class Settings {
 function gh_dir_uuid($dir) {
 	$dev = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | grep \'/dev\' | awk \'{print $1}\'');
 	if (empty($dev) || strpos($dev, '/dev/') !== 0) {
-		return FALSE;
+		return 'remote';
 	}
 	return trim(exec('blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
 }
