@@ -172,6 +172,25 @@ if ($action == 'remove-share') {
 	echo "    Space needed: " . bytes_to_human($space_needed, FALSE) . "\n";
 	echo "    Free space: " . bytes_to_human($free_space, FALSE) . "\n";
 	
+	// Adjust the landing zone free space, if some file copies are already on that drive
+	$storage_pool_drives_to_unwind = array();
+	foreach ($storage_pool_drives as $sp_drive) {
+		if (!file_exists("$sp_drive/$share")) {
+			#echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
+			continue;
+		}
+		if (gh_dir_uuid("$sp_drive/$share") === gh_dir_uuid("$landing_zone")) {
+			$more_free_space = 1024 * exec("du -sk " . escapeshellarg("$sp_drive/$share") . " | awk '{print $1}'");
+			$free_space += $more_free_space;
+			echo "      + " . bytes_to_human($more_free_space, FALSE) . " (file copies already on $sp_drive) = " . bytes_to_human($free_space, FALSE) . " (Total available space)\n";
+			
+			// We also need to make sure this drive is 'unwind' first, to make sure it will have enough free space to receive all the file copies.
+			array_unshift($storage_pool_drives_to_unwind, $sp_drive);
+		} else {
+			array_push($storage_pool_drives_to_unwind, $sp_drive);
+		}
+	}
+	
 	if ($space_needed > $free_space) {
 		echo "Not enough free space available in $landing_zone. Aborting.\n";
 		exit(1);
@@ -184,24 +203,18 @@ if ($action == 'remove-share') {
 	echo "    Done.\n";
 
 	// Copy the data files from the storage pool into the landing zone
-	$storage_folders_with_files = array();
 	$num_files_total = 0;
-	foreach ($storage_pool_drives as $sp_drive) {
-		if (!file_exists("$sp_drive/$share")) {
-			echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
-		} else {
-			$storage_folders_with_files[] = "$sp_drive/$share";
-			unset($result);
-			echo "  Moving files from $sp_drive/$share into $landing_zone... Please wait...\n";
-			exec("rsync -rlptgoDuvW --remove-source-files " . escapeshellarg("$sp_drive/$share/") . " " . escapeshellarg('/' . trim($landing_zone, '/')), $result);
-			$num_files = count($result)-5;
-			if ($num_files < 0) {
-				$num_files = 0;
-			}
-			$num_files_total += $num_files;
-			exec("find " . escapeshellarg("$sp_drive/$share/") . " -type d -delete");
-			echo "    Done. Copied $num_files files.\n";
+	foreach ($storage_pool_drives_to_unwind as $sp_drive) {
+		unset($result);
+		echo "  Moving files from $sp_drive/$share into $landing_zone... Please wait...\n";
+		exec("rsync -rlptgoDuvW --remove-source-files " . escapeshellarg("$sp_drive/$share/") . " " . escapeshellarg('/' . trim($landing_zone, '/')), $result);
+		$num_files = count($result)-5;
+		if ($num_files < 0) {
+			$num_files = 0;
 		}
+		$num_files_total += $num_files;
+		exec("find " . escapeshellarg("$sp_drive/$share/") . " -type d -delete");
+		echo "    Done. Copied $num_files files.\n";
 	}
 	echo "All done. Copied $num_files_total files.\nYou should now remove the Greyhole options from the [$share] share in your smb.conf.\n";
 	
