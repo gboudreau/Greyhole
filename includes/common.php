@@ -1625,6 +1625,9 @@ class Settings {
 
 function gh_dir_uuid($dir) {
 	$dev = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | grep \'/dev\' | awk \'{print $1}\'');
+	if (!is_dir($dir)) {
+	    return FALSE;
+	}
 	if (empty($dev) || strpos($dev, '/dev/') !== 0) {
 		return 'remote';
 	}
