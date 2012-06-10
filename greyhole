@@ -3400,7 +3400,7 @@ Trash size:\n";
 				$report .= "    Those metadata files have been deleted, since you used the --delete-orphaned-metadata option. They will not re-appear in the future.\n";
 			} else {
 				$report .= "    Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.\n";
-				$report .= "    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store using \"greyhole --delete-metadata=<path>, where <path> is one of the vsalue listed below.\"\n";
+				$report .= "    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store using \"greyhole --delete-metadata='<path>'\", where <path> is one of the value listed below.\n";
 			}
   			$report .= "  Files with no copies:\n";
 			$report .= "    " . implode("\n    ", array_keys($fsck_report['no_copies_found_files'])) . "\n\n";
