@@ -139,6 +139,7 @@ if ($action == 'delete-metadata') {
 	$share = trim(mb_substr($options['dir'], 0, mb_strpos($options['dir'], '/')+1), '/');
 	$full_path = trim(mb_substr($options['dir'], mb_strpos($options['dir'], '/')+1), '/');
 	list($path, $filename) = explode_full_path($full_path);
+	set_metastore_backup();
 	foreach (get_metafile_data_filenames($share, $path, $filename, 1) as $file) {
 		if (file_exists($file)) {
 			echo "Deleting $file\n";
