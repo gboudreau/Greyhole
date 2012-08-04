@@ -314,10 +314,13 @@ function parse_config() {
 		}
 		$shares_options[$share_name] = $share_options;
 		
-		// Validate that the landing zone is NOT a subdirectory of a storage pool drive!
+		// Validate that the landing zone is NOT a subdirectory of a storage pool drive, and that storage pool drives are not subdirectories of the landing zone!
 		foreach ($storage_pool_drives as $key => $sp_drive) {
 			if (mb_strpos($share_options['landing_zone'], $sp_drive) === 0) {
 				gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pool drive ($sp_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+			}
+			if (mb_strpos($sp_drive, $share_options['landing_zone']) === 0) {
+				gh_log(CRITICAL, "Found a storage pool drive ($sp_drive), which is INSIDE a share landing zone (" . $share_options['landing_zone'] . "), for share $share_name. Storage pool drives should never be inside a directory that you use as a share landing zone ('path' in smb.conf).\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
 			}
 		}
 	}
