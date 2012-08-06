@@ -1512,7 +1512,7 @@ function file_is_locked($share, $full_path) {
 	// Locked, according to DB... But maybe it's not really locked?
 	if (!gh_file_exists($real_fullpath)) {
 		// File doesn't exists anymore... It can't be really locked... Let's assume this is just Samba that 'forgot' to close the file handle.
-		$query = sprintf("UPDATE tasks WHERE SET complete = 'yes' WHERE complete = 'no' AND action = 'write' AND share = '%s' AND full_path = '%s'",
+		$query = sprintf("UPDATE tasks SET complete = 'yes' WHERE complete = 'no' AND action = 'write' AND share = '%s' AND full_path = '%s'",
 			db_escape_string($share),
 			db_escape_string($full_path)
 		);
