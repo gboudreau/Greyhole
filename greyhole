@@ -1,7 +1,7 @@
-#!/usr/bin/php
+#!/usr/bin/env php
 <?php
 /*
-Copyright 2009-2011 Guillaume Boudreau, Andrew Hopkinson
+Copyright 2009-2012 Guillaume Boudreau, Andrew Hopkinson
 
 This file is part of Greyhole.
 
@@ -1111,8 +1111,7 @@ function execute_next_task() {
 				if ($fp) {
 					global $du;
 					foreach ($du as $path => $size) {
-						$chars_count = count_chars($path, 1);
-						fwrite($fp, $chars_count[ord('/')] . " $path $size\n");
+						fwrite($fp, round($size/1024)."\t$path\n");
 					}
 					fwrite($fp, "# " . serialize($shares_options) . "\n");
 					fclose($fp);
@@ -4269,6 +4268,14 @@ function print_usage() {
 	echo "                        metadata files. If the file copies re-appear later, you'll need\n";
 	echo "                        to run fsck with --find-orphaned-files to have them reappear in\n";
 	echo "                        your shares.\n";
+	echo "  -u, --disk-usage-report\n";
+	echo "                        Will produce a report of disk usage for your shares.\n";
+	echo "                        The report, saved in /usr/share/greyhole/gh-disk-usage.log, is\n";
+	echo "                        compatible with the gt5 tool, which can be used to browse your\n";
+	echo "                        shares, and find what is using the most space.\n";
+	echo "                        NOTE: This reports disk usage for a single copy of each file.\n";
+	echo "                        Those files can take more space, if you asked for multiple\n";
+	echo "                        copies to be kept.\n";
 	exit(1);
 }
 

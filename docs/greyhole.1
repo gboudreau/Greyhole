@@ -1,4 +1,4 @@
-.TH greyhole 1  "10/16/2011" "Greyhole %VERSION%" "Greyhole - Redundant Storage Pool using Samba"
+.TH greyhole 1  "04/05/2012" "Greyhole %VERSION%" "Greyhole - Redundant Storage Pool using Samba"
 .SH NAME
 greyhole \- control your Greyhole storage pool
 .SH SYNOPSIS
@@ -24,7 +24,7 @@ Start the daemon.
 Schedule a fsck.
 .TP
 \-C, \-\-cancel\-fsck
-Cancel all scheduled fsck.
+Cancel any ongoing or scheduled fsck operations.
 .TP
 \-l, \-\-balance
 Balance available space on storage pool drives.
@@ -135,6 +135,19 @@ When fsck find metadata files with no file copies, delete those
 metadata files. If the file copies re\-appear later, you'll need
 to run fsck with \-\-find\-orphaned\-files to have them reappear in
 your shares.
+.TP
+\-u, \-\-disk\-usage\-report
+Will produce a report of disk usage for your shares.
+The report, saved in /usr/share/greyhole/gh-disk-usage.log, is 
+compatible with the
+.B gt5
+tool, which can be used to browse your 
+shares, and find what is using the most space.
+.RS 7
+NOTE: This reports disk usage for a single copy of each file. Those 
+files can take more space, if you asked for multiple copies to be
+kept.
+.RE 0
 .SH EXAMPLES
 .TP
 Remove a drive from your pool, to later replace it:
