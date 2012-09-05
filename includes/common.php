@@ -1552,9 +1552,9 @@ class FSCKLogFile {
 
 class Settings {
 	public static function get($name, $unserialize=FALSE, $value=FALSE) {
-		$query = sprintf("SELECT * FROM settings WHERE name LIKE '%s'", $name);
+		$query = sprintf("SELECT * FROM settings WHERE name LIKE '%s'", db_escape_string($name));
 		if ($value !== FALSE) {
-			$query .= sprintf(" AND value LIKE '%s'", $value);
+			$query .= sprintf(" AND value LIKE '%s'", db_escape_string($value));
 		}
 		$result = db_query($query) or gh_log(CRITICAL, "Can't select setting '$name'/'$value' from settings table: " . db_error());
 		$setting = db_fetch_object($result);
@@ -1570,19 +1570,19 @@ class Settings {
 		}
 		global $db_use_mysql;
 		if (@$db_use_mysql) {
-			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE value = VALUES(value)", $name, $value);
+			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE value = VALUES(value)", db_escape_string($name), db_escape_string($value));
 			db_query($query) or gh_log(CRITICAL, "Can't insert/update '$name' setting: " . db_error());
 		} else {
-			$query = sprintf("DELETE FROM settings WHERE name = '%s'", $name);
+			$query = sprintf("DELETE FROM settings WHERE name = '%s'", db_escape_string($name));
 			db_query($query) or gh_log(CRITICAL, "Can't delete '$name' setting: " . db_error());
-			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s')", $name, $value);
+			$query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s')", db_escape_string($name), db_escape_string($value));
 			db_query($query) or gh_log(CRITICAL, "Can't insert '$name' setting: " . db_error());
 		}
 		return (object) array('name' => $name, 'value' => $value);
 	}
 
 	public static function rename($from, $to) {
-		$query = sprintf("UPDATE settings SET name = '%s' WHERE name = '%s'", $to, $from);
+		$query = sprintf("UPDATE settings SET name = '%s' WHERE name = '%s'", db_escape_string($to), db_escape_string($from));
 		db_query($query) or gh_log(CRITICAL, "Can't rename setting '$from' to '$to': " . db_error());
 	}
 
