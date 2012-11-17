@@ -3888,11 +3888,13 @@ function sort_storage_drives_available_space() {
 		$free_space = $dfs[$sp_drive]['free'];
 		$minimum_free_space = (float) (isset($minimum_free_space_pool_drives[$sp_drive]) ? $minimum_free_space_pool_drives[$sp_drive]*1024*1024 : 0.0);
 		$available_space = (float) $free_space - $minimum_free_space;
-		while (isset($sorted_target_drives[$available_space])) {
+		while (isset($sorted_target_drives["$available_space"])) {
 			// In case some drives have the exact same amount of available_space, make sure we return all drives!
 			$available_space++;
 		}
-		$sorted_target_drives[$available_space] = $sp_drive;
+		// On 32-bit systems, numeric array keys can't go over 2,147,483,648, so this would overflow on drives with more available space.
+		// Using string keys will prevent overflows, and it will be cast into a number later, when we use it as such.
+		$sorted_target_drives["$available_space"] = $sp_drive;
 	}
 	ksort($sorted_target_drives);
 	return $sorted_target_drives;
