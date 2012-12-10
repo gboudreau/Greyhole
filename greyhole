@@ -686,6 +686,13 @@ if ($action == 'balance') {
 	exit(0);
 }
 
+if ($action == 'cancel-balance') {
+	db_query("DELETE FROM tasks WHERE action = 'balance'") or gh_log(CRITICAL, "Can't delete balance tasks: " . db_error()); 
+	echo "All scheduled balance tasks have now been deleted.\n";
+	restart_service();
+	exit(0);
+}
+
 if ($action == 'cancel-fsck') {
 	db_query("DELETE FROM tasks WHERE action = 'fsck'") or gh_log(CRITICAL, "Can't delete fsck tasks: " . db_error());
 	db_query("DELETE FROM tasks WHERE action = 'md5'") or gh_log(CRITICAL, "Can't delete md5 tasks: " . db_error());
@@ -4071,12 +4078,13 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DfClsSLaqiU5X';
+	$opts_actions = 'DfClBsSLaqiU5X';
 	$longopts_actions = array(
 		'daemon',
 		'fsck',
 		'cancel-fsck',
 		'balance',
+		'cancel-balance',
 		'stats',
 		'status',
 		'logs',
@@ -4200,8 +4208,9 @@ function print_usage() {
 	echo "  -?, --help            Display this help and exit.\n";
 	echo "  -D, --daemon          Start the daemon.\n";
 	echo "  -f, --fsck            Schedule a fsck.\n";
-	echo "  -C, --cancel-fsck     Cancel all scheduled fsck.\n";
+	echo "  -C, --cancel-fsck     Cancel any ongoing or scheduled fsck operations.\n";
 	echo "  -l, --balance         Balance available space on storage pool drives.\n";
+	echo "  -B, --cancel-balance  Cancel any ongoing or scheduled balance operations.\n";
 	echo "  -s, --stats           Display storage pool statistics.\n";
 	echo "  -i, --iostat          I/O statistices for your storage pool drives.\n";
 	echo "  -L, --logs            Display new greyhole.log entries as they are logged.\n";
