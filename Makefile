@@ -17,6 +17,7 @@ deb: dist
 	(cd release/$(PACKAGE)-$(VERSION) && make deb && rm Makefile)
 	(cd release/$(PACKAGE)-$(VERSION) && find . -type f -exec md5sum {} \; | grep -v 'DEBIAN' > DEBIAN/md5sums)
 	sed -i 's@ \./@ @' release/$(PACKAGE)-$(VERSION)/DEBIAN/md5sums
+	(cd release/$(PACKAGE)-$(VERSION) && chmod +x DEBIAN/postinst DEBIAN/postrm)
 	(cd release/$(PACKAGE)-$(VERSION) && sudo chown -R root:root .)
 	(cd release && sudo dpkg-deb --build $(PACKAGE)-$(VERSION) greyhole-$(VERSION)-1.$(ARCH).deb)
 	(cd release && sudo rm -rf $(PACKAGE)-$(VERSION))
