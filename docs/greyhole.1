@@ -138,15 +138,21 @@ your shares.
 .TP
 \-u, \-\-disk\-usage\-report
 Will produce a report of disk usage for your shares.
-The report, saved in /usr/share/greyhole/gh-disk-usage.log, is 
+The report, saved in /usr/share/greyhole/gh-disk-usage.log, is
 compatible with the
 .B gt5
-tool, which can be used to browse your 
+tool, which can be used to browse your
 shares, and find what is using the most space.
+There is also a web UI available here:
+\fIhttps://gist.github.com/4173898\fR
 .RS 7
-NOTE: This reports disk usage for a single copy of each file. Those 
-files can take more space, if you asked for multiple copies to be
-kept.
+The weekly fsck run includes this option, so you should always 
+have an up-to-date report available for use when you need it.
+.RE 0
+.RS 7
+NOTE: This reports disk usage for every copy of each file. If you
+asked for two copies to be kept, that would mean a 1MB file
+would appear as 2MB in the report.
 .RE 0
 .SH EXAMPLES
 .TP
