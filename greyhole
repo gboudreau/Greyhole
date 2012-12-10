@@ -773,6 +773,7 @@ set_uniq_id();
 terminology_conversion();
 set_metastore_backup();
 Settings::backup();
+samba_check_vfs();
 parse_samba_spool();
 simplify_tasks();
 while (TRUE) {
@@ -2346,6 +2347,61 @@ function parse_samba_log($simplify_after_parse=TRUE) {
 function update_last_read_log_smbd_line($fp) {
 	$f_seek_point = ftell($fp);
 	Settings::set('last_read_log_smbd_line', $f_seek_point);
+}
+
+function samba_get_version() {
+	return str_replace(' ', '.', exec('/usr/sbin/smbd --version | awk \'{print $2}\' | awk -F\'-\' \'{print $1}\' | awk -F\'.\' \'{print $1,$2}\''));
+}
+
+function samba_restart() {
+  	gh_log(INFO, "The Samba daemon will now restart...");
+  	if (is_file('/etc/init/smbd.conf')) {
+  		exec("/sbin/restart smbd");
+  	} else if (is_file('/etc/init.d/samba')) {
+  		exec("/etc/init.d/samba restart");
+  	} else if (is_file('/etc/init.d/smb')) {
+  		exec("/etc/init.d/smb restart");
+  	} else if (is_file('/etc/init.d/smbd')) {
+  		exec("/etc/init.d/smbd restart");
+  	} else {
+  		gh_log(CRITICAL, "Couldn't find how to restart Samba. Please restart the Samba daemon manually.");
+  	}
+}
+
+function samba_check_vfs() {
+  	$vfs_is_ok = FALSE;
+
+  	// Samba version
+  	$version = str_replace('.', '', samba_get_version());
+  	
+  	// Get CPU architecture (x86_64 or i386)
+  	$arch = exec('uname -m');
+
+  	// Find VFS symlink
+  	$lib_dir = '/usr/lib';
+  	if ($arch == "x86_64") {
+  		$lib_dir = '/usr/lib64';
+  	}
+  	$vfs_file = "$lib_dir/samba/vfs/greyhole.so";
+
+  	if (is_file($vfs_file)) {
+  		// Get VFS symlink target
+  		$vfs_target = readlink($vfs_file);
+
+  		if (strpos($vfs_target, "/greyhole-samba$version.so") !== FALSE) {
+  			$vfs_is_ok = TRUE;
+  		}
+  	}
+
+  	if (!$vfs_is_ok) {
+  		$vfs_target = "$lib_dir/greyhole/greyhole-samba$version.so";
+  		gh_log(WARN, "Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
+  		if (is_file($vfs_file)) {
+  			unlink($vfs_file);
+  		}
+  		symlink($vfs_target, $vfs_file);
+  		samba_restart();
+  	}
 }
 
 function parse_samba_spool($simplify_after_parse=TRUE) {
