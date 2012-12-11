@@ -1119,7 +1119,8 @@ function execute_next_task() {
 				if ($fp) {
 					global $du;
 					foreach ($du as $path => $size) {
-						fwrite($fp, round($size/1024)."\t$path\n");
+						$chars_count = count_chars($path, 1);
+                                                fwrite($fp, $chars_count[ord('/')] . " $path $size\n");
 					}
 					fwrite($fp, "# " . serialize($shares_options) . "\n");
 					fclose($fp);
