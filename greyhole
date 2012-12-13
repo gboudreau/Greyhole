@@ -4338,12 +4338,14 @@ function print_usage() {
 	echo "                        your shares.\n";
 	echo "  -u, --disk-usage-report\n";
 	echo "                        Will produce a report of disk usage for your shares.\n";
-	echo "                        The report, saved in /usr/share/greyhole/gh-disk-usage.log, is\n";
-	echo "                        compatible with the gt5 tool, which can be used to browse your\n";
-	echo "                        shares, and find what is using the most space.\n";
-	echo "                        NOTE: This reports disk usage for a single copy of each file.\n";
-	echo "                        Those files can take more space, if you asked for multiple\n";
-	echo "                        copies to be kept.\n";
+	echo "                        The report, saved in /usr/share/greyhole/gh-disk-usage.log, can\n";
+	echo "                        be visualized using a web UI available here:\n";
+	echo "                        https://github.com/gboudreau/Greyhole/wiki/How-to-visualize-used-disk-space-in-your-storage-pool\n";
+	echo "                        The weekly fsck run includes this option, so you should always\n";
+	echo "                        have an up-to-date report available for use when you need it.\n";
+	echo "                        NOTE: This reports disk usage for every copy of each file. If\n";
+	echo "                        you asked for two copies to be kept, that would mean a 1MB file\n";
+	echo "                        would appear as 2MB in the report.\n";
 	exit(1);
 }
 
