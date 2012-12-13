@@ -57,9 +57,9 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	smbd --version
 
 	# For Samba 3.4: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	# For Samba 3.5: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then cp samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else cp samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	
 	Ubuntu (10+): install the Upstart script:
 		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
