@@ -136,6 +136,7 @@ elif [ -x /usr/bin/apt-get ]; then
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
 	sudo restart greyhole
 fi
+chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree
 
 
 ############################
