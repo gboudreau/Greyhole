@@ -1810,7 +1810,12 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 			gh_chperm($metafile->path, $file_infos);
 		} else {
 			gh_log(WARN, "    Failed file copy. Will mark this metadata file 'Gone'.");
-			@unlink($temp_path);
+			if ($copied) {
+				@unlink($temp_path);
+			} else {
+				// Do NOT delete $temp_path if the file was moved... Just move it back!
+				gh_rename($temp_path, $source_file);
+			}
 			if ($metafile->is_linked) {
 				$metafile->is_linked = FALSE;
 				$link_next = TRUE;
