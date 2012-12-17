@@ -93,7 +93,7 @@ start () {
 stop () {
 	echo -n "Shutting down Greyhole ... "
 	if [ -f /sbin/start-stop-daemon ]; then
-	    start-stop-daemon --stop --quiet --retry=TERM/10/KILL/5 --pidfile $PIDFILE --name $DAEMON
+	    start-stop-daemon --stop --quiet --retry=TERM/10/KILL/5 --pidfile $PIDFILE --name php
     	RETVAL=$?
 	    [ $RETVAL -eq 0 ] && echo "OK" || echo "FAILED"
 	else
