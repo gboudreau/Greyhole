@@ -520,7 +520,7 @@ if ($action == 'view-queue') {
 }
 
 if ($action == 'status') {
-	$num_dproc = (int) exec('ps ax | grep "^.*greyhole --daemon" | grep -v grep | wc -l');
+	$num_dproc = (int) exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | wc -l');
 	if ($num_dproc == 0) {
 		echo "\nGreyhole daemon is currently stopped.\n\n";
 		exit(1);
@@ -762,7 +762,7 @@ if ($action == 'md5-worker') {
 	exit(0);
 }
 
-$num_daemon_processes = exec('ps ax | grep ".*/php .*/greyhole --daemon" | grep -v grep | wc -l');
+$num_daemon_processes = exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | wc -l');
 if ($num_daemon_processes > 1) {
 	die("Found an already running Greyhole daemon with PID " . trim(file_get_contents('/var/run/greyhole.pid')) . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
 }
