@@ -46,10 +46,10 @@ status () {
 	PID=`cat $PIDFILE 2> /dev/null`
 	if [ -f $PIDFILE -a "`ps ax | grep \"^ *$PID.*greyhole --daemon\" | grep -v grep | wc -l`" -eq "1" ]; then
 		[ "$COMMAND" = "status" ] && echo "Greyhole is running."
-    	return 0
+		return 0
 	else
 		[ "$COMMAND" = "status" ] && echo "Greyhole isn't running."
-    	return 1
+		return 1
 	fi
 }
 
@@ -71,21 +71,21 @@ start () {
 	status && echo "greyhole already running." && return 0
 	if [ -f /sbin/start-stop-daemon ]; then
 	    start-stop-daemon --start --pidfile $PIDFILE --exec $0 --background -- daemon_start
-    	RETVAL=$?
-    	if [ $RETVAL -eq 0 ]; then
-    		echo "OK"
-    	else
-    		echo "FAILED"
-    	fi
+		RETVAL=$?
+		if [ $RETVAL -eq 0 ]; then
+			echo "OK"
+		else
+			echo "FAILED"
+		fi
 	else
-    	daemon +5 --check $DAEMON $0 daemon_start
-    	RETVAL=$?
-    	if [ $RETVAL -eq 0 ]; then
-    		success $"$base startup"
-    	else
-    		failure $"$base startup"
-    	fi
-    	echo
+		daemon +5 --check $DAEMON $0 daemon_start
+		RETVAL=$?
+		if [ $RETVAL -eq 0 ]; then
+			success $"$base startup"
+		else
+			failure $"$base startup"
+		fi
+		echo
 	fi
 	return $RETVAL
 }
@@ -94,14 +94,14 @@ stop () {
 	echo -n "Shutting down Greyhole ... "
 	if [ -f /sbin/start-stop-daemon ]; then
 	    start-stop-daemon --stop --quiet --retry=TERM/10/KILL/5 --pidfile $PIDFILE --name $DAEMON
-    	RETVAL=$?
-	    [ $RETVAL -eq 0 ] && echo "OK" || echo "FAILED"
+		RETVAL=$?
+		[ $RETVAL -eq 0 ] && echo "OK" || echo "FAILED"
 	else
-    	killproc $DAEMON
-    	RETVAL=$?
-    	[ $RETVAL -eq 0 ] && success $"$base shutdown" || failure $"$base shutdown"
-    	echo
-    fi
+		killproc $DAEMON
+		RETVAL=$?
+		[ $RETVAL -eq 0 ] && success $"$base shutdown" || failure $"$base shutdown"
+		echo
+	fi
 	[ $RETVAL -eq 0 ] && rm -f $PIDFILE
 	return $ret
 }
@@ -113,7 +113,7 @@ restart () {
 }
 
 condrestart () {
-    status && restart || :
+	status && restart || :
 }
 
 case "$COMMAND" in
