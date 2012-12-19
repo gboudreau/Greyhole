@@ -112,12 +112,21 @@ if ($db_options->engine == 'sqlite') {
 	}
 }
 
-function db_migrate() {
+function db_migrate($attempt_repair = TRUE) {
 	global $db_options, $db_use_mysql, $db_use_sqlite;
 	// Migration #1 (complete = frozen|thawed)
 	if (@$db_use_mysql) {
 		$query = "DESCRIBE tasks";
-		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+		$result = db_query($query);
+		if (!$result) {
+			if ((mysql_errno() == 144 || mysql_errno() == 145) && $attempt_repair) {
+				repair_tables();
+				db_migrate(FALSE);
+				return;
+			} else {
+				die("Can't describe tasks with query: $query - Error: " . db_error());
+			}
+		}
 		while ($row = db_fetch_object($result)) {
 			if ($row->Field == 'complete') {
 				if ($row->Type == "enum('yes','no')") {
@@ -156,7 +165,16 @@ function db_migrate() {
 	// Migration #3 (larger settings.value: tinytext > text)
 	if (@$db_use_mysql) {
 		$query = "DESCRIBE settings";
-		$result = db_query($query) or die("Can't describe settings with query: $query - Error: " . db_error());
+		$result = db_query($query);
+		if (!$result) {
+			if ((mysql_errno() == 144 || mysql_errno() == 145) && $attempt_repair) {
+				repair_tables();
+				db_migrate(FALSE);
+				return;
+			} else {
+				die("Can't describe settings with query: $query - Error: " . db_error());
+			}
+		}
 		while ($row = db_fetch_object($result)) {
 			if ($row->Field == 'value') {
 				if ($row->Type == "tinytext") {
@@ -250,6 +268,23 @@ function db_migrate() {
 				}
 				break;
 			}
+		}
+	}
+}
+
+function repair_tables() {
+	global $db_use_mysql, $action;
+	if (@$db_use_mysql) {
+		if ($action == 'daemon') {
+			gh_log(INFO, "Optimizing MySQL tables...");
+		}
+		db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
+		db_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . db_error());
+		// Let's repair tasks_completed only if it's broken!
+		$result = db_query("SELECT * FROM tasks_completed LIMIT 1");
+		if ($result === FALSE) {
+			gh_log(INFO, "Repairing MySQL tables...");
+			db_query("REPAIR TABLE tasks_completed") or gh_log(CRITICAL, "Can't repair tasks_completed table: " . db_error());
 		}
 	}
 }
