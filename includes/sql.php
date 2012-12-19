@@ -87,8 +87,14 @@ if ($db_options->engine == 'sqlite') {
 		return $connected;
 	}
 	
-	function db_query($query) {
-		return mysql_query($query);
+	function db_query($query, $attempt_repair=TRUE) {
+		$result = mysql_query($query);
+		if ($result === FALSE && (mysql_errno() == 144 || mysql_errno() == 145) && $attempt_repair) {
+			// Table is crashed
+			repair_tables();
+			return db_query($query, FALSE); // $attempt_repair = FALSE, to not go into an infinite loop, if the repair doesn't work.
+		}
+		return $result;
 	}
 
 	function db_escape_string($string) {
@@ -117,16 +123,7 @@ function db_migrate($attempt_repair = TRUE) {
 	// Migration #1 (complete = frozen|thawed)
 	if (@$db_use_mysql) {
 		$query = "DESCRIBE tasks";
-		$result = db_query($query);
-		if (!$result) {
-			if ((mysql_errno() == 144 || mysql_errno() == 145) && $attempt_repair) {
-				repair_tables();
-				db_migrate(FALSE);
-				return;
-			} else {
-				die("Can't describe tasks with query: $query - Error: " . db_error());
-			}
-		}
+		$result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
 		while ($row = db_fetch_object($result)) {
 			if ($row->Field == 'complete') {
 				if ($row->Type == "enum('yes','no')") {
@@ -165,16 +162,7 @@ function db_migrate($attempt_repair = TRUE) {
 	// Migration #3 (larger settings.value: tinytext > text)
 	if (@$db_use_mysql) {
 		$query = "DESCRIBE settings";
-		$result = db_query($query);
-		if (!$result) {
-			if ((mysql_errno() == 144 || mysql_errno() == 145) && $attempt_repair) {
-				repair_tables();
-				db_migrate(FALSE);
-				return;
-			} else {
-				die("Can't describe settings with query: $query - Error: " . db_error());
-			}
-		}
+		$result = db_query($query) or die("Can't describe settings with query: $query - Error: " . db_error());
 		while ($row = db_fetch_object($result)) {
 			if ($row->Field == 'value') {
 				if ($row->Type == "tinytext") {
