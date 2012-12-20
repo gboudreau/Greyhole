@@ -78,6 +78,7 @@ start () {
 		fi
 		echo
 	fi
+	sleep 1 # Allow some time for the daemon to appear in the processes list
 	[ $RETVAL -eq 0 ] && ps ax | grep "greyhole --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
 	return $RETVAL
 }
