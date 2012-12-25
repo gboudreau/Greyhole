@@ -53,6 +53,19 @@ status () {
 	fi
 }
 
+daemon_start () {
+    n=`grep daemon_niceness /etc/greyhole.conf | grep -v '#.*daemon_niceness' | sed 's/^.*= *\(.*\) *$/\1/'`
+	if [ "$n" = "" ]; then
+		n=1
+	fi
+	nice -n $n $DAEMON --daemon > /dev/null &
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+		ps ax | grep "$DAEMON --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
+	fi
+	return $RETVAL
+}
+
 start () {
 	echo -n "Starting Greyhole ... "
 	status && echo "greyhole already running." && return 0
@@ -115,6 +128,9 @@ case "$COMMAND" in
 		;;
 	start)
 		start
+		;;
+	daemon_start)
+		daemon_start
 		;;
 	stop)
 		stop
