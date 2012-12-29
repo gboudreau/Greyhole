@@ -73,31 +73,24 @@ mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
 
 LIBDIR=/usr/lib
-if [ "`uname -i`" = "x86_64" ]; then
-        LIBDIR=/usr/lib64
+if [ "`uname -m`" = "x86_64" ]; then
+	LIBDIR=/usr/lib64
 fi
-echo "  Found LIB_DIR = ${LIBDIR}"
 if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
-	echo "  Removing old ${LIBDIR}/samba/vfs/greyhole.so library"
 	rm ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
-if [ "$SMB_VERSION" = "3 5" ]; then
-	echo "  Detected Samba 3.5; creating symlink pointing to greyhole-samba35.so"
+if [ "$SMB_VERSION" = "3 4" ]; then
+	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
+elif [ "$SMB_VERSION" = "3 5" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
 elif [ "$SMB_VERSION" = "3 6" ]; then
-	echo "  Detected Samba 3.6; creating symlink pointing to greyhole-samba36.so"
 	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 else
-	echo "  Detected Samba 3.4; creating symlink pointing to greyhole-samba34.so"
-	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
-fi
-
-if [ ! -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
-	echo "Error: missing symlink ${LIBDIR}/samba/vfs/greyhole.so"
-	echo "Please try re-installing this RPM."
-	exit 1
+	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba ($SMB_VERSION)."
+	echo "We will try to use the VFS for version 3.6, but that might not work."
+	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
 if [ -f /etc/logrotate.d/syslog ]; then

@@ -13,12 +13,16 @@ if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
 fi
 
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
-if [ "$SMB_VERSION" = "3 5" ]; then
+if [ "$SMB_VERSION" = "3 4" ]; then
+	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
+elif [ "$SMB_VERSION" = "3 5" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
 elif [ "$SMB_VERSION" = "3 6" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 else
-	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
+	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba ($SMB_VERSION)."
+	echo "We will try to use the VFS for version 3.6, but that might not work."
+	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 fi
 
 # For Ubuntu 11.10, where even x86_64 install use /usr/lib
@@ -26,12 +30,14 @@ if [ "`uname -m`" = "x86_64" -a -x /usr/lib/samba/vfs/ ]; then
 	if [ -f /usr/lib/samba/vfs/greyhole.so ]; then
 		rm /usr/lib/samba/vfs/greyhole.so
 	fi
-	if [ "$SMB_VERSION" = "3 5" ]; then
+	if [ "$SMB_VERSION" = "3 4" ]; then
+		ln -s ${LIBDIR}/greyhole/greyhole-samba34.so /usr/lib/samba/vfs/greyhole.so
+	elif [ "$SMB_VERSION" = "3 5" ]; then
 		ln -s ${LIBDIR}/greyhole/greyhole-samba35.so /usr/lib/samba/vfs/greyhole.so
 	elif [ "$SMB_VERSION" = "3 6" ]; then
 		ln -s ${LIBDIR}/greyhole/greyhole-samba36.so /usr/lib/samba/vfs/greyhole.so
 	else
-		ln -s ${LIBDIR}/greyhole/greyhole-samba34.so /usr/lib/samba/vfs/greyhole.so
+		ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 	fi
 fi
 
