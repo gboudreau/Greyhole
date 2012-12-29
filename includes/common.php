@@ -1634,7 +1634,7 @@ function gh_dir_uuid($dir) {
 	if (empty($dev) || strpos($dev, '/dev/') !== 0) {
 		return 'remote';
 	}
-	return trim(exec('blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
+	return trim(exec('/sbin/blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
 }
 
 function fix_all_symlinks() {
