@@ -155,7 +155,7 @@ chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree
 ############################
 # Upload new files to GitHub
 
-./github-auto-post-downloads.php $VERSION
+./github-auto-post-downloads.php $VERSION $BUILD_NUMBER
 
 
 ####################

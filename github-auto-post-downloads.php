@@ -10,14 +10,15 @@ foreach (json_decode(file_get_contents('https://api.github.com/repos/gboudreau/G
 
 // Find files to upload
 $version = $argv[1];
-foreach (glob("release/*$version*") as $file) {
+$build_number = $argv[2];
+foreach (glob("release/*$version-$build_number*") as $file) {
     $filename = basename($file);
     if (strpos($filename, 'hda-greyhole-') !== FALSE || strpos($filename, '.src.rpm') !== FALSE || strpos($filename, 'greyhole-web-app') !== FALSE || strpos($filename, '.armv5tel.') !== FALSE) {
         // Skip those files
         continue;
     }
     $file_type = get_file_type($filename);
-    $description = "Greyhole $version ($file_type)";
+    $description = "Greyhole $version-$build_number ($file_type)";
 
     echo "Uploading $filename with description $description...\n";
     // Create the download metadata on Github
