@@ -113,6 +113,12 @@ if [ -f /proc/fs/cifs/OplockEnabled ]; then
 	modprobe cifs
 	echo 0 > /proc/fs/cifs/OplockEnabled
 fi
+if [ -f /sys/module/cifs/parameters/enable_oplocks ]; then
+	# cifs client workaround
+	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
+	modprobe cifs enable_oplocks=0
+	echo 0 > /sys/module/cifs/parameters/enable_oplocks
+fi
 
 # Service install
 /sbin/chkconfig --add greyhole
