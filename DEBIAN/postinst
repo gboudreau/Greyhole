@@ -75,7 +75,7 @@ else
     if [ -f /etc/init.d/samba ]; then
         sed -i 's/smb/samba/' /etc/init.d/greyhole
     fi
-	if [ -f /sbin/chkconfig ];
+	if [ -f /sbin/chkconfig ]; then
 		/sbin/chkconfig --add greyhole
 		/sbin/chkconfig greyhole on
 	else
