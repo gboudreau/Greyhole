@@ -59,8 +59,6 @@ if [ -f /sbin/start ]; then
 	# Using Upstart instead of SYSV init.d
 	if [ -f /etc/init.d/greyhole ]; then
 		rm /etc/init.d/greyhole
-		stop greyhole 2> /dev/null > /dev/null || true
-		start greyhole 2> /dev/null > /dev/null
 	fi
 	if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
 		restart greyhole
@@ -77,7 +75,12 @@ else
     if [ -f /etc/init.d/samba ]; then
         sed -i 's/smb/samba/' /etc/init.d/greyhole
     fi
-	update-rc.d greyhole defaults
+	if [ -f /sbin/chkconfig ];
+		/sbin/chkconfig --add greyhole
+		/sbin/chkconfig greyhole on
+	else
+		/usr/sbin/update-rc.d greyhole defaults
+	fi
 	if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
 		service greyhole restart
 		running=1

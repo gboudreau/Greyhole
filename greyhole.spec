@@ -134,8 +134,12 @@ else
     if [ -f /etc/init.d/samba ]; then
         sed -i 's/smb/samba/' /etc/init.d/greyhole
     fi
+	if [ -f /sbin/chkconfig ];
 		/sbin/chkconfig --add greyhole
 		/sbin/chkconfig greyhole on
+	else
+		/usr/sbin/update-rc.d greyhole defaults
+	fi
 	if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
 		service greyhole restart
 		running=1
