@@ -48,6 +48,7 @@ if [ -f /sys/module/cifs/parameters/enable_oplocks ]; then
 	echo 0 > /sys/module/cifs/parameters/enable_oplocks
 fi
 
+running=0
 if [ -f /sbin/start ]; then
 	# Using Upstart instead of SYSV init.d
 	if [ -f /etc/init.d/greyhole ]; then
@@ -57,6 +58,7 @@ if [ -f /sbin/start ]; then
 	fi
 	if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
 		restart greyhole
+		running=1
 	fi
 else
 	# (SYSV) Service install & start
@@ -72,9 +74,12 @@ else
 	update-rc.d greyhole defaults
 	if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
 		service greyhole restart
+		running=1
 	fi
 fi
 
-echo "==========================================================================="
-echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
-echo "==========================================================================="
+if [ $running -eq 0 ]; then
+	echo "==========================================================================="
+	echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
+	echo "==========================================================================="
+fi

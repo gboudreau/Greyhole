@@ -123,13 +123,17 @@ fi
 # Service install
 /sbin/chkconfig --add greyhole
 /sbin/chkconfig greyhole on
-/sbin/service greyhole condrestart 2>&1 > /dev/null
+running=0
+	if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
+		service greyhole restart
+		running=1
+	fi
 
-echo "Post-install script completed."
-echo
-echo "==========================================================================="
-echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
-echo "==========================================================================="
+if [ $running -eq 0 ]; then
+	echo "==========================================================================="
+	echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
+	echo "==========================================================================="
+fi
 
 %preun
 
