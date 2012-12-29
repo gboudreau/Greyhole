@@ -1,4 +1,4 @@
-# VERSION & ARCH are now specified in build_greyhole.sh, using export
+# VERSION, BUILD_NUMBER & ARCH are now specified in build_greyhole.sh, using export
 PACKAGE=greyhole
 
 deb: dist
@@ -6,9 +6,9 @@ deb: dist
 	(cd release && tar -xzf $(PACKAGE)-$(VERSION).tar.gz)
 	rm release/$(PACKAGE)-$(VERSION)/greyhole.spec
 	cp -r DEBIAN release/$(PACKAGE)-$(VERSION)/
-	sed -i 's/^Version:.*/Version: $(VERSION)-1/' release/$(PACKAGE)-$(VERSION)/DEBIAN/control
+	sed -i 's/^Version:.*/Version: $(VERSION)-$(BUILD_NUMBER)/' release/$(PACKAGE)-$(VERSION)/DEBIAN/control
 	sed -i 's/^Architecture:.*/Architecture: $(ARCH)/' release/$(PACKAGE)-$(VERSION)/DEBIAN/control
-	sed -i 's/__VERSION__/$(VERSION)-1/' release/$(PACKAGE)-$(VERSION)/DEBIAN/changelog
+	sed -i 's/__VERSION__/$(VERSION)-$(BUILD_NUMBER)/' release/$(PACKAGE)-$(VERSION)/DEBIAN/changelog
 	sed -i "s/__DATE__/`date +'%a, %d %b %Y %T %z'`/" release/$(PACKAGE)-$(VERSION)/DEBIAN/changelog
 	(cd release/$(PACKAGE)-$(VERSION) && mv DEBIAN/Makefile .)
 	(cd release/$(PACKAGE)-$(VERSION) && mkdir -p usr/share/doc/greyhole/ && mv DEBIAN/copyright usr/share/doc/greyhole/)
@@ -19,7 +19,7 @@ deb: dist
 	sed -i 's@ \./@ @' release/$(PACKAGE)-$(VERSION)/DEBIAN/md5sums
 	(cd release/$(PACKAGE)-$(VERSION) && chmod +x DEBIAN/postinst DEBIAN/postrm)
 	(cd release/$(PACKAGE)-$(VERSION) && sudo chown -R root:root .)
-	(cd release && sudo dpkg-deb --build $(PACKAGE)-$(VERSION) greyhole-$(VERSION)-1.$(ARCH).deb)
+	(cd release && sudo dpkg-deb --build $(PACKAGE)-$(VERSION) greyhole-$(VERSION)-$(BUILD_NUMBER).$(ARCH).deb)
 	(cd release && sudo rm -rf $(PACKAGE)-$(VERSION))
 
 rpm: dist
@@ -42,6 +42,7 @@ dist:
 	rsync -a --exclude-from=.build_excluded_files.txt * release/$(PACKAGE)-$(VERSION)/
 	(cd release/$(PACKAGE)-$(VERSION)/ && git clone git@github.com:gboudreau/Greyhole.git; cd Greyhole; git log --pretty=oneline --reverse | cut -d ' ' -f2-  | grep -v '^Tag: ' > ../CHANGES; cd ..; rm -rf Greyhole)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
+	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Release:\(\s*\).BUILD_NUMBER\s*$$/Release:\1$(BUILD_NUMBER)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' greyhole)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole.1)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole-dfree.1)
