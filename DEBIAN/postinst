@@ -70,7 +70,9 @@ else
         sed -i 's/smb/samba/' /etc/init.d/greyhole
     fi
 	update-rc.d greyhole defaults
-	service greyhole condrestart 2>&1 > /dev/null
+	if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
+		service greyhole restart
+	fi
 fi
 
 echo "==========================================================================="
