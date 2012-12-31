@@ -137,8 +137,12 @@ fi
 %preun
 
 # Delete VFS module symlinks, if any
-rm -f /usr/lib64/samba/vfs/greyhole.so
-rm -f /usr/lib/samba/vfs/greyhole.so
+if [ -f /usr/lib64/samba/vfs/greyhole.so ]; then
+	rm -f /usr/lib64/samba/vfs/greyhole.so
+fi
+if [ -f /usr/lib/samba/vfs/greyhole.so ]; then
+	rm -f /usr/lib/samba/vfs/greyhole.so
+fi
 
 if [ "$1" != 0 ]; then
 	/sbin/service greyhole condrestart 2>&1 > /dev/null
