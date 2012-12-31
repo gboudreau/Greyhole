@@ -114,33 +114,15 @@ if [ -f /sys/module/cifs/parameters/enable_oplocks ]; then
 fi
 
 running=0
-if [ -f /sbin/start ]; then
-	# Using Upstart instead of SYSV init.d
-	if [ -f /etc/init.d/greyhole ]; then
-		rm /etc/init.d/greyhole
-	fi
-	if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
-		restart greyhole
-		running=1
-	fi
+# (SYSV) Service install & start
+if [ -f /sbin/chkconfig ]; then
+	/sbin/chkconfig --add greyhole
+	/sbin/chkconfig greyhole on
 else
-	# (SYSV) Service install & start
-	if [ -f /etc/init/greyhole.conf ]; then
-		rm /etc/init/greyhole.conf
-	fi
-	if [ -f /etc/init.d/mysql ]; then
-	    sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
-    fi
-    if [ -f /etc/init.d/samba ]; then
-        sed -i 's/smb/samba/' /etc/init.d/greyhole
-    fi
-	if [ -f /sbin/chkconfig ]; then
-		/sbin/chkconfig --add greyhole
-		/sbin/chkconfig greyhole on
-	else
-		/usr/sbin/update-rc.d greyhole defaults
-	fi
-	if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
+	/usr/sbin/update-rc.d greyhole defaults
+fi
+if [ -f /etc/rc.d/init.d/greyhole ]; then
+	if [ "`service greyhole status 2> /dev/null | grep 'is running' | wc -l`" = "1" ]; then
 		service greyhole restart
 		running=1
 	fi
