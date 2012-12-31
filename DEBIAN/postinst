@@ -60,9 +60,11 @@ if [ -f /sbin/start ]; then
 	if [ -f /etc/init.d/greyhole ]; then
 		rm /etc/init.d/greyhole
 	fi
-	if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
-		restart greyhole
-		running=1
+	if [ -f /etc/init/greyhole.conf ]; then
+		if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
+			restart greyhole
+			running=1
+		fi
 	fi
 else
 	# (SYSV) Service install & start
@@ -81,9 +83,11 @@ else
 	else
 		/usr/sbin/update-rc.d greyhole defaults
 	fi
-	if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
-		service greyhole restart
-		running=1
+	if [ -f /etc/init.d/greyhole ]; then
+		if [ "`service greyhole status | grep 'is running' | wc -l`" = "1" ]; then
+			service greyhole restart
+			running=1
+		fi
 	fi
 fi
 
