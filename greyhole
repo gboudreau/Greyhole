@@ -843,7 +843,7 @@ function convert_sp_drives_tag_files() {
 		$devices[$device_id][] = $sp_drive;
 	}
 	foreach ($devices as $device_id => $sp_drives) {
-		if (count($sp_drives) > 1 && $device_id !== 0) {
+		if (count($sp_drives) > 1 && $device_id !== 0 && $device_id != 'remote') {
 			if ($allow_multiple_sp_per_device) {
 				gh_log(INFO, "The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf 'allow_multiple_sp_per_device' options, you chose to ignore this normally critical error.");
 			} else {
