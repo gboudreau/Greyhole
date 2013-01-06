@@ -2861,7 +2861,7 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
 	$fsck_report['landing_zone']['num_dirs']++;
 
 	$list = array();
-	$handle = opendir($path);
+	$handle = @opendir($path);
 	if ($handle === FALSE) {
 		gh_log(ERROR, "  Couldn't open $path to list content. Skipping...");
 		return;
