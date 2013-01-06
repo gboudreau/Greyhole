@@ -3634,12 +3634,9 @@ function get_share_options_from_full_path($full_path) {
 		if (mb_strpos($full_path, $share_options['landing_zone']) === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
 			$landing_zone = $share_options['landing_zone'];
 			$share = $share_options;
-			break;
 		}
 	}
 	return $share;
-
-
 }
 
 function get_storage_volume_from_path($full_path) {
@@ -3650,7 +3647,6 @@ function get_storage_volume_from_path($full_path) {
 		if (mb_strpos($full_path, $sp_drive) === 0 && mb_strlen($sp_drive) > $longest_path_found) {
 			$storage_volume = $sp_drive;
 			$longest_path_found = mb_strlen($sp_drive);
-			break;
 		} 
 	}
 	return $storage_volume;
@@ -3666,13 +3662,11 @@ function get_share_options_from_storage_volume($full_path,$storage_volume) {
 			if (mb_strpos($full_path, "$metastore/$share_name") === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
 				$land_zone = $share_options['landing_zone'];
 				$share = $share_options;
-				break;
 			}
 		}else{
 			if (mb_strpos($full_path, "$storage_volume/$share_name") === 0 && mb_strlen($share_options['landing_zone']) > mb_strlen($landing_zone)) {
 				$landing_zone = $share_options['landing_zone'];
 				$share = $share_options;
-				break;
 			}
 		}
 	}
