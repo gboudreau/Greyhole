@@ -226,7 +226,7 @@ if ($action == 'remove-share') {
 
 if ($action == 'gone' || $action == 'going') {
 	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
-		$options['drive'] = '/' . trim($options['drive'], '/');
+		$options['drive'] = '/' . trim(@$options['drive'], '/');
 	}
 	if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
 		if (!empty($options['drive'])) {
@@ -645,7 +645,7 @@ if ($action == 'stats') {
 
 if ($action == 'replace') {
 	if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
-		$options['drive'] = '/' . trim($options['drive'], '/');
+		$options['drive'] = '/' . trim(@$options['drive'], '/');
 	}
 	if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
 		if (!empty($options['drive'])) {
