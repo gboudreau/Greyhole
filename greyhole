@@ -240,6 +240,17 @@ if ($action == 'gone' || $action == 'going') {
 		exit(1);
 	}
 
+	if ($action == 'going') {
+		// Check that all scheduled fsck have completed; an incomplete fsck means some file copies might be missing!
+		$result = db_query("SELECT COUNT(*) AS total FROM tasks WHERE action = 'fsck'") or die("Can't query tasks for pending fsck operations. Error: " . db_error());
+		$row = db_fetch_object($result);
+		if ($row->total > 0) {
+			echo "There are pending fsck operations. This could mean some file copies are missing, which would make it dangerous to remove a drive at this time.\n";
+			echo "Please wait until all fsck operation are complete, and then retry.\n";
+			exit(2);
+		}
+	}
+
 	// Removing this drive here will insure it won't be used for new files while we're moving files away, and that it can later be replaced.
 	remove_drive_definition($options['drive']);
 
