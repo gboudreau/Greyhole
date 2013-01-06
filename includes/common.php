@@ -1632,7 +1632,23 @@ function gh_dir_uuid($dir) {
 	    return FALSE;
 	}
 	if (empty($dev) || strpos($dev, '/dev/') !== 0) {
-		return 'remote';
+		// ZFS pool maybe?
+		if (file_exists('/sbin/zpool')) {
+			$dataset = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | awk \'{print $1}\'');
+			if (strpos($dataset, '/') !== FALSE) {
+				$is_zfs = exec('mount | grep ' . escapeshellarg("$dataset .*zfs") . ' 2> /dev/null | wc -l');
+				if ($is_zfs == 1) {
+					$pool = explode('/', $dataset)[0];
+					$partition_id = exec('/sbin/zpool list -v ' . escapeshellarg($pool) . ' 2> /dev/null | awk \'{print $1}\' | tail -n 1');
+					if (!empty($partition_id)) {
+						$dev = '/dev/disk/by-id/' . $partition_id;
+					}
+				}
+			}
+		}
+		if (empty($dev)) {
+			return 'remote';
+		}
 	}
 	return trim(exec('/sbin/blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
 }
