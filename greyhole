@@ -273,7 +273,10 @@ if ($action == 'gone' || $action == 'going') {
 				}
 				echo "Done.\n";
 			} else {
+				// Temporarily rename $going_drive/$share_name for fix_symlinks_on_share to be able to find symlinks that will be broken once this drive is removed.
+				rename("$going_drive/$share_name", "$going_drive/$share_name".".tmp");
 				fix_symlinks_on_share($share_name);
+				rename("$going_drive/$share_name".".tmp", "$going_drive/$share_name");
 			}
 		}
 	}
