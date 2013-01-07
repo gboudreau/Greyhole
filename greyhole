@@ -3328,6 +3328,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 						$num_copies_current++;
 					} else {
 						gh_log(WARN, "    Failed file copy. Skipping.");
+						@unlink($temp_path);
 						if ($metafile->is_linked) {
 							$metafile->is_linked = FALSE;
 						}
@@ -3921,7 +3922,7 @@ function gh_balance() {
 					$pool_drives_avail_space[$source_drive] += $filesize;
 				} else {
 					gh_log(WARN, "    Failed file copy. Skipping.");
-					gh_recycle($temp_path);
+					@unlink($temp_path);
 					continue;
 				}
 
