@@ -445,11 +445,7 @@ if ($action == 'debug') {
 
 	$last_task = array_pop($debug_tasks);
 	$share = $last_task->share;
-	if ($last_task->action == 'rename') {
-		$full_path = $last_task->additional_info;
-	} else {
-		$full_path = $last_task->full_path;
-	}
+	$full_path = $last_task->full_path;
 	list($path, $filename) = explode_full_path($full_path);
 	echo "Landing Zone:\n";
 	echo "  "; passthru("ls -l " . escapeshellarg(get_share_landing_zone($share) . "/" . $full_path));
