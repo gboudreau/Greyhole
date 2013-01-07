@@ -615,6 +615,12 @@ if ($action == 'status') {
 }
 
 if ($action == 'stats') {
+	if (file_exists('/sbin/zpool')) {
+		if (exec("whoami") != 'root') {
+			echo "Warning: If you are using ZFS datasets as Greyhole storage pool drives, you will need to execute this as root.\n";
+		}
+	}
+
 	$max_drive_strlen = max(array_map('mb_strlen', $storage_pool_drives)) + 1;
 
 	$totals = array(
