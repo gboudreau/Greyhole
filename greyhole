@@ -1836,7 +1836,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 
 		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
 		if (!is_greyhole_owned_drive($root_path)) {
-			gh_log(WARN, "  Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+			gh_log(WARN, "  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 			$metafile->state = 'Gone';
 			$metafiles[$key] = $metafile;
 			continue;
