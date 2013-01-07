@@ -2012,10 +2012,22 @@ function create_metafiles($share, $full_path, $num_copies_required, $filesize, $
 			// This will allow us to use a new drive that has been installed where an old drive was previously.
 			$metafile->state = 'Pending';
 		}
-		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
-		if (!is_greyhole_owned_drive($root_path)) {
+		$sp_drive = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
+		if (!is_greyhole_owned_drive($sp_drive)) {
 			$metafile->state = 'Gone';
 		}
+
+		// Check free space!
+		$dfs = get_free_space_in_storage_pool_drives();
+		if (!isset($dfs[$sp_drive])) {
+			$free_space = 0;
+		} else {
+			$free_space = $dfs[$sp_drive]['free'];
+		}
+		if ($free_space <= $filesize/1024) {
+			$metafile->state = 'Gone';
+		}
+		
 		if ($metafile->state != 'OK' && $metafile->state != 'Pending') {
 			$num_ok--;
 		}
