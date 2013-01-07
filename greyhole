@@ -309,7 +309,7 @@ if ($action == 'gone' || $action == 'going') {
 
 	if ($action == 'going') {
 		// Schedule fsck for all shares to re-create missing copies on other shares
-		schedule_fsck_all_shares();
+		schedule_fsck_all_shares(array('email'));
 		echo "All the files that were only on $going_drive have been copied somewhere else.\n";
 		echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed, and you will receive email reports when it completes.\n";
 		unlink($options['drive'] . "/.greyhole_used_this");
