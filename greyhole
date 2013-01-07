@@ -263,6 +263,10 @@ if ($action == 'gone' || $action == 'going') {
 		// global $going_drive; // Used in function is_greyhole_owned_drive()
 		$going_drive = $options['drive'];
 
+		// For the fsck_file calls to be able to use the files on $going_drive if needed, to create extra copies.
+		global $options;
+		$options['find-orphans'] = TRUE;
+
 		// fsck shares with only 1 file copy to remove those from $going_drive
 		initialize_fsck_report('Shares with only 1 copy');
 		foreach ($shares_options as $share_name => $share_options) {
@@ -277,6 +281,11 @@ if ($action == 'gone' || $action == 'going') {
 				rename("$going_drive/$share_name", "$going_drive/$share_name".".tmp");
 				fix_symlinks_on_share($share_name);
 				rename("$going_drive/$share_name".".tmp", "$going_drive/$share_name");
+				
+				// Also, just to be safe, make sure that all the files in $going_drive/$share_name are also somewhere else, as expected.
+				echo "Checking that all the files in the share '$share_name' also exist on another drive...";
+				check_going_dir("$going_drive/$share_name", $share_name, $going_drive);
+				echo " Done.\n";
 			}
 		}
 	}
@@ -308,6 +317,45 @@ if ($action == 'gone' || $action == 'going') {
 	}
 	echo "\n";
 	exit(0);
+}
+
+function check_going_dir($path, $share, $going_drive) {
+	$handle = @opendir($path);
+	if ($handle === FALSE) {
+		gh_log(ERROR, "Couldn't open $path to list content. Skipping...");
+		return;
+	}
+	gh_log(DEBUG, "Entering $path");
+	while (($filename = readdir($handle)) !== FALSE) {
+		if ($filename == '.' || $filename == '..') { continue; }
+
+		$full_path = "$path/$filename";
+		$file_type = @filetype($full_path);
+		if ($file_type === FALSE) {
+			// Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+			$file_type = @filetype(normalize_utf8_characters($full_path));
+			if ($file_type !== FALSE) {
+				// Bingo!
+				$full_path = normalize_utf8_characters($full_path);
+				$path = normalize_utf8_characters($path);
+			}
+		}
+
+		if ($file_type == 'dir') {
+			check_going_dir($full_path, $share, $going_drive);
+		} else {
+			$file_path = trim(mb_substr($path, mb_strlen("$going_drive/$share")+1), '/');
+			$file_metafiles = array();
+			$file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles);
+			gh_log(DEBUG, "$file_path has " . count($file_copies_inodes) . " valid copies (other than the one on $going_drive)");
+			if (count($file_copies_inodes) == 0) {
+				gh_log(WARN, "Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
+				echo ".";
+				gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
+			}
+		}
+	}
+	closedir($handle);
 }
 
 if ($action == 'debug') {
