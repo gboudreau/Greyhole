@@ -578,7 +578,7 @@ if ($action == 'view-queue') {
 		echo "Spooled operations that have been parsed will be listed above and disappear from the count below.\n";
 
 		echo sprintf("\n%-$max_share_strlen"."s  ", 'Spooled');
-		echo $queues['Spooled'] . "\n";
+		echo number_format($queues['Spooled'], 0) . "\n";
 
 		echo "\n";
 	}
