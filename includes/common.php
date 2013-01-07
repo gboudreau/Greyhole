@@ -1663,7 +1663,7 @@ function fix_all_symlinks() {
 function fix_symlinks_on_share($share_name) {
 	global $shares_options, $storage_pool_drives;
 	$share_options = $shares_options[$share_name];
-	echo "Looking for broken symbolic links in the share '$share_name'... Please be patient... ";
+	echo "Looking for broken symbolic links in the share '$share_name'...";
 	chdir($share_options['landing_zone']);
 	exec("find -L . -type l", $result);
 	foreach ($result as $file_to_relink) {
@@ -1681,7 +1681,7 @@ function fix_symlinks_on_share($share_name) {
 			}
 		}
 	}
-	echo "Done.\n";
+	echo " Done.\n";
 }
 
 function schedule_fsck_all_shares($fsck_options=array()) {
