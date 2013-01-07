@@ -1367,11 +1367,12 @@ function mark_gone_drive_fscked($sp_drive, $action='add') {
 function check_storage_pool_drives($skip_fsck=FALSE) {
 	global $storage_pool_drives, $email_to, $gone_ok_drives;
 	$needs_fsck = FALSE;
+	$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
 	$returned_drives = array();
 	$missing_drives = array();
 	$i = 0; $j = 0;
 	foreach ($storage_pool_drives as $sp_drive) {
-		if (!is_greyhole_owned_drive($sp_drive) && !gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this")) {
+		if (!is_greyhole_owned_drive($sp_drive) && !gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this") && !empty($drives_definitions[$sp_drive])) {
 			if($needs_fsck !== 2){	
 				$needs_fsck = 1;
 			}
@@ -1380,7 +1381,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 			gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
 			gh_log(DEBUG, "Email sent for gone drive: $sp_drive");
 			$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
-		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_drive($sp_drive)) {
+		} else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_drive($sp_drive) && !empty($drives_definitions[$sp_drive])) {
 			// $sp_drive is now back
 			$needs_fsck = 2;
 			$returned_drives[] = $sp_drive;
@@ -1410,7 +1411,6 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
 	if(count($missing_drives) > 0) {
 		$body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives has disappeared:\n";
 
-		$drives_definitions = Settings::get('sp_drives_definitions', TRUE);
 		foreach ($missing_drives as $sp_drive) {
 			if (!is_dir($sp_drive)) {
 	  			$body .= "$sp_drive: directory doesn't exists\n";
