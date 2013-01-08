@@ -1675,7 +1675,6 @@ function fix_symlinks_on_share($share_name) {
 				if (gh_is_file($new_link_target)) {
 					unlink($file_to_relink);
 					symlink($new_link_target, $file_to_relink);
-					echo ".";
 					break;
 				}
 			}
