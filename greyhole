@@ -347,8 +347,7 @@ function check_going_dir($path, $share, $going_drive) {
 		} else {
 			$file_path = trim(mb_substr($path, mb_strlen("$going_drive/$share")+1), '/');
 			$file_metafiles = array();
-			$file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles);
-			gh_log(DEBUG, "$file_path has " . count($file_copies_inodes) . " valid copies (other than the one on $going_drive)");
+			$file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
 			if (count($file_copies_inodes) == 0) {
 				gh_log(WARN, "Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
 				echo ".";
@@ -4729,7 +4728,7 @@ function restart_service() {
 	}
 }
 
-function get_file_inodes($share, $file_path, $filename, &$file_metafiles) {
+function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_is_enough=FALSE) {
 	global $storage_pool_drives;
 	$file_copies_inodes = array();
 	
@@ -4750,10 +4749,15 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles) {
 
 			if (!is_greyhole_owned_drive($sp_drive)) {
 				$state = 'Gone';
-				gh_log(INFO, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
+				if (!$one_is_enough) {
+					gh_log(INFO, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
+				}
 			} else {
 				$state = 'OK';
 				$file_copies_inodes[$inode_number] = $clean_full_path;
+				if ($one_is_enough) {
+					return $file_copies_inodes;
+				}
 			}
 			$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => $state);
 			
