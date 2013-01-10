@@ -2718,7 +2718,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 				} else {
 					gh_log(ERROR, "See the INSTALL file for instructions on how to prepare partitions to include in your storage pool.");
 				}
-			} else if (!file_exists("$sp_drive/.greyhole_used_this")) {
+			} else if (!file_exists("$sp_drive/.greyhole_used_this") && is_greyhole_owned_drive($sp_drive)) {
 				gh_log(ERROR, "Can't find how much free space is left on $sp_drive. This partition will never be used!");
 				gh_log(ERROR, "Please report this using the 'Bugs Tracker' link found on http://greyhole.net. You should include the following information in your ticket:");
 				gh_log(ERROR, "===== Error report starts here =====");
