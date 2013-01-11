@@ -515,10 +515,9 @@ if ($action == 'view-queue') {
 		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share = '%s'", db_escape_string($share_name))) or die("Can't find # of fsck in tasks table: " . db_error());
 		$row = db_fetch_object($result);
 		$num_fsck_pending = (int) $row->num;
-		$total_num_fsck_pending += $num_fsck_pending;
 
 		$landing_zone = $shares_options[$share_name]['landing_zone'];
-		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND (share LIKE '%s/%%' OR share = '%s')", db_escape_string($landing_zone), db_escape_string($landing_zone))) or die("Can't find # of fsck in tasks table: " . db_error());
+		$result = db_query(sprintf("SELECT COUNT(*) AS num FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share LIKE '%s/%%'", db_escape_string($landing_zone))) or die("Can't find # of fsck in tasks table: " . db_error());
 		$row = db_fetch_object($result);
 		$num_fsck_pending += (int) $row->num;
 		$total_num_fsck_pending += $num_fsck_pending;
