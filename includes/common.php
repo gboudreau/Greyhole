@@ -1638,7 +1638,8 @@ function gh_dir_uuid($dir) {
 			if (strpos($dataset, '/') !== FALSE) {
 				$is_zfs = exec('mount | grep ' . escapeshellarg("$dataset .*zfs") . ' 2> /dev/null | wc -l');
 				if ($is_zfs == 1) {
-					$pool = explode('/', $dataset)[0];
+					$p = explode('/', $dataset);
+					$pool = $p[0];
 					$partition_id = exec('/sbin/zpool list -v ' . escapeshellarg($pool) . ' 2> /dev/null | awk \'{print $1}\' | tail -n 1');
 					if (!empty($partition_id)) {
 						$dev = '/dev/disk/by-id/' . $partition_id;
