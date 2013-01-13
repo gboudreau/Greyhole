@@ -1,4 +1,4 @@
-# VERSION, BUILD_NUMBER & ARCH are now specified in build_greyhole.sh, using export
+# VERSION, BUILD_NUMBER & ARCH are now specified in build_greyhole.sh, using exports
 PACKAGE=greyhole
 
 deb: dist
@@ -40,7 +40,11 @@ amahi-rpm: dist
 dist:
 	(mkdir -p release && cd release && mkdir -p $(PACKAGE)-$(VERSION))
 	rsync -a --exclude-from=.build_excluded_files.txt * release/$(PACKAGE)-$(VERSION)/
-	(cd release/$(PACKAGE)-$(VERSION)/ && git clone git@github.com:gboudreau/Greyhole.git; cd Greyhole; git log --pretty=oneline --reverse | cut -d ' ' -f2-  | grep -v '^Tag: ' > ../CHANGES; cd ..; rm -rf Greyhole)
+	
+	if [ -d /tmp/Greyhole.git ]; then (cd /tmp/Greyhole.git; git pull); else git clone git@github.com:gboudreau/Greyhole.git /tmp/Greyhole.git; fi
+	(cd /tmp/Greyhole.git; git log --pretty=oneline --reverse | cut -d ' ' -f2-  | grep -v '^Tag: ' > /tmp/Greyhole-CHANGES)
+	cp /tmp/Greyhole-CHANGES release/$(PACKAGE)-$(VERSION)/CHANGES
+
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Release:\(\s*\).BUILD_NUMBER\s*$$/Release:\1$(BUILD_NUMBER)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' greyhole)
@@ -65,6 +69,12 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/common.php');" greyhole-dfree | awk -F':' '{print $$1+1}'` greyhole-dfree >> greyhole-dfree.new)
 	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole-dfree.new greyhole-dfree)
 
+	# ... in web-app/index.php
+	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/common.php');" web-app/index.php | awk -F':' '{print $$1-1}'` web-app/index.php > web-app/index.php.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/common.php.2 >> web-app/index.php.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/common.php');" web-app/index.php | awk -F':' '{print $$1+1}'` web-app/index.php >> web-app/index.php.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && mv web-app/index.php.new web-app/index.php)
+
 	rm release/$(PACKAGE)-$(VERSION)/includes/common.php.[1,2]
 
 	# Inject includes/sql.php...
@@ -83,14 +93,15 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/sql.php');" greyhole-dfree | awk -F':' '{print $$1+1}'` greyhole-dfree >> greyhole-dfree.new)
 	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole-dfree.new greyhole-dfree)
 
+	# ... in web-app/index.php
+	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/sql.php');" web-app/index.php | awk -F':' '{print $$1-1}'` web-app/index.php > web-app/index.php.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/sql.php.2 >> web-app/index.php.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/sql.php');" web-app/index.php | awk -F':' '{print $$1+1}'` web-app/index.php >> web-app/index.php.new)
+	(cd release/$(PACKAGE)-$(VERSION)/ && mv web-app/index.php.new web-app/index.php)
+
 	rm release/$(PACKAGE)-$(VERSION)/includes/sql.php.[1,2]
 
-	mv release/$(PACKAGE)-$(VERSION)/includes/ release/$(PACKAGE)-$(VERSION)/web-app/
-	mv release/$(PACKAGE)-$(VERSION)/web-app/ release/$(PACKAGE)-web-app-$(VERSION)
 	(cd release/ && tar -czvf $(PACKAGE)-$(VERSION).tar.gz $(PACKAGE)-$(VERSION))
-	(cd release/ && rm -rf $(PACKAGE)-$(VERSION))
-	mv release/$(PACKAGE)-web-app-$(VERSION) release/$(PACKAGE)-$(VERSION)
-	(cd release/ && tar -czvf $(PACKAGE)-web-app-$(VERSION).tar.gz $(PACKAGE)-$(VERSION))
 	(cd release/ && rm -rf $(PACKAGE)-$(VERSION))
 
 install: rpm

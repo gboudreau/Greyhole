@@ -17,8 +17,15 @@ CREATE TABLE tasks_completed (
 id INTEGER,
 action VARCHAR( 10 ) NOT NULL,
 share TINYTEXT NOT NULL,
-full_path TINYTEXT NULL,
+full_path TEXT NULL,
 additional_info TINYTEXT NULL,
 complete TINYTEXT NOT NULL,
 event_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE du_stats (
+share TINYTEXT NOT NULL,
+full_path TEXT NOT NULL,
+depth INTEGER NOT NULL,
+size INTEGER NOT NULL
 );

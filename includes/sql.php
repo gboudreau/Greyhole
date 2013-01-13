@@ -258,6 +258,31 @@ function db_migrate($attempt_repair = TRUE) {
 			}
 		}
 	}
+
+	// Migration #8 (new du_stats table)
+	if (@$db_use_mysql) {
+		$query = "CREATE TABLE IF NOT EXISTS `du_stats` (`share` TINYTEXT NOT NULL, `full_path` TEXT NOT NULL, `depth` TINYINT(3) UNSIGNED NOT NULL, `size` BIGINT(20) NOT NULL) ENGINE = MYISAM";
+	} else {
+		$query = "CREATE TABLE IF NOT EXISTS du_stats (share TINYTEXT NOT NULL, full_path TEXT NOT NULL, depth INTEGER, size INTEGER)";
+	}
+	db_query($query) or die("Can't create du_stats table with query: $query - Error: " . db_error());
+	if (@$db_use_mysql) {
+		$query = "SHOW INDEX FROM `du_stats` WHERE Key_name = 'uniqness'";
+		$result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
+		if (db_fetch_object($result) === FALSE) {
+			// migrate
+			db_query("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (936))");
+		}
+	}
+	
+	// Migration #9 (larger full_path in md5_checker index)
+	if (@$db_use_mysql) {
+		$query = "SHOW INDEX FROM `tasks` WHERE Key_name = 'md5_checker' AND Column_name = 'full_path' AND Sub_part = 255";
+		if (db_fetch_object($result) !== FALSE) {
+			db_query("ALTER TABLE tasks DROP INDEX md5_checker");
+			db_query("ALTER TABLE tasks ADD INDEX md5_checker (action, share(64), full_path(925), complete)");
+		}
+	}
 }
 
 function repair_tables() {
@@ -268,6 +293,7 @@ function repair_tables() {
 		}
 		db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
 		db_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . db_error());
+		db_query("REPAIR TABLE du_stats") or gh_log(CRITICAL, "Can't repair du_stats table: " . db_error());
 		// Let's repair tasks_completed only if it's broken!
 		$result = db_query("SELECT * FROM tasks_completed LIMIT 1");
 		if ($result === FALSE) {

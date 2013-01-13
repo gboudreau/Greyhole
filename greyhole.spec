@@ -25,23 +25,30 @@ rm -rf $RPM_BUILD_ROOT
 
 mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
-mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/
+mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/web-app/
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1/
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man5/
 
-install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/rc.d/init.d/greyhole
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
-install -m 0755 -D -p greyhole-config-update ${RPM_BUILD_ROOT}%{_bindir}
-install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
-install -m 0644 -D -p USAGE ${RPM_BUILD_ROOT}/usr/share/greyhole/
+
 install -m 0644 -D -p schema-mysql.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0644 -D -p schema-sqlite.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0755 -D -p db_migration-sqlite2mysql.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/
+install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%/usr/share/greyhole/
+
 install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/greyhole.conf
+install -m 0755 -D -p initd_script.sh ${RPM_BUILD_ROOT}/etc/rc.d/init.d/greyhole
+install -m 0644 -D -p logrotate.greyhole ${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/greyhole
 install -m 0644 -D -p greyhole.cron.d ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d/greyhole
 install -m 0755 -D -p greyhole.cron.weekly ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.weekly/greyhole
 install -m 0755 -D -p greyhole.cron.daily ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.daily/greyhole
+
+install -m 0644 -D -p web-app/index.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/
+install -m 0644 -D -p web-app/README ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/
+
+install -m 0644 -D -p USAGE ${RPM_BUILD_ROOT}/usr/share/greyhole/
+
 install -m 0644 -D -p docs/greyhole.1.gz ${RPM_BUILD_ROOT}/usr/share/man/man1/
 install -m 0644 -D -p docs/greyhole-dfree.1.gz ${RPM_BUILD_ROOT}/usr/share/man/man1/
 install -m 0644 -D -p docs/greyhole.conf.5.gz ${RPM_BUILD_ROOT}/usr/share/man/man5/
@@ -172,6 +179,8 @@ fi
 /usr/share/man/*
 
 %changelog
+* Sun Jan 13 2013 Guillaume Boudreau
+- Including gh-du web UI
 * Sun Jan 02 2011 Guillaume Boudreau
 - Fedora 14 (Samba 3.5) compatibility fixes
 * Mon Mar 29 2010 Carlos Puchol

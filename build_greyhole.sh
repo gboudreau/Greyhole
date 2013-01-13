@@ -174,7 +174,7 @@ rm -rf /tmp/Greyhole.git
 
 if [ "$BUILD_NUMBER" = "1" ]; then
 	cd release
-		LAST_TGZ=`ls -1atr *.tar.gz | grep -v web-app | grep -v 'hda-' | grep -B 1 greyhole-$VERSION | head -1`
+		LAST_TGZ=`ls -1atr *.tar.gz | grep -v 'hda-' | grep -B 1 greyhole-$VERSION | head -1`
 		tar --wildcards -x "*/CHANGES" -f $LAST_TGZ
 		tar --wildcards -x "*/CHANGES" -f greyhole-$VERSION.tar.gz
 	

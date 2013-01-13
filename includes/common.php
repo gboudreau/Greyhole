@@ -26,6 +26,10 @@ define('WARN',  4);
 define('ERROR', 3);
 define('CRITICAL', 2);
 
+define('FSCK_TYPE_SHARE', 1);
+define('FSCK_TYPE_STORAGE_POOL_DRIVE', 2);
+define('FSCK_TYPE_METASTORE', 3);
+
 $action = 'initialize';
 
 date_default_timezone_set(date_default_timezone_get());
@@ -378,6 +382,9 @@ function parse_config() {
 }
 
 function clean_dir($dir) {
+	if (empty($dir)) {
+		return $dir;
+	}
 	if ($dir[0] == '.' && $dir[1] == '/') {
 		$dir = mb_substr($dir, 2);
 	}

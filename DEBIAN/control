@@ -1,6 +1,6 @@
 Section: net
 Priority: extra
-Maintainer: Guillaume Boudreau <gb@greyhole.net>
+Maintainer: Guillaume Boudreau <guillaume@greyhole.net>
 Homepage: http://www.greyhole.net
 Package: greyhole
 Version: 0.9.3-1

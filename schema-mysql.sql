@@ -28,3 +28,10 @@ CREATE TABLE `tasks_completed` (
 `complete` ENUM( 'yes',  'no' ) NOT NULL,
 `event_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE = MYISAM;
+
+CREATE TABLE `du_stats` (
+`share` TINYTEXT NOT NULL,
+`full_path` TEXT NOT NULL,
+`depth` TINYINT(3) UNSIGNED NOT NULL,
+`size` BIGINT(20) NOT NULL
+) ENGINE = MYISAM;
