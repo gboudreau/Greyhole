@@ -1543,7 +1543,7 @@ function get_num_copies($share) {
 	global $shares_options, $storage_pool_drives;
 	if (!isset($shares_options[$share]['num_copies'])) {
 		global $config_file;
-		gh_log(WARNING, "Found a task on a share ($share) that disappeared from $config_file. Skipping.");
+		gh_log(WARN, "Found a task on a share ($share) that disappeared from $config_file. Skipping.");
 		return -1;
 	}
 	$num_copies = $shares_options[$share]['num_copies'];
