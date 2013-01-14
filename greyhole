@@ -2926,7 +2926,7 @@ You probably want to do something about this!
 				// Make sure the drives we want to use are not yet full
 				$priority_drives = array();
 				foreach ($stick_into as $stick_into_dir) {
-					if (array_search($stick_into_dir, $full_drives) === FALSE && array_search($stick_into_dir, $storage_pool_drives) !== FALSE) {
+					if (array_search($stick_into_dir, array_keys($full_drives)) === FALSE && array_search($stick_into_dir, $storage_pool_drives) !== FALSE) {
 						unset($drives[array_search($stick_into_dir, $drives)]);
 						$priority_drives[] = $stick_into_dir;
 					}
