@@ -1647,9 +1647,17 @@ function gh_dir_uuid($dir) {
 				if ($is_zfs == 1) {
 					$p = explode('/', $dataset);
 					$pool = $p[0];
-					$partition_id = exec('/sbin/zpool list -v ' . escapeshellarg($pool) . ' 2> /dev/null | awk \'{print $1}\' | tail -n 1');
-					if (!empty($partition_id)) {
-						$dev = '/dev/disk/by-id/' . $partition_id;
+					$dev_name = exec('/sbin/zpool list -v ' . escapeshellarg($pool) . ' 2> /dev/null | awk \'{print $1}\' | tail -n 1');
+					if (!empty($dev_name)) {
+						$dev = exec("ls -l /dev/disk/*/$dev_name | awk '{print \$(NF-2)}'");
+						if (empty($dev) && file_exists("/dev/$dev_name")) {
+							$dev = '/dev/$dev_name';
+							gh_log(INFO, "Found a ZFS pool ($pool) that uses a device name in /dev/ ($dev). That is a bad idea, since those can easily change, which would prevent this pool from mounting automatically. You should use any of the /dev/disk/*/ links instead. For example, you could do: zpool export $pool && zpool import -d /dev/disk/by-id/ $pool. More details at http://zfsonlinux.org/faq.html#WhatDevNamesShouldIUseWhenCreatingMyPool");
+						}
+					}
+					if (empty($dev)) {
+						gh_log(WARN, "Warning! Couldn't find the device used by your ZFS pool name $pool. That pool will never be used.");
+						return FALSE;
 					}
 				}
 			}
