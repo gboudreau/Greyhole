@@ -282,14 +282,13 @@ function repair_tables() {
 		if ($action == 'daemon') {
 			gh_log(INFO, "Optimizing MySQL tables...");
 		}
-		db_query("REPAIR TABLE tasks") or gh_log(CRITICAL, "Can't repair tasks table: " . db_error());
-		db_query("REPAIR TABLE settings") or gh_log(CRITICAL, "Can't repair settings table: " . db_error());
-		db_query("REPAIR TABLE du_stats") or gh_log(CRITICAL, "Can't repair du_stats table: " . db_error());
-		// Let's repair tasks_completed only if it's broken!
-		$result = db_query("SELECT * FROM tasks_completed LIMIT 1");
-		if ($result === FALSE) {
-			gh_log(INFO, "Repairing MySQL tables...");
-			db_query("REPAIR TABLE tasks_completed") or gh_log(CRITICAL, "Can't repair tasks_completed table: " . db_error());
+		// Let's repair tables only if they need to!
+		foreach (array('tasks', 'settings', 'du_stats', 'tasks_completed') as $table_name) {
+			$result = db_query("SELECT * FROM $table_name LIMIT 1");
+			if ($result === FALSE) {
+				gh_log(INFO, "Repairing $table_name MySQL table...");
+				db_query("REPAIR TABLE $table_name") or gh_log(CRITICAL, "Can't repair $table_name table: " . db_error());
+			}
 		}
 	}
 }
