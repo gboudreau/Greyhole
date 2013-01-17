@@ -274,15 +274,6 @@ function db_migrate($attempt_repair = TRUE) {
 			db_query("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (936))");
 		}
 	}
-	
-	// Migration #9 (larger full_path in md5_checker index)
-	if (@$db_use_mysql) {
-		$query = "SHOW INDEX FROM `tasks` WHERE Key_name = 'md5_checker' AND Column_name = 'full_path' AND Sub_part = 255";
-		if (db_fetch_object($result) !== FALSE) {
-			db_query("ALTER TABLE tasks DROP INDEX md5_checker");
-			db_query("ALTER TABLE tasks ADD INDEX md5_checker (action, share(64), full_path(925), complete)");
-		}
-	}
 }
 
 function repair_tables() {
