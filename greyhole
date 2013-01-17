@@ -4794,7 +4794,7 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
 			if (file_exists($temp_filename) && gh_is_file($temp_filename)) {
 				gh_log(INFO, "  Found temporary file $temp_filename ... deleting.");
 				$fsck_report['temp_files'][] = $temp_filename;
-				gh_recycle($temp_filename);
+				unlink($temp_filename);
 			}
 		}
 	}
