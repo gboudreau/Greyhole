@@ -4787,6 +4787,9 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
 					return $file_copies_inodes;
 				}
 			}
+			if (is_string($file_metafiles)) {
+				gh_log(WARN, "Warning! \$file_metafiles is now a string: '$file_metafiles'.");
+			}
 			$file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => $state);
 			
 			// Temp files leftovers of stopped Greyhole executions
