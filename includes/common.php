@@ -105,7 +105,7 @@ function recursive_include_parser($file) {
 }
 
 function parse_config() {
-	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time;
+	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention;
 
 	$deprecated_options = array(
 		'delete_moves_to_attic' => 'delete_moves_to_trash',
@@ -130,6 +130,7 @@ function parse_config() {
 	$df_cache_time = 15;
 	$delete_moves_to_trash = TRUE;
 	$memory_limit = '128M';
+	$executed_tasks_retention = 365;
 	
 	foreach (explode("\n", $config_text) as $line) {
 		if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {

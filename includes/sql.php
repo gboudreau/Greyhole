@@ -292,4 +292,17 @@ function repair_tables() {
 		}
 	}
 }
+
+function delete_executed_tasks() {
+	global $executed_tasks_retention;
+	if ($executed_tasks_retention == 'forever') {
+		return;
+	}
+	if (!is_int($executed_tasks_retention)) {
+		die("Error: Invalid value for 'executed_tasks_retention' in greyhole.conf: '$executed_tasks_retention'. You need to use either 'forever' (no quotes), or a number of days.\n");
+	}
+	echo "Cleaning executed tasks: keeping the last $executed_tasks_retention days of logs.\n";
+	$query = sprintf("DELETE FROM tasks_completed WHERE event_date < NOW() - INTERVAL %d DAY", (int) $executed_tasks_retention);
+	db_query($query) or gh_log(CRITICAL, "Can't clean tasks_completed table: " . db_error());
+}
 ?>

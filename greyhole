@@ -816,6 +816,9 @@ if ($action == 'fsck') {
 	if (isset($options['checksums'])) {
 		echo "Any mismatch in checksums will be logged in both " . $greyhole_log_file . " and " . FSCKLogFile::PATH . "/fsck_checksums.log\n";
 	}
+
+	// Also clean the tasks_completed table
+	delete_executed_tasks();
 	
 	exit(0);
 }
