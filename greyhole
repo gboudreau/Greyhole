@@ -54,6 +54,28 @@ if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $acti
 	}
 }
 
+if ($action == 'pause') {
+	$pid = (int) exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | awk \'{print $1}\'');
+	if ($pid) {
+		exec('kill -STOP ' . $pid);
+		echo "The Greyhole deamon has been paused. Use 'greyhole --resume' to restart it.\n";
+		exit(0);
+	} else {
+		echo "Couldn't find a Greyhole daemon running.\n";
+		exit(1);
+	}
+}
+if ($action == 'resume') {
+	$pid = (int) exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | awk \'{print $1}\'');
+	if ($pid) {
+		exec('kill -CONT ' . $pid);
+		echo "The Greyhole deamon has resumed.\n";
+		exit(0);
+	} else {
+		echo "Couldn't find a Greyhole daemon running.\n";
+		exit(1);
+	}
+}
 if ($action == 'getuid') {
 	$uniq_id = set_uniq_id();
 	echo $uniq_id;
@@ -4244,9 +4266,11 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 }
 
 function process_command_line() {
-	$opts_actions = 'DfClBsSLaqiU5X';
+	$opts_actions = 'DPRfClBsSLaqiU5X';
 	$longopts_actions = array(
 		'daemon',
+		'pause',
+		'resume',
 		'fsck',
 		'cancel-fsck',
 		'balance',
@@ -4372,6 +4396,8 @@ function print_usage() {
 	echo "Where ACTION is one of:\n";
 	echo "  -?, --help            Display this help and exit.\n";
 	echo "  -D, --daemon          Start the daemon.\n";
+	echo "  -P, --pause           Pause the daemon.\n";
+	echo "  -R, --resume          Resume a paused daemon.\n";
 	echo "  -f, --fsck            Schedule a fsck.\n";
 	echo "  -C, --cancel-fsck     Cancel any ongoing or scheduled fsck operations.\n";
 	echo "  -l, --balance         Balance available space on storage pool drives.\n";
@@ -4537,7 +4563,7 @@ function md5_worker_thread($drives) {
 		$drives_clause .= sprintf("additional_info LIKE '%s%%'", db_escape_string($drive));
 	}
 
-	$query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND ($drives_clause) ORDER BY id ASC LIMIT 10";
+	$query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND ($drives_clause) ORDER BY id ASC LIMIT 1000";
 	
 	$last_check_time = time();
 	while (TRUE) {
