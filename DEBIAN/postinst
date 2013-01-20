@@ -19,6 +19,8 @@ elif [ "$SMB_VERSION" = "3 5" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
 elif [ "$SMB_VERSION" = "3 6" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
+elif [ "$SMB_VERSION" = "4 0" ]; then
+	ln -s ${LIBDIR}/greyhole/greyhole-samba40.so ${LIBDIR}/samba/vfs/greyhole.so
 else
 	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba ($SMB_VERSION)."
 	echo "We will try to use the VFS for version 3.6, but that might not work."
@@ -36,6 +38,8 @@ if [ "`uname -m`" = "x86_64" -a -x /usr/lib/samba/vfs/ ]; then
 		ln -s ${LIBDIR}/greyhole/greyhole-samba35.so /usr/lib/samba/vfs/greyhole.so
 	elif [ "$SMB_VERSION" = "3 6" ]; then
 		ln -s ${LIBDIR}/greyhole/greyhole-samba36.so /usr/lib/samba/vfs/greyhole.so
+	elif [ "$SMB_VERSION" = "4 0" ]; then
+		ln -s ${LIBDIR}/greyhole/greyhole-samba40.so /usr/lib/samba/vfs/greyhole.so
 	else
 		ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
 	fi

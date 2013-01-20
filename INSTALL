@@ -69,13 +69,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Ubuntu: /etc/init.d/samba restart, or restart smbd
 	Debian: service samba restart
 
-3. For Samba other than 3.4/3.5/3.6: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba other than 3.4/3.5/3.6/4.0: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
-	
-	Note: if, for some reason, you need to compile the VFS module with Samba 3.4 or 3.6, you'll need to use the proper version number in the cp and patch commands below.
-	For example, for Samba 3.6:
-		cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.6.c modules/vfs_greyhole.c
-		patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.6.patch
+
+  a) The following is for Samba 3.x. For Samba 4, see 3.b) below.
 
 	Fedora:
 	yumdownloader --source samba
@@ -98,10 +95,17 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; fi
 	if [ -x /usr/lib/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
-	Fedora: service smb restart
-	Ubuntu (< 10): /etc/init.d/samba restart
-	Ubuntu (10+): restart smbd
-	Debian: service samba restart
+  b) The following is for Samba 4.x. For Samba 3, see 3.a) above.
+
+	SAMBA_VERSION=4.0.1 # Or whatever is the latest version of Samba4.
+	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
+	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm samba-${SAMBA_VERSION}.tar.gz
+	cd samba-${SAMBA_VERSION}
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.0.c modules/vfs_greyhole.c
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.0.patch
+	./configure --enable-debug --enable-selftest && make
+	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/default/source3/modules/libvfs-greyhole.so /usr/lib64/samba/vfs/greyhole.so; fi
+	if [ -x /usr/lib/samba/vfs/ ]; then cp bin/default/source3/modules/libvfs-greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
 4. Add Greyhole to services that start on boot:
 
@@ -114,8 +118,14 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
     Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
 	Note: The cron.d script added above includes an @reboot cron line to make this permanent.
 
-	modprobe cifs
-	echo 0 > /proc/fs/cifs/OplockEnabled
+	if [ -f /proc/fs/cifs/OplockEnabled ]; then
+		modprobe cifs
+		echo 0 > /proc/fs/cifs/OplockEnabled
+	fi
+	if [ -f /sys/module/cifs/parameters/enable_oplocks ]; then
+		modprobe cifs enable_oplocks=0
+		echo 0 > /sys/module/cifs/parameters/enable_oplocks
+	fi
 
 
 You are now ready to configure and use Greyhole.

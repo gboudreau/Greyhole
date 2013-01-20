@@ -57,6 +57,7 @@ install -m 0644 -D -p docs/greyhole.conf.5.gz ${RPM_BUILD_ROOT}/usr/share/man/ma
 	install -m 0644 -D -p samba-module/bin/3.4/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
 	install -m 0644 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
 	install -m 0644 -D -p samba-module/bin/3.6/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
+	install -m 0644 -D -p samba-module/bin/4.0/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba40.so
 %else
 	%ifarch %{arm}
 		install -m 0644 -D -p samba-module/bin/3.4/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
@@ -66,6 +67,7 @@ install -m 0644 -D -p docs/greyhole.conf.5.gz ${RPM_BUILD_ROOT}/usr/share/man/ma
 		install -m 0644 -D -p samba-module/bin/3.4/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
 		install -m 0644 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
 		install -m 0644 -D -p samba-module/bin/3.6/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
+		install -m 0644 -D -p samba-module/bin/4.0/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba40.so
 	%endif
 %endif
 
@@ -94,6 +96,8 @@ elif [ "$SMB_VERSION" = "3 5" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
 elif [ "$SMB_VERSION" = "3 6" ]; then
 	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
+elif [ "$SMB_VERSION" = "4 0" ]; then
+	ln -s ${LIBDIR}/greyhole/greyhole-samba40.so ${LIBDIR}/samba/vfs/greyhole.so
 else
 	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba ($SMB_VERSION)."
 	echo "We will try to use the VFS for version 3.6, but that might not work."
