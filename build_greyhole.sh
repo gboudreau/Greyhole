@@ -141,12 +141,20 @@ if [ -x /usr/bin/yum ]; then
 	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree
 	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
+	if [ -f /includes/common.php ]; then sudo rm /includes/common.php; fi
+	sudo ln -s ~/greyhole/includes/common.php /includes/common.php
+	if [ -f /includes/common.php ]; then sudo rm /includes/sql.php; fi
+	sudo ln -s ~/greyhole/includes/sql.php /includes/sql.php
 	sudo service greyhole condrestart
 elif [ -x /usr/bin/apt-get ]; then
 	sudo apt-get update && sudo apt-get install greyhole
 	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree
 	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
+	if [ -f /includes/common.php ]; then sudo rm /includes/common.php; fi
+	sudo ln -s ~/greyhole/includes/common.php /includes/common.php
+	if [ -f /includes/common.php ]; then sudo rm /includes/sql.php; fi
+	sudo ln -s ~/greyhole/includes/sql.php /includes/sql.php
 	sudo restart greyhole
 fi
 chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree
