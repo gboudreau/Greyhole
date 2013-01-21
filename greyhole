@@ -995,19 +995,8 @@ function execute_next_task() {
 				gh_log(DEBUG, "Nothing to do... Sleeping.");
 
 				repair_tables();
-				
-				$query = "SELECT * from tasks WHERE action = 'md5' AND complete = 'no' LIMIT 1";
-				$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks for incomplete md5: " . db_error());
-				if ($row = db_fetch_object($result)) {
-					$num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
-					if ($num_worker_threads == 0) {
-						gh_log(DEBUG, "Will spawn new worker threads to work on incomplete checksums calculations.");
-						foreach ($storage_pool_drives as $sp_drive) {
-							spawn_thread('md5-worker', array($sp_drive));
-						}
-					}
-				}
-				db_free_result($result);
+
+				check_md5_workers();
 				
 				// Email any unsent fsck reports found in /usr/share/greyhole/
 				foreach (array('fsck_checksums.log', 'fsck_files.log') as $log_file) {
@@ -2978,7 +2967,7 @@ function gh_fsck_reset_du($share, $full_path=null) {
 }
 
 function gh_fsck($path, $share, $storage_path = FALSE) {
-	global $storage_pool_drives, $fsck_report;
+	global $storage_pool_drives, $fsck_report, $options;
 	
 	gh_log(DEBUG, "Entering $path");
 	$fsck_report['landing_zone']['num_dirs']++;
@@ -3007,6 +2996,30 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
 				gh_fsck($full_path, $share, $storage_path);
 			} else {
 				gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $storage_path);
+				
+				if (@$options['verify-checksums']) {
+					$count_md5 = get_count_md5();
+					if ($count_md5 > 1000) {
+						// 1000+ md5 tasks in the DB. Let's work on those a little before continuing.
+
+						// Make sure the MD5 worker threads are running.
+						check_md5_workers();
+
+						while ($count_md5 > 500) {
+							gh_log(DEBUG, "MD5 tasks pending: $count_md5");
+							$query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete = 'yes' AND action = 'md5' ORDER BY id ASC LIMIT 1";
+							$result_new_tasks = db_query($query) or gh_log(CRITICAL, "Can't query tasks: " . db_error());
+							$task = db_fetch_object($result_new_tasks);
+							if ($task) {
+								gh_check_md5($task);
+							} else {
+								sleep(5);
+							}
+
+							$count_md5 = get_count_md5();
+						}
+					}
+				}
 			}
 		}
 	}
@@ -4754,8 +4767,31 @@ function delete_tasks($task_ids) {
 	db_query("DELETE FROM tasks WHERE id IN ($task_ids)") or gh_log(CRITICAL, "Can't delete tasks: " . db_error());
 
 	global $result_new_tasks;
-	db_free_result($result_new_tasks);
-	$result_new_tasks = null;
+	if ($result_new_tasks) {
+		db_free_result($result_new_tasks);
+		$result_new_tasks = null;
+	}
+}
+
+function check_md5_workers() {
+	$query = "SELECT * from tasks WHERE action = 'md5' AND complete = 'no' LIMIT 1";
+	$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks for incomplete md5: " . db_error());
+	if ($row = db_fetch_object($result)) {
+		$num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
+		if ($num_worker_threads == 0) {
+			gh_log(DEBUG, "Will spawn new worker threads to work on incomplete checksums calculations.");
+			foreach ($storage_pool_drives as $sp_drive) {
+				spawn_thread('md5-worker', array($sp_drive));
+			}
+		}
+	}
+	db_free_result($result);
+}
+
+function get_count_md5() {
+	$result = db_query("SELECT COUNT(*) AS total FROM tasks WHERE action = 'md5'");
+	$row = db_fetch_object($result);
+	return (int) $row->total;
 }
 
 function set_fsck_options($task) {
