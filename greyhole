@@ -2555,7 +2555,6 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 		foreach ($files as $filename) {
 			@unlink($last_filename);
 
-			$filename = "/var/spool/greyhole/$filename";
 			$last_filename = $filename;
 
 			$line = file_get_contents($filename);
