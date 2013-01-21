@@ -4562,9 +4562,9 @@ function spawn_thread($action, $arguments) {
 	}
 
 	$cmd = "/usr/bin/greyhole --$action --drive=" . implode(' --drive=', array_map('escapeshellarg', $arguments));
-	exec("$cmd 1>/var/run/greyhole_m5d_worker.pid 2>&1 &");
+	exec("$cmd 1>/var/run/greyhole_thread.pid 2>&1 &");
 	usleep(100000); // 1/10s
-	return (int) file_get_contents('/var/run/greyhole_m5d_worker.pid');
+	return (int) file_get_contents('/var/run/greyhole_thread.pid');
 }
 
 function md5_worker_thread($drives) {
@@ -4595,14 +4595,12 @@ function md5_worker_thread($drives) {
 		if ($task === FALSE) {
 			// Nothing new to process
 			
-			// Stop this thread once we have nothing more to do, and fsck completed.
-			$task = get_next_task($tmp_rs);
-			if ($task === FALSE || ($task->action != 'fsck' && $task->action != 'fsck_file')) {
+			// Stop this thread once we have nothing more to do, and we have waited 1 hour for more work.
+			if (time() - $last_check_time > 3600) {
 				gh_log(DEBUG, "MD5 worker thread for " . implode(', ', $drives) . " will now exit; it has nothing more to do.");
-				#gh_log(DEBUG, "Current task: " . var_export($task, TRUE));
 				break;
 			}
-
+			
 			sleep(5);
 			continue;
 		}
@@ -4774,6 +4772,7 @@ function delete_tasks($task_ids) {
 }
 
 function check_md5_workers() {
+	global $storage_pool_drives;
 	$query = "SELECT * from tasks WHERE action = 'md5' AND complete = 'no' LIMIT 1";
 	$result = db_query($query) or gh_log(CRITICAL, "Can't query tasks for incomplete md5: " . db_error());
 	if ($row = db_fetch_object($result)) {
