@@ -176,11 +176,11 @@ fi
 %defattr(-,root,root,-)
 %config(noreplace) %{_sysconfdir}/greyhole.conf
 /etc/rc.d/init.d/greyhole
-%{_bindir}/
-%{_sysconfdir}/
-%{_libdir}
-/usr/share/greyhole/*
-/usr/share/man/*
+/etc/*/greyhole*
+/usr/bin/greyhole*
+%{_libdir}/greyhole/
+/usr/share/greyhole/
+/usr/share/man/*/greyhole*
 
 %changelog
 * Sun Jan 13 2013 Guillaume Boudreau
