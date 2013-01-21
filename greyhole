@@ -4780,7 +4780,9 @@ function check_md5_workers() {
 		if ($num_worker_threads == 0) {
 			gh_log(DEBUG, "Will spawn new worker threads to work on incomplete checksums calculations.");
 			foreach ($storage_pool_drives as $sp_drive) {
-				spawn_thread('md5-worker', array($sp_drive));
+				if (is_greyhole_owned_drive($sp_drive)) {
+					spawn_thread('md5-worker', array($sp_drive));
+				}
 			}
 		}
 	}
