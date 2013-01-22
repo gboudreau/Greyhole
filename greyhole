@@ -2470,6 +2470,8 @@ function samba_restart() {
   		exec("/etc/init.d/smb restart");
   	} else if (is_file('/etc/init.d/smbd')) {
   		exec("/etc/init.d/smbd restart");
+  	} else if (is_file('/etc/systemd/system/multi-user.target.wants/smb.service')) {
+  		exec("systemctl restart smb.service");
   	} else {
   		gh_log(CRITICAL, "Couldn't find how to restart Samba. Please restart the Samba daemon manually.");
   	}
