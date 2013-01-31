@@ -97,13 +97,13 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
   b) The following is for Samba 4.x. For Samba 3, see 3.a) above.
 
-	SAMBA_VERSION=4.0.1 # Or whatever is the latest version of Samba4.
+	SAMBA_VERSION=4.0.2 # Or whatever is the latest version of Samba4.
 	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
 	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm samba-${SAMBA_VERSION}.tar.gz
 	cd samba-${SAMBA_VERSION}
 	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.0.c modules/vfs_greyhole.c
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.0.patch
-	./configure --enable-debug --enable-selftest && make
+	./configure --enable-debug --enable-selftest --disable-symbol-versions && make
 	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/default/source3/modules/libvfs-greyhole.so /usr/lib64/samba/vfs/greyhole.so; fi
 	if [ -x /usr/lib/samba/vfs/ ]; then cp bin/default/source3/modules/libvfs-greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
 
