@@ -56,16 +56,14 @@ if ($level_min > 1) {
 }
 
 if ($level_min > 1) {
-	$query = sprintf("SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth IN (%d, %d) AND share = '%s' AND full_path LIKE '%s%%'",
+	$query = sprintf("SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = %d AND share = '%s' AND full_path LIKE '%s%%'",
 		$level_min,
-		$level_max,
 		$share,
 		empty($full_path) ? '' : "$full_path/"
 	);
 } else {
-	$query = sprintf("SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth IN (%d, %d)",
-		$level_min,
-		$level_max
+	$query = sprintf("SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = %d",
+		$level_min
 	);
 }
 $results = db_query($query) or die("SQL error: " . db_error());
@@ -96,9 +94,9 @@ function escape($string) {
       function drawChart() {
         // Create and populate the data table.
         var data = google.visualization.arrayToDataTable([
-          ['Path', 'Parent', 'Size (bytes)'],
-          ['<?php echo escape($path) ?>', null, <?php echo $total_bytes ?>],
-          ['Files', '<?php echo escape($path) ?>', <?php echo $total_bytes_files ?>],
+          ['Path', 'Parent', 'Size (bytes)', 'Color'],
+          ['<?php echo escape($path) ?>', null, <?php echo $total_bytes ?>, <?php echo $total_bytes ?>],
+          ['Files', '<?php echo escape($path) ?>', <?php echo $total_bytes_files ?>, <?php echo $total_bytes_files ?>],
           <?php
           foreach ($results_rows as $row) {
               $bytes = (float) $row->size;
@@ -106,7 +104,7 @@ function escape($string) {
               if ($row->file_path[strlen($row->file_path)-1] == '/') {
                   $row->file_path = substr($row->file_path, 0, strlen($row->file_path)-1);
               }
-              echo "['" . escape($row->file_path) . "','".escape($parent)."',$bytes],\n";
+              echo "['" . escape($row->file_path) . "','".escape($parent)."',$bytes,$bytes],\n";
           }
           ?>
         ]);
