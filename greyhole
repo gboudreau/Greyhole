@@ -3351,7 +3351,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 		} else {
 			save_metafiles($share, $file_path, $filename, $file_metafiles);
 		}
-	} else if (count($file_copies_inodes) < $num_copies_required) {
+	} else if (count($file_copies_inodes) < $num_copies_required && $num_copies_required > 0) {
 		// Create new copies
 		gh_log(INFO, "  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
 		if (isset($fsck_report['missing_copies'])) {
