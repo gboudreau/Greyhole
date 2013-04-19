@@ -3202,6 +3202,9 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 	}
 
 	$num_copies_required = get_num_copies($share);
+	if ($num_copies_required == -1) {
+		gh_log(CRITICAL, "Tried to fsck a share that is missing from greyhole.conf. Quitting.");
+	}
 	
 	if (count($file_copies_inodes) > 0) {
 		$found_linked_metafile = FALSE;
