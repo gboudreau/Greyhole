@@ -351,11 +351,14 @@ function parse_config() {
 		ini_set('memory_limit', $memory_limit);
 	}
 	if (isset($memory_limit)) {
-		if(preg_match('/M$/',$memory_limit)) {
-			$memory_limit = preg_replace('/M$/','',$memory_limit);
-			$memory_limit = $memory_limit * 1048576;
-		}elseif(preg_match('/K$/',$memory_limit)) {
-			$memory_limit = preg_replace('/K$/','',$memory_limit);
+		if(preg_match('/G$/i',$memory_limit)) {
+			$memory_limit = preg_replace('/G$/i','',$memory_limit);
+			$memory_limit = $memory_limit * 1024 * 1024 * 1024;
+		}elseif(preg_match('/M$/i',$memory_limit)) {
+			$memory_limit = preg_replace('/M$/i','',$memory_limit);
+			$memory_limit = $memory_limit * 1024 * 1024;
+		}elseif(preg_match('/K$/i',$memory_limit)) {
+			$memory_limit = preg_replace('/K$/i','',$memory_limit);
 			$memory_limit = $memory_limit * 1024;
 		}
 	}
