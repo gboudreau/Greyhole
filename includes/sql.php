@@ -32,90 +32,81 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
    cpg+git@amahi.org
 */
 
-if ($db_options->engine == 'sqlite') {
-	function db_connect() {
-		global $db_options;
-		if (!file_exists($db_options->db_path)) {
-			// create the db automatically if it does not exist
-			system("sqlite3 $db_options->db_path < $db_options->schema");
-		}
-		$db_options->dbh = new PDO("sqlite:" . $db_options->db_path);
-		return $db_options->dbh;
-	}
+function db_connect() {
+    global $db_options;
 
-	function db_query($query) {
-		global $db_options;
-		return $db_options->dbh->query($query);
-	}
+    if ($db_options->engine == 'sqlite') {
+        $connect_string = "sqlite:" . $db_options->db_path;
+        if (!file_exists($db_options->db_path)) {
+            // create the db automatically if it does not exist
+            system("sqlite3 " . escapeshellarg($db_options->db_path) . " < " . escapeshellarg($db_options->schema));
+        }
+    } else {
+        $connect_string = 'mysql:host=' . $db_options->host . ';dbname=' . $db_options->name;
+    }
 
-	function db_escape_string($string) {
-		global $db_options;
-		$escaped_string = $db_options->dbh->quote($string);
-		return substr($escaped_string, 1, strlen($escaped_string)-2);
-	}
+    try {
+        $db_options->dbh = @new PDO($connect_string, $db_options->user, $db_options->pass, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
+    } catch (PDOException $ex) {
+        $db_options->error = $ex->getMessage();
+        return FALSE;
+    }
 
-	function db_fetch_object($result) {
-		return $result->fetchObject();
-	}
+    if ($db_options->engine == 'mysql') {
+        db_query("SET SESSION group_concat_max_len = 1048576");
+        db_query("SET SESSION wait_timeout = 86400"); # Allow 24h fsck!
+    }
 
-	function db_free_result($result) {
-		return TRUE;
-	}
+    return $db_options->dbh;
+}
 
-	function db_insert_id() {
-		global $db_options;
-		return $db_options->dbh->lastInsertId();
-	}
+function db_query($query) {
+    global $db_options;
+    try {
+        $stmt = $db_options->dbh->query($query);
+    } catch (PDOException $ex) {
+        $error = $db_options->dbh->errorInfo();
+        if (($error[1] == 144 || $error[1] == 145) && $attempt_repair) {
+            gh_log(INFO, "Error during MySQL query: " . $ex->getMessage() . '. Will now try to repair the MySQL tables.');
+            repair_tables();
+            return db_query($query, FALSE); // $attempt_repair = FALSE, to not go into an infinite loop, if the repair doesn't work.
+        }
+        $db_options->error = $ex->getMessage();
+        return FALSE;
+    }
+    return $stmt;
+}
 
-	function db_error() {
-		global $db_options;
-		$error = $db_options->dbh->errorInfo();
-		return $error[2];
-	}
-} else {
-	// MySQL
-	function db_connect() {
-		global $db_options;
-		$connected = mysql_connect($db_options->host, $db_options->user, $db_options->pass);
-		if ($connected) {
-			$connected = mysql_select_db($db_options->name);
-			if ($connected) {
-				db_query("SET SESSION group_concat_max_len = 1048576");
-				db_query("SET SESSION wait_timeout = 86400"); # Allow 24h fsck!
-			}
-		}
-		return $connected;
-	}
-	
-	function db_query($query, $attempt_repair=TRUE) {
-		$result = mysql_query($query);
-		if ($result === FALSE && (mysql_errno() == 144 || mysql_errno() == 145) && $attempt_repair) {
-			// Table is crashed
-			repair_tables();
-			return db_query($query, FALSE); // $attempt_repair = FALSE, to not go into an infinite loop, if the repair doesn't work.
-		}
-		return $result;
-	}
+function db_escape_string($string) {
+    global $db_options;
+    $escaped_string = $db_options->dbh->quote($string);
+    return substr($escaped_string, 1, strlen($escaped_string)-2);
+}
 
-	function db_escape_string($string) {
-		return mysql_real_escape_string($string);
-	}
+function db_fetch_object($stmt) {
+    try {
+        $obj = $stmt->fetchObject();
+    } catch (PDOException $ex) {
+        gh_log(ERROR, "Error fetching database row: " . $ex->getMessage());
+        global $db_options;
+        $db_options->error = $ex->getMessage();
+        return FALSE;
+    }
+    return $obj;
+}
 
-	function db_fetch_object($result) {
-		return mysql_fetch_object($result);
-	}
+function db_free_result($stmt) {
+    return TRUE;
+}
 
-	function db_free_result($result) {
-		return mysql_free_result($result);
-	}
+function db_insert_id() {
+    global $db_options;
+    return $db_options->dbh->lastInsertId();
+}
 
-	function db_insert_id() {
-		return mysql_insert_id();
-	}
-
-	function db_error() {
-		return mysql_error();
-	}
+function db_error() {
+    global $db_options;
+    return $db_options->error;
 }
 
 function db_migrate($attempt_repair = TRUE) {

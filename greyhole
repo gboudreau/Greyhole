@@ -44,7 +44,7 @@ if ($action == 'md5-worker') {
 
 process_config();
 
-db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
+db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database: " . db_error());
 db_migrate();
 
 if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status' && $action != 'getuid' && $action != 'logs') {
@@ -1244,7 +1244,7 @@ function archive_task($task_id) {
 	if (!$worked) {
 		// Let's try a second time... This is kinda important!
 		global $db_options;
-		db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
+		db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database: " . db_error());
 		db_query($query) or gh_log(CRITICAL, "Can't insert in tasks_completed: " . db_error());
 	}
 
