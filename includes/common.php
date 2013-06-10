@@ -32,8 +32,6 @@ define('FSCK_TYPE_METASTORE', 3);
 
 $action = 'initialize';
 
-date_default_timezone_set(date_default_timezone_get());
-
 set_error_handler("gh_error_handler");
 register_shutdown_function("gh_shutdown");
 
@@ -204,6 +202,10 @@ function parse_config() {
 				    global $drive_selection_algorithm;
 				    $drive_selection_algorithm = DriveSelection::parse($value, @$drive_selection_groups);
 				    break;
+                case 'timezone':
+                    $timezone = $value;
+                    date_default_timezone_set($value);
+                    break;
 				default:
 					if (mb_strpos($name, 'num_copies') === 0) {
 						$share = mb_substr($name, 11, mb_strlen($name)-12);
@@ -253,6 +255,10 @@ function parse_config() {
 			}
 	    }
 	}
+
+    if (!isset($timezone)) {
+        date_default_timezone_set(@date_default_timezone_get());
+    }
 	
 	if (is_array($storage_pool_drives) && count($storage_pool_drives) > 0) {
 		$df_command = "df -k";

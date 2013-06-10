@@ -58,6 +58,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	mysql -u greyhole_user -p89y63jdwe greyhole < /usr/share/greyhole/schema-mysql.sql
 
 4. Customize the Greyhole configuration file, /etc/greyhole.conf, as needed.
+   Important: you need to either use the `date.timezone` setting in your php.ini, or specify your timezone in greyhole.conf, using the `timezone` config option.
 
 5. Start the Greyhole service:
 
