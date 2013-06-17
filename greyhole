@@ -1844,17 +1844,6 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 			continue;
 		}
 
-		if (is_link($source_file)) {
-			$source_size = gh_filesize(readlink($source_file));
-		} else if (gh_is_file($source_file)) {
-			$source_size = gh_filesize($source_file);
-		}
-		if (isset($source_size)) {
-			gh_log(DEBUG, "  Copying " . bytes_to_human($source_size, FALSE) . " file to $metafile->path");
-		} else {
-			gh_log(DEBUG, "  Copying file to $metafile->path");
-		}
-
 		$root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
 		if (!is_greyhole_owned_drive($root_path)) {
 			gh_log(WARN, "  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
@@ -1872,43 +1861,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 			continue;
 		}
 
-		$temp_path = get_temp_filename($metafile->path);
-		
-		$copied = FALSE;
-		$it_worked = FALSE;
-		$start_time = time();
-		if (is_link($source_file)) {
-			exec(get_copy_cmd(readlink($source_file), $temp_path));
-			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == $source_size;
-		} else if (gh_is_file($source_file)) {
-			$source_dev = gh_file_deviceid($source_file);
-			$target_dev = gh_file_deviceid($metafile_dir_path);
-			if ($source_dev === $target_dev && $source_dev !== FALSE) {
-				gh_log(DEBUG, "  (using rename)");
-				gh_rename($source_file, $temp_path);
-				$copied = FALSE;
-			} else {
-				exec(get_copy_cmd($source_file, $temp_path));
-				$copied = TRUE;
-			}
-			$it_worked = file_exists($temp_path) && gh_filesize($temp_path) == $source_size;
-		}
-		
-		if ($it_worked) {
-			if (time() - $start_time > 0) {
-				$speed = number_format($source_size/1024/1024 / (time() - $start_time), 1);
-				gh_log(DEBUG, "    Copy created at $speed MBps.");
-			}
-			gh_rename($temp_path, $metafile->path);
-			gh_chperm($metafile->path, $file_infos);
-		} else {
-			gh_log(WARN, "    Failed file copy. Will mark this metadata file 'Gone'.");
-			if ($copied) {
-				@unlink($temp_path);
-			} else {
-				// Do NOT delete $temp_path if the file was moved... Just move it back!
-				gh_rename($temp_path, $source_file);
-			}
+		if (!gh_copy_file($source_file, $metafile->path)) {
 			if ($metafile->is_linked) {
 				$metafile->is_linked = FALSE;
 				$link_next = TRUE;
@@ -1960,6 +1913,70 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 		}
 		save_metafiles($share, $path, $filename, $metafiles);
 	}
+}
+
+function gh_copy_file($source_file, &$destination_file) {
+	$start_time = time();
+	$source_size = gh_filesize($source_file);
+    $temp_path = get_temp_filename($destination_file);
+
+    if (is_link($source_file)) {
+        $source_size = gh_filesize(readlink($source_file));
+    } else if (gh_is_file($source_file)) {
+        $source_size = gh_filesize($source_file);
+    }
+
+    if (isset($source_size)) {
+        gh_log(DEBUG, "  Copying " . bytes_to_human($source_size, FALSE) . " file to $destination_file");
+    } else {
+        gh_log(DEBUG, "  Copying file to $destination_file");
+    }
+
+	$renamed = FALSE;
+	if (gh_is_file($source_file)) {
+		$source_dev = gh_file_deviceid($source_file);
+		$target_dev = gh_file_deviceid($destination_file);
+		if ($source_dev === $target_dev && $source_dev !== FALSE) {
+			gh_log(DEBUG, "  (using rename)");
+			gh_rename($source_file, $temp_path);
+			$renamed = TRUE;
+		}
+	}
+
+	if (!$renamed) {
+		// Wasn't renamed; need to be copied.
+        $copy_source = is_link($source_file) ? readlink($source_file) : $source_file;
+		exec(get_copy_cmd($copy_source, $temp_path));
+	}
+
+    $it_worked = file_exists($temp_path) && ($renamed || file_exists($source_file)) && gh_filesize($temp_path) == $source_size;
+    if (!$it_worked) {
+        // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+        $it_worked = file_exists(normalize_utf8_characters($temp_path)) && ($renamed || file_exists($source_file)) && gh_filesize(normalize_utf8_characters($temp_path)) == $source_size;
+        if ($it_worked) {
+            // Bingo!
+            $temp_path = normalize_utf8_characters($temp_path);
+            $destination_file = normalize_utf8_characters($destination_file);
+        }
+    }
+    if ($it_worked) {
+    	if (time() - $start_time > 0) {
+    		$speed = number_format($source_size/1024/1024 / (time() - $start_time), 1);
+    		gh_log(DEBUG, "    Copy created at $speed MBps.");
+    	}
+    	gh_rename($temp_path, $destination_file);
+    	gh_chperm($destination_file, gh_get_file_infos($source_file));
+    } else {
+    	gh_log(WARN, "    Failed file copy. Will mark this metadata file 'Gone'.");
+		if ($renamed) {
+			// Do NOT delete $temp_path if the file was renamed... Just move it back!
+			gh_rename($temp_path, $source_file);
+		} else {
+            // Remove the failed copy, if any.
+	    	@unlink($temp_path);
+		}
+    }
+    return $it_worked;
 }
 
 function gh_chperm($real_file_path, $file_infos) {
@@ -3410,29 +3427,15 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 				}
 
 				if ($metafile->state == 'Pending') {
-					$source_size = gh_filesize($original_file_path);
-					gh_log(DEBUG, "  Copying " . bytes_to_human($source_size, FALSE) . " file to $metafile->path");
-					$temp_path = get_temp_filename($metafile->path);
-					$start_time = time();
-					exec(get_copy_cmd($original_file_path, $temp_path));
-					$it_worked = file_exists($temp_path) && file_exists($original_file_path) && gh_filesize($temp_path) == gh_filesize($original_file_path);
-					if ($it_worked) {
-						if (time() - $start_time > 0) {
-							$speed = number_format($source_size/1024/1024 / (time() - $start_time), 1);
-							gh_log(DEBUG, "    Copy created at $speed MBps.");
-						}
-						gh_rename($temp_path, $metafile->path);
-						gh_chperm($metafile->path, gh_get_file_infos($original_file_path));
-						$metafile->state = 'OK';
-						$num_copies_current++;
-					} else {
-						gh_log(WARN, "    Failed file copy. Skipping.");
-						@unlink($temp_path);
-						if ($metafile->is_linked) {
-							$metafile->is_linked = FALSE;
-						}
-						$metafile->state = 'Gone';
-					}
+                    if (gh_copy_file($original_file_path, $metafile->path)) {
+                        $metafile->state = 'OK';
+                        $num_copies_current++;
+                    } else {
+                        if ($metafile->is_linked) {
+                            $metafile->is_linked = FALSE;
+                        }
+                        $metafile->state = 'Gone';
+                    }
 					$file_metafiles[$key] = $metafile;
 				}
 			}
