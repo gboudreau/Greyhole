@@ -103,7 +103,7 @@ function recursive_include_parser($file) {
 }
 
 function parse_config() {
-	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention;
+	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $greyhole_error_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention;
 
 	$deprecated_options = array(
 		'delete_moves_to_attic' => 'delete_moves_to_trash',
@@ -121,6 +121,7 @@ function parse_config() {
 	// Defaults
 	$log_level = DEBUG;
 	$greyhole_log_file = '/var/log/greyhole.log';
+    $greyhole_error_log_file = FALSE;
 	$email_to = 'root';
 	$log_memory_usage = FALSE;
 	$check_for_open_files = TRUE;
@@ -409,7 +410,7 @@ function explode_full_path($full_path) {
 }
 
 function gh_log($local_log_level, $text) {
-	global $greyhole_log_file, $log_level, $log_memory_usage, $action, $log_to_stdout;
+	global $greyhole_log_file, $greyhole_error_log_file, $log_level, $log_memory_usage, $action, $log_to_stdout;
 	if ($local_log_level > $log_level) {
 		return;
 	}
@@ -432,7 +433,11 @@ function gh_log($local_log_level, $text) {
 		if (strtolower($greyhole_log_file) == 'syslog') {
 			$worked = syslog($local_log_level, $log_text);
 		} else if (!empty($greyhole_log_file)) {
-			$worked = error_log($log_text, 3, $greyhole_log_file);
+            if ($local_log_level <= WARN && !empty($greyhole_error_log_file)) {
+                $worked = error_log($log_text, 3, $greyhole_error_log_file);
+            } else {
+    			$worked = error_log($log_text, 3, $greyhole_log_file);
+            }
 		} else {
 			$worked = FALSE;
 		}
