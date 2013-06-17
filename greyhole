@@ -2007,9 +2007,18 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
 				if (gh_is_file($parent_directory)) {
 					gh_rename($parent_directory, "$parent_directory (file copy)");
 				}
-				if (!mkdir($parent_directory, $dir_infos->fileperms)) {
-					gh_log(WARN, "  Failed to create directory $parent_directory");
-					return FALSE;
+				if (!@mkdir($parent_directory, $dir_infos->fileperms)) {
+                    // Even if mkdir return false, the folder might have been correctly created... who would think...
+                    if (!is_dir($parent_directory)) {
+                        // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+                        if (is_dir(normalize_utf8_characters($parent_directory))) {
+                            // Bingo!
+                            $parent_directory = normalize_utf8_characters($parent_directory);
+                        } else {
+                            gh_log(WARN, "  Failed to create directory $parent_directory");
+                            return FALSE;
+                        }
+                    }
 				}
 			}
 			if (!chown($parent_directory, $dir_infos->fileowner)) {
@@ -2257,7 +2266,16 @@ function save_metafiles($share, $path, $filename, $metafiles) {
 				if (is_dir("$data_filepath/$filename")) {
 					exec("rm -rf " . escapeshellarg("$data_filepath/$filename"));
 				}
-				file_put_contents("$data_filepath/$filename", serialize($metafiles));
+				$worked = @file_put_contents("$data_filepath/$filename", serialize($metafiles));
+                if ($worked === FALSE) {
+                    // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+                    $worked = file_put_contents(normalize_utf8_characters("$data_filepath/$filename"), serialize($metafiles));
+                    if ($worked !== FALSE) {
+                        // Bingo!
+                        $data_filepath = normalize_utf8_characters($data_filepath);
+                        $filename = normalize_utf8_characters($filename);
+                    }
+                }
 				$has_metafile = TRUE;
 				$paths_used[] = $data_filepath;
 				break;
@@ -3053,7 +3071,12 @@ function gh_fsck_metastore($root, $path, $share) {
 	global $fsck_report;
 	
 	if (!is_dir("$root$path")) {
-		return;
+		// Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+        $root = normalize_utf8_characters($root);
+        $path = normalize_utf8_characters($path);
+        if (!is_dir("$root$path")) {
+            return;
+        }
 	}
 	gh_log(DEBUG, "Entering metastore " . clean_dir($root . $path));
 
@@ -3186,9 +3209,16 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
 	foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
 		foreach ($metafile_block as $metafile) {
+            $inode_number = @gh_fileinode($metafile->path);
 			$root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
-			$inode_number = @gh_fileinode($metafile->path);
-			if (is_link($metafile->path)) {
+            if ($root_path == $metafile->path) {
+                // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+                $root_path = str_replace(normalize_utf8_characters(clean_dir("/$share/$file_path/$filename")), '', $metafile->path);
+                if ($inode_number !== FALSE && $metafile->state == 'OK') {
+                    gh_log(DEBUG, "Found $metafile->path");
+                }
+            }
+            if (is_link($metafile->path)) {
 				$link_target = readlink($metafile->path);
 				if (array_search($link_target, $file_copies_inodes) !== FALSE) {
 					// This link points to another file copy. Bad, bad!
@@ -3422,9 +3452,19 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 						continue;
 					}
 				}
-				
-				if (!is_dir($metafile_dir_path) || $metafile->state == 'Gone') {
-					continue;
+
+                if (!is_dir($metafile_dir_path) || $metafile->state == 'Gone') {
+                    if ($metafile->state != 'Gone') {
+                        // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+            			if (is_dir(normalize_utf8_characters($metafile_dir_path))) {
+                            // Bingo!
+                            $metafile_dir_path = normalize_utf8_characters($metafile_dir_path);
+                            $metafile->path = normalize_utf8_characters($metafile->path);
+                            $file_metafiles[$key] = $metafile;
+                        } else {
+                            continue;
+                        }
+                    }
 				}
 
 				if ($metafile->state == 'Pending') {
