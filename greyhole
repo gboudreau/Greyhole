@@ -2169,14 +2169,14 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
 		}
 		foreach ($metafiles as $key => $metafile) {
 			if ($metafile->state == 'OK' && $share_file_link_to !== FALSE) {
-				if ($metafile->is_linked && $metafile->path != $share_file_link_to) {
+				if (@$metafile->is_linked && $metafile->path != $share_file_link_to) {
 					if (!$quiet) {
 						gh_log(DEBUG, '  Changing is_linked to FALSE for ' . $metafile->path);
 					}
 					$metafile->is_linked = FALSE;
 					$metafiles[$key] = $metafile;
 					save_metafiles($share, $path, $filename, $metafiles);
-				} else if (!$metafile->is_linked && $metafile->path == $share_file_link_to) {
+				} else if (empty($metafile->is_linked) && $metafile->path == $share_file_link_to) {
 					if (!$quiet) {
 						gh_log(DEBUG, '  Changing is_linked to TRUE for ' . $metafile->path);
 					}
