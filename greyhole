@@ -84,16 +84,17 @@ if ($action == 'getuid') {
 if ($action == 'logs') {
 	if (strtolower($greyhole_log_file) == 'syslog') {
 		if (gh_is_file('/var/log/syslog')) {
-			passthru("tail -f /var/log/syslog | grep --line-buffered Greyhole");
+			passthru("tail -F -n 1 /var/log/syslog | grep --line-buffered Greyhole");
 		} else {
-			passthru("tail -f /var/log/messages | grep --line-buffered Greyhole");
+			passthru("tail -F -n 1 /var/log/messages | grep --line-buffered Greyhole");
 		}
 	} else {
         $files = escapeshellarg($greyhole_log_file);
+		passthru("tail -n 1 $files");
         if (!empty($greyhole_error_log_file)) {
-            $files .= " " . escapeshellarg($greyhole_error_log_file);
+            $files = escapeshellarg($greyhole_error_log_file) . " " . $files;
         }
-		passthru("tail -qf $files");
+		passthru("tail -qF -n 0 $files");
 	}
 	exit(0);
 }
