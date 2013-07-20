@@ -23,17 +23,17 @@
 # This script is used to build new Greyhole versions. It will:
 #   1. Create a source TGZ, and RPM & DEB packages
 #   2. Upload the new files on the greyhole.net host
-#   3. Update the APT & YUM repositories
+#   3. Update the APT & YUM repositories (manual intervention required)
 #   4. Install the new version locally (using apt-get or yum, depending on what's available)
-#   5. Upload the new files to GitHub
-#	6. Tag the git branch
-#   7. Update the CHANGELOG on http://www.greyhole.net/releases/CHANGELOG
-#   8. Send 'New version available' notifications by email, Twitter (@GreyholeApp), Facebook (Greyhole) and IRC (#greyhole on Freenode).
+#	5. Tag the git branch
+#   6. Update the CHANGELOG on http://www.greyhole.net/releases/CHANGELOG
+#   7. Send 'New version available' notifications by email, Twitter (@GreyholeApp), Facebook (Greyhole) and IRC (#greyhole on Freenode).
 
 
 #######
 # Setup
 #   sudo easy_install twitter
+#   sudo yum -y install dpkg
 #   curl -O https://raw.github.com/dtompkins/fbcmd/master/fbcmd_update.php; sudo php fbcmd_update.php install && rm fbcmd_update.php && fbcmd
 #   echo -n 'github_username:github_password' > .github_userpwd
 #   echo -n 'nickserv_password' > .irc_password
@@ -160,12 +160,6 @@ fi
 chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree
 
 
-############################
-# Upload new files to GitHub
-
-./github-auto-post-downloads.php $VERSION $BUILD_NUMBER
-
-
 ####################
 # Tag the git branch
 git clone git@github.com:gboudreau/Greyhole.git /tmp/Greyhole.git
@@ -201,6 +195,9 @@ if [ "$BUILD_NUMBER" = "1" ]; then
 	cd ..
 fi
 
+echo
+echo "Now would be a good time to update the Release on https://github.com/gboudreau/Greyhole/releases to provide a changelog, and the packaged .tar.gz from http://www.greyhole.net/releases/greyhole-$VERSION.tar.gz"
+read -p 'Press [Enter] key to continue...'
 
 ############################################
 # Send notifications to Twitter/FB/IRC/email
