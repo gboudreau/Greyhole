@@ -1,4 +1,6 @@
-/var/log/greyhole.* {
+/var/log/greyhole.log
+/var/log/greyhole.err
+{
 	daily
 	missingok
 	rotate 7
