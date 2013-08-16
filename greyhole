@@ -1742,7 +1742,27 @@ function gh_write($share, $full_path, $task_id) {
 				}
 				unset($existing_metafiles[$key]);
 			}
-			gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
+			// Empty the existing metafiles array, to be able to recreate all new copies on the correct drives, per the dir_selection_algorithm
+			$existing_metafiles = array();
+			$new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
+			if (!isset($new_metafiles[$source_file])) {
+				// Delete source file; we copied it somewhere else
+				// Let's just make sure we have at least one OK file before we delete it!
+				gh_log(DEBUG, "  Source file is not needed anymore. Deleting...");
+				$is_ok = FALSE;
+				foreach ($new_metafiles as $metafile) {
+					if ($metafile->state == 'OK') {
+						$is_ok = TRUE;
+						break;
+					}
+				}
+				if ($is_ok) {
+					// Ok, now we're sure.
+					gh_recycle($source_file);
+				} else {
+					gh_log(DEBUG, "  Change of mind... Couldn't find any OK metadata file... Will keep the source!");
+				}
+			}
 		}
 	} else {
 		if (!isset($source_file)) {
@@ -1821,6 +1841,8 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
 	save_metafiles($share, $path, $filename, $metafiles);
 
 	create_copies_from_metafiles($metafiles, $share, $full_path, $source_file);
+
+    return $metafiles;
 }
 
 function create_copies_from_metafiles($metafiles, $share, $full_path, $source_file, $missing_only=FALSE) {
