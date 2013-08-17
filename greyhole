@@ -2849,7 +2849,9 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 	$got_all_drives = FALSE;
 	while (!$got_all_drives) {
 		$num_empty_ds = 0;
+        global $is_forced;
 		foreach ($shares_options[$share]['drive_selection_algorithm'] as $ds) {
+			$is_forced = $ds->isForced();
 			list($drives, $drives_last_resort) = $ds->draft();
 			foreach ($drives as $sp_drive => $space) {
 				$sorted_target_drives[$sp_drive] = $space;
@@ -3943,7 +3945,7 @@ function gh_get_dir_perms($directory) {
 }
 
 function gh_balance() {
-	global $storage_pool_drives, $shares_options, $is_sticky;
+	global $storage_pool_drives, $shares_options, $is_sticky, $is_forced;
 
 	// Start with shares that have sticky files, so that subsequent shares will be used to try to balance what moving files into stick_into drives could debalance...
 	// Then start with the shares for which we keep the most # copies;
@@ -4003,6 +4005,7 @@ function gh_balance() {
 				list($path, $filename) = explode_full_path($full_path);
 				gh_log(DEBUG, "  Working on file: $share_name/$full_path (". bytes_to_human($filesize*1024, FALSE) .")");
 
+                // $is_sticky and $is_forced are set in order_target_drives(), based on $share_name & $path
 				$sp_drives = order_target_drives($filesize, FALSE, $share_name, $path, '  ');
 
 				unset($sp_drive);
@@ -4051,6 +4054,8 @@ function gh_balance() {
 
 				if ($is_sticky) {
 					gh_log(DEBUG, "  Moving sticky file, even if that means it won't help balancing available space.");
+                } else if ($is_forced) {
+					gh_log(DEBUG, "  Moving file per drive_selection_algorithm configuration, even if that means it won't help balancing available space.");
 				} else if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$sp_drive]-$filesize
 						|| $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
 						|| ($balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] > $target_avail_space)

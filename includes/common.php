@@ -1170,18 +1170,22 @@ class DriveSelection {
     var $num_drives_per_draft;
     var $selection_algorithm;
     var $drives;
-    var $is_custom;
+    var $is_forced;
     
     var $sorted_target_drives;
     var $last_resort_sorted_target_drives;
-    
-    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_custom) {
+
+    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_forced) {
         $this->num_drives_per_draft = $num_drives_per_draft;
         $this->selection_algorithm = $selection_algorithm;
         $this->drives = $drives;
-        $this->is_custom = $is_custom;
+        $this->is_forced = $is_forced;
     }
     
+    public function isForced() {
+        return $this->is_forced;
+    }
+
     function init(&$sorted_target_drives, &$last_resort_sorted_target_drives) {
         // Sort by used space (asc) for least_used_space, or by available space (desc) for most_available_space
         if ($this->selection_algorithm == 'least_used_space') {
@@ -1268,7 +1272,7 @@ class DriveSelection {
 
     function update() {
         // Make sure num_drives_per_draft and drives have been set, in case storage_pool_drive lines appear after drive_selection_algorithm line(s) in the config file
-        if (!$this->is_custom && ($this->selection_algorithm == 'least_used_space' || $this->selection_algorithm == 'most_available_space')) {
+        if (!$this->is_forced && ($this->selection_algorithm == 'least_used_space' || $this->selection_algorithm == 'most_available_space')) {
             global $storage_pool_drives;
             $this->num_drives_per_draft = count($storage_pool_drives);
             $this->drives = $storage_pool_drives;
