@@ -1294,8 +1294,12 @@ function gh_unlink($share, $full_path, $task_id) {
 	if (!$landing_zone) {
 		return;
 	}
-	
-	gh_log(INFO, "File deleted: $landing_zone/$full_path");
+
+    if (should_ignore_file($share, $full_path)) {
+        return;
+    }
+
+    gh_log(INFO, "File deleted: $landing_zone/$full_path");
 	
 	if (array_search($share, $trash_share_names) !== FALSE) {
 		// Will delete the file in the trash which has no corresponding symlink in the Greyhole Trash share.
@@ -1356,6 +1360,10 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
 		return;
 	}
 	
+    if (should_ignore_file($share, $target_full_path)) {
+        return;
+    }
+
 	if (is_dir("$landing_zone/$target_full_path") || is_a_metastore_dir($share, $full_path)) {
 		gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
@@ -1669,6 +1677,29 @@ function find_next_rename_task($share, $full_path, $task_id) {
 	return db_fetch_object($result);
 }
 
+function should_ignore_file($share, $full_path) {
+    global $ignored_files, $ignored_folders;
+
+    list($path, $filename) = explode_full_path($full_path);
+
+    foreach ($ignored_files as $ignored_file_re) {
+        if (preg_match(';' . $ignored_file_re . ';', $filename)) {
+            gh_log(INFO, "Ignoring task because it matches the following ignored_files pattern: $ignored_file_re");
+            return TRUE;
+        }
+    }
+    foreach ($ignored_folders as $ignored_folder_re) {
+        $p = clean_dir("$share/$path");
+        gh_log(DEBUG, "Looking for ignore match between $p and $ignored_folder_re");
+        if (preg_match(';' . $ignored_folder_re . ';', $p)) {
+            gh_log(INFO, "Ignoring task because it matches the following ignored_folders pattern: $ignored_folder_re");
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
 function gh_write($share, $full_path, $task_id) {
 	global $storage_pool_drives, $log_level, $sleep_before_task;
 	
@@ -1676,6 +1707,10 @@ function gh_write($share, $full_path, $task_id) {
 	if (!$landing_zone) {
 		return;
 	}
+
+    if (should_ignore_file($share, $full_path)) {
+        return;
+    }
 	
 	if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore.')) {
 		$new_full_path = find_future_full_path($share, $full_path, $task_id);

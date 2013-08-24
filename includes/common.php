@@ -103,7 +103,7 @@ function recursive_include_parser($file) {
 }
 
 function parse_config() {
-	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $greyhole_error_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention;
+	global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $greyhole_error_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention, $ignored_files, $ignored_folders;
 
 	$deprecated_options = array(
 		'delete_moves_to_attic' => 'delete_moves_to_trash',
@@ -116,6 +116,8 @@ function parse_config() {
 	$shares_options = array();
 	$storage_pool_drives = array();
 	$frozen_directories = array();
+    $ignored_files = array();
+    $ignored_folders = array();
 	$config_text = recursive_include_parser($config_file);
 	
 	// Defaults
@@ -206,6 +208,12 @@ function parse_config() {
                 case 'timezone':
                     $timezone = $value;
                     date_default_timezone_set($value);
+                    break;
+                case 'ignored_files':
+                    $ignored_files[] = $value;
+                    break;
+                case 'ignored_folders':
+                    $ignored_folders[] = $value;
                     break;
 				default:
 					if (mb_strpos($name, 'num_copies') === 0) {
@@ -402,6 +410,11 @@ function clean_dir($dir) {
 	while (mb_strpos($dir, '//') !== FALSE) {
 		$dir = str_replace("//", "/", $dir);
 	}
+    $l = strlen($dir);
+	if ($dir[$l-2] == '/' && $dir[$l-1] == '.') {
+		$dir = mb_substr($dir, 0, $l-2);
+	}
+	$dir = str_replace("/./", "/", $dir);
 	return $dir;
 }
 
