@@ -1698,7 +1698,11 @@ function gh_dir_uuid($dir) {
             return 'remote';
         }
     }
-    return trim(exec('/sbin/blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
+    $uuid = trim(exec('/sbin/blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
+    if (empty($uuid)) {
+        return 'remote';
+    }
+    return $uuid;
 }
 
 function fix_all_symlinks() {
