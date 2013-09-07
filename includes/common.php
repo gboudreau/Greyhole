@@ -411,7 +411,7 @@ function clean_dir($dir) {
         $dir = str_replace("//", "/", $dir);
     }
     $l = strlen($dir);
-    if ($dir[$l-2] == '/' && $dir[$l-1] == '.') {
+    if ($l >= 2 && $dir[$l-2] == '/' && $dir[$l-1] == '.') {
         $dir = mb_substr($dir, 0, $l-2);
     }
     $dir = str_replace("/./", "/", $dir);
