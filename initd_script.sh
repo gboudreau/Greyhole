@@ -44,7 +44,8 @@ COMMAND="$1"
 
 status () {
 	PID=`cat $PIDFILE 2> /dev/null`
-	if [ -f $PIDFILE -a "`ps ax | grep \"^ *$PID.*greyhole --daemon\" | grep -v grep | wc -l`" -eq "1" ]; then
+    DAEMON_RUNNING=`ps ax | grep "^ *$PID.*greyhole --daemon\|^ *$PID.*greyhole -D" | grep -v grep | wc -l`
+	if [ -f $PIDFILE -a "$DAEMON_RUNNING" -eq "1" ]; then
 		[ "$COMMAND" = "status" ] && echo "Greyhole is running."
 		return 0
 	else

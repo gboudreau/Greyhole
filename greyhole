@@ -55,7 +55,7 @@ if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $acti
 }
 
 if ($action == 'pause') {
-    $pid = (int) exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | awk \'{print $1}\'');
+    $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | awk \'{print $1}\'');
     if ($pid) {
         exec('kill -STOP ' . $pid);
         echo "The Greyhole deamon has been paused. Use 'greyhole --resume' to restart it.\n";
@@ -66,7 +66,7 @@ if ($action == 'pause') {
     }
 }
 if ($action == 'resume') {
-    $pid = (int) exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | awk \'{print $1}\'');
+    $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | awk \'{print $1}\'');
     if ($pid) {
         exec('kill -CONT ' . $pid);
         echo "The Greyhole deamon has resumed.\n";
@@ -612,7 +612,7 @@ if ($action == 'view-queue') {
 }
 
 if ($action == 'status') {
-    $num_dproc = (int) exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | wc -l');
+    $num_dproc = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
     if ($num_dproc == 0) {
         echo "\nGreyhole daemon is currently stopped.\n\n";
         exit(1);
@@ -860,7 +860,7 @@ if ($action == 'md5-worker') {
     exit(0);
 }
 
-$num_daemon_processes = exec('ps ax | grep ".*greyhole --daemon" | grep -v grep | wc -l');
+$num_daemon_processes = exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
 if ($num_daemon_processes > 1) {
     die("Found an already running Greyhole daemon with PID " . trim(file_get_contents('/var/run/greyhole.pid')) . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
 }
