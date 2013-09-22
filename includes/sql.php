@@ -158,7 +158,7 @@ function db_migrate($attempt_repair = TRUE) {
             if ($row->Field == 'value') {
                 if ($row->Type == "tinytext") {
                     // migrate
-                    db_query("ALTER TABLE settings CHANGE value value TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NOT NULL");
+                    db_query("ALTER TABLE settings CHANGE value value TEXT CHARACTER SET utf8 NOT NULL");
                 }
                 break;
             }
@@ -201,7 +201,8 @@ function db_migrate($attempt_repair = TRUE) {
         $result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
         if (db_fetch_object($result) !== FALSE) {
             // migrate
-            db_query("ALTER TABLE tasks DROP INDEX find_next_task ADD INDEX find_next_task (complete, id)");
+            db_query("ALTER TABLE tasks DROP INDEX find_next_task");
+            db_query("ALTER TABLE tasks ADD INDEX find_next_task (complete, id)");
         }
     }
 
@@ -218,7 +219,7 @@ function db_migrate($attempt_repair = TRUE) {
         $result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
         if (db_fetch_object($result) === FALSE) {
             // migrate
-            db_query("ALTER TABLE tasks ADD INDEX md5_checker (action, share(64), full_path(255), complete)");
+            db_query("ALTER TABLE tasks ADD INDEX md5_checker (action, share(64), full_path(265), complete)");
         }
         
         $query = "DESCRIBE tasks";
@@ -227,7 +228,7 @@ function db_migrate($attempt_repair = TRUE) {
             if ($row->Field == 'additional_info') {
                 if ($row->Type == "tinytext") {
                     // migrate
-                    db_query("ALTER TABLE tasks CHANGE additional_info additional_info TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL");
+                    db_query("ALTER TABLE tasks CHANGE additional_info additional_info TEXT CHARACTER SET utf8 NULL");
                 }
                 break;
             }
@@ -242,8 +243,8 @@ function db_migrate($attempt_repair = TRUE) {
             if ($row->Field == 'full_path') {
                 if ($row->Type == "tinytext") {
                     // migrate
-                    db_query("ALTER TABLE tasks CHANGE full_path full_path TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL");
-                    db_query("ALTER TABLE tasks_completed CHANGE full_path full_path TEXT CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL");
+                    db_query("ALTER TABLE tasks CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
+                    db_query("ALTER TABLE tasks_completed CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
                 }
                 break;
             }
@@ -252,7 +253,7 @@ function db_migrate($attempt_repair = TRUE) {
 
     // Migration #8 (new du_stats table)
     if (@$db_use_mysql) {
-        $query = "CREATE TABLE IF NOT EXISTS `du_stats` (`share` TINYTEXT NOT NULL, `full_path` TEXT NOT NULL, `depth` TINYINT(3) UNSIGNED NOT NULL, `size` BIGINT(20) NOT NULL) ENGINE = MYISAM";
+        $query = "CREATE TABLE IF NOT EXISTS `du_stats` (`share` TINYTEXT NOT NULL, `full_path` TEXT NOT NULL, `depth` TINYINT(3) UNSIGNED NOT NULL, `size` BIGINT(20) UNSIGNED NOT NULL, UNIQUE KEY `uniqness` (`share`(64),`full_path`(269))) ENGINE = MYISAM DEFAULT CHARSET=utf8";
     } else {
         $query = "CREATE TABLE IF NOT EXISTS du_stats (share TINYTEXT NOT NULL, full_path TEXT NOT NULL, depth INTEGER, size INTEGER)";
     }
@@ -262,7 +263,7 @@ function db_migrate($attempt_repair = TRUE) {
         $result = db_query($query) or die("Can't show index with query: $query - Error: " . db_error());
         if (db_fetch_object($result) === FALSE) {
             // migrate
-            db_query("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (936))");
+            db_query("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (269))");
         }
     }
 }
