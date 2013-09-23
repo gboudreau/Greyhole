@@ -4089,8 +4089,6 @@ function gh_balance() {
 
                 if ($is_sticky) {
                     gh_log(DEBUG, "  Moving sticky file, even if that means it won't help balancing available space.");
-                } else if ($is_forced) {
-                    gh_log(DEBUG, "  Moving file per drive_selection_algorithm configuration, even if that means it won't help balancing available space.");
                 } else if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$sp_drive]-$filesize
                         || $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
                         || ($balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] > $target_avail_space)
