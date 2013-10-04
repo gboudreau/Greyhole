@@ -1771,16 +1771,8 @@ function gh_write($share, $full_path, $task_id) {
                 $source_file = $existing_metafiles[$key]->path;
                 gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
             }
-            foreach ($keys_to_remove as $key) {
-                if ($existing_metafiles[$key]->path != $source_file) {
-                    gh_recycle($existing_metafiles[$key]->path);
-                }
-                unset($existing_metafiles[$key]);
-            }
-            // Empty the existing metafiles array, to be able to recreate all new copies on the correct drives, per the dir_selection_algorithm
-            $existing_metafiles = array();
-            $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
-            if (!isset($new_metafiles[$source_file])) {
+            $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove);
+            if (!empty($new_metafiles) && !isset($new_metafiles[$source_file])) {
                 // Delete source file; we copied it somewhere else
                 // Let's just make sure we have at least one OK file before we delete it!
                 gh_log(DEBUG, "  Source file is not needed anymore. Deleting...");
@@ -1840,7 +1832,7 @@ function gh_write($share, $full_path, $task_id) {
 
 }
 
-function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id) {
+function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove=NULL) {
     $landing_zone = get_share_landing_zone($share);
     list($path, $filename) = explode_full_path($full_path);
 
@@ -1852,17 +1844,27 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
             gh_log(DEBUG, "  File $landing_zone/$full_path is locked by another process. Will wait until it's unlocked to work on it.");
             postpone_task($task_id);
             $locked_files[clean_dir("$share/$full_path")] = TRUE;
-            return;
+            return array();
         }
         $sleep_before_task = array();
     }
-    
+
+    if ($keys_to_remove !== NULL) {
+        foreach ($keys_to_remove as $key) {
+            if ($existing_metafiles[$key]->path != $source_file) {
+                gh_recycle($existing_metafiles[$key]->path);
+            }
+        }
+        // Empty the existing metafiles array, to be able to recreate all new copies on the correct drives, per the dir_selection_algorithm
+        $existing_metafiles = array();
+    }
+
     $metafiles = create_metafiles($share, $full_path, $num_copies_required, $filesize, $existing_metafiles);
 
     if (count($metafiles) == 0) {
         gh_log(WARN, "  No metadata files could be created. Will wait until metadata files can be created to work on this file.");
         postpone_task($task_id);
-        return;
+        return array();
     }
 
     if (!is_link("$landing_zone/$full_path")) {
