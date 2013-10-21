@@ -1995,7 +1995,7 @@ function gh_copy_file($source_file, &$destination_file) {
     $renamed = FALSE;
     if (gh_is_file($source_file)) {
         $source_dev = gh_file_deviceid($source_file);
-        $target_dev = gh_file_deviceid($destination_file);
+        $target_dev = gh_file_deviceid(dirname($destination_file));
         if ($source_dev === $target_dev && $source_dev !== FALSE) {
             gh_log(DEBUG, "  (using rename)");
             gh_rename($source_file, $temp_path);
