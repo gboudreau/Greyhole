@@ -2116,11 +2116,6 @@ function create_metafiles($share, $full_path, $num_copies_required, $filesize, $
     
     $num_ok = count($metafiles);
     foreach ($metafiles as $key => $metafile) {
-        if (!file_exists($metafile->path)) {
-            // Re-use paths to old file copies that are now gone.
-            // This will allow us to use a new drive that has been installed where an old drive was previously.
-            $metafile->state = 'Pending';
-        }
         $sp_drive = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
         if (!is_greyhole_owned_drive($sp_drive)) {
             $metafile->state = 'Gone';
