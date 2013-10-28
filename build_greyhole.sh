@@ -35,7 +35,7 @@
 #   sudo easy_install twitter
 #   sudo yum -y install dpkg
 #   curl -O https://raw.github.com/dtompkins/fbcmd/master/fbcmd_update.php; sudo php fbcmd_update.php install && rm fbcmd_update.php && fbcmd
-#   echo -n 'github_username:github_password' > .github_userpwd
+#   echo -n 'github_api_token' > .github_token
 #   echo -n 'nickserv_password' > .irc_password
 
 
@@ -187,9 +187,17 @@ if [ "$BUILD_NUMBER" = "1" ]; then
 	cd ..
 fi
 
-echo
-echo "Now would be a good time to update the Release on https://github.com/gboudreau/Greyhole/releases to provide a changelog, and the packaged .tar.gz from http://www.greyhole.net/releases/greyhole-$VERSION.tar.gz"
-read -p 'Press [Enter] key to continue...'
+##########################
+# Create release on Github
+
+echo "Creating release on Github.com"
+file_to_upload="release/greyhole-$VERSION.tar.gz"
+json=`echo -n $VERSION | php -r '$version=file_get_contents("php://stdin");$changelog=trim(file_get_contents("/tmp/gh_changelog"));echo json_encode(array("tag_name"=>$version,"name"=>$version,"body"=>$changelog));'`
+curl -s -H "Authorization: token `cat .github_token`" -H "Accept: application/vnd.github.manifold-preview" -X POST -d "$json" https://api.github.com/repos/gboudreau/greyhole/releases > /tmp/response.json
+filename=`basename "$file_to_upload"`
+upload_url=`echo $filename | php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo str_replace("{?name}", "?name=".file_get_contents("php://stdin"), $o->upload_url);'`
+curl -s -H "Authorization: token `cat .github_token`" -H "Accept: application/vnd.github.manifold-preview" -X POST -H "Content-Type: application/x-gzip" --data-binary @"$file_to_upload" "$upload_url"
+release_url=`php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_url."\n";'`
 
 ############################################
 # Send notifications to Twitter/FB/IRC/email
