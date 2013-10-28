@@ -103,7 +103,7 @@ function recursive_include_parser($file) {
 }
 
 function parse_config() {
-    global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $greyhole_error_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention, $ignored_files, $ignored_folders;
+    global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $greyhole_error_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention, $ignored_files, $ignored_folders, $save_metadata_on_dropbox, $dropbox_library_path;
 
     $deprecated_options = array(
         'delete_moves_to_attic' => 'delete_moves_to_trash',
@@ -132,6 +132,8 @@ function parse_config() {
     $delete_moves_to_trash = TRUE;
     $memory_limit = '128M';
     $executed_tasks_retention = 365;
+    $save_metadata_on_dropbox = FALSE;
+    $dropbox_library_path = '/usr/share/greyhole/dropbox-sdk';
     
     foreach (explode("\n", $config_text) as $line) {
         if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
@@ -158,6 +160,7 @@ function parse_config() {
                 case 'log_memory_usage':
                 case 'check_for_open_files':
                 case 'allow_multiple_sp_per_device':
+                case 'save_metadata_on_dropbox':
                     global ${$name};
                     ${$name} = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
                     break;

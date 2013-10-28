@@ -162,6 +162,37 @@ if ($action == 'fix-symlinks') {
     exit(0);
 }
 
+if ($action == 'enable-dropbox') {
+    if (!file_exists("$dropbox_library_path/autoload.php")) {
+        echo "Error: Dropbox library not found in $dropbox_library_path\n";
+        return;
+    }
+    require_once("$dropbox_library_path/autoload.php");
+
+    $dbx_app_info = new Dropbox\AppInfo('ms6ncvflzg8uyo5', 'q8jcheilbgtadao');
+    $webAuth = new Dropbox\WebAuthNoRedirect($dbx_app_info, "Greyhole/%VERSION%");
+    $authorizeUrl = $webAuth->start();
+    echo "Dropbox Authorization Instructions:\n";
+    echo "  1. Go to: " . $authorizeUrl . "\n";
+    echo "  2. Click \"Allow\" (you might have to log in first).\n";
+    echo "  3. Copy the authorization code.\n";
+    $authCode = trim(readline("Enter the authorization code here: "));
+    try {
+        list($dropbox_token, $dropboxUserId) = $webAuth->finish($authCode);
+        echo "\nDropbox token saved.\n";
+    } catch (Dropbox\Exception_BadRequest $ex) {
+        if (strpos($ex->getMessage(), "invalid_grant")) {
+            echo "\nError: given \"code\" is not valid\n";
+        } else {
+            echo "\nError: " . $ex->getMessage() . "\n";
+        }
+        exit(1);
+    }
+    Settings::set('dropbox_token', $dropbox_token);
+    
+    exit(0);
+}
+
 if ($action == 'delete-metadata') {
     $share = trim(mb_substr($options['dir'], 0, mb_strpos($options['dir'], '/')+1), '/');
     $full_path = trim(mb_substr($options['dir'], mb_strpos($options['dir'], '/')+1), '/');
@@ -872,6 +903,7 @@ terminology_conversion();
 set_metastore_backup();
 Settings::backup();
 samba_check_vfs();
+dbx_init();
 parse_samba_spool();
 simplify_tasks();
 while (TRUE) {
@@ -879,6 +911,35 @@ while (TRUE) {
     $action = 'check_pool';
     check_storage_pool_drives();
     execute_next_task();
+}
+
+function dbx_init() {
+    global $dbx_client, $dropbox_library_path, $save_metadata_on_dropbox;
+
+    if (!$save_metadata_on_dropbox) {
+        return;
+    }
+
+    if (!file_exists("$dropbox_library_path/autoload.php")) {
+        gh_log(ERROR, "Error: Dropbox library not found in $dropbox_library_path");
+        return;
+    }
+    require_once("$dropbox_library_path/autoload.php");
+
+    $dropbox_token = Settings::get('dropbox_token');
+    if (empty($dropbox_token)) {
+        gh_log(ERROR, "Error: no valid Dropbox OAuth2 token could be found. You need to execute 'greyhole --enable-dropbox' to create one.");
+        return;
+    }
+    $dbx_client = new Dropbox\Client($dropbox_token, "Greyhole/%VERSION%");
+
+    // Test the token
+    try {
+        $dbx_client->getAccountInfo();
+    } catch (Dropbox\Exception_InvalidAccessToken $ex) {
+        gh_log(ERROR, "Your Dropbox token is deprecated. Create a new one with: greyhole --enable-dropbox");
+        unset($dbx_client);
+    }
 }
 
 function terminology_conversion() {
@@ -1431,6 +1492,9 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                     fix_symlinks($landing_zone, $share, "$full_path/$file_path", "$target_full_path/$file_path");
                 }
                 
+                // Delete the old metadata file on Dropbox; it will be re-created in save_metafiles()
+                dbx_delete_file("$full_path/$file_path");
+
                 list($path, $filename) = explode_full_path("$target_full_path/$file_path");
                 save_metafiles($share, $path, $filename, $new_file_metafiles);
             }
@@ -1875,6 +1939,9 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
         }
     }
 
+    global $saved_to_dbx;
+    $saved_to_dbx = FALSE;
+
     save_metafiles($share, $path, $filename, $metafiles);
 
     create_copies_from_metafiles($metafiles, $share, $full_path, $source_file);
@@ -2296,9 +2363,12 @@ function remove_metafiles($share, $path, $filename) {
         gh_log(DEBUG, "    Removed metadata file at $f");
         clearstatcache();
     }
+    dbx_delete_file($share, $path, $filename);
 }
 
 function save_metafiles($share, $path, $filename, $metafiles) {
+    global $saved_to_dbx;
+
     if (count($metafiles) == 0) {
         remove_metafiles($share, $path, $filename);
         return;
@@ -2330,6 +2400,11 @@ function save_metafiles($share, $path, $filename, $metafiles) {
                         $filename = normalize_utf8_characters($filename);
                     }
                 }
+                // Also save a copy on Dropbox, if enabled
+                if ($worked && $saved_to_dbx != "$share/$path/$filename") {
+                    dbx_upload_file("$data_filepath/$filename", $share, $path, $filename);
+                    $saved_to_dbx = "$share/$path/$filename";
+                }
                 $has_metafile = TRUE;
                 $paths_used[] = $data_filepath;
                 break;
@@ -2339,6 +2414,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
             unlink("$data_filepath/$filename");
         }
     }
+
     if (count($paths_used) == 1) {
         // Also save a backup on another drive
         global $metastore_backup_drives;
@@ -2354,6 +2430,36 @@ function save_metafiles($share, $path, $filename, $metafiles) {
             file_put_contents("$data_filepath/$filename", serialize($metafiles));
         }
     }
+}
+
+function dbx_upload_file($file, $share, $path, $filename) {
+    global $dbx_client;
+    if (!empty($dbx_client)) {
+        $target_file = "/" . clean_dir("$share/$path/$filename");
+        gh_log(DEBUG, "    Saving metadata in Dropbox: " . clean_dir("/Apps/Greyhole/$target_file"));
+        $fp = fopen($file, "rb");
+        try {
+            $result = $dbx_client->uploadFile($target_file, Dropbox\WriteMode::force(), $fp);
+        } catch (Dropbox\Exception_BadRequest $ex) {
+            gh_log(ERROR, "Error saving metadata file to Dropbox: " . str_replace("\n", " ", $ex->getMessage()));
+        }
+        fclose($fp);
+        return $result['path'] == $target_file;
+    }
+    return TRUE;
+}
+
+function dbx_delete_file($share, $path, $filename) {
+    global $dbx_client;
+    if (!empty($dbx_client)) {
+        $target_file = "/" . clean_dir("$share/$path/$filename");
+        gh_log(DEBUG, "    Removed metadata file from Dropbox: " . clean_dir("/Apps/Greyhole/$target_file"));
+        try {
+            $result = $dbx_client->delete($target_file);
+        } catch (Dropbox\Exception_BadResponse $ex) {
+        }
+    }
+    return TRUE;
 }
 
 function simplify_tasks() {
@@ -4388,7 +4494,7 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 }
 
 function process_command_line() {
-    $opts_actions = 'DPRfClBsSLaqiU5X';
+    $opts_actions = 'DPRfClBsSLaqiU5Xx';
     $longopts_actions = array(
         'daemon',
         'pause',
@@ -4405,7 +4511,8 @@ function process_command_line() {
         'iostat',
         'getuid',
         'md5-worker',
-        'fix-symlinks'
+        'fix-symlinks',
+        'enable-dropbox'
     );
 
     $opts_actions_with_values = 'r::w::g::n::t::b:p:U:';
@@ -4558,6 +4665,10 @@ function print_usage() {
     echo "                        Move the files currently inside the specified share from the\n";
     echo "                        storage pool into the shared folder (landing zone),\n";
     echo "                        effectively removing the share from Greyhole's storage pool.\n";
+    echo "  -x, --enable-dropbox\n";
+    echo "                        Allow the Greyhole app to save files in your Dropbox account.\n";
+    echo "                        Greyhole will only have access to the files in /Apps/Greyhole\n";
+    echo "                        in your Dropbox, and nothing else.\n";
     
     echo "\n";
     echo "For --stats and --view-queue, the available OPTIONS are:\n";
