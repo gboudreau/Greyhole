@@ -651,8 +651,18 @@ if ($arch != 'x86_64') {
 } else {
     gh_log(DEBUG, "64-bit system detected: Greyhole will use PHP built-in file functions.");
 
-    function gh_filesize($filename) {
-        return filesize($filename);
+    function gh_filesize(&$filename) {
+        $size = @filesize($filename);
+        // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+        if ($size === FALSE) {
+            // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+            $size = filesize(normalize_utf8_characters($filename));
+            if ($size !== FALSE) {
+                // Bingo!
+                $filename = normalize_utf8_characters($filename);
+            }
+        }
+        return $size;
     }
     
     function gh_fileowner($filename) {
