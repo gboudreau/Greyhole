@@ -2048,7 +2048,8 @@ function gh_copy_file($source_file, &$destination_file) {
     $temp_path = get_temp_filename($destination_file);
 
     if (is_link($source_file)) {
-        $source_size = gh_filesize(readlink($source_file));
+        $link_target = readlink($source_file);
+        $source_size = gh_filesize($link_target);
     } else if (gh_is_file($source_file)) {
         $source_size = gh_filesize($source_file);
     }
@@ -2079,7 +2080,7 @@ function gh_copy_file($source_file, &$destination_file) {
     $it_worked = file_exists($temp_path) && ($renamed || file_exists($source_file)) && gh_filesize($temp_path) == $source_size;
     if (!$it_worked) {
         // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
-        $it_worked = file_exists(normalize_utf8_characters($temp_path)) && ($renamed || file_exists($source_file)) && gh_filesize(normalize_utf8_characters($temp_path)) == $source_size;
+        $it_worked = file_exists(normalize_utf8_characters($temp_path)) && ($renamed || file_exists($source_file)) && gh_filesize($temp_path) == $source_size;
         if ($it_worked) {
             // Bingo!
             $temp_path = normalize_utf8_characters($temp_path);
@@ -3375,11 +3376,27 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             $root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
             if ($root_path == $metafile->path) {
                 // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
-                $root_path = str_replace(normalize_utf8_characters(clean_dir("/$share/$file_path/$filename")), '', $metafile->path);
+                $root_path = str_replace(normalize_utf8_characters(clean_dir("/$share/$file_path/$filename")), '', normalize_utf8_characters($metafile->path));
+                if ($root_path == $metafile->path) {
+                    gh_log(WARN, "Couldn't find root path for $metafile->path");
+                }
                 if ($inode_number !== FALSE && $metafile->state == 'OK') {
                     gh_log(DEBUG, "Found $metafile->path");
                 }
             }
+
+            // Sometimes, two paths will be almost the same, except for the UTF-8 normalization they use.
+            // For those, we could end up with two entries in $file_metafiles - bad!
+            // So we make sure we don't end up with duplicates like this:
+            foreach ($file_metafiles as $k => $v) {
+                if ($k == $metafile->path || normalize_utf8_characters($k) == normalize_utf8_characters($metafile->path)) {
+                    $metafile->path = $v->path;
+                    $metafile->state = $v->state;
+                    unset($file_metafiles[$k]);
+                    break;
+                }
+            }
+
             if (is_link($metafile->path)) {
                 $link_target = readlink($metafile->path);
                 if (array_search($link_target, $file_copies_inodes) !== FALSE) {
@@ -3422,7 +3439,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
     
     if (count($file_copies_inodes) > 0) {
         $found_linked_metafile = FALSE;
-        foreach ($file_metafiles as $key => $metafile) {
+        foreach ($file_metafiles as $metafile) {
             if ($metafile->is_linked) {
                 if (file_exists($metafile->path)) {
                     $found_linked_metafile = TRUE;
@@ -3512,7 +3529,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                 }
                 // Found no good reason!
 
-                if ($file_size == 0) {
+                if ($file_size === FALSE) {
                     // Empty file; just delete it.
                     gh_log(WARN, "  An empty file copy was found: $real_full_path is 0 bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.");
                     unlink($real_full_path);
@@ -3574,7 +3591,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
         if (isset($fsck_report['missing_copies'])) {
             $fsck_report['missing_copies']++;
         }
-        clearstatcache(); $filesize = gh_filesize("$original_file_path");
+        clearstatcache(); $filesize = gh_filesize($original_file_path);
         $file_metafiles = create_metafiles($share, "$file_path/$filename", $num_copies_required, $filesize, $file_metafiles);
 
         // Re-copy the file everywhere, and re-create the symlink
@@ -5074,7 +5091,7 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
                 }
             }
             if (is_string($file_metafiles)) {
-                gh_log(WARN, "Warning! \$file_metafiles is now a string: '$file_metafiles'.");
+                gh_log(CRITICAL, "Fatal error! \$file_metafiles is now a string: '$file_metafiles'.");
             }
             $file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => $state);
             
