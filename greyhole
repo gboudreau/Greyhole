@@ -2586,6 +2586,10 @@ function samba_check_vfs() {
       if ($arch == "x86_64") {
           $lib_dir = '/usr/lib64';
       }
+      if (file_exists('/usr/lib/x86_64-linux-gnu')) {
+          $lib_dir = '/usr/lib/x86_64-linux-gnu';
+      }
+
       $vfs_file = "$lib_dir/samba/vfs/greyhole.so";
 
       if (is_file($vfs_file)) {

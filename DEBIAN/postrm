@@ -4,6 +4,7 @@ set -e
 # Remove 
 rm -f /usr/lib64/samba/vfs/greyhole.so
 rm -f /usr/lib/samba/vfs/greyhole.so
+rm -f /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so
 
 if [ "$1" = purge ]; then
 	# not an update, a complete uninstall

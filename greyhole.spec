@@ -85,6 +85,9 @@ LIBDIR=/usr/lib
 if [ "`uname -m`" = "x86_64" ]; then
 	LIBDIR=/usr/lib64
 fi
+if [ -d /usr/lib/x86_64-linux-gnu ]; then
+    LIBDIR=/usr/lib/x86_64-linux-gnu
+fi
 if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
 	rm ${LIBDIR}/samba/vfs/greyhole.so
 fi
@@ -148,12 +151,9 @@ fi
 %preun
 
 # Delete VFS module symlinks, if any
-if [ -f /usr/lib64/samba/vfs/greyhole.so ]; then
-	rm -f /usr/lib64/samba/vfs/greyhole.so
-fi
-if [ -f /usr/lib/samba/vfs/greyhole.so ]; then
-	rm -f /usr/lib/samba/vfs/greyhole.so
-fi
+rm -f /usr/lib64/samba/vfs/greyhole.so
+rm -f /usr/lib/samba/vfs/greyhole.so
+rm -f /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so
 
 if [ "$1" != 0 ]; then
 	/sbin/service greyhole condrestart 2>&1 > /dev/null
