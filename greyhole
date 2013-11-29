@@ -2447,6 +2447,12 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
     $old_action = $action;
     $action = 'read_smb_spool';
 
+    // Just in case the spool folder is missing!
+    if (!file_exists('/var/spool/greyhole')) {
+        mkdir('/var/spool/greyhole', 0777, TRUE);
+        chmod('/var/spool/test', 0777); // mkdir mode is affected by the umask, so we need to insure proper mode on that folder.
+    }
+
     // If we have enough queued tasks (90% of $max_queued_tasks), let's not parse the log at this time, and get some work done.
     // Once we fall below that, we'll queue up to at most $max_queued_tasks new tasks, then get back to work.
     // This will effectively 'batch' large file operations to make sure the DB doesn't become a problem because of the number of rows,
