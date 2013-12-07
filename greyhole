@@ -2871,12 +2871,16 @@ You probably want to do something about this!
                     }
                 }
                 
-                // Make sure the drives we want to use are not yet full
+                // Make sure the drives we want to use are not yet full and have available space
                 $priority_drives = array();
                 foreach ($stick_into as $stick_into_dir) {
-                    if (array_search($stick_into_dir, array_keys($full_drives)) === FALSE && array_search($stick_into_dir, $storage_pool_drives) !== FALSE) {
-                        unset($drives[array_search($stick_into_dir, $drives)]);
-                        $priority_drives[] = $stick_into_dir;
+                    if (array_search($stick_into_dir, array_keys($full_drives)) === FALSE && array_search($stick_into_dir, $storage_pool_drives) !== FALSE ) {
+                        if (array_search($stick_into_dir, array_keys($last_resort_sorted_target_drives)) !== FALSE) {
+                            gh_log(DEBUG, $log_prefix . "Ignoring Drives for sticky with no available space");                            
+                        } else {
+                            $priority_drives[] = $stick_into_dir;
+                            unset($drives[array_search($stick_into_dir, $drives)]);
+                        }
                     }
                 }
                 $drives = array_merge($priority_drives, $drives);
