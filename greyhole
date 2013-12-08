@@ -133,10 +133,10 @@ if ($action == 'iostat') {
 }
 
 if ($action == 'thaw') {
-    if (isset($options['dir']) && array_search($options['dir'], $frozen_directories) === FALSE) {
+    if (isset($options['dir']) && !array_contains($frozen_directories, $options['dir'])) {
         $options['dir'] = '/' . trim($options['dir'], '/');
     }
-    if (!isset($options['dir']) || array_search($options['dir'], $frozen_directories) === FALSE) {
+    if (!isset($options['dir']) || !array_contains($frozen_directories, $options['dir'])) {
         echo "Frozen directories:\n";
         foreach ($frozen_directories as $frozen_directory) {
             echo "  $frozen_directory\n";
@@ -252,10 +252,10 @@ if ($action == 'remove-share') {
 }
 
 if ($action == 'gone' || $action == 'going') {
-    if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
+    if (!array_contains($storage_pool_drives, @$options['drive'])) {
         $options['drive'] = '/' . trim(@$options['drive'], '/');
     }
-    if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
+    if (!array_contains($storage_pool_drives, $options['drive'])) {
         if (!empty($options['drive'])) {
             echo "Directory " . $options['drive'] . " is not one of your defined storage pool drives.\n";
         }
@@ -731,10 +731,10 @@ if ($action == 'stats') {
 }
 
 if ($action == 'replace') {
-    if (array_search(@$options['drive'], $storage_pool_drives) === FALSE) {
+    if (!array_contains($storage_pool_drives, @$options['drive'])) {
         $options['drive'] = '/' . trim(@$options['drive'], '/');
     }
-    if (array_search($options['drive'], $storage_pool_drives) === FALSE) {
+    if (!array_contains($storage_pool_drives, $options['drive'])) {
         if (!empty($options['drive'])) {
             echo "Drive " . $options['drive'] . " is not one of your defined storage pool drive.\n";
         }
@@ -801,7 +801,6 @@ if ($action == 'cancel-fsck') {
 }
 
 if ($action == 'fsck') {
-    $pos = array_search('fsck', $argv);
     $full_path = '';
     if (isset($options['dir'])) {
         $full_path = $options['dir'];
@@ -919,7 +918,7 @@ function convert_sp_drives_tag_files() {
         }
     }
     foreach ($drives_definitions as $sp_drive => $uuid) {
-        if (array_search($sp_drive, $storage_pool_drives) === FALSE) {
+        if (!array_contains($storage_pool_drives, $sp_drive)) {
             unset($drives_definitions[$sp_drive]);
         }
     }
@@ -1034,7 +1033,7 @@ function execute_next_task() {
         }
     }
     
-    if (($key = array_search($task->id, $sleep_before_task)) !== FALSE) {
+    if (array_contains($sleep_before_task, $task->id)) {
         $action = 'sleep';
         gh_log(DEBUG, "Only locked files operations pending... Sleeping.");
         sleep($log_level == DEBUG ? 10 : ($log_level == TEST ? 1 : 600));
@@ -1266,7 +1265,7 @@ function gh_rmdir($share, $full_path) {
     
     gh_log(INFO, "Directory deleted: $landing_zone/$full_path");
     
-    if (array_search($share, $trash_share_names) !== FALSE) {
+    if (array_contains($trash_share_names, $share)) {
         // Remove that directory from all trashes
         foreach ($storage_pool_drives as $sp_drive) {
             if (@rmdir("$sp_drive/.gh_trash/$full_path")) {
@@ -1301,7 +1300,7 @@ function gh_unlink($share, $full_path, $task_id) {
 
     gh_log(INFO, "File deleted: $landing_zone/$full_path");
     
-    if (array_search($share, $trash_share_names) !== FALSE) {
+    if (array_contains($trash_share_names, $share)) {
         // Will delete the file in the trash which has no corresponding symlink in the Greyhole Trash share.
         // That symlink is what was deleted from that share to create the task we're currently working on.
         $full_path = preg_replace('/ copy [0-9]+$/', '', $full_path);
@@ -2554,7 +2553,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
                 if (isset($fd) && $fd == -1) {
                     continue;
                 }
-                if ($act != 'unlink' && $act != 'rmdir' && array_search($share, $trash_share_names) !== FALSE) { continue; }
+                if ($act != 'unlink' && $act != 'rmdir' && array_contains($trash_share_names, $share)) { continue; }
                 $new_tasks++;
                 $query = sprintf("INSERT INTO tasks (action, share, full_path, additional_info, complete) VALUES ('%s', '%s', %s, %s, '%s')",
                     $act,
@@ -2817,7 +2816,7 @@ You probably want to do something about this!
                     // Stick files into specific drives: $stick_into
                     // Let's check if those drives are listed in the config file!
                     foreach ($stick_into as $key => $stick_into_dir) {
-                        if (array_search($stick_into_dir, $storage_pool_drives) === FALSE) {
+                        if (!array_contains($storage_pool_drives, $stick_into_dir)) {
                             unset($stick_into[$key]);
                             $more_drives_needed = TRUE;
                         }
@@ -2858,7 +2857,7 @@ You probably want to do something about this!
                         // Let's check if those drives are listed in the config file!
                         $update_needed = FALSE;
                         foreach ($stick_into as $key => $stick_into_dir) {
-                            if (array_search($stick_into_dir, $storage_pool_drives) === FALSE) {
+                            if (!array_contains($storage_pool_drives, $stick_into_dir)) {
                                 unset($stick_into[$key]);
                                 $update_needed = TRUE;
                             }
@@ -2876,9 +2875,9 @@ You probably want to do something about this!
                 // Make sure the drives we want to use are not yet full and have available space
                 $priority_drives = array();
                 foreach ($stick_into as $stick_into_dir) {
-                    if (array_search($stick_into_dir, $storage_pool_drives) !== FALSE
-                            && array_search($stick_into_dir, $full_drives) === FALSE
-                            && array_search($stick_into_dir, $last_resort_sorted_target_drives) === FALSE) {
+                    if (array_contains($storage_pool_drives, $stick_into_dir)
+                            && !array_contains($full_drives, $stick_into_dir)
+                            && !array_contains($last_resort_sorted_target_drives, $stick_into_dir)) {
                         $priority_drives[] = $stick_into_dir;
                         unset($drives[array_search($stick_into_dir, $drives)]);
                     }
@@ -3133,7 +3132,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
             if (is_link($metafile->path)) {
                 $link_target = readlink($metafile->path);
-                if (array_search($link_target, $file_copies_inodes) !== FALSE) {
+                if (array_contains($file_copies_inodes, $link_target)) {
                     // This link points to another file copy. Bad, bad!
                     gh_log(WARN, "Warning! Found a symlink in your storage pool: $metafile->path -> $link_target. Deleting.");
                     gh_recycle($metafile->path);
@@ -3238,7 +3237,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
         
         // Check that all file copies have the same size
         foreach ($file_copies_inodes as $key => $real_full_path) {
-            if (array_search($real_full_path, array_keys($file_copies_inodes)) !== FALSE) {
+            if (array_contains(array_keys($file_copies_inodes), $real_full_path)) {
                 // That file isn't available atm, but it's OK.
                 continue;
             }
@@ -3899,7 +3898,7 @@ function gh_balance() {
 
                 unset($sp_drive);
                 if ($is_sticky) {
-                    if (count($sp_drives) == $num_total_drives - 1 && array_search($source_drive, $sp_drives) === FALSE) {
+                    if (count($sp_drives) == $num_total_drives - 1 && !array_contains($sp_drives, $source_drive)) {
                         // Only drive full is the source drive. Let's move files away from there!
                     } else if (count($sp_drives) < $num_total_drives) {
                         $skip_stickies = TRUE;
@@ -3908,7 +3907,7 @@ function gh_balance() {
                     }
                     
                     $sticky_drives = array_slice($sp_drives, 0, get_num_copies($share_name));
-                    if (array_search($source_drive, $sticky_drives)) {
+                    if (array_contains($sticky_drives, $source_drive)) {
                         // Source drive is a stick_into drive; let's not move that file!
                         gh_log(DEBUG, "  Source is sticky. Skipping.");
                         continue;

@@ -288,7 +288,7 @@ function parse_config() {
         if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
             $share_name = $regs[1];
         }
-        if (isset($share_name) && !isset($shares_options[$share_name]) && array_search($share_name, $trash_share_names) === FALSE) { continue; }
+        if (isset($share_name) && !isset($shares_options[$share_name]) && !array_contains($trash_share_names, $share_name)) { continue; }
         if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
             $shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
             $shares_options[$share_name]['name'] = $share_name;
@@ -305,7 +305,7 @@ function parse_config() {
         $drive_selection_algorithm = DriveSelection::parse('most_available_space', null);
     }
     foreach ($shares_options as $share_name => $share_options) {
-        if (array_search($share_name, $trash_share_names) !== FALSE) {
+        if (array_contains($trash_share_names, $share_name)) {
             global $trash_share;
             $trash_share = array('name' => $share_name, 'landing_zone' => $shares_options[$share_name]['landing_zone']);
             unset($shares_options[$share_name]);
@@ -576,7 +576,7 @@ function get_share_landing_zone($share) {
     global $shares_options, $trash_share_names;
     if (isset($shares_options[$share]['landing_zone'])) {
         return $shares_options[$share]['landing_zone'];
-    } else if (array_search($share, $trash_share_names) !== FALSE) {
+    } else if (array_contains($trash_share_names, $share)) {
         global $trash_share;
         return $trash_share['landing_zone'];
     } else {
@@ -1227,13 +1227,13 @@ class DriveSelection {
         // Only keep drives that are in $this->drives
         $this->sorted_target_drives = array();
         foreach ($sorted_target_drives as $sp_drive => $space) {
-            if (array_search($sp_drive, $this->drives) !== FALSE) {
+            if (array_contains($this->drives, $sp_drive)) {
                 $this->sorted_target_drives[$sp_drive] = $space;
             }
         }
         $this->last_resort_sorted_target_drives = array();
         foreach ($last_resort_sorted_target_drives as $sp_drive => $space) {
-            if (array_search($sp_drive, $this->drives) !== FALSE) {
+            if (array_contains($this->drives, $sp_drive)) {
                 $this->last_resort_sorted_target_drives[$sp_drive] = $space;
             }
         }
@@ -1361,10 +1361,10 @@ function get_gone_ok_drives() {
 
 function mark_gone_ok($sp_drive, $action='add') {
     global $storage_pool_drives;
-    if (array_search($sp_drive, $storage_pool_drives) === FALSE) {
+    if (!array_contains($storage_pool_drives, $sp_drive)) {
         $sp_drive = '/' . trim($sp_drive, '/');
     }
-    if (array_search($sp_drive, $storage_pool_drives) === FALSE) {
+    if (!array_contains($storage_pool_drives, $sp_drive)) {
         return FALSE;
     }
 
@@ -1755,5 +1755,9 @@ function schedule_fsck_all_shares($fsck_options=array()) {
         );
         db_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
     }
+}
+
+function array_contains($haystack, $needle) {
+    return array_search($needle, $haystack) !== FALSE;
 }
 ?>
