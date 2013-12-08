@@ -2646,9 +2646,6 @@ function get_free_space_in_storage_pool_drives() {
 
 function order_target_drives($filesize_kb, $include_full_drives, $share, $path, $log_prefix='') {
     global $storage_pool_drives, $minimum_free_space_pool_drives, $last_OOS_notification, $sticky_files, $shares_options;
-    $sorted_target_drives = array();
-    $last_resort_sorted_target_drives = array();
-    $full_drives = array();
 
     foreach ($shares_options[$share]['drive_selection_algorithm'] as $ds) {
         $algo = $ds->selection_algorithm;
@@ -2659,6 +2656,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
 
     $sorted_target_drives = array('available_space' => array(), 'used_space' => array());
     $last_resort_sorted_target_drives = array('available_space' => array(), 'used_space' => array());
+    $full_drives = array();
     foreach ($storage_pool_drives as $sp_drive) {
         if (!isset($dfs[$sp_drive])) {
             if (!is_dir($sp_drive)) {
@@ -2797,10 +2795,14 @@ You probably want to do something about this!
             gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
         }
     }
-    
-    $drives = array_merge(array_keys($sorted_target_drives), array_keys($last_resort_sorted_target_drives));
+
+    $sorted_target_drives = array_keys($sorted_target_drives);
+    $last_resort_sorted_target_drives = array_keys($last_resort_sorted_target_drives);
+    $full_drives = array_keys($full_drives);
+
+    $drives = array_merge($sorted_target_drives, $last_resort_sorted_target_drives);
     if ($include_full_drives) {
-        $drives = array_merge($drives, array_keys($full_drives));
+        $drives = array_merge($drives, $full_drives);
     }
 
     if (isset($sticky_files)) {
@@ -2874,13 +2876,11 @@ You probably want to do something about this!
                 // Make sure the drives we want to use are not yet full and have available space
                 $priority_drives = array();
                 foreach ($stick_into as $stick_into_dir) {
-                    if (array_search($stick_into_dir, array_keys($full_drives)) === FALSE && array_search($stick_into_dir, $storage_pool_drives) !== FALSE ) {
-                        if (array_search($stick_into_dir, array_keys($last_resort_sorted_target_drives)) !== FALSE) {
-                            gh_log(DEBUG, $log_prefix . "Ignoring Drives for sticky with no available space");                            
-                        } else {
-                            $priority_drives[] = $stick_into_dir;
-                            unset($drives[array_search($stick_into_dir, $drives)]);
-                        }
+                    if (array_search($stick_into_dir, $storage_pool_drives) !== FALSE
+                            && array_search($stick_into_dir, $full_drives) === FALSE
+                            && array_search($stick_into_dir, $last_resort_sorted_target_drives) === FALSE) {
+                        $priority_drives[] = $stick_into_dir;
+                        unset($drives[array_search($stick_into_dir, $drives)]);
                     }
                 }
                 $drives = array_merge($priority_drives, $drives);
