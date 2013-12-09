@@ -10,3 +10,4 @@ irc_notif.sh
 Logo.psd
 README.md
 test_cases.php
+inject-includes.php

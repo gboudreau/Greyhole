@@ -53,54 +53,12 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole.conf.5)
 	(cd release/$(PACKAGE)-$(VERSION)/docs/ && gzip -9 greyhole.1 && gzip -9 greyhole-dfree.1 && gzip -9 greyhole.conf.5)
 
-	# Inject includes/common.php...
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "\*/" includes/common.php | head -1 | awk -F':' '{print $$1+2}'` includes/common.php > includes/common.php.1)
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`wc -l includes/common.php.1 | awk '{print $$1-1}'` includes/common.php.1 > includes/common.php.2)
+    # Inject require()'d files
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole-dfree)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php web-app/index.php)
 
-	# ... in greyhole
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/common.php');" greyhole | awk -F':' '{print $$1-1}'` greyhole > greyhole.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/common.php.2 >> greyhole.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/common.php');" greyhole | awk -F':' '{print $$1+1}'` greyhole >> greyhole.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole.new greyhole)
-
-	# ... in greyhole-dfree
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/common.php');" greyhole-dfree | awk -F':' '{print $$1-1}'` greyhole-dfree > greyhole-dfree.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/common.php.2 >> greyhole-dfree.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/common.php');" greyhole-dfree | awk -F':' '{print $$1+1}'` greyhole-dfree >> greyhole-dfree.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole-dfree.new greyhole-dfree)
-
-	# ... in web-app/index.php
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/common.php');" web-app/index.php | awk -F':' '{print $$1-1}'` web-app/index.php > web-app/index.php.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/common.php.2 >> web-app/index.php.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/common.php');" web-app/index.php | awk -F':' '{print $$1+1}'` web-app/index.php >> web-app/index.php.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && mv web-app/index.php.new web-app/index.php)
-
-	rm release/$(PACKAGE)-$(VERSION)/includes/common.php.[1,2]
-
-	# Inject includes/sql.php...
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "\*/" includes/sql.php | head -1 | awk -F':' '{print $$1+2}'` includes/sql.php > includes/sql.php.1)
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`wc -l includes/sql.php.1 | awk '{print $$1-1}'` includes/sql.php.1 > includes/sql.php.2)
-
-	# ... in greyhole
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/sql.php');" greyhole | awk -F':' '{print $$1-1}'` greyhole > greyhole.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/sql.php.2 >> greyhole.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/sql.php');" greyhole | awk -F':' '{print $$1+1}'` greyhole >> greyhole.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole.new greyhole)
-
-	# ... in greyhole-dfree
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/sql.php');" greyhole-dfree | awk -F':' '{print $$1-1}'` greyhole-dfree > greyhole-dfree.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/sql.php.2 >> greyhole-dfree.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/sql.php');" greyhole-dfree | awk -F':' '{print $$1+1}'` greyhole-dfree >> greyhole-dfree.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && mv greyhole-dfree.new greyhole-dfree)
-
-	# ... in web-app/index.php
-	(cd release/$(PACKAGE)-$(VERSION)/ && head -`grep -n "include('includes/sql.php');" web-app/index.php | awk -F':' '{print $$1-1}'` web-app/index.php > web-app/index.php.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && cat includes/sql.php.2 >> web-app/index.php.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && tail -n +`grep -n "include('includes/sql.php');" web-app/index.php | awk -F':' '{print $$1+1}'` web-app/index.php >> web-app/index.php.new)
-	(cd release/$(PACKAGE)-$(VERSION)/ && mv web-app/index.php.new web-app/index.php)
-
-	rm release/$(PACKAGE)-$(VERSION)/includes/sql.php.[1,2]
-
+    # Create tgz
 	(cd release/ && tar -czvf $(PACKAGE)-$(VERSION).tar.gz $(PACKAGE)-$(VERSION))
 	(cd release/ && rm -rf $(PACKAGE)-$(VERSION))
 
