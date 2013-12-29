@@ -4,49 +4,43 @@ set -e
 mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
 
-LIBDIR=/usr/lib
-if [ "`uname -m`" = "x86_64" ]; then
-	LIBDIR=/usr/lib64
+if [ -d /usr/lib/x86_64-linux-gnu ]; then 
+    SOURCE_LIBDIR="/usr/lib64" # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
+    TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"
+elif [ "`uname -m`" = "x86_64" ]; then
+    SOURCE_LIBDIR="/usr/lib64"
+    TARGET_LIBDIR="/usr/lib64"
+    
+    # For Ubuntu 11.10, where even x86_64 install use /usr/lib
+    if [ -d /usr/lib/samba/vfs/ ]; then
+        TARGET_LIBDIR="/usr/lib"
+    fi
+else
+    SOURCE_LIBDIR="/usr/lib"
+    TARGET_LIBDIR="/usr/lib"
 fi
-if [ -d /usr/lib/x86_64-linux-gnu ]; then
-    LIBDIR=/usr/lib/x86_64-linux-gnu
-fi
-if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
-	rm ${LIBDIR}/samba/vfs/greyhole.so
-fi
+
+TARGET_SYMLINK="${TARGET_LIBDIR}/samba/vfs/greyhole.so"
 
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
-if [ "$SMB_VERSION" = "3 4" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
-elif [ "$SMB_VERSION" = "3 5" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
-elif [ "$SMB_VERSION" = "3 6" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
-elif [ "$SMB_VERSION" = "4 0" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba40.so ${LIBDIR}/samba/vfs/greyhole.so
+if [ "${SMB_VERSION}" = "3 4" ]; then
+    LIB_FILE="greyhole-samba34.so"
+elif [ "${SMB_VERSION}" = "3 5" ]; then
+    LIB_FILE="greyhole-samba35.so"
+elif [ "${SMB_VERSION}" = "3 6" ]; then
+    LIB_FILE="greyhole-samba36.so"
+elif [ "${SMB_VERSION}" = "4 0" ]; then
+    LIB_FILE="greyhole-samba40.so"
 else
-	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba ($SMB_VERSION)."
-	echo "We will try to use the VFS for version 3.6, but that might not work."
-	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
+	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba (${SMB_VERSION})."
+	echo "We will try to use the VFS for Samba 3.6, but that might not work."
+    LIB_FILE="greyhole-samba36.so"
 fi
 
-# For Ubuntu 11.10, where even x86_64 install use /usr/lib
-if [ "`uname -m`" = "x86_64" -a -d /usr/lib/samba/vfs/ ]; then
-	if [ -f /usr/lib/samba/vfs/greyhole.so ]; then
-		rm /usr/lib/samba/vfs/greyhole.so
-	fi
-	if [ "$SMB_VERSION" = "3 4" ]; then
-		ln -s ${LIBDIR}/greyhole/greyhole-samba34.so /usr/lib/samba/vfs/greyhole.so
-	elif [ "$SMB_VERSION" = "3 5" ]; then
-		ln -s ${LIBDIR}/greyhole/greyhole-samba35.so /usr/lib/samba/vfs/greyhole.so
-	elif [ "$SMB_VERSION" = "3 6" ]; then
-		ln -s ${LIBDIR}/greyhole/greyhole-samba36.so /usr/lib/samba/vfs/greyhole.so
-	elif [ "$SMB_VERSION" = "4 0" ]; then
-		ln -s ${LIBDIR}/greyhole/greyhole-samba40.so /usr/lib/samba/vfs/greyhole.so
-	else
-		ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
-	fi
-fi
+SOURCE_LIB="${SOURCE_LIBDIR}/greyhole/${LIB_FILE}"
+
+rm -f ${TARGET_SYMLINK}
+ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
 	# cifs client workaround
@@ -64,9 +58,7 @@ fi
 running=0
 if [ -f /sbin/start ]; then
 	# Using Upstart instead of SYSV init.d
-	if [ -f /etc/init.d/greyhole ]; then
-		rm /etc/init.d/greyhole
-	fi
+	rm -f /etc/init.d/greyhole
 	if [ -f /etc/init/greyhole.conf ]; then
 		if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
 			restart greyhole
@@ -75,9 +67,7 @@ if [ -f /sbin/start ]; then
 	fi
 else
 	# (SYSV) Service install & start
-	if [ -f /etc/init/greyhole.conf ]; then
-		rm /etc/init/greyhole.conf
-	fi
+	rm -f /etc/init/greyhole.conf
 	if [ -f /etc/init.d/mysql ]; then
 	    sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
     fi

@@ -52,12 +52,13 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 		install -m 0644 -D -p includes/common.php "$include_path/includes"
 		install -m 0644 -D -p includes/sql.php "$include_path/includes"
 	fi
-
+    
 	# What version of Samba are you running ?
-	smbd --version
+    SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
+    echo "You appear to be running Samba $SMB_VERSION"
 
 	# For Samba 3.4: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.4/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.4/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	# For Samba 3.5: #
 		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	# For Samba 3.6: #
@@ -108,8 +109,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.0.c source3/modules/vfs_greyhole.c
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.0.patch
 	./configure --enable-debug --enable-selftest --disable-symbol-versions && make
-	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/default/source3/modules/libvfs-greyhole.so /usr/lib64/samba/vfs/greyhole.so; fi
-	if [ -x /usr/lib/samba/vfs/ ]; then cp bin/default/source3/modules/libvfs-greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
+
+    # Create a symlink in the Samba VFS modules dir pointing to the compiled VFS
+    if [ -d /usr/lib/x86_64-linux-gnu ]; then LIBDIR=/usr/lib/x86_64-linux-gnu; elif [ "`uname -m`" = "x86_64" ]; then LIBDIR=/usr/lib64; else LIBDIR=/usr/lib; fi
+    ln -s bin/default/source3/modules/libvfs-greyhole.so ${LIBDIR}/samba/vfs/greyhole.so
 
 4. Add Greyhole to services that start on boot:
 

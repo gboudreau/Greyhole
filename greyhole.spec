@@ -54,20 +54,21 @@ install -m 0644 -D -p docs/greyhole-dfree.1.gz ${RPM_BUILD_ROOT}/usr/share/man/m
 install -m 0644 -D -p docs/greyhole.conf.5.gz ${RPM_BUILD_ROOT}/usr/share/man/man5/
 
 %ifarch x86_64
-	install -m 0644 -D -p samba-module/bin/3.4/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
-	install -m 0644 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
-	install -m 0644 -D -p samba-module/bin/3.6/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
-	install -m 0644 -D -p samba-module/bin/4.0/greyhole-x86_64.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba40.so
+	install -m 0644 -D -p samba-module/bin/3.4/greyhole-x86_64.so ${RPM_BUILD_ROOT}/usr/lib64/greyhole/greyhole-samba34.so
+	install -m 0644 -D -p samba-module/bin/3.5/greyhole-x86_64.so ${RPM_BUILD_ROOT}/usr/lib64/greyhole/greyhole-samba35.so
+	install -m 0644 -D -p samba-module/bin/3.6/greyhole-x86_64.so ${RPM_BUILD_ROOT}/usr/lib64/greyhole/greyhole-samba36.so
+	install -m 0644 -D -p samba-module/bin/4.0/greyhole-x86_64.so ${RPM_BUILD_ROOT}/usr/lib64/greyhole/greyhole-samba40.so
 %else
 	%ifarch %{arm}
-		install -m 0644 -D -p samba-module/bin/3.4/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
-		install -m 0644 -D -p samba-module/bin/3.5/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
-		#install -m 0644 -D -p samba-module/bin/3.6/greyhole-arm.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
+		install -m 0644 -D -p samba-module/bin/3.4/greyhole-arm.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba34.so
+		install -m 0644 -D -p samba-module/bin/3.5/greyhole-arm.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba35.so
+		#install -m 0644 -D -p samba-module/bin/3.6/greyhole-arm.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba36.so # Not available yet
+		#install -m 0644 -D -p samba-module/bin/4.0/greyhole-arm.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba40.so # Not available yet
 	%else
-		install -m 0644 -D -p samba-module/bin/3.4/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba34.so
-		install -m 0644 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba35.so
-		install -m 0644 -D -p samba-module/bin/3.6/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba36.so
-		install -m 0644 -D -p samba-module/bin/4.0/greyhole-i386.so ${RPM_BUILD_ROOT}%{_libdir}/greyhole/greyhole-samba40.so
+		install -m 0644 -D -p samba-module/bin/3.4/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba34.so
+		install -m 0644 -D -p samba-module/bin/3.5/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba35.so
+		install -m 0644 -D -p samba-module/bin/3.6/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba36.so
+		install -m 0644 -D -p samba-module/bin/4.0/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba40.so
 	%endif
 %endif
 
@@ -81,38 +82,38 @@ echo "Executing post-install script..."
 mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
 
-LIBDIR=/usr/lib
-if [ "`uname -m`" = "x86_64" ]; then
-	LIBDIR=/usr/lib64
+if [ -d /usr/lib/x86_64-linux-gnu ]; then 
+    SOURCE_LIBDIR="/usr/lib64"
+    TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"
+elif [ "`uname -m`" = "x86_64" ]; then
+    SOURCE_LIBDIR="/usr/lib64"
+    TARGET_LIBDIR="/usr/lib64"
+else
+    SOURCE_LIBDIR="/usr/lib"
+    TARGET_LIBDIR="/usr/lib"
 fi
-if [ -d /usr/lib/x86_64-linux-gnu ]; then
-    LIBDIR=/usr/lib/x86_64-linux-gnu
-fi
-if [ -f ${LIBDIR}/samba/vfs/greyhole.so ]; then
-	rm ${LIBDIR}/samba/vfs/greyhole.so
-fi
+
+TARGET_SYMLINK="${TARGET_LIBDIR}/samba/vfs/greyhole.so"
 
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
-if [ "$SMB_VERSION" = "3 4" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba34.so ${LIBDIR}/samba/vfs/greyhole.so
-elif [ "$SMB_VERSION" = "3 5" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba35.so ${LIBDIR}/samba/vfs/greyhole.so
-elif [ "$SMB_VERSION" = "3 6" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
-elif [ "$SMB_VERSION" = "4 0" ]; then
-	ln -s ${LIBDIR}/greyhole/greyhole-samba40.so ${LIBDIR}/samba/vfs/greyhole.so
+if [ "${SMB_VERSION}" = "3 4" ]; then
+    LIB_FILE="greyhole-samba34.so"
+elif [ "${SMB_VERSION}" = "3 5" ]; then
+    LIB_FILE="greyhole-samba35.so"
+elif [ "${SMB_VERSION}" = "3 6" ]; then
+    LIB_FILE="greyhole-samba36.so"
+elif [ "${SMB_VERSION}" = "4 0" ]; then
+    LIB_FILE="greyhole-samba40.so"
 else
-	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba ($SMB_VERSION)."
-	echo "We will try to use the VFS for version 3.6, but that might not work."
-	ln -s ${LIBDIR}/greyhole/greyhole-samba36.so ${LIBDIR}/samba/vfs/greyhole.so
+	echo "Warning: Greyhole doesn't include a VFS module for your version of Samba (${SMB_VERSION})."
+	echo "We will try to use the VFS for Samba 3.6, but that might not work."
+    LIB_FILE="greyhole-samba36.so"
 fi
 
-if [ -f /etc/logrotate.d/syslog ]; then
-	# Undo changes to /etc/logrotate.d/syslog; deprecated now.
-	grep -v greyhole /etc/logrotate.d/syslog > /etc/logrotate.d/syslog.new
-	mv -f /etc/logrotate.d/syslog.new /etc/logrotate.d/syslog
-	[ -f /etc/init.d/syslog ] && service syslog reload > /dev/null || service rsyslog restart > /dev/null
-fi
+SOURCE_LIB="${SOURCE_LIBDIR}/greyhole/${LIB_FILE}"
+
+rm -f ${TARGET_SYMLINK}
+ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
 	# cifs client workaround
@@ -151,9 +152,9 @@ fi
 %preun
 
 # Delete VFS module symlinks, if any
+rm -f /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so
 rm -f /usr/lib64/samba/vfs/greyhole.so
 rm -f /usr/lib/samba/vfs/greyhole.so
-rm -f /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so
 
 if [ "$1" != 0 ]; then
 	/sbin/service greyhole condrestart 2>&1 > /dev/null
