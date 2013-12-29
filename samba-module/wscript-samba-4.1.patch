@@ -1,0 +1,29 @@
+*** a/source3/modules/wscript_build	2013-04-09 03:14:59.000000000 -0500
+--- b/source3/modules/wscript_build	2013-05-05 19:12:56.047888856 -0500
+***************
+*** 50,55 ****
+--- 50,63 ----
+  VFS_LINUX_XFS_SGID_SRC = 'vfs_linux_xfs_sgid.c'
+  VFS_TIME_AUDIT_SRC = 'vfs_time_audit.c'
+  VFS_MEDIA_HARMONY_SRC = 'vfs_media_harmony.c'
++ VFS_GREYHOLE_SRC = 'vfs_greyhole.c'
++ bld.SAMBA3_MODULE('vfs_greyhole',
++                    subsystem='vfs',
++                    source=VFS_GREYHOLE_SRC,
++                    deps='',
++                    init_function='',
++                    internal_module=bld.SAMBA3_IS_STATIC_MODULE('vfs_greyhole'),
++                    enabled=bld.SAMBA3_IS_ENABLED_MODULE('vfs_greyhole'))
+  VFS_BTRFS_SRC = 'vfs_btrfs.c'
+  VFS_CEPH_SRC = 'vfs_ceph.c'
+  VFS_GLUSTERFS_SRC = 'vfs_glusterfs.c'
+  
+  
+  bld.SAMBA3_SUBSYSTEM('NFS4_ACLS',
+*** a/source3/wscript	2013-04-09 03:14:59.000000000 -0500
+--- b/source3/wscript	2013-05-05 19:19:58.380817099 -0500
+***************
+*** 1696 ****
+! 				      vfs_media_harmony
+--- 1696 ----
+! 				      vfs_media_harmony vfs_greyhole

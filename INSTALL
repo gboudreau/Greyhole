@@ -65,6 +65,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.6/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.6/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	# For Samba 4.0: #
 		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.0/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.0/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.0/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	# For Samba 4.1: #
+		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.1/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.1/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else echo "Sorry, but we don't have a Samba VFS module that you can use"; fi
 
 	Ubuntu (10+): install the Upstart script:
 		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
@@ -74,33 +76,10 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Ubuntu: /etc/init.d/samba restart, or restart smbd
 	Debian: service samba restart
 
-3. For Samba other than 3.4/3.5/3.6/4.0: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba >4.1: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
-  a) The following is for Samba 3.x. For Samba 4, see 3.b) below.
-
-	Fedora:
-	yumdownloader --source samba
-	rpm -ivh samba-3.*.fc*.src.rpm
-	cd rpmbuild/SOURCES
-	tar zxf samba-3.*.tar.gz
-	cd samba-3.*/source3/
-
-	Ubuntu:
-	SAMBA_VERSION=`smbd --version | awk '{print $2}'`
-	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
-	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm samba-${SAMBA_VERSION}.tar.gz
-	cd samba-${SAMBA_VERSION}/source3
-
-	Both (Fedora & Ubuntu):
-	./configure
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
-	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
-	make
-	if [ -x /usr/lib64/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib64/samba/vfs/greyhole.so; fi
-	if [ -x /usr/lib/samba/vfs/ ]; then cp bin/greyhole.so /usr/lib/samba/vfs/greyhole.so; fi
-
-  b) The following is for Samba 4.x. For Samba 3, see 3.a) above.
+  The following is for Samba 4.x. For Samba 3, see a previous version of this file: https://github.com/gboudreau/Greyhole/blob/0.9.35/INSTALL
 
 	SAMBA_VERSION=4.0.7 # Or whatever is the latest version of Samba4.
 	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
