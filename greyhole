@@ -1492,10 +1492,11 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                     fix_symlinks($landing_zone, $share, "$full_path/$file_path", "$target_full_path/$file_path");
                 }
                 
-                // Delete the old metadata file on Dropbox; it will be re-created in save_metafiles()
-                dbx_delete_file("$full_path/$file_path");
-
                 list($path, $filename) = explode_full_path("$target_full_path/$file_path");
+
+                // Delete the old metadata file on Dropbox; it will be re-created in save_metafiles()
+                dbx_delete_file($share, $path, $filename);
+
                 save_metafiles($share, $path, $filename, $new_file_metafiles);
             }
         }
