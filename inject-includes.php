@@ -5,7 +5,7 @@ if ($argc != 2) {
     die("Usage: $argv[0] [php_file]\n");
 }
 
-file_put_contents($argv[1].".test", inject_in_file($argv[1]));
+file_put_contents($argv[1], "#!/usr/bin/php\n" . inject_in_file($argv[1]));
 
 function inject_in_file($file, $level=0) {
     $file_content = file_get_contents($file);
