@@ -2410,7 +2410,7 @@ function samba_check_vfs() {
       $arch = exec('uname -m');
 
       // Find VFS symlink
-    if (file_exists('/usr/lib/samba/vfs')) {
+    if (file_exists('/usr/lib/x86_64-linux-gnu/samba/vfs')) {
         $source_libdir = '/usr/lib64'; # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
         $target_libdir = '/usr/lib/x86_64-linux-gnu';
     } else if ($arch == "x86_64") {
