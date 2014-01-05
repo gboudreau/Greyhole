@@ -2414,7 +2414,8 @@ function samba_check_vfs() {
       if ($arch == "x86_64") {
           $lib_dir = '/usr/lib64';
       }
-      if (file_exists('/usr/lib/x86_64-linux-gnu')) {
+      $source_libdir = $lib_dir;
+      if (file_exists('/usr/lib/x86_64-linux-gnu/samba/vfs')) {
           $lib_dir = '/usr/lib/x86_64-linux-gnu';
       }
 
@@ -2430,7 +2431,7 @@ function samba_check_vfs() {
       }
 
       if (!$vfs_is_ok) {
-          $vfs_target = "$lib_dir/greyhole/greyhole-samba$version.so";
+          $vfs_target = "$source_libdir/greyhole/greyhole-samba$version.so";
           gh_log(WARN, "Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
           if (is_file($vfs_file)) {
               unlink($vfs_file);
