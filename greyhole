@@ -2410,29 +2410,38 @@ function samba_check_vfs() {
       $arch = exec('uname -m');
 
       // Find VFS symlink
-      $lib_dir = '/usr/lib';
-      if ($arch == "x86_64") {
-          $lib_dir = '/usr/lib64';
-      }
-      $source_libdir = $lib_dir;
-      if (file_exists('/usr/lib/x86_64-linux-gnu/samba/vfs')) {
-          $lib_dir = '/usr/lib/x86_64-linux-gnu';
-      }
+    if (file_exists('/usr/lib/samba/vfs')) {
+        $source_libdir = '/usr/lib64'; # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
+        $target_libdir = '/usr/lib/x86_64-linux-gnu';
+    } else if ($arch == "x86_64") {
+        $source_libdir = '/usr/lib64';
+        $target_libdir = '/usr/lib64';
 
-      $vfs_file = "$lib_dir/samba/vfs/greyhole.so";
+        # For Ubuntu, where even x86_64 install use /usr/lib
+        if (file_exists('/usr/lib/samba/vfs')) {
+            $target_libdir = '/usr/lib';
+        }
+    } else {
+        $source_libdir = '/usr/lib';
+        $target_libdir = '/usr/lib';
+    }
 
+      $vfs_file = "$target_libdir/samba/vfs/greyhole.so";
+
+    gh_log(DEBUG, "Checking symlink at $vfs_file...");
       if (is_file($vfs_file)) {
           // Get VFS symlink target
           $vfs_target = @readlink($vfs_file);
 
           if (strpos($vfs_target, "/greyhole-samba$version.so") !== FALSE) {
+            gh_log(DEBUG, "  Is OK.");
               $vfs_is_ok = TRUE;
           }
       }
 
       if (!$vfs_is_ok) {
           $vfs_target = "$source_libdir/greyhole/greyhole-samba$version.so";
-          gh_log(WARN, "Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
+          gh_log(WARN, "  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
           if (is_file($vfs_file)) {
               unlink($vfs_file);
           }
