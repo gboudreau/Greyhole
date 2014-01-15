@@ -1285,7 +1285,7 @@ class DriveSelection {
                 //gh_log(WARN, "Warning: drive selection group named '$group_name' is undefined.");
                 continue;
             }
-            if ($num_drives == 'all' || $num_drives > count($drive_selection_groups[$group_name])) {
+            if (stripos(trim($num_drives), 'all') === 0 || $num_drives > count($drive_selection_groups[$group_name])) {
                 $num_drives = count($drive_selection_groups[$group_name]);
             }
             $ds[] = new DriveSelection($num_drives, $selection_algorithm, $drive_selection_groups[$group_name], TRUE);
