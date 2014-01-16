@@ -1682,7 +1682,7 @@ function should_ignore_file($share, $full_path) {
     list($path, $filename) = explode_full_path($full_path);
 
     foreach ($ignored_files as $ignored_file_re) {
-        if (preg_match(';' . $ignored_file_re . ';', $filename)) {
+        if (preg_match(';^' . $ignored_file_re . '$;', $filename)) {
             gh_log(INFO, "Ignoring task because it matches the following ignored_files pattern: $ignored_file_re");
             return TRUE;
         }
@@ -1690,7 +1690,7 @@ function should_ignore_file($share, $full_path) {
     foreach ($ignored_folders as $ignored_folder_re) {
         $p = clean_dir("$share/$path");
         gh_log(DEBUG, "Looking for ignore match between $p and $ignored_folder_re");
-        if (preg_match(';' . $ignored_folder_re . ';', $p)) {
+        if (preg_match(';^' . $ignored_folder_re . '$;', $p)) {
             gh_log(INFO, "Ignoring task because it matches the following ignored_folders pattern: $ignored_folder_re");
             return TRUE;
         }
