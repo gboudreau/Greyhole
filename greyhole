@@ -1008,7 +1008,7 @@ function execute_next_task() {
                     $log->emailAsRequired();
                 }
 
-                sleep($log_level == DEBUG ? 10 : ($log_level == TEST || PERF ? 1 : 600));
+                sleep($log_level == DEBUG ? 10 : ($log_level == TEST || $log_level == PERF ? 1 : 600));
                 db_free_result($result_new_tasks);
                 $result_new_tasks = null;
                 $locked_files = array();
