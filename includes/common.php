@@ -290,7 +290,7 @@ function parse_config() {
         }
         if (isset($share_name) && !isset($shares_options[$share_name]) && !array_contains($trash_share_names, $share_name)) { continue; }
         if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
-            $shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/');
+            $shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/"');
             $shares_options[$share_name]['name'] = $share_name;
         }
     }
