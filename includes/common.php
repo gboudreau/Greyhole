@@ -131,7 +131,7 @@ function parse_config() {
     $df_cache_time = 15;
     $delete_moves_to_trash = TRUE;
     $memory_limit = '128M';
-    $executed_tasks_retention = 365;
+    $executed_tasks_retention = 60;
     
     foreach (explode("\n", $config_text) as $line) {
         if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
