@@ -12,7 +12,7 @@ function inject_in_file($file, $level=0) {
     $new_content = '';
     $is_php = TRUE;
     foreach (explode("\n", $file_content) as $line) {
-        if (preg_match("@include\(['\"](.+)['\"]\);@", $line, $matches)) {
+        if (preg_match("@include\(['\"](.+)['\"]\);@", $line, $matches) || preg_match("@require\(['\"](.+)['\"]\);@", $line, $matches) || preg_match("@require_once\(['\"](.+)['\"]\);@", $line, $matches)) {
             // Inject other PHP file
             $new_content .= inject_in_file($matches[1], $level+1) . "\n";
         } else if (preg_match("@^\/\*@", $line) && $level > 0) {
