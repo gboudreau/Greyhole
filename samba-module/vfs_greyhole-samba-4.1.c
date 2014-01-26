@@ -40,6 +40,8 @@ static int greyhole_connect(vfs_handle_struct *handle, const char *svc, const ch
 static int greyhole_mkdir(vfs_handle_struct *handle, const char *path, mode_t mode);
 static int greyhole_rmdir(vfs_handle_struct *handle, const char *path);
 static int greyhole_open(vfs_handle_struct *handle, struct smb_filename *fname, files_struct *fsp, int flags, mode_t mode);
+static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count);
+static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count, off_t offset);
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
 static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
 static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
@@ -80,10 +82,30 @@ static struct vfs_fn_pointers vfs_greyhole_fns = {
 	/* File operations */
 
 	.open_fn = greyhole_open,
+	.write_fn = greyhole_write,
+	.pwrite_fn = greyhole_pwrite,
 	.close_fn = greyhole_close,
 	.rename_fn = greyhole_rename,
 	.unlink_fn = greyhole_unlink
 };
+
+#define PO10_LIMIT (INT_MAX/10)
+
+static int nDigits(int i)
+{
+  int n,po10;
+
+  if (i < 0) i = -i;
+  n=1;
+  po10=10;
+  while(i>=po10)
+  {
+    n++;
+    if (po10 > PO10_LIMIT) break;
+    po10*=10;
+  }
+  return n;
+}
 
 static int greyhole_syslog_facility(vfs_handle_struct *handle)
 {
@@ -168,6 +190,52 @@ static int greyhole_open(vfs_handle_struct *handle, struct smb_filename *fname, 
 				result,
 				"for writing ");
 		}
+	}
+
+	return result;
+}
+
+static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count)
+{
+	ssize_t result;
+	FILE *spoolf;
+	char filename[255];
+	struct timeval tp;
+
+	result = SMB_VFS_NEXT_WRITE(handle, fsp, data, count);
+
+	if (result >= 0) {
+		gettimeofday(&tp, (struct timezone *) NULL);
+		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
+		snprintf(filename, 39 + sizeof(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+			share,
+			fsp->fh->fd);
+		fclose(spoolf);
+	}
+
+	return result;
+}
+
+static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count, off_t offset)
+{
+	ssize_t result;
+	FILE *spoolf;
+	char filename[255];
+	struct timeval tp;
+
+	result = SMB_VFS_NEXT_PWRITE(handle, fsp, data, count, offset);
+
+	if (result >= 0) {
+		gettimeofday(&tp, (struct timezone *) NULL);
+		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
+		snprintf(filename, 39 + sizeof(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+			share,
+			fsp->fh->fd);
+		fclose(spoolf);
 	}
 
 	return result;

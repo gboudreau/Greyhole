@@ -2482,10 +2482,11 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
     $new_tasks = 0;
     $last_line = FALSE;
     $act = FALSE;
+    $close_tasks = array();
     while (TRUE) {
         $files = array();
         $space_left_in_queue = $max_queued_tasks - $num_rows - $new_tasks;
-        exec('find -L /var/spool/greyhole -type f | sort -n 2> /dev/null | head -' . $space_left_in_queue, $files);
+        exec('find -L /var/spool/greyhole -type f -printf "%T@ %p\n" | sort -n 2> /dev/null | head -' . $space_left_in_queue, $files);
         if (count($files) == 0) {
             break;
         }
@@ -2494,7 +2495,12 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
             gh_log(DEBUG, "Processing Samba spool...");
         }
         
-        foreach ($files as $filename) {
+        foreach ($files as $file) {
+            // Remove timestamp prefix from $file, to get the complete filename
+            $file = explode(' ', $file);
+            array_shift($file);
+            $filename = implode(' ', $file);
+
             @unlink($last_filename);
 
             $last_filename = $filename;
@@ -2510,13 +2516,9 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 
             $last_line = $line;
 
-            // Close logs are only processed when no more duplicates are found, so we'll execute this now that a non-duplicate line was found.
-            if ($act === 'close') {
-                $query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
-                    db_escape_string($share),
-                    $fd
-                );
-                db_query($query) or gh_log(CRITICAL, "Error updating tasks (1): " . db_error() . "; Query: $query");
+            // Close & fwrite logs are only processed when no more duplicates are found, so we'll execute this now that a non-duplicate line was found.
+            if ($act === 'fwrite' || $act === 'close') {
+                close_task($act, $share, $fd, $close_tasks);
             }
 
             $line = $line_ar;
@@ -2548,6 +2550,9 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
                     $fullpath = array_shift($line);
                     $fullpath_target = array_shift($line);
                     break;
+                case 'fwrite':
+                    $fd = array_shift($line);
+                    break;
                 case 'close':
                     $fd = array_shift($line);
                     break;
@@ -2558,8 +2563,8 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
                 continue;
             }
 
-            // Close logs are only processed when no more duplicates are found, so we won't execute it just yet; we'll process it the next time we find a non-duplicate line.
-            if ($act != 'close') {
+            // Close & fwrite logs are only processed when no more duplicates are found, so we won't execute it just yet; we'll process it the next time we find a non-duplicate line.
+            if ($act != 'close' && $act != 'fwrite') {
                 if (isset($fd) && $fd == -1) {
                     continue;
                 }
@@ -2587,15 +2592,13 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
         }
     }
 
-    // Close logs are only processed when no more duplicates are found, so we'll execute this now that we're done parsing the current log.
-    if ($act == 'close') {
-        $query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
-            db_escape_string($share),
-            $fd
-        );
-        db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
+    // Close & fwrite logs are only processed when no more duplicates are found, so we'll execute this now that we're done parsing all spooled files.
+    if ($act === 'fwrite' || $act === 'close') {
+        close_task($act, $share, $fd, $close_tasks);
     }
-    
+    // We also need to 'execute' all close tasks, now that we're just all fwrite have been logged
+    close_all_tasks($close_tasks);
+
     if ($new_tasks > 0) {
         gh_log(DEBUG, "Found $new_tasks new tasks in spool.");
 
@@ -2614,6 +2617,75 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
     }
     
     $action = $old_action;
+}
+
+function close_task($act, $share, $fd, &$tasks) {
+    if ($act === 'fwrite') {
+        $query = sprintf("UPDATE tasks SET complete = 'written' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
+            db_escape_string($share),
+            $fd
+        );
+        db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
+        gh_log(DEBUG, "DBG fwrite task $query");
+    }
+    if ($act === 'close') {
+        // We will only close tasks at the very end, to make sure all fwrite tasks have been handled.
+        // We need to do this because some fwrite spool file might apply to multiple write (open) tasks.
+        // For example: writing into two files in the same share within the same second. See Greyhole VFS implementation for writes to see why.
+        $row = db_fetch_object(db_query("SELECT MAX(id) AS last_id FROM tasks"));
+        $last_id = FALSE;
+        if ($row) {
+            $task = (object) array(
+                'share' => $share,
+                'fd' => $fd,
+                'last_id' => $row->last_id,
+            );
+            $tasks[] = $task;
+            gh_log(DEBUG, "DBG close task = " . var_export($task, TRUE));
+        }
+    }
+}
+
+function close_all_tasks($tasks) {
+    foreach ($tasks as $task) {
+        gh_log(DEBUG, "DBG0 task = " . var_export($task, TRUE));
+
+        $share = $task->share;
+        $fd = $task->fd;
+        $last_id = $task->last_id;
+
+        // We only want to handle real writes (complete = 'written'); if complete = 'no', that means the file was open for writing, but wasn't written to; we'll ignore those.
+
+        $query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'written' AND share = '%s' AND additional_info = '%s' AND id <= %d",
+            db_escape_string($share),
+            $fd,
+            $last_id
+        );
+        gh_log(DEBUG, "DBG1 $query");
+        db_query($query) or gh_log(CRITICAL, "Error updating tasks (1): " . db_error() . "; Query: $query");
+
+        // Remove write tasks that were not written to. But log them first.
+        $query = sprintf("SELECT full_path FROM tasks WHERE complete = 'no' AND share = '%s' AND additional_info = '%s' AND id <= %d",
+            db_escape_string($share),
+            $fd,
+            $last_id
+        );
+        gh_log(DEBUG, "DBG2 $query");
+        $result = db_query($query) or gh_log(CRITICAL, "Error selecting task on close: " . db_error() . "; Query: $query");
+        while ($row = db_fetch_object($result)) {
+            // Ignore
+            gh_log(DEBUG, "File pointer to $row->full_path was closed without being written to. Ignoring.");
+        }
+        db_free_result($result);
+
+        $query = sprintf("DELETE FROM tasks WHERE complete = 'no' AND share = '%s' AND additional_info = '%s' AND id <= %d",
+            db_escape_string($share),
+            $fd,
+            $last_id
+        );
+        gh_log(DEBUG, "DBG3 $query");
+        db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
+    }
 }
 
 function get_free_space_in_storage_pool_drives() {

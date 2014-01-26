@@ -23,8 +23,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 1. Install the required applications: PHP 5+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
-	Fedora: yum -y install mysql-server php php-mysql php-mbstring php-intl samba samba-common patch gcc yum-utils php-pear rsync lsof
-	Ubuntu: apt-get -y install mysql-server php5-cli php5-mysql php5-mysqlnd php5-intl samba samba-common samba-common-bin build-essential php-pear rsync lsof sysstat
+	Fedora: yum -y install mysql-server php php-mysql php-mbstring php-intl samba samba-common php-pear rsync lsof
+	Ubuntu: apt-get -y install mysql-server php5-cli php5-mysql php5-mysqlnd php5-intl samba samba-common samba-common-bin php-pear rsync lsof sysstat
 
 2. Install Greyhole (as root):
 
@@ -80,6 +80,9 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
   The following is for Samba 4.x. For Samba 3, see a previous version of this file: https://github.com/gboudreau/Greyhole/blob/0.9.35/INSTALL
+
+	Fedora: yum -y install patch gcc python-devel
+	Ubuntu: apt-get -y install build-essential python-dev
 
 	SAMBA_VERSION=4.0.7 # Or whatever is the latest version of Samba4.
 	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz

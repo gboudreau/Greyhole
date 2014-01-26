@@ -266,6 +266,22 @@ function db_migrate($attempt_repair = TRUE) {
             db_query("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (269))");
         }
     }
+
+    // Migration #9 (complete = written)
+    if (@$db_use_mysql) {
+        $query = "DESCRIBE tasks";
+        $result = db_query($query) or die("Can't describe tasks with query: $query - Error: " . db_error());
+        while ($row = db_fetch_object($result)) {
+            if ($row->Field == 'complete') {
+                if ($row->Type == "enum('yes','no','frozen','thawed','idle')") {
+                    // migrate
+                    db_query("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') NOT NULL");
+                    db_query("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') NOT NULL");
+                }
+                break;
+            }
+        }
+    }
 }
 
 function repair_tables() {
