@@ -92,11 +92,11 @@ archs='i386 armv5tel x86_64'
 for arch in $archs; do
 	export ARCH=$arch
 	make rpm
-	make amahi-rpm
+	#make amahi-rpm
 done
 
 # DEB
-archs='i386 amd64'
+archs='i386 amd64 armhf'
 for arch in $archs; do
 	export ARCH=$arch
 	make deb
