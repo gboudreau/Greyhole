@@ -2401,13 +2401,13 @@ function samba_restart() {
 }
 
 function samba_check_vfs() {
-      $vfs_is_ok = FALSE;
+    $vfs_is_ok = FALSE;
 
-      // Samba version
-      $version = str_replace('.', '', samba_get_version());
+    // Samba version
+     $version = str_replace('.', '', samba_get_version());
       
-      // Get CPU architecture (x86_64 or i386)
-      $arch = exec('uname -m');
+    // CPU architecture (x86_64 or i386 or armv6l or armv5*)
+    $arch = exec('uname -m');
 
       // Find VFS symlink
     if (file_exists('/usr/lib/x86_64-linux-gnu/samba/vfs')) {
@@ -2426,7 +2426,7 @@ function samba_check_vfs() {
         $target_libdir = '/usr/lib';
     }
 
-      $vfs_file = "$target_libdir/samba/vfs/greyhole.so";
+    $vfs_file = "$target_libdir/samba/vfs/greyhole.so";
 
     gh_log(DEBUG, "Checking symlink at $vfs_file...");
       if (is_file($vfs_file)) {
@@ -2619,29 +2619,44 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
     $action = $old_action;
 }
 
+// See explanation in close_task() about armv5 VFS modules
+$use_old_vfs = FALSE;
+if (stripos($arch, 'armv5') !== FALSE) {
+    $use_old_vfs = TRUE;
+}
+
 function close_task($act, $share, $fd, &$tasks) {
     if ($act === 'fwrite') {
         $query = sprintf("UPDATE tasks SET complete = 'written' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
             db_escape_string($share),
             $fd
         );
-        db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
+        db_query($query) or gh_log(CRITICAL, "Error updating tasks (1): " . db_error() . "; Query: $query");
         gh_log(DEBUG, "DBG fwrite task $query");
     }
     if ($act === 'close') {
-        // We will only close tasks at the very end, to make sure all fwrite tasks have been handled.
-        // We need to do this because some fwrite spool file might apply to multiple write (open) tasks.
-        // For example: writing into two files in the same share within the same second. See Greyhole VFS implementation for writes to see why.
-        $row = db_fetch_object(db_query("SELECT MAX(id) AS last_id FROM tasks"));
-        $last_id = FALSE;
-        if ($row) {
-            $task = (object) array(
-                'share' => $share,
-                'fd' => $fd,
-                'last_id' => $row->last_id,
+        global $use_old_vfs;
+        if ($use_old_vfs) {
+            // armv5 VFS have not been recompiled to create fwrite spooled files; so for those, we process close tasks like we did before.
+            $query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = '%s' AND additional_info = '%s'",
+                db_escape_string($share),
+                $fd
             );
-            $tasks[] = $task;
-            gh_log(DEBUG, "DBG close task = " . var_export($task, TRUE));
+            db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
+        } else {
+            // We will only close tasks at the very end, to make sure all fwrite tasks have been handled.
+            // We need to do this because some fwrite spool file might apply to multiple write (open) tasks.
+            // For example: writing into two files in the same share within the same second. See Greyhole VFS implementation for writes to see why.
+            $row = db_fetch_object(db_query("SELECT MAX(id) AS last_id FROM tasks"));
+            if ($row) {
+                $task = (object) array(
+                    'share' => $share,
+                    'fd' => $fd,
+                    'last_id' => $row->last_id,
+                );
+                $tasks[] = $task;
+                gh_log(DEBUG, "DBG close task = " . var_export($task, TRUE));
+            }
         }
     }
 }
@@ -2662,7 +2677,7 @@ function close_all_tasks($tasks) {
             $last_id
         );
         gh_log(DEBUG, "DBG1 $query");
-        db_query($query) or gh_log(CRITICAL, "Error updating tasks (1): " . db_error() . "; Query: $query");
+        db_query($query) or gh_log(CRITICAL, "Error updating tasks (3): " . db_error() . "; Query: $query");
 
         // Remove write tasks that were not written to. But log them first.
         $query = sprintf("SELECT full_path FROM tasks WHERE complete = 'no' AND share = '%s' AND additional_info = '%s' AND id <= %d",
@@ -2684,7 +2699,7 @@ function close_all_tasks($tasks) {
             $last_id
         );
         gh_log(DEBUG, "DBG3 $query");
-        db_query($query) or gh_log(CRITICAL, "Error updating tasks (2): " . db_error() . "; Query: $query");
+        db_query($query) or gh_log(CRITICAL, "Error updating tasks (4): " . db_error() . "; Query: $query");
     }
 }
 

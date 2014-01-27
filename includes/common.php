@@ -586,6 +586,7 @@ function get_share_landing_zone($share) {
     }
 }
 
+// Get CPU architecture (x86_64 or i386 or armv6l or armv5*)
 $arch = exec('uname -m');
 if ($arch != 'x86_64') {
     gh_log(DEBUG, "32-bit system detected: Greyhole will NOT use PHP built-in file functions.");
