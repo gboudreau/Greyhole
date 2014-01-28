@@ -25,10 +25,11 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 		wide links = yes
 
 	For each of your shares, add a 'dfree command' and 'vfs objects' lines, as seen below.
+	The 'vfs objects' line can break Active directory integration, simply re-install greyhole to resolve this.
 
 	Example share definition:
 		[share_name]
-		    path = /path/to/share
+		    path = /path/to/landing_zone/share_name
 		    create mask = 0770
 		    directory mask = 0770
 		    read only = no
@@ -69,7 +70,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 
 
 Check for errors in the Greyhole log: greyhole --logs
-
+To get live updates of what greyhole is workking on, use tail -f /var/log/greyhole.log
 
 If you use any application that needs to use files on your shares, you'll need to mount the shares locally, and point your applications to those mounts.
 You should never work on the files in your storage pool directories, or the symlinks in your shared directories.
