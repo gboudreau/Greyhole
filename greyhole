@@ -2632,7 +2632,6 @@ function close_task($act, $share, $fd, &$tasks) {
             $fd
         );
         db_query($query) or gh_log(CRITICAL, "Error updating tasks (1): " . db_error() . "; Query: $query");
-        gh_log(DEBUG, "DBG fwrite task $query");
     }
     if ($act === 'close') {
         global $use_old_vfs;
@@ -2655,7 +2654,6 @@ function close_task($act, $share, $fd, &$tasks) {
                     'last_id' => $row->last_id,
                 );
                 $tasks[] = $task;
-                gh_log(DEBUG, "DBG close task = " . var_export($task, TRUE));
             }
         }
     }
@@ -2663,8 +2661,6 @@ function close_task($act, $share, $fd, &$tasks) {
 
 function close_all_tasks($tasks) {
     foreach ($tasks as $task) {
-        gh_log(DEBUG, "DBG0 task = " . var_export($task, TRUE));
-
         $share = $task->share;
         $fd = $task->fd;
         $last_id = $task->last_id;
@@ -2676,20 +2672,28 @@ function close_all_tasks($tasks) {
             $fd,
             $last_id
         );
-        gh_log(DEBUG, "DBG1 $query");
         db_query($query) or gh_log(CRITICAL, "Error updating tasks (3): " . db_error() . "; Query: $query");
 
         // Remove write tasks that were not written to. But log them first.
-        $query = sprintf("SELECT full_path FROM tasks WHERE complete = 'no' AND share = '%s' AND additional_info = '%s' AND id <= %d",
+        $query = sprintf("SELECT id, full_path FROM tasks WHERE complete = 'no' AND share = '%s' AND additional_info = '%s' AND id <= %d",
             db_escape_string($share),
             $fd,
             $last_id
         );
-        gh_log(DEBUG, "DBG2 $query");
         $result = db_query($query) or gh_log(CRITICAL, "Error selecting task on close: " . db_error() . "; Query: $query");
         while ($row = db_fetch_object($result)) {
-            // Ignore
-            gh_log(DEBUG, "File pointer to $row->full_path was closed without being written to. Ignoring.");
+            // Maybe the file is empty?
+            $file_fullpath = get_share_landing_zone($share) . '/' . $row->full_path;
+            $size = gh_filesize($file_fullpath);
+            if ($size == 0) {
+                $query = sprintf("UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE id = %d",
+                    $row->id
+                );
+                db_query($query) or gh_log(CRITICAL, "Error updating tasks (4): " . db_error() . "; Query: $query");
+            } else {
+                // Ignore
+                gh_log(DEBUG, "File pointer to $row->full_path was closed without being written to. Ignoring.");
+            }
         }
         db_free_result($result);
 
@@ -2698,8 +2702,7 @@ function close_all_tasks($tasks) {
             $fd,
             $last_id
         );
-        gh_log(DEBUG, "DBG3 $query");
-        db_query($query) or gh_log(CRITICAL, "Error updating tasks (4): " . db_error() . "; Query: $query");
+        db_query($query) or gh_log(CRITICAL, "Error updating tasks (5): " . db_error() . "; Query: $query");
     }
 }
 
