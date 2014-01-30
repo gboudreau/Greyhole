@@ -475,7 +475,7 @@ function gh_shutdown() {
 }
 
 function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
-    if (error_reporting() === 0) {
+    if(!($errno & error_reporting())) {
         // Ignored (@) warning
         return TRUE;
     }
