@@ -1418,11 +1418,11 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                     $symlink_target = $metafile->path;
                 }
                 
-                if (is_link("$landing_zone/$target_full_path/$file_path") && readlink("$landing_zone/$target_full_path/$file_path") != $symlink_target) {
+                if (is_link("$landing_zone/$target_full_path/$file_path") && !empty($symlink_target) && readlink("$landing_zone/$target_full_path/$file_path") != $symlink_target) {
                     gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $symlink_target");
                     unlink("$landing_zone/$target_full_path/$file_path");
                     symlink($symlink_target, "$landing_zone/$target_full_path/$file_path");
-                } else if (is_link("$landing_zone/$full_path/$file_path") && !file_exists(readlink("$landing_zone/$full_path/$file_path"))) {
+                } else if (is_link("$landing_zone/$full_path/$file_path") && !empty($symlink_target) && !file_exists(readlink("$landing_zone/$full_path/$file_path"))) {
                     gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path/$file_path to point to $symlink_target");
                     unlink("$landing_zone/$full_path/$file_path");
                     symlink($symlink_target, "$landing_zone/$full_path/$file_path");
