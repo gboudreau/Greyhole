@@ -19,23 +19,27 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+define('DEBUG', FALSE);
+
 $config = (object) array(
 	'test_dir' => '/mnt/samba/TimeMachine/',
-	'share_dir' => '/mnt/hdd2/TimeMachine_share_test/',
+	'share_dir' => '/mnt/hdd5/shares/TimeMachine/',
 	'pool_dirs' => array(
-		'/mnt/hdd0/gh/TimeMachine',
+		'/mnt/hdd1/gh/TimeMachine',
 		'/mnt/hdd2/gh/TimeMachine',
 		'/mnt/hdd3/gh/TimeMachine',
 		'/mnt/hdd4/gh/TimeMachine',
 		'/mnt/hdd5/gh/TimeMachine',
 		'/mnt/hdd6/gh/TimeMachine',
 		'/mnt/hdd7/gh/TimeMachine',
+        '/mnt/hdd8/gh/TimeMachine',
+        '/mnt/hdd9/gh/TimeMachine',
 	),
 
 	'dont_wait' => FALSE,
 	
 	// Run only a specific test
-	// 'run_only' => (object) array('test_name' => 'double file rename after dir rename', 'start_with_run_num' => 1),
+	//'run_only' => (object) array('test_name' => 'random back and forth dir & file renames', 'start_with_run_num' => 1),
 );
 
 $num_test = 1;
@@ -473,48 +477,97 @@ $tests = array(
 		'repetitions' => 512,
 		'code' => function($run_num) { $i = 1;
 			mkdir('dir1');
+
 			file_put_contents('dir1/file1', 'a');
+            logd("  a > dir1/file1");
+
+            _assert('dir1/file1', 'a');
 			wait($i++, $run_num);
+            _assert('dir1/file1', 'a');
+
 			file_put_contents('file2', 'b');
+            logd("  b > file2");
+
+            _assert('file2', 'b');
 			wait($i++, $run_num);
+            _assert('file2', 'b');
+
 			mkdir('dir2');
 			file_put_contents('dir2/file3', 'c');
+            logd("  c > dir2/file3");
+
+            _assert('dir2/file3', 'c');
 			wait($i++, $run_num);
+            _assert('dir2/file3', 'c');
 
 			rename('dir1', 'dir3');
-			wait($i++, $run_num);
-			rename('dir3/file1', 'dir3/file4');
-			wait($i++, $run_num);
-			rename('dir3/file4', 'dir2/file4');
-			wait($i++, $run_num);
-			rename('dir2', 'dir4');
-			wait($i++, $run_num);
-			rename('dir4/file4', 'dir3/file5');
-			wait($i++, $run_num);
-			rename('file2', 'dir4/file4');
-			wait($i++, $run_num);
+            logd("  dir1 > dir3");
 
-			$ok = file_get_contents('dir3/file5') == 'a';
-			$ok &= file_get_contents('dir4/file4') == 'b';
-			$ok &= file_get_contents('dir4/file3') == 'c';
+            _assert('dir3/file1', 'a');
+            wait($i++, $run_num);
+            _assert('dir3/file1', 'a');
+
+			rename('dir3/file1', 'dir3/file4');
+            logd("  dir3/file1 > dir3/file4");
+
+            _assert('dir3/file4', 'a');
+			wait($i++, $run_num);
+            _assert('dir3/file4', 'a');
+
+			rename('dir3/file4', 'dir2/file4');
+            logd("  dir3/file4 > dir2/file4");
+
+            _assert('dir2/file4', 'a');
+			wait($i++, $run_num);
+            _assert('dir2/file4', 'a');
+
+			rename('dir2', 'dir4');
+            logd("  dir2 > dir4");
+
+            _assert('dir4/file3', 'c');
+            _assert('dir4/file4', 'a');
+			wait($i++, $run_num);
+            _assert('dir4/file3', 'c');
+            _assert('dir4/file4', 'a');
+
+			rename('dir4/file4', 'dir3/file5');
+            logd("  dir4/file4 > dir3/file5");
+
+            _assert('dir3/file5', 'a');
+			wait($i++, $run_num);
+            _assert('dir3/file5', 'a');
+
+			rename('file2', 'dir4/file4');
+            logd("  file2 > dir4/file4");
+
+            _assert('dir4/file4', 'b');
+			wait($i++, $run_num);
+            _assert('dir4/file4', 'b');
+
+            _assert('dir3/file5', 'a');
+            _assert('dir4/file4', 'b');
+            _assert('dir4/file3', 'c');
 			wait();
-			$ok &= file_get_contents('dir3/file5') == 'a';
-			$ok &= file_get_contents('dir4/file4') == 'b';
-			$ok &= file_get_contents('dir4/file3') == 'c';
+            _assert('dir3/file5', 'a');
+            _assert('dir4/file4', 'b');
+            _assert('dir4/file3', 'c');
+
 			unlink('dir3/file5');
 			unlink('dir4/file4');
 			unlink('dir4/file3');
-			$ok &= !file_exists('dir3/file5');
-			$ok &= !file_exists('dir4/file4');
-			$ok &= !file_exists('dir4/file3');
+
+            _assert('dir3/file5', FALSE);
+            _assert('dir4/file4', FALSE);
+            _assert('dir4/file3', FALSE);
 			wait();
-			$ok &= !file_exists('dir3/file5');
-			$ok &= !file_exists('dir4/file4');
-			$ok &= !file_exists('dir4/file3');
+            _assert('dir3/file5', FALSE);
+            _assert('dir4/file4', FALSE);
+            _assert('dir4/file3', FALSE);
+
 			rmdir('dir3');
 			rmdir('dir4');
 			wait();
-			return $ok;
+			return TRUE;
 		}
 	),
 
@@ -551,10 +604,27 @@ foreach ($tests as $test) {
 
 // Functions
 
+function logd($what) {
+    if (DEBUG) echo get_date() . "$what\n";
+}
+
+function _assert($file, $expected_content) {
+    $content = @file_get_contents($file);
+    // This ls is somehow needed to allow PHP to refresh it's file cache. Without it, some tests will sometimes fail...
+    if (DEBUG) { echo "*** " . get_date() . "\n"; passthru('find /mnt/hdd*/gh/TimeMachine/ /mnt/hdd*/gh/.gh_metastore/TimeMachine/ /mnt/hdd5/shares/TimeMachine/ /mnt/hdd*/gh/TimeMachine/*/ /mnt/hdd*/gh/.gh_metastore/TimeMachine/*/ /mnt/hdd5/shares/TimeMachine/*/ -type f 2>/dev/null'); echo "***\n"; }
+        if ($expected_content != $content) {
+        $file_exists = file_exists($file);
+        die(get_date() . "assert failed: $file should contain '$expected_content'; it contains '$content' (file exists? " . ($file_exists ? 'yes' : 'no') . ").\n");
+    }
+}
+
+function get_date() {
+    return date("M ") . sprintf('%2d', (int) date("d")) . date(" H:i:s ");
+}
+
 function print_result($test, $ok) {
 	global $num_test;
-	echo date("M ") . sprintf('%2d', (int) date("d")) . date(" H:i:s ");
-	echo " Test #" . ($num_test++) . ": $test: " . ($ok ? 'OK' : 'FAILED') . "\n";
+	echo get_date() . "Test #" . ($num_test++) . ": $test: " . ($ok ? 'OK' : 'FAILED') . "\n";
 	if (!$ok) {
 		die("\n");
 	}
@@ -567,6 +637,7 @@ function wait($wait_num=0, $i=0) {
 	}
 	$wait = $wait_num == 0 || ($i-1)/(pow(2, $wait_num-1)) % 2 == 1;
 	if ($wait) {
+        logd("  Wait...");
 		$last_line_before = exec('tail -1 /var/log/greyhole.log');
 		while (TRUE) {
 			$last_line = exec('tail -1 /var/log/greyhole.log');
