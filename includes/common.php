@@ -661,7 +661,7 @@ if ($arch != 'x86_64') {
         // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
         if ($size === FALSE) {
             // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
-            $size = filesize(normalize_utf8_characters($filename));
+            $size = @filesize(normalize_utf8_characters($filename));
             if ($size !== FALSE) {
                 // Bingo!
                 $filename = normalize_utf8_characters($filename);
