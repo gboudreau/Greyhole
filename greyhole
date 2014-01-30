@@ -2485,6 +2485,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
     $close_tasks = array();
     while (TRUE) {
         $files = array();
+        $last_filename = FALSE;
         $space_left_in_queue = $max_queued_tasks - $num_rows - $new_tasks;
         exec('find -L /var/spool/greyhole -type f -printf "%T@ %p\n" | sort -n 2> /dev/null | head -' . $space_left_in_queue, $files);
         if (count($files) == 0) {
@@ -2501,7 +2502,9 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
             array_shift($file);
             $filename = implode(' ', $file);
 
-            @unlink($last_filename);
+            if ($last_filename) {
+                unlink($last_filename);
+            }
 
             $last_filename = $filename;
 
@@ -2586,7 +2589,9 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
                 break;
             }
         }
-        @unlink($last_filename);
+        if ($last_filename) {
+            unlink($last_filename);
+        }
         if ($num_rows+$new_tasks >= $max_queued_tasks) {
             break;
         }
