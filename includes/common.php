@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2011 Guillaume Boudreau, Andrew Hopkinson
+Copyright 2009-2014 Guillaume Boudreau, Andrew Hopkinson
 
 This file is part of Greyhole.
 
@@ -18,6 +18,10 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+include('includes/ConfigHelper.php');
+include('includes/DB.php');
+include('includes/Log.php');
+
 define('PERF', 9);
 define('TEST', 8);
 define('DEBUG', 7);
@@ -25,6 +29,11 @@ define('INFO',  6);
 define('WARN',  4);
 define('ERROR', 3);
 define('CRITICAL', 2);
+
+$constarray = get_defined_constants(true);
+foreach($constarray['user'] as $key => $val) {
+    eval(sprintf('$_CONSTANTS[\'%s\'] = ' . (is_int($val) || is_float($val) ? '%s' : "'%s'") . ';', addslashes($key), addslashes($val)));
+}
 
 define('FSCK_TYPE_SHARE', 1);
 define('FSCK_TYPE_STORAGE_POOL_DRIVE', 2);
@@ -45,25 +54,10 @@ if (!defined('PHP_VERSION_ID')) {
     define('PHP_VERSION_ID', ($version[0] * 10000 + $version[1] * 100 + $version[2]));
 }
 
-$constarray = get_defined_constants(true);
-foreach($constarray['user'] as $key => $val) {
-    eval(sprintf('$_CONSTANTS[\'%s\'] = ' . (is_int($val) || is_float($val) ? '%s' : "'%s'") . ';', addslashes($key), addslashes($val)));
-}
-
 // Cached df results
 $last_df_time = 0;
 $last_dfs = array();
 $sleep_before_task = array();
-
-if (!isset($config_file)) {
-    $config_file = '/etc/greyhole.conf';
-}
-
-if (!isset($smb_config_file)) {
-    $smb_config_file = '/etc/samba/smb.conf';
-}
-
-$trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
 
 function recursive_include_parser($file) {
     
@@ -102,304 +96,6 @@ function recursive_include_parser($file) {
     }
 }
 
-function parse_config() {
-    global $_CONSTANTS, $log_level, $storage_pool_drives, $shares_options, $minimum_free_space_pool_drives, $df_command, $config_file, $smb_config_file, $sticky_files, $db_options, $frozen_directories, $trash_share_names, $max_queued_tasks, $memory_limit, $delete_moves_to_trash, $greyhole_log_file, $greyhole_error_log_file, $email_to, $log_memory_usage, $check_for_open_files, $allow_multiple_sp_per_device, $df_cache_time, $executed_tasks_retention, $ignored_files, $ignored_folders;
-
-    $deprecated_options = array(
-        'delete_moves_to_attic' => 'delete_moves_to_trash',
-        'storage_pool_directory' => 'storage_pool_drive',
-        'dir_selection_groups' => 'drive_selection_groups',
-        'dir_selection_algorithm' => 'drive_selection_algorithm'
-    );
-
-    $parsing_drive_selection_groups = FALSE;
-    $shares_options = array();
-    $storage_pool_drives = array();
-    $frozen_directories = array();
-    $ignored_files = array();
-    $ignored_folders = array();
-    $config_text = recursive_include_parser($config_file);
-    
-    // Defaults
-    $log_level = DEBUG;
-    $greyhole_log_file = '/var/log/greyhole.log';
-    $greyhole_error_log_file = FALSE;
-    $email_to = 'root';
-    $log_memory_usage = FALSE;
-    $check_for_open_files = TRUE;
-    $allow_multiple_sp_per_device = FALSE;
-    $df_cache_time = 15;
-    $delete_moves_to_trash = TRUE;
-    $memory_limit = '128M';
-    $executed_tasks_retention = 60;
-    
-    foreach (explode("\n", $config_text) as $line) {
-        if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
-            $name = trim($regs[1]);
-            $value = trim($regs[2]);
-            if ($name[0] == '#') {
-                continue;
-            }
-            
-            foreach ($deprecated_options as $old_name => $new_name) {
-                if (mb_strpos($name, $old_name) !== FALSE) {
-                    $fixed_name = str_replace($old_name, $new_name, $name);
-                    #gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
-                    $name = $fixed_name;
-                }
-            }
-
-            $parsing_drive_selection_groups = FALSE;
-            switch($name) {
-                case 'log_level':
-                    $log_level = $_CONSTANTS[$value];
-                    break;
-                case 'delete_moves_to_trash': // or delete_moves_to_attic
-                case 'log_memory_usage':
-                case 'check_for_open_files':
-                case 'allow_multiple_sp_per_device':
-                    global ${$name};
-                    ${$name} = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-                    break;
-                case 'storage_pool_drive': // or storage_pool_directory
-                    if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?([gmk])b?/i", $value, $regs)) {
-                        $storage_pool_drives[] = trim($regs[1]);
-                        if (strtolower($regs[3]) == 'g') {
-                            $minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]);
-                        } else if (strtolower($regs[3]) == 'm') {
-                            $minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]) / 1024.0;
-                        } else if (strtolower($regs[3]) == 'k') {
-                            $minimum_free_space_pool_drives[trim($regs[1])] = (float) trim($regs[2]) / 1024.0 / 1024.0;
-                        }
-                    }
-                    break;
-                case 'wait_for_exclusive_file_access':
-                    $shares = explode(',', str_replace(' ', '', $value));
-                    foreach ($shares as $share) {
-                        $shares_options[$share]['wait_for_exclusive_file_access'] = TRUE;
-                    }
-                    break;
-                case 'sticky_files':
-                    $last_sticky_files_dir = trim($value, '/');
-                    $sticky_files[$last_sticky_files_dir] = array();
-                    break;
-                case 'stick_into':
-                    $sticky_files[$last_sticky_files_dir][] = '/' . trim($value, '/');
-                    break;
-                case 'frozen_directory':
-                    $frozen_directories[] = trim($value, '/');
-                    break;
-                case 'memory_limit':
-                    ini_set('memory_limit',$value);
-                    $memory_limit = $value;
-                    break;
-                case 'drive_selection_groups': // or dir_selection_groups
-                    if (preg_match("/(.+):(.*)/", $value, $regs)) {
-                        global $drive_selection_groups;
-                        $group_name = trim($regs[1]);
-                        $drive_selection_groups[$group_name] = array_map('trim', explode(',', $regs[2]));
-                        $parsing_drive_selection_groups = TRUE;
-                    }
-                    break;
-                case 'drive_selection_algorithm': // or dir_selection_algorithm
-                    global $drive_selection_algorithm;
-                    $drive_selection_algorithm = DriveSelection::parse($value, @$drive_selection_groups);
-                    break;
-                case 'timezone':
-                    $timezone = $value;
-                    date_default_timezone_set($value);
-                    break;
-                case 'ignored_files':
-                    $ignored_files[] = $value;
-                    break;
-                case 'ignored_folders':
-                    $ignored_folders[] = $value;
-                    break;
-                default:
-                    if (mb_strpos($name, 'num_copies') === 0) {
-                        $share = mb_substr($name, 11, mb_strlen($name)-12);
-                        if (mb_stripos($value, 'max') === 0) {
-                            $value = 9999;
-                        }
-                        $shares_options[$share]['num_copies'] = (int) $value;
-                    } else if (mb_strpos($name, 'delete_moves_to_trash') === 0) {
-                        $share = mb_substr($name, 22, mb_strlen($name)-23);
-                        $shares_options[$share]['delete_moves_to_trash'] = trim($value) === '1' || mb_strpos(strtolower(trim($value)), 'yes') !== FALSE || mb_strpos(strtolower(trim($value)), 'true') !== FALSE;
-                    } else if (mb_strpos($name, 'drive_selection_groups') === 0) { // or dir_selection_groups
-                        $share = mb_substr($name, 23, mb_strlen($name)-24);
-                        if (preg_match("/(.+):(.+)/", $value, $regs)) {
-                            $group_name = trim($regs[1]);
-                            $shares_options[$share]['drive_selection_groups'][$group_name] = array_map('trim', explode(',', $regs[2]));
-                            $parsing_drive_selection_groups = $share;
-                        }
-                    } else if (mb_strpos($name, 'drive_selection_algorithm') === 0) { // or dir_selection_algorithm
-                        $share = mb_substr($name, 26, mb_strlen($name)-27);
-                        if (!isset($shares_options[$share]['drive_selection_groups'])) {
-                            $shares_options[$share]['drive_selection_groups'] = @$drive_selection_groups;
-                        }
-                        $shares_options[$share]['drive_selection_algorithm'] = DriveSelection::parse($value, $shares_options[$share]['drive_selection_groups']);
-                    } else {
-                        global ${$name};
-                        if (is_numeric($value)) {
-                            ${$name} = (int) $value;
-                        } else {
-                            ${$name} = $value;
-                        }
-                    }
-            }
-        } else if ($parsing_drive_selection_groups !== FALSE) {
-            $value = trim($line);
-            if (strlen($value) == 0 || $value[0] == '#') {
-                continue;
-            }
-            if (preg_match("/(.+):(.+)/", $value, $regs)) {
-                $group_name = trim($regs[1]);
-                $drives = array_map('trim', explode(',', $regs[2]));
-                if (is_string($parsing_drive_selection_groups)) {
-                    $share = $parsing_drive_selection_groups;
-                    $shares_options[$share]['drive_selection_groups'][$group_name] = $drives;
-                } else {
-                    $drive_selection_groups[$group_name] = $drives;
-                }
-            }
-        }
-    }
-
-    if (!isset($timezone)) {
-        date_default_timezone_set(@date_default_timezone_get());
-    }
-    
-    if (is_array($storage_pool_drives) && count($storage_pool_drives) > 0) {
-        $df_command = "df -k";
-        foreach ($storage_pool_drives as $key => $sp_drive) {
-            $df_command .= " " . escapeshellarg($sp_drive);
-            $storage_pool_drives[$key] = '/' . trim($sp_drive, '/');
-        }
-        $df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\"";
-    } else {
-        gh_log(WARN, "You have no storage_pool_drive defined. Greyhole can't run.");
-        return FALSE;
-    }
-
-    exec('testparm -s ' . escapeshellarg($smb_config_file) . ' 2> /dev/null', $config_text);
-    foreach ($config_text as $line) {
-        $line = trim($line);
-        if (mb_strlen($line) == 0) { continue; }
-        if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
-            $share_name = $regs[1];
-        }
-        if (isset($share_name) && !isset($shares_options[$share_name]) && !array_contains($trash_share_names, $share_name)) { continue; }
-        if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
-            $shares_options[$share_name]['landing_zone'] = '/' . trim($regs[1], '/"');
-            $shares_options[$share_name]['name'] = $share_name;
-        }
-    }
-
-    global $drive_selection_algorithm;
-    if (isset($drive_selection_algorithm)) {
-        foreach ($drive_selection_algorithm as $ds) {
-            $ds->update();
-        }
-    } else {
-        // Default drive_selection_algorithm
-        $drive_selection_algorithm = DriveSelection::parse('most_available_space', null);
-    }
-    foreach ($shares_options as $share_name => $share_options) {
-        if (array_contains($trash_share_names, $share_name)) {
-            global $trash_share;
-            $trash_share = array('name' => $share_name, 'landing_zone' => $shares_options[$share_name]['landing_zone']);
-            unset($shares_options[$share_name]);
-            continue;
-        }
-        if ($share_options['num_copies'] > count($storage_pool_drives)) {
-            $share_options['num_copies'] = count($storage_pool_drives);
-        }
-        if (!isset($share_options['landing_zone'])) {
-            global $config_file, $smb_config_file;
-            gh_log(WARN, "Found a share ($share_name) defined in $config_file with no path in $smb_config_file. Either add this share in $smb_config_file, or remove it from $config_file, then restart Greyhole.");
-            return FALSE;
-        }
-        if (!isset($share_options['delete_moves_to_trash'])) {
-            $share_options['delete_moves_to_trash'] = $delete_moves_to_trash;
-        }
-        if (isset($share_options['drive_selection_algorithm'])) {
-            foreach ($share_options['drive_selection_algorithm'] as $ds) {
-                $ds->update();
-            }
-        } else {
-            $share_options['drive_selection_algorithm'] = $drive_selection_algorithm;
-        }
-        if (isset($share_options['drive_selection_groups'])) {
-            unset($share_options['drive_selection_groups']);
-        }
-        $shares_options[$share_name] = $share_options;
-        
-        // Validate that the landing zone is NOT a subdirectory of a storage pool drive, and that storage pool drives are not subdirectories of the landing zone!
-        foreach ($storage_pool_drives as $key => $sp_drive) {
-            if (mb_strpos($share_options['landing_zone'], $sp_drive) === 0) {
-                gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options['landing_zone'] . ", which is INSIDE a storage pool drive ($sp_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
-            }
-            if (mb_strpos($sp_drive, $share_options['landing_zone']) === 0) {
-                gh_log(CRITICAL, "Found a storage pool drive ($sp_drive), which is INSIDE a share landing zone (" . $share_options['landing_zone'] . "), for share $share_name. Storage pool drives should never be inside a directory that you use as a share landing zone ('path' in smb.conf).\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
-            }
-        }
-    }
-    
-    if (!isset($db_engine)) {
-        $db_engine = 'mysql';
-    } else {
-        $db_engine = mb_strtolower($db_engine);
-    }
-
-    global ${"db_use_$db_engine"};
-    ${"db_use_$db_engine"} = TRUE;
-    
-    if (!isset($max_queued_tasks)) {
-        if ($db_engine == 'sqlite') {
-            $max_queued_tasks = 1000;
-        } else {
-            $max_queued_tasks = 10000000;
-        }
-    }
-
-    if (!isset($memory_limit)) {
-        ini_set('memory_limit', $memory_limit);
-    }
-    if (isset($memory_limit)) {
-        if(preg_match('/G$/i',$memory_limit)) {
-            $memory_limit = preg_replace('/G$/i','',$memory_limit);
-            $memory_limit = $memory_limit * 1024 * 1024 * 1024;
-        }elseif(preg_match('/M$/i',$memory_limit)) {
-            $memory_limit = preg_replace('/M$/i','',$memory_limit);
-            $memory_limit = $memory_limit * 1024 * 1024;
-        }elseif(preg_match('/K$/i',$memory_limit)) {
-            $memory_limit = preg_replace('/K$/i','',$memory_limit);
-            $memory_limit = $memory_limit * 1024;
-        }
-    }
-    $db_options = (object) array(
-        'engine' => $db_engine,
-        'schema' => "/usr/share/greyhole/schema-$db_engine.sql"
-    );
-    if ($db_options->engine == 'sqlite') {
-        $db_options->db_path = $db_path;
-        $db_options->dbh = null; // internal handle to use with sqlite
-    } else {
-        $db_options->host = $db_host;
-        $db_options->user = $db_user;
-        $db_options->pass = $db_pass;
-        $db_options->name = $db_name;
-    }
-    
-    include('includes/sql.php');
-    
-    if (strtolower($greyhole_log_file) == 'syslog') {
-        openlog("Greyhole", LOG_PID, LOG_USER);
-    }
-    
-    return TRUE;
-}
-
 function clean_dir($dir) {
     if (empty($dir)) {
         return $dir;
@@ -407,7 +103,7 @@ function clean_dir($dir) {
     if ($dir[0] == '.' && $dir[1] == '/') {
         $dir = mb_substr($dir, 2);
     }
-    while (mb_strpos($dir, '//') !== FALSE) {
+    while (string_contains($dir, '//')) {
         $dir = str_replace("//", "/", $dir);
     }
     $l = strlen($dir);
@@ -423,13 +119,14 @@ function explode_full_path($full_path) {
 }
 
 function gh_log($local_log_level, $text) {
-    global $greyhole_log_file, $greyhole_error_log_file, $log_level, $log_memory_usage, $action, $log_to_stdout;
+    global $action;
+    $log_level = Config::get(CONFIG_LOG_LEVEL);
     if ($local_log_level > $log_level) {
         return;
     }
 
     $date = date("M d H:i:s");
-    if ($log_level >= PERF) {
+    if ($log_level >= Log::PERF) {
         $utimestamp = microtime(true);
         $timestamp = floor($utimestamp);
         $date .= '.' . round(($utimestamp - $timestamp) * 1000000);
@@ -437,29 +134,27 @@ function gh_log($local_log_level, $text) {
     $log_text = sprintf("%s%s%s\n", 
         "$date $local_log_level $action: ",
         $text,
-        @$log_memory_usage ? " [" . memory_get_usage() . "]" : ''
+        Config::get(CONFIG_LOG_MEMORY_USAGE) ? " [" . memory_get_usage() . "]" : ''
     );
 
-    if (isset($log_to_stdout)) {
-        echo $log_text;
-    } else {
-        if (strtolower($greyhole_log_file) == 'syslog') {
-            $worked = syslog($local_log_level, $log_text);
-        } else if (!empty($greyhole_log_file)) {
-            if ($local_log_level <= WARN && !empty($greyhole_error_log_file)) {
-                $worked = error_log($log_text, 3, $greyhole_error_log_file);
-            } else {
-                $worked = error_log($log_text, 3, $greyhole_log_file);
-            }
+    $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
+    if (strtolower($greyhole_log_file) == 'syslog') {
+        $worked = syslog($local_log_level, $log_text);
+    } else if (!empty($greyhole_log_file)) {
+        $greyhole_error_log_file = Config::get(CONFIG_GREYHOLE_ERROR_LOG_FILE);
+        if ($local_log_level <= WARN && !empty($greyhole_error_log_file)) {
+            $worked = @error_log($log_text, 3, $greyhole_error_log_file);
         } else {
-            $worked = FALSE;
+            $worked = @error_log($log_text, 3, $greyhole_log_file);
         }
-        if (!$worked) {
-            error_log(trim($log_text));
-        }
+    } else {
+        $worked = FALSE;
+    }
+    if (!$worked) {
+        error_log(trim($log_text));
     }
     
-    if ($local_log_level === CRITICAL) {
+    if ($local_log_level === Log::CRITICAL) {
         exit(1);
     }
 }
@@ -488,7 +183,7 @@ function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
     case E_COMPILE_WARNING:
     case E_CORE_WARNING:
     case E_NOTICE:
-        global $greyhole_log_file;
+        $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
         if ($errstr == "fopen($greyhole_log_file): failed to open stream: Permission denied") {
             // We want to ignore this warning. Happens when regular users try to use greyhole, and greyhole tries to log something.
             // What would have been logged will be echoed instead.
@@ -573,15 +268,13 @@ function duration_to_human($seconds) {
 }
 
 function get_share_landing_zone($share) {
-    global $shares_options, $trash_share_names;
-    if (isset($shares_options[$share]['landing_zone'])) {
-        return $shares_options[$share]['landing_zone'];
-    } else if (array_contains($trash_share_names, $share)) {
-        global $trash_share;
-        return $trash_share['landing_zone'];
+    $lz = SharesConfig::get($share, CONFIG_LANDING_ZONE);
+    if ($lz !== FALSE) {
+        return $lz;
+    } else if (array_contains(ConfigHelper::$trash_share_names, $share)) {
+        return SharesConfig::get(CONFIG_TRASH_SHARE, CONFIG_LANDING_ZONE);
     } else {
-        global $config_file, $smb_config_file;
-        gh_log(WARN, "  Found a share ($share) with no path in $smb_config_file, or missing it's num_copies[$share] config in $config_file. Skipping.");
+        gh_log(WARN, "  Found a share ($share) with no path in " . ConfigHelper::$smb_config_file . ", or missing it's num_copies[$share] config in " . ConfigHelper::$config_file . ". Skipping.");
         return FALSE;
     }
 }
@@ -589,8 +282,6 @@ function get_share_landing_zone($share) {
 // Get CPU architecture (x86_64 or i386 or armv6l or armv5*)
 $arch = exec('uname -m');
 if ($arch != 'x86_64') {
-    gh_log(DEBUG, "32-bit system detected: Greyhole will NOT use PHP built-in file functions.");
-
     function gh_filesize($filename) {
         $result = exec("stat -c %s ".escapeshellarg($filename)." 2>/dev/null");
         if (empty($result)) {
@@ -650,8 +341,6 @@ if ($arch != 'x86_64') {
         return $result === 0;
     }
 } else {
-    gh_log(DEBUG, "64-bit system detected: Greyhole will use PHP built-in file functions.");
-
     function gh_filesize(&$filename) {
         $size = @filesize($filename);
         // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
@@ -705,12 +394,11 @@ if ($arch != 'x86_64') {
 }
 
 function memory_check() {
-    global $memory_limit;
     $usage = memory_get_usage();
-    $used = $usage/$memory_limit;
+    $used = $usage / Config::get(CONFIG_MEMORY_LIMIT);
     $used = $used * 100;
     if ($used > 95) {
-        gh_log(CRITICAL, $used . '% memory usage, exiting. Please increase memory_limit in /etc/greyhole.conf');
+        gh_log(CRITICAL, "$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in /etc/greyhole.conf");
     }
 }
 
@@ -1223,7 +911,7 @@ class DriveSelection {
             arsort($sorted_target_drives);
             arsort($last_resort_sorted_target_drives);
         } else {
-            gh_log(CRITICAL, "Unknown drive_selection_algorithm found: " . $this->selection_algorithm);
+            gh_log(CRITICAL, "Unknown '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' found: " . $this->selection_algorithm);
         }
         // Only keep drives that are in $this->drives
         $this->sorted_target_drives = array();
@@ -1269,12 +957,11 @@ class DriveSelection {
     static function parse($config_string, $drive_selection_groups) {
         $ds = array();
         if ($config_string == 'least_used_space' || $config_string == 'most_available_space') {
-            global $storage_pool_drives;
-            $ds[] = new DriveSelection(count($storage_pool_drives), $config_string, $storage_pool_drives, FALSE);
+            $ds[] = new DriveSelection(count(Config::storagePoolDrives()), $config_string, Config::storagePoolDrives(), FALSE);
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(least_used_space|most_available_space)/i', $config_string, $regs)) {
-            gh_log(CRITICAL, "Can't understand the drive_selection_algorithm value: $config_string");
+            gh_log(CRITICAL, "Can't understand the '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' value: $config_string");
         }
         $selection_algorithm = $regs[2];
         $groups = array_map('trim', explode(',', $regs[1]));
@@ -1297,21 +984,20 @@ class DriveSelection {
     function update() {
         // Make sure num_drives_per_draft and drives have been set, in case storage_pool_drive lines appear after drive_selection_algorithm line(s) in the config file
         if (!$this->is_forced && ($this->selection_algorithm == 'least_used_space' || $this->selection_algorithm == 'most_available_space')) {
-            global $storage_pool_drives;
-            $this->num_drives_per_draft = count($storage_pool_drives);
-            $this->drives = $storage_pool_drives;
+            $this->num_drives_per_draft = count(Config::storagePoolDrives());
+            $this->drives = Config::storagePoolDrives();
         }
     }
 }
 
 $greyhole_owned_drives = array();
 function is_greyhole_owned_drive($sp_drive) {
-    global $going_drive, $df_cache_time, $greyhole_owned_drives;
+    global $going_drive, $greyhole_owned_drives;
     if (isset($going_drive) && $sp_drive == $going_drive) {
         return FALSE;
     }
     $is_greyhole_owned_drive = isset($greyhole_owned_drives[$sp_drive]);
-    if ($is_greyhole_owned_drive && $greyhole_owned_drives[$sp_drive] < time() - $df_cache_time) {
+    if ($is_greyhole_owned_drive && $greyhole_owned_drives[$sp_drive] < time() - Config::get(CONFIG_DF_CACHE_TIME)) {
         unset($greyhole_owned_drives[$sp_drive]);
         $is_greyhole_owned_drive = FALSE;
     }
@@ -1361,11 +1047,10 @@ function get_gone_ok_drives() {
 }
 
 function mark_gone_ok($sp_drive, $action='add') {
-    global $storage_pool_drives;
-    if (!array_contains($storage_pool_drives, $sp_drive)) {
+    if (!array_contains(Config::storagePoolDrives(), $sp_drive)) {
         $sp_drive = '/' . trim($sp_drive, '/');
     }
-    if (!array_contains($storage_pool_drives, $sp_drive)) {
+    if (!array_contains(Config::storagePoolDrives(), $sp_drive)) {
         return FALSE;
     }
 
@@ -1415,13 +1100,13 @@ function mark_gone_drive_fscked($sp_drive, $action='add') {
 }
 
 function check_storage_pool_drives($skip_fsck=FALSE) {
-    global $storage_pool_drives, $email_to, $gone_ok_drives;
+    global $gone_ok_drives;
     $needs_fsck = FALSE;
     $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
     $returned_drives = array();
     $missing_drives = array();
     $i = 0; $j = 0;
-    foreach ($storage_pool_drives as $sp_drive) {
+    foreach (Config::storagePoolDrives() as $sp_drive) {
         if (!is_greyhole_owned_drive($sp_drive) && !gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this") && !empty($drives_definitions[$sp_drive])) {
             if($needs_fsck !== 2){    
                 $needs_fsck = 1;
@@ -1456,7 +1141,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
         if (strlen($subject) > 255) {
             $subject = substr($subject, 0, 255);
         }
-        mail($email_to, $subject, $body);
+        mail(Config::get(CONFIG_EMAIL_TO), $subject, $body);
     }
     if(count($missing_drives) > 0) {
         $body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives has disappeared:\n";
@@ -1487,7 +1172,7 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
         if (strlen($subject) > 255) {
             $subject = substr($subject, 0, 255);
         }
-        mail($email_to, $subject, $body);
+        mail(Config::get(CONFIG_EMAIL_TO), $subject, $body);
     }
     if ($needs_fsck !== FALSE) {
         set_metastore_backup();
@@ -1495,21 +1180,20 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
         clearstatcache();
 
         if (!$skip_fsck) {
-            global $shares_options;
             initialize_fsck_report('All shares');
-            if($needs_fsck === 2) {
+            if ($needs_fsck === 2) {
                 foreach ($returned_drives as $drive) {
                     $metastores = get_metastores_from_storage_volume($drive);
                     gh_log(INFO, "Starting fsck for metadata store on $drive which came back online.");
-                    foreach($metastores as $metastore) {
-                        foreach($shares_options as $share_name => $share_options) {
+                    foreach ($metastores as $metastore) {
+                        foreach (SharesConfig::getShares() as $share_name => $share_options) {
                             gh_fsck_metastore($metastore,"/$share_name", $share_name);
                         }
                     }
                     gh_log(INFO, "fsck for returning drive $drive's metadata store completed.");
                 }
                 gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
-            }else{
+            } else {
                 gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
                 fix_all_symlinks();
             }
@@ -1540,7 +1224,7 @@ class FSCKLogFile {
 
         $last_mod_date = filemtime($logfile);
         if ($last_mod_date > $this->getLastEmailSentTime()) {
-            global $email_to;
+            $email_to = Config::get(CONFIG_EMAIL_TO);
             gh_log(WARN, "Sending $logfile by email to $email_to");
             mail($email_to, $this->getSubject(), $this->getBody());
 
@@ -1602,12 +1286,13 @@ class FSCKLogFile {
 
 class Settings {
     public static function get($name, $unserialize=FALSE, $value=FALSE) {
-        $query = sprintf("SELECT * FROM settings WHERE name LIKE '%s'", db_escape_string($name));
+        $query = "SELECT * FROM settings WHERE name LIKE :name";
+        $params = array('name' => $name);
         if ($value !== FALSE) {
-            $query .= sprintf(" AND value LIKE '%s'", db_escape_string($value));
+            $query .= " AND value LIKE :value";
+            $params['value'] = $value;
         }
-        $result = db_query($query) or gh_log(CRITICAL, "Can't select setting '$name'/'$value' from settings table: " . db_error());
-        $setting = db_fetch_object($result);
+        $setting = DB::getFirst($query, $params);
         if ($setting === FALSE) {
             return FALSE;
         }
@@ -1618,32 +1303,19 @@ class Settings {
         if (is_array($value)) {
             $value = serialize($value);
         }
-        global $db_use_mysql;
-        if (@$db_use_mysql) {
-            $query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s') ON DUPLICATE KEY UPDATE value = VALUES(value)", db_escape_string($name), db_escape_string($value));
-            db_query($query) or gh_log(CRITICAL, "Can't insert/update '$name' setting: " . db_error());
-        } else {
-            $query = sprintf("DELETE FROM settings WHERE name = '%s'", db_escape_string($name));
-            db_query($query) or gh_log(CRITICAL, "Can't delete '$name' setting: " . db_error());
-            $query = sprintf("INSERT INTO settings (name, value) VALUES ('%s', '%s')", db_escape_string($name), db_escape_string($value));
-            db_query($query) or gh_log(CRITICAL, "Can't insert '$name' setting: " . db_error());
-        }
+        $query = "INSERT INTO settings SET name = :name, value = :value ON DUPLICATE KEY UPDATE value = VALUES(value)";
+        DB::insert($query, array('name' => $name, 'value' => $value));
         return (object) array('name' => $name, 'value' => $value);
     }
 
     public static function rename($from, $to) {
-        $query = sprintf("UPDATE settings SET name = '%s' WHERE name = '%s'", db_escape_string($to), db_escape_string($from));
-        db_query($query) or gh_log(CRITICAL, "Can't rename setting '$from' to '$to': " . db_error());
+        $query = "UPDATE settings SET name = :to WHERE name = :from";
+        DB::execute($query, array('from' => $from, 'to' => $to));
     }
 
     public static function backup() {
-        global $storage_pool_drives;
-        $result = db_query("SELECT * FROM settings") or gh_log(CRITICAL, "Can't select settings for backup: " . db_error());
-        $settings = array();
-        while ($setting = db_fetch_object($result)) {
-            $settings[] = $setting;
-        }
-        foreach ($storage_pool_drives as $sp_drive) {
+        $settings = DB::getAll("SELECT * FROM settings");
+        foreach (Config::storagePoolDrives() as $sp_drive) {
             if (is_greyhole_owned_drive($sp_drive)) {
                 $settings_backup_file = "$sp_drive/.gh_settings.bak";
                 file_put_contents($settings_backup_file, serialize($settings));
@@ -1652,8 +1324,7 @@ class Settings {
     }
 
     public static function restore() {
-        global $storage_pool_drives;
-        foreach ($storage_pool_drives as $sp_drive) {
+        foreach (Config::storagePoolDrives() as $sp_drive) {
             $settings_backup_file = "$sp_drive/.gh_settings.bak";
             $latest_backup_time = 0;
             if (file_exists($settings_backup_file)) {
@@ -1717,22 +1388,20 @@ function gh_dir_uuid($dir) {
 }
 
 function fix_all_symlinks() {
-    global $shares_options;
-    foreach ($shares_options as $share_name => $share_options) {
+    foreach (SharesConfig::getShares() as $share_name => $share_options) {
         fix_symlinks_on_share($share_name);
     }
 }
 
 function fix_symlinks_on_share($share_name) {
-    global $shares_options, $storage_pool_drives;
-    $share_options = $shares_options[$share_name];
+    $share_options = SharesConfig::getConfigForShare($share_name);
     echo "Looking for broken symbolic links in the share '$share_name'...";
-    chdir($share_options['landing_zone']);
+    chdir($share_options[CONFIG_LANDING_ZONE]);
     exec("find -L . -type l", $result);
     foreach ($result as $file_to_relink) {
         if (is_link($file_to_relink)) {
             $file_to_relink = substr($file_to_relink, 2);
-            foreach ($storage_pool_drives as $sp_drive) {
+            foreach (Config::storagePoolDrives() as $sp_drive) {
                 if (!is_greyhole_owned_drive($sp_drive)) { continue; }
                 $new_link_target = clean_dir("$sp_drive/$share_name/$file_to_relink");
                 if (gh_is_file($new_link_target)) {
@@ -1747,18 +1416,26 @@ function fix_symlinks_on_share($share_name) {
 }
 
 function schedule_fsck_all_shares($fsck_options=array()) {
-    global $shares_options;
-    foreach ($shares_options as $share_name => $share_options) {
-        $full_path = $share_options['landing_zone'];
-        $query = sprintf("INSERT INTO tasks (action, share, additional_info, complete) VALUES ('fsck', '%s', %s, 'yes')",
-            db_escape_string($full_path),
-            (!empty($fsck_options) ? "'" . implode('|', $fsck_options) . "'" : "NULL")
+    foreach (SharesConfig::getShares() as $share_name => $share_options) {
+        $query = "INSERT INTO tasks SET action = 'fsck', share = :full_path, additional_info = :fsck_options, complete = 'yes'";
+        $params = array(
+            'full_path' => $share_options[CONFIG_LANDING_ZONE],
+            'fsck_options' => empty($fsck_options) ? NULL : implode('|', $fsck_options)
         );
-        db_query($query) or gh_log(CRITICAL, "Can't insert fsck task: " . db_error());
+        DB::insert($query, $params);
     }
 }
 
 function array_contains($haystack, $needle) {
     return array_search($needle, $haystack) !== FALSE;
 }
+
+function string_contains($haystack, $needle) {
+    return mb_strpos($haystack, $needle) !== FALSE;
+}
+
+function string_starts_with($haystack, $needle) {
+    return mb_strpos($haystack, $needle) === 0;
+}
+
 ?>

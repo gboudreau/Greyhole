@@ -1,7 +1,6 @@
-#!/usr/bin/php
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2014 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -19,19 +18,13 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-include('includes/common.php');
-ConfigHelper::parse();
-
-$total_space = 0;
-$total_free_space = 0;
-foreach (Config::storagePoolDrives() as $sp_drive) {
-	$response = explode(' ', exec("df -k ".escapeshellarg($sp_drive)." 2>/tmp/greyhole_df_error.log | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'"));
-	if (count($response) != 2) {
-		continue;
-	}
-	$total_space += $response[0];
-	$total_free_space += $response[1];
+class Log {
+    const PERF     = 9;
+    const TEST     = 8;
+    const DEBUG    = 7;
+    const INFO     = 6;
+    const WARN     = 4;
+    const ERROR    = 3;
+    const CRITICAL = 2;
 }
-
-echo "$total_space $total_free_space 1024\n";
 ?>

@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2013 Guillaume Boudreau
+Copyright 2013-2014 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -20,9 +20,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 include('includes/common.php');
 
-parse_config();
-db_connect() or gh_log(CRITICAL, "Can't connect to $db_options->engine database.");
-db_migrate();
+ConfigHelper::parse();
+DB::connect();
 
 header('Content-Type: text/html; charset=utf8');
 setlocale(LC_CTYPE, "en_US.UTF-8");
@@ -45,32 +44,33 @@ $share = array_shift($p);
 $full_path = implode('/', $p);
               
 if ($level_min > 1) {
-	$query = sprintf("SELECT size FROM du_stats WHERE depth = %d AND share = '%s' AND full_path = '%s'",
-		$level_min - 1,
-		$share,
-		$full_path
+	$query = "SELECT size FROM du_stats WHERE depth = :depth AND share = :share AND full_path = :full_path";
+    $params = array(
+		'depth' => $level_min - 1,
+		'share' => $share,
+		'full_path' => $full_path
 	);
-	$results = db_query($query) or die("SQL error: " . db_error());
-	$row = db_fetch_object($results);
-	$total_bytes = (float) $row->size;
+    $total_bytes = (float) DB::getFirstValue($query, $params) or die("SQL error: " . DB::error());
 }
 
 if ($level_min > 1) {
-	$query = sprintf("SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = %d AND share = '%s' AND full_path LIKE '%s%%'",
-		$level_min,
-		$share,
-		empty($full_path) ? '' : "$full_path/"
+	$query = "SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = :depth AND share = :share AND full_path LIKE :full_path";
+    $params = array(
+		'depth' => $level_min,
+		'share' => $share,
+		'full_path' => empty($full_path) ? '%' : "$full_path/%"
 	);
 } else {
-	$query = sprintf("SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = %d",
-		$level_min
+	$query = "SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = :depth";
+    $params = array(
+		'depth' => $level_min
 	);
 }
-$results = db_query($query) or die("SQL error: " . db_error());
+$rows = DB::getAll($query) or die("SQL error: " . DB::error());
 
 $total_bytes_subfolders = 0;
 $results_rows = array();
-while ($row = db_fetch_object($results)) {
+foreach ($rows as $row) {
 	$results_rows[] = $row;
     if ($row->depth == $level_min) {
         $total_bytes_subfolders += (float) $row->size;
