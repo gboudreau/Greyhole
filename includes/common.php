@@ -281,11 +281,7 @@ function parse_config() {
         return FALSE;
     }
 
-    $testparm_exe = 'testparm';
-    if (gh_file_exists('/usr/bin/testparm')) {
-        $testparm_exe = '/usr/bin/testparm';
-    }
-    exec($testparm_exe . ' -s ' . escapeshellarg($smb_config_file) . ' 2> /dev/null', $config_text);
+    exec('testparm -s ' . escapeshellarg($smb_config_file) . ' 2> /dev/null', $config_text);
     foreach ($config_text as $line) {
         $line = trim($line);
         if (mb_strlen($line) == 0) { continue; }
