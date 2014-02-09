@@ -1,5 +1,5 @@
 /* 
-Copyright Guillaume Boudreau, 2009
+Copyright 2009-2014 Guillaume Boudreau
 
 This file is part of Greyhole.
 

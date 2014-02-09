@@ -1,5 +1,5 @@
 /* 
-Copyright Guillaume Boudreau, 2009
+Copyright 2009-2014 Guillaume Boudreau, Edgars Binans
 
 This file is part of Greyhole.
 
@@ -18,10 +18,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-/*
-Samba 4.0 support and some refactoring by Edgars Binans, 2013.
 */
 
 #include "includes.h"

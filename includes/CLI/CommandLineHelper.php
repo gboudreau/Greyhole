@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau, Andrew Hopkinson
+Copyright 2009-2014 Guillaume Boudreau
 
 This file is part of Greyhole.
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2011 Guillaume Boudreau
+# Copyright 2011-2014 Guillaume Boudreau
 # 
 # This file is part of Greyhole.
 # 

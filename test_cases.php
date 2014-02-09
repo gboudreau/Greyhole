@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 /*
-Copyright 2010 Guillaume Boudreau
+Copyright 2010-2014 Guillaume Boudreau
 
 This file is part of Greyhole.
 
