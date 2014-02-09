@@ -22,8 +22,6 @@ require_once('includes/CLI/AbstractAnonymousCliRunner.php');
 
 class DebugCliRunner extends AbstractAnonymousCliRunner {
     public function run() {
-        global $storage_pool_drives, $greyhole_log_file;
-        
         if (!isset($this->options['cmd_param'])) {
             $this->log("Please specify a file to debug.");
             $this->finish(1);
@@ -56,7 +54,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
             # Is there more?
             $new_query = preg_replace('/SELECT .* FROM/i', 'SELECT COUNT(*) FROM', $query);
             $count = DB::getFirstValue($new_query, $params);
-            if ($count > 0) {
+            if ($count == 0) {
                 break;
             }
         }
