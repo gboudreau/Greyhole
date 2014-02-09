@@ -19,39 +19,22 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-include('includes/common.php');
+require_once('includes/common.php');
+require_once('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
+require_once('includes/DaemonRunner.php');
 
-list($action, $options) = process_command_line();
+// This will parse the command line, and find commands and options.
+// It will then instantiate the appropriate class (that extends AbstractRunner), and return it.
+$cliHelper = new CommandLineHelper();
+$runner = $cliHelper->processCommandLine();
 
-if ($action == 'unknown') {
-    print_usage();
-}
+// This will run the runner(!) i.e. what the user asked for will now be executed.
+$runner->run();
 
-// Any forking needs to happen before DB::connect(), or the parent exiting will close the child's DB connection!
-if ($action == 'md5-worker') {
-    $pid = pcntl_fork();
-    if ($pid == -1) {
-        die("Error spawning child md5-worker!");
-    }
-    if ($pid == 0) {
-        // Child
-    } else {
-        // Parent
-        echo $pid;
-        exit(0);
-    }
-}
+// The runner has finished; let's clean up before quitting.
+$runner->finish();
 
-process_config();
 
-DB::connect();
-
-if ($action != 'stats' && $action != 'view-queue' && $action != 'debug' && $action != 'iostat' && $action != 'status' && $action != 'getuid' && $action != 'logs') {
-    if (exec("whoami") != 'root') {
-        echo "You need to execute this as root.\n";
-        exit(1);
-    }
-}
 
 if ($action == 'pause') {
     $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | awk \'{print $1}\'');
@@ -75,795 +58,7 @@ if ($action == 'resume') {
         exit(1);
     }
 }
-if ($action == 'getuid') {
-    $uniq_id = set_uniq_id();
-    echo $uniq_id;
-    exit(0);
-}
-if ($action == 'logs') {
-    $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
-    $greyhole_error_log_file = Config::get(CONFIG_GREYHOLE_ERROR_LOG_FILE);
-    if (strtolower($greyhole_log_file) == 'syslog') {
-        if (gh_is_file('/var/log/syslog')) {
-            passthru("tail -F -n 1 /var/log/syslog | grep --line-buffered Greyhole");
-        } else {
-            passthru("tail -F -n 1 /var/log/messages | grep --line-buffered Greyhole");
-        }
-    } else {
-        $files = escapeshellarg($greyhole_log_file);
-        passthru("tail -n 1 $files");
-        if (!empty($greyhole_error_log_file)) {
-            $files = escapeshellarg($greyhole_error_log_file) . " " . $files;
-        }
-        passthru("tail -qF -n 0 $files");
-    }
-    exit(0);
-}
-if ($action == 'iostat') {
-    $devices_drives = array();
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        $device = exec("df " . escapeshellarg($sp_drive) . " 2>/dev/null | awk '{print \$1}'");
-        $device = preg_replace('@/dev/(sd[a-z])[0-9]+@', '\1', $device);
-        $devices_drives[$device] = $sp_drive;
-    }
 
-    while (TRUE) {
-        unset($result);
-        exec("iostat -p ALL -k 10 2 | grep '^sd[a-z] ' | awk '{print \$1,\$3,\$4}'", $result);
-        $iostat = array();
-        foreach ($result as $line) {
-            $info = explode(' ', $line);
-            $device = $info[0];
-            $read_kBps = $info[1];
-            $write_kBps = $info[2];
-            if (!isset($devices_drives[$device])) {
-                # That device isn't in the storage pool.
-                continue;
-            }
-            $drive = $devices_drives[$device];
-            $iostat[$drive] = (int) round($read_kBps + $write_kBps);
-        }
-        #ksort($iostat); // Let keep the order in which the drives were mounted
-        foreach ($iostat as $drive => $io_kBps) {
-            printf("$drive: %7s kBps\n", $io_kBps);
-        }
-        echo "---\n";
-    }
-    
-    exit(0);
-}
-
-if ($action == 'thaw') {
-    $frozen_directories = Config::get(CONFIG_FROZEN_DIRECTORY);
-    if (isset($options['dir']) && !array_contains($frozen_directories, $options['dir'])) {
-        $options['dir'] = '/' . trim($options['dir'], '/');
-    }
-    if (!isset($options['dir']) || !array_contains($frozen_directories, $options['dir'])) {
-        echo "Frozen directories:\n";
-        foreach ($frozen_directories as $frozen_directory) {
-            echo "  $frozen_directory\n";
-        }
-        echo "To thaw any of the above directories, use the following command:\n";
-        echo "greyhole --thaw=directory\n";
-        exit(0);
-    }
-    $path = explode('/', $options['dir']);
-    $share = array_shift($path);
-    $query = "UPDATE tasks SET complete = 'thawed' WHERE complete = 'frozen' AND share = :share AND full_path LIKE :path";
-    DB::execute($query, array('share' => $share, 'path' => implode('/', $path).'%'));
-    echo $options['dir'] . " directory has been thawed.\n";
-    echo "All pasts file operations that occurred in this directory will now be processed by Greyhole.\n";
-    exit(0);
-}
-
-if ($action == 'fix-symlinks') {
-    fix_all_symlinks();
-    exit(0);
-}
-
-if ($action == 'delete-metadata') {
-    $share = trim(mb_substr($options['dir'], 0, mb_strpos($options['dir'], '/')+1), '/');
-    $full_path = trim(mb_substr($options['dir'], mb_strpos($options['dir'], '/')+1), '/');
-    list($path, $filename) = explode_full_path($full_path);
-    set_metastore_backup();
-    foreach (get_metafile_data_filenames($share, $path, $filename) as $file) {
-        if (file_exists($file)) {
-            echo "Deleting $file\n";
-            unlink($file);
-        }
-    }
-    echo "Done.\n";
-    exit(0);
-}
-
-if ($action == 'remove-share') {
-    $share = $options['dir'];
-    if (!SharesConfig::exists($share)) {
-        echo "'$share' is not a known share.\n";
-        echo "If you removed it already from your Greyhole configuration, please re-add it, and retry.\n";
-        echo "Otherwise, please use one of the following share name:\n";
-        echo "  " . implode("\n  ", array_keys(SharesConfig::getShares())) . "\n";
-        exit(1);
-    }
-
-    $landing_zone = get_share_landing_zone($share);
-
-    echo "Will remove '$share' share from the Greyhole storage pool, by moving all the data files inside this share to it's landing zone: $landing_zone\n";
-    
-    // df the landing zone, to see how much free space it has
-    $free_space = 1024 * exec("df -k --total " . escapeshellarg($landing_zone) . " | awk '/^total/{print $4}'");
-
-    // du the files to see if there's room in the landing zone
-    echo "  Finding how much space is needed, and if you have enough... Please wait...\n";
-    $space_needed = 1024 * exec("du -skL " . escapeshellarg($landing_zone) . " | awk '{print $1}'");
-    echo "    Space needed: " . bytes_to_human($space_needed, FALSE) . "\n";
-    echo "    Free space: " . bytes_to_human($free_space, FALSE) . "\n";
-    
-    // Adjust the landing zone free space, if some file copies are already on that drive
-    $storage_pool_drives_to_unwind = array();
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (!file_exists("$sp_drive/$share")) {
-            #echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
-            continue;
-        }
-        if (gh_dir_uuid("$sp_drive/$share") === gh_dir_uuid("$landing_zone")) {
-            $more_free_space = 1024 * exec("du -sk " . escapeshellarg("$sp_drive/$share") . " | awk '{print $1}'");
-            $free_space += $more_free_space;
-            echo "      + " . bytes_to_human($more_free_space, FALSE) . " (file copies already on $sp_drive) = " . bytes_to_human($free_space, FALSE) . " (Total available space)\n";
-            
-            // We also need to make sure this drive is 'unwind' first, to make sure it will have enough free space to receive all the file copies.
-            array_unshift($storage_pool_drives_to_unwind, $sp_drive);
-        } else {
-            array_push($storage_pool_drives_to_unwind, $sp_drive);
-        }
-    }
-    
-    if ($space_needed > $free_space) {
-        echo "Not enough free space available in $landing_zone. Aborting.\n";
-        exit(1);
-    }
-    echo "  OK! Let's do this.\n";
-
-    // Remove the symlinks from the landing zone
-    echo "  Deleting symlinks from landing zone... Please wait...\n";
-    exec("find " . escapeshellarg($landing_zone) . " -type l -delete");
-    echo "    Done.\n";
-
-    // Copy the data files from the storage pool into the landing zone
-    $num_files_total = 0;
-    foreach ($storage_pool_drives_to_unwind as $sp_drive) {
-        unset($result);
-        echo "  Moving files from $sp_drive/$share into $landing_zone... Please wait...\n";
-        exec("rsync -rlptgoDuvW --remove-source-files " . escapeshellarg("$sp_drive/$share/") . " " . escapeshellarg('/' . trim($landing_zone, '/')), $result);
-        $num_files = count($result)-5;
-        if ($num_files < 0) {
-            $num_files = 0;
-        }
-        $num_files_total += $num_files;
-        exec("find " . escapeshellarg("$sp_drive/$share/") . " -type d -delete");
-        echo "    Done. Copied $num_files files.\n";
-    }
-    echo "All done. Copied $num_files_total files.\nYou should now remove the Greyhole options from the [$share] share in your smb.conf.\n";
-
-    ConfigHelper::removeShare($share);
-
-    exit(0);
-}
-
-if ($action == 'gone' || $action == 'going') {
-    if (!array_contains(Config::storagePoolDrives(), @$options['drive'])) {
-        $options['drive'] = '/' . trim(@$options['drive'], '/');
-    }
-    if (!array_contains(Config::storagePoolDrives(), $options['drive'])) {
-        if (!empty($options['drive'])) {
-            echo "Directory " . $options['drive'] . " is not one of your defined storage pool drives.\n";
-        }
-        echo "Please use one of the following with the --$action option:\n  ";
-        echo implode("\n  ", Config::storagePoolDrives()) . "\n";
-        echo "Note that the correct syntax for this command is:\n";
-        echo "  greyhole --$action=<drive>\n";
-        echo "The '=' character is mandatory.\n";
-        exit(1);
-    }
-
-    if ($action == 'going') {
-        // Check that all scheduled fsck have completed; an incomplete fsck means some file copies might be missing!
-        $total = DB::getFirstValue("SELECT COUNT(*) AS total FROM tasks WHERE action = 'fsck'");
-        if ($total > 0) {
-            echo "There are pending fsck operations. This could mean some file copies are missing, which would make it dangerous to remove a drive at this time.\n";
-            echo "Please wait until all fsck operation are complete, and then retry.\n";
-            exit(2);
-        }
-    }
-
-    // Removing this drive here will insure it won't be used for new files while we're moving files away, and that it can later be replaced.
-    remove_drive_definition($options['drive']);
-
-    if ($action == 'going') {
-        file_put_contents($options['drive'] . "/.greyhole_used_this", "Flag to prevent Greyhole from thinking this drive disappeared for no reason...");
-        set_metastore_backup();
-        gh_log(INFO, "Storage pool drive " . $options['drive'] . " will be removed from the storage pool.");
-        echo("\nStorage pool drive " . $options['drive'] . " will be removed from the storage pool. This can take a while, please be patient.\n");
-
-        // global $going_drive; // Used in function is_greyhole_owned_drive()
-        $going_drive = $options['drive'];
-
-        // For the fsck_file calls to be able to use the files on $going_drive if needed, to create extra copies.
-        global $options;
-        $options['find-orphans'] = TRUE;
-
-        // fsck shares with only 1 file copy to remove those from $going_drive
-        initialize_fsck_report('Shares with only 1 copy');
-        foreach (SharesConfig::getShares() as $share_name => $share_options) {
-            echo "\n";
-            if ($share_options[CONFIG_NUM_COPIES] == 1) {
-                echo "Moving file copies for share '$share_name'... ";
-                if (is_dir("$going_drive/$share_name")) {
-                    gh_fsck_reset_du($share_name);
-                    gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
-                }
-                echo "Done.\n";
-            } else {
-                // Temporarily rename $going_drive/$share_name for fix_symlinks_on_share to be able to find symlinks that will be broken once this drive is removed.
-                rename("$going_drive/$share_name", "$going_drive/$share_name".".tmp");
-                fix_symlinks_on_share($share_name);
-                rename("$going_drive/$share_name".".tmp", "$going_drive/$share_name");
-                
-                // Also, just to be safe, make sure that all the files in $going_drive/$share_name are also somewhere else, as expected.
-                echo "Checking that all the files in the share '$share_name' also exist on another drive...";
-                check_going_dir("$going_drive/$share_name", $share_name, $going_drive);
-                echo " Done.\n";
-            }
-        }
-    }
-
-    // Remove $going_drive from config file and restart (if it was running)
-    removeStoragePoolDrive($options['drive']);
-
-    // For Amahi users
-    if (file_exists('/usr/bin/hdactl')) {
-        echo "\nYou should de-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page.\n";
-    }
-
-    mark_gone_ok($options['drive'], 'remove');
-    mark_gone_drive_fscked($options['drive'], 'remove');
-    gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been removed.");
-    echo "\nStorage pool drive " . $options['drive'] . " has been removed from your pool, which means the missing file copies that are in this drive will be re-created during the next fsck.\n";
-
-    if ($action == 'going') {
-        // Schedule fsck for all shares to re-create missing copies on other shares
-        schedule_fsck_all_shares(array('email'));
-        echo "All the files that were only on $going_drive have been copied somewhere else.\n";
-        echo "A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed, and you will receive email reports when it completes.\n";
-        unlink($options['drive'] . "/.greyhole_used_this");
-    } else { // $action == 'gone'
-        echo "Sadly, file copies that were only on this drive, if any, are now lost!\n";
-    }
-    echo "\n";
-    exit(0);
-}
-
-function check_going_dir($path, $share, $going_drive) {
-    $handle = @opendir($path);
-    if ($handle === FALSE) {
-        gh_log(ERROR, "Couldn't open $path to list content. Skipping...");
-        return;
-    }
-    gh_log(DEBUG, "Entering $path");
-    while (($filename = readdir($handle)) !== FALSE) {
-        if ($filename == '.' || $filename == '..') { continue; }
-
-        $full_path = "$path/$filename";
-        $file_type = @filetype($full_path);
-        if ($file_type === FALSE) {
-            // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
-            $file_type = @filetype(normalize_utf8_characters($full_path));
-            if ($file_type !== FALSE) {
-                // Bingo!
-                $full_path = normalize_utf8_characters($full_path);
-                $path = normalize_utf8_characters($path);
-            }
-        }
-
-        if ($file_type == 'dir') {
-            check_going_dir($full_path, $share, $going_drive);
-        } else {
-            $file_path = trim(mb_substr($path, mb_strlen("$going_drive/$share")+1), '/');
-            $file_metafiles = array();
-            $file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
-            if (count($file_copies_inodes) == 0) {
-                gh_log(WARN, "Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
-                echo ".";
-                gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
-            }
-        }
-    }
-    closedir($handle);
-}
-
-if ($action == 'debug') {
-    if (!isset($options['debug_filename'])) {
-        print_usage();
-    }
-    $filename = $options['debug_filename'];
-    
-    if (!string_contains($filename, '/')) {
-        $filename = "/$filename";
-    }
-
-    echo "Debugging file operations for file named \"$filename\"\n";
-
-    echo "\nFrom DB\n=======\n";
-    $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE full_path LIKE :filename ORDER BY id ASC";
-    $debug_tasks = DB::getAll($query, array('filename' => "%$filename%"), 'id');
-
-    // Renames
-    $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info LIKE :filename ORDER BY id ASC";
-    $params = array('filename' => "%$filename%");
-    while (TRUE) {
-        $rows = DB::getAll($query, $params);
-        foreach ($rows as $row) {
-            $debug_tasks[$row->id] = $row;
-            $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info = :full_path ORDER BY id ASC";
-            $params = array('full_path' => $row->full_path);
-        }
-
-        # Is there more?
-        $new_query = preg_replace('/SELECT .* FROM/i', 'SELECT COUNT(*) FROM', $query);
-        $count = DB::getFirstValue($new_query, $params);
-        if ($count > 0) {
-            break;
-        }
-    }
-    
-    ksort($debug_tasks);
-    $to_grep = array();
-    foreach ($debug_tasks as $task) {
-        echo "  [$task->event_date] Task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : '') . "\n";
-        $to_grep["$task->share/$task->full_path"] = 1;
-        if ($task->action == 'rename') {
-            $to_grep["$task->share/$task->additional_info"] = 1;
-        }
-    }
-    if (empty($to_grep)) {
-        $to_grep[$filename] = 1;
-        if (string_contains($filename, '/')) {
-            $share = trim(mb_substr($filename, 0, mb_strpos(mb_substr($filename, 1), '/')+1), '/');
-            $full_path = trim(mb_substr($filename, mb_strpos(mb_substr($filename, 1), '/')+1), '/');
-            $debug_tasks[] = (object) array('share' => $share, 'full_path' => $full_path);
-        }
-    }
-
-    echo "\nFrom logs\n=========\n";
-    $to_grep = array_keys($to_grep);
-    $to_grep = implode("|", $to_grep);
-    $commands = array();
-    $commands[] = "zgrep -h -E -B 1 -A 2 -h " . escapeshellarg($to_grep) . " " . Config::get(CONFIG_GREYHOLE_LOG_FILE) . "*.gz";
-    $commands[] = "grep -h -E -B 1 -A 2 -h " . escapeshellarg($to_grep) . " " . escapeshellarg(Config::get(CONFIG_GREYHOLE_LOG_FILE));
-    foreach ($commands as $command) {
-        exec($command, $result);
-    }
-
-    $result2 = array();
-    $i = 0;
-    foreach ($result as $rline) {
-        if ($rline == '--') { continue; }
-        $date_time = substr($rline, 0, 15);
-        $timestamp = strtotime($date_time);
-        $result2[$timestamp.sprintf("%04d", $i++)] = $rline;
-    }
-    ksort($result2);
-    echo implode("\n", $result2) . "\n";
-    
-    echo "\nFrom filesystem\n===============\n";
-
-    $last_task = array_pop($debug_tasks);
-    $share = $last_task->share;
-    $full_path = $last_task->full_path;
-    list($path, $filename) = explode_full_path($full_path);
-    echo "Landing Zone:\n";
-    echo "  "; passthru("ls -l " . escapeshellarg(get_share_landing_zone($share) . "/" . $full_path));
-
-    echo "\nMetadata Store:\n";
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        $metastore = clean_dir("$sp_drive/.gh_metastore");
-        if (file_exists("$metastore/$share/$full_path")) {
-            echo "  "; passthru("ls -l " . escapeshellarg("$metastore/$share/$full_path"));
-            $data = var_export(unserialize(file_get_contents("$metastore/$share/$full_path")), TRUE);
-            $data = str_replace("\n", "\n    ", $data);
-            echo "    $data\n";
-        }
-    }
-
-    echo "\nFile copies:\n";
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (file_exists("$sp_drive/$share/$full_path")) {
-            echo "  "; passthru("ls -l " . escapeshellarg("$sp_drive/$share/$full_path"));
-        }
-    }
-
-    exit(0);
-}
-
-if ($action == 'empty-trash') {
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        $trash_path = clean_dir("$sp_drive/.gh_trash");
-        if (!file_exists($trash_path)) {
-            echo "Trash in $sp_drive is empty. Nothing to do.\n";
-        } else {
-            $trash_size = trim(exec("du -sk " . escapeshellarg($trash_path) . " | awk '{print $1}'"));
-            echo "Trash in $sp_drive is " . bytes_to_human($trash_size*1024, FALSE) . ". Emptying... ";
-            exec("rm -rf " . escapeshellarg($trash_path));
-            echo "Done\n";
-        }
-    }
-    $trash_share = SharesConfig::getConfigForShare(CONFIG_TRASH_SHARE);
-    if ($trash_share && mb_strlen(escapeshellarg($trash_share[CONFIG_LANDING_ZONE])) > 8) {
-        exec("rm -rf " . escapeshellarg($trash_share[CONFIG_LANDING_ZONE]) . '/*');
-    }
-    exit(0);
-}
-
-if ($action == 'view-queue') {
-    $shares_names = array_keys(SharesConfig::getShares());
-    natcasesort($shares_names);
-
-    $max_share_strlen = max(array_merge(array_map('mb_strlen', $shares_names), array(7)));
-
-    $queues = array();
-    $total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = $total_num_fsck_pending = 0;
-    foreach ($shares_names as $share_name) {
-        $num_writes_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE action = 'write' AND share = :share AND complete IN ('yes', 'thawed')", array('share' => $share_name));
-        $total_num_writes_pending += $num_writes_pending;
-
-        $num_delete_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'unlink' OR action = 'rmdir') AND share = :share AND complete IN ('yes', 'thawed')", array('share' => $share_name));
-        $total_num_delete_pending += $num_delete_pending;
-
-        $num_rename_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE action = 'rename' AND share = :share AND complete IN ('yes', 'thawed')", array('share' => $share_name));
-        $total_num_rename_pending += $num_rename_pending;
-
-        $num_fsck_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share = :share", array('share' => $share_name));
-
-        $landing_zone = SharesConfig::get($share_name, CONFIG_LANDING_ZONE);
-        $num_fsck_pending += (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share LIKE :landing_zone", array('landing_zone' => "$landing_zone/%"));
-        $total_num_fsck_pending += $num_fsck_pending;
-
-        $queues[$share_name] = (object) array(
-            'num_writes_pending' => $num_writes_pending,
-            'num_delete_pending' => $num_delete_pending,
-            'num_rename_pending' => $num_rename_pending,
-            'num_fsck_pending' => $num_fsck_pending,
-        );
-    }
-    $queues['Total'] = (object) array(
-        'num_writes_pending' => $total_num_writes_pending,
-        'num_delete_pending' => $total_num_delete_pending,
-        'num_rename_pending' => $total_num_rename_pending,
-        'num_fsck_pending' => $total_num_fsck_pending,
-    );
-    
-    $queues['Spooled'] = (int) exec("find -L /var/spool/greyhole -type f | wc -l");
-
-    if (isset($options['json'])) {
-        echo json_encode($queues);
-    } else {
-        echo "\nGreyhole Work Queue Statistics\n==============================\n\n";
-        echo "This table gives you the number of pending operations queued for the Greyhole daemon, per share.\n\n";
-
-        $col_size = 7;
-        foreach ($queues['Total'] as $type => $num) {
-            $num = number_format($num, 0);
-            if (strlen($num) > $col_size) {
-                $col_size = strlen($num);
-            }
-        }
-        $col_format = '%' . $col_size . 's';
-
-        printf("%$max_share_strlen"."s  $col_format  $col_format  $col_format  $col_format\n", '', 'Write', 'Delete', 'Rename', 'Check');
-
-        foreach ($queues as $share_name => $queue) {
-            if ($share_name == 'Spooled') continue;
-            if ($share_name == 'Total') {
-                for ($i=0; $i<$max_share_strlen+2+(4*$col_size)+(3*2); $i++) {
-                    echo "=";
-                }
-                echo "\n";
-            }
-            echo sprintf("%-$max_share_strlen"."s", $share_name) . "  ";
-            echo sprintf($col_format, number_format($queue->num_writes_pending, 0)) . "  ";
-            echo sprintf($col_format, number_format($queue->num_delete_pending, 0)) . "  ";
-            echo sprintf($col_format, number_format($queue->num_rename_pending, 0)) . "  ";
-            echo sprintf($col_format, number_format($queue->num_fsck_pending, 0)) . "\n";
-        }
-        printf("%$max_share_strlen"."s  $col_format  $col_format  $col_format  $col_format\n", '', 'Write', 'Delete', 'Rename', 'Check');
-
-        echo "\nThe following is the number of pending operations that the Greyhole daemon still needs to parse.\n";
-        echo "Until it does, the nature of those operations is unknown.\n";
-        echo "Spooled operations that have been parsed will be listed above and disappear from the count below.\n";
-
-        echo sprintf("\n%-$max_share_strlen"."s  ", 'Spooled');
-        echo number_format($queues['Spooled'], 0) . "\n";
-
-        echo "\n";
-    }
-    exit(0);
-}
-
-if ($action == 'status') {
-    $num_dproc = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
-    if ($num_dproc == 0) {
-        echo "\nGreyhole daemon is currently stopped.\n\n";
-        exit(1);
-    }
-
-    $tasks = get_next_tasks(TRUE);
-    if ($tasks === FALSE) {
-        echo "\nCurrently idle.\n";
-    } else {
-        $task = array_shift($tasks);
-        echo "\nCurrently working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : '') . "\n";
-    }
-    
-    exec("tail -10 " . escapeshellarg(Config::get(CONFIG_GREYHOLE_LOG_FILE)), $last_log_lines);
-    echo "\nRecent log entries:\n";
-    echo "  " . implode("\n  ", $last_log_lines) . "\n";
-    
-    $last_log_line = $last_log_lines[count($last_log_lines)-1];
-    $last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
-    $raw_last_log_line = mb_substr($last_log_line, 16);
-    $last_log_line = explode(' ', $raw_last_log_line);
-    $last_action = str_replace(':', '', $last_log_line[1]);
-    echo "\nLast logged action: $last_action\n";
-    echo "  on " . date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")\n";
-    echo "\n";
-    exit(0);
-}
-
-if ($action == 'stats') {
-    if (file_exists('/sbin/zpool')) {
-        if (exec("whoami") != 'root') {
-            echo "Warning: If you are using ZFS datasets as Greyhole storage pool drives, you will need to execute this as root.\n";
-        }
-    }
-
-    $max_drive_strlen = max(array_map('mb_strlen', Config::storagePoolDrives())) + 1;
-
-    $totals = array(
-        'total_space' => 0,
-        'used_space' => 0,
-        'free_space' => 0,
-        'trash_size' => 0,
-        'potential_available_space' => 0
-    );
-
-    $dfs = get_free_space_in_storage_pool_drives();
-    $stats = array();
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (!isset($dfs[$sp_drive]) || !file_exists($sp_drive)) {
-            $stats[$sp_drive] = (object) array();
-            continue;
-        }
-        if (!is_greyhole_owned_drive($sp_drive)) {
-            $stats[$sp_drive] = (object) array();
-            continue;
-        }
-
-        $df_command = "df -k " . escapeshellarg($sp_drive) . " | tail -1";
-        unset($responses);
-        exec($df_command, $responses);
-
-        $total_space = 0;
-        $used_space = 0;
-        if (isset($responses[0])) {
-            if (preg_match("@\s+([0-9]+)\s+([0-9]+)\s+[0-9]+\s+[0-9]+%\s+.+$@", $responses[0], $regs)) {
-                $total_space = (float) $regs[1];
-                $used_space = (float) $regs[2];
-            }
-        }
-
-        $free_space = $dfs[$sp_drive]['free'];
-
-        $trash_path = clean_dir("$sp_drive/.gh_trash");
-        if (!file_exists($trash_path)) {
-            $trash_size = (float) 0;
-        } else {
-            $trash_size = (float) trim(exec("du -sk " . escapeshellarg($trash_path) . " | awk '{print $1}'"));
-        }
-
-        $potential_available_space = (float) $free_space + $trash_size;
-        
-        $stats[$sp_drive] = (object) array(
-            'total_space' => $total_space,
-            'used_space' => $used_space,
-            'free_space' => $free_space,
-            'trash_size' => $trash_size,
-            'potential_available_space' => $potential_available_space,
-        );
-
-        $totals['total_space'] += $total_space;
-        $totals['used_space'] += $used_space;
-        $totals['free_space'] += $free_space;
-        $totals['trash_size'] += $trash_size;
-        $totals['potential_available_space'] += $potential_available_space;
-    }
-    $stats['Total'] = (object) $totals;
-    
-    if (isset($options['json'])) {
-        echo json_encode($stats);
-    } else {
-        echo "\nGreyhole Statistics\n===================\n\n";
-        echo "Storage Pool\n";
-        printf("%$max_drive_strlen"."s    Total -   Used =   Free +  Trash = Possible\n", '');
-        foreach ($stats as $sp_drive => $stat) {
-            if ($sp_drive == 'Total') printf("  %-$max_drive_strlen"."s ==========================================\n", "");
-            printf("  %-$max_drive_strlen"."s ", "$sp_drive:");
-            if (empty($stat->total_space)) {
-                echo "                 Offline                  \n";
-            } else {
-                echo sprintf('%5.0f', $stat->total_space/1024/1024) . "G - " . sprintf('%5.0f', $stat->used_space/1024/1024) . "G = " . sprintf('%5.0f', $stat->free_space/1024/1024) . "G + " . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G = " . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G\n";
-            }
-        }
-        echo "\n";
-    }
-
-    exit(0);
-}
-
-if ($action == 'replace') {
-    if (!array_contains(Config::storagePoolDrives(), @$options['drive'])) {
-        $options['drive'] = '/' . trim(@$options['drive'], '/');
-    }
-    if (!array_contains(Config::storagePoolDrives(), $options['drive'])) {
-        if (!empty($options['drive'])) {
-            echo "Drive " . $options['drive'] . " is not one of your defined storage pool drive.\n";
-        }
-        echo "Please use one of the following with the --replace option:\n  ";
-        echo implode("\n  ", Config::storagePoolDrives()) . "\n";
-        echo "Note that the correct syntax for this command is:\n";
-        echo "  greyhole --$action=<drive>\n";
-        echo "The '=' character is mandatory.\n";
-        exit(1);
-    }
-    if (!is_dir($options['drive'])) {
-        gh_log(ERROR, "The directory " . $options['drive'] . " does not exists. Greyhole can't --replace directories that don't exits.");
-        echo "The directory " . $options['drive'] . " does not exists. Greyhole can't --replace directories that don't exits.\n";
-        exit(2);
-    }
-
-    remove_drive_definition($options['drive']);
-
-    gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.");
-    echo "Storage pool drive " . $options['drive'] . " has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.\n";
-    restart_service();
-    exit(0);
-}
-
-if ($action == 'wait-for') {
-    if (!mark_gone_ok($options['drive'])) {
-        if (!empty($options['drive'])) {
-            echo "Drive " . $options['drive'] . " is not one of your defined storage pool drive.\n";
-        }
-        echo "Please use one of the following with the --wait-for option:\n  ";
-        echo implode("\n  ", Config::storagePoolDrives()) . "\n";
-        echo "Note that the correct syntax for this command is:\n";
-        echo "  greyhole --$action=<drive>\n";
-        echo "The '=' character is mandatory.\n";
-        exit(1);
-    }
-    gh_log(INFO, "Storage pool drive " . $options['drive'] . " has been marked Temporarily-Gone");
-    echo "Storage pool drive " . $options['drive'] . " has been marked Temporarily-Gone, which means the missing file copies that are in this drive will not be re-created until it reappears.\n";
-    exit(0);
-}
-
-if ($action == 'balance') {
-    $query = "INSERT INTO tasks (action, share, complete) VALUES ('balance', '', 'yes')";
-    DB::insert($query);
-    echo "A balance has been scheduled. It will start after all currently pending tasks have been completed.\n";
-    echo "This operation will try to even the available space on all drives included in your storage pool.\n";
-    exit(0);
-}
-
-if ($action == 'cancel-balance') {
-    DB::execute("DELETE FROM tasks WHERE action = 'balance'");
-    echo "All scheduled balance tasks have now been deleted.\n";
-    restart_service();
-    exit(0);
-}
-
-if ($action == 'cancel-fsck') {
-    DB::execute("DELETE FROM tasks WHERE action = 'fsck'");
-    DB::execute("DELETE FROM tasks WHERE action = 'md5'");
-    echo "All scheduled fsck tasks have now been deleted.\n";
-    echo "Specific files checks might have been queued for problematic files, and those (fsck_file) tasks will still be executed, once other tasks have been processed.\n";
-    restart_service();
-    exit(0);
-}
-
-if ($action == 'fsck') {
-    $full_path = '';
-    if (isset($options['dir'])) {
-        $full_path = $options['dir'];
-        if (!is_dir($full_path)) {
-            echo "$full_path is not a directory. Exiting.\n";
-            exit(1);
-        }
-    }
-    $fsck_options = array();
-    if (isset($options['email-report'])) {
-        $fsck_options[] = 'email';
-    }
-    if (!isset($options['dont-walk-metadata-store'])) {
-        $fsck_options[] = 'metastore';
-    }
-    if (isset($options['if-conf-changed'])) {
-        $fsck_options[] = 'if-conf-changed';
-    }
-    if (isset($options['find-orphaned-files'])) {
-        $fsck_options[] = 'orphaned';
-    }
-    if (isset($options['checksums'])) {
-        $fsck_options[] = 'checksums';
-    }
-    if (isset($options['delete-orphaned-metadata'])) {
-        $fsck_options[] = 'del-orphaned-metadata';
-    }
-    if ($full_path == '') {
-        schedule_fsck_all_shares($fsck_options);
-        $full_path = 'all shares';
-    } else {
-        $query = "INSERT INTO tasks SET action = 'fsck', share = :full_path, additional_info = :fsck_options, complete = 'yes'";
-        if (empty($fsck_options)) {
-            $fsck_options = NULL;
-        } else {
-            $fsck_options = implode('|', $fsck_options);
-        }
-        $params = array(
-            'full_path' => $full_path,
-            'fsck_options' => $fsck_options,
-        );
-        DB::insert($query, $params);
-    }
-    echo "fsck of $full_path has been scheduled. It will start after all currently pending tasks have been completed.\n";
-    if (isset($options['checksums'])) {
-        echo "Any mismatch in checksums will be logged in both " . Config::get(CONFIG_GREYHOLE_LOG_FILE) . " and " . FSCKLogFile::PATH . "/fsck_checksums.log\n";
-    }
-
-    // Also clean the tasks_completed table
-    DB::deleteExecutedTasks();
-    
-    exit(0);
-}
-
-if ($action == 'md5-worker') {
-    if (is_array($options['drive'])) {
-        $drives = $options['drive'];
-    } else {
-        $drives = array($options['drive']);
-    }
-    md5_worker_thread($drives);
-    exit(0);
-}
-
-$num_daemon_processes = exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
-if ($num_daemon_processes > 1) {
-    die("Found an already running Greyhole daemon with PID " . trim(file_get_contents('/var/run/greyhole.pid')) . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
-}
-
-gh_log(INFO, "Greyhole (version %VERSION%) daemon started.");
-DB::repairTables();
-set_uniq_id();
-terminology_conversion();
-set_metastore_backup();
-Settings::backup();
-samba_check_vfs();
-parse_samba_spool();
-simplify_tasks();
-while (TRUE) {
-    parse_samba_spool();
-    $action = 'check_pool';
-    check_storage_pool_drives();
-    execute_next_task();
-}
 
 function terminology_conversion() {
     convert_folders('.gh_graveyard','.gh_metastore');
@@ -899,7 +94,7 @@ function convert_sp_drives_tag_files() {
             unlink("$sp_drive/.greyhole_uses_this");
         }
         if ($drives_definitions[$sp_drive] != $drive_uuid) {
-            gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+            Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
         }
     }
     foreach ($drives_definitions as $sp_drive => $uuid) {
@@ -916,9 +111,9 @@ function convert_sp_drives_tag_files() {
     foreach ($devices as $device_id => $sp_drives) {
         if (count($sp_drives) > 1 && $device_id !== 0 && $device_id != 'remote') {
             if (Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
-                gh_log(INFO, "The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf '" . CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE . "' options, you chose to ignore this normally critical error.");
+                Log::info("The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf '" . CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE . "' options, you chose to ignore this normally critical error.");
             } else {
-                gh_log(CRITICAL, "ERROR: The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ". The Greyhole daemon will now stop.");
+                Log::critical("ERROR: The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ". The Greyhole daemon will now stop.");
             }
         }
     }
@@ -941,7 +136,7 @@ function convert_folders($old,$new) {
         $old_term = clean_dir("$sp_drive/".$old);
         $new_term = clean_dir("$sp_drive/".$new);
         if (file_exists($old_term)) {
-            gh_log(INFO, "Moving $old_term to $new_term...");
+            Log::info("Moving $old_term to $new_term...");
             gh_rename($old_term,$new_term);
         }
     }
@@ -961,7 +156,7 @@ function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
 }
 
 function execute_next_task() {
-    global $fsck_report, $sleep_before_task, $action, $next_task, $current_task_id, $locked_files, $fix_symlinks_scanned_dirs;
+    global $fsck_report, $sleep_before_task, $next_task, $current_task_id, $locked_files, $fix_symlinks_scanned_dirs;
 
     if (isset($next_task)) {
         $task = $next_task;
@@ -976,8 +171,8 @@ function execute_next_task() {
             if (!empty($next_tasks)) {
                 $task = array_shift($next_tasks);
             } else {
-                $action = 'sleep';
-                gh_log(DEBUG, "Nothing to do... Sleeping.");
+                Log::setAction(ACTION_SLEEP);
+                Log::debug("Nothing to do... Sleeping.");
 
                 DB::repairTables();
 
@@ -989,7 +184,7 @@ function execute_next_task() {
                     $log->emailAsRequired();
                 }
 
-                $log_level = Config::get(CONFIG_LOG_LEVEL);
+                $log_level = Log::getLevel();
                 sleep($log_level == Log::DEBUG ? 10 : ($log_level == Log::TEST || $log_level == Log::PERF ? 1 : 600));
                 $locked_files = array();
 
@@ -1004,9 +199,9 @@ function execute_next_task() {
         $frozen_directories = Config::get(CONFIG_FROZEN_DIRECTORY);
         foreach ($frozen_directories as $frozen_directory) {
             if (string_starts_with("$task->share/$task->full_path", $frozen_directory)) {
-                $action = $task->action;
-                gh_log(DEBUG, "Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
-                gh_log(DEBUG, "  This directory is frozen. Will postpone this task until it is thawed.");
+                Log::setAction($task->action);
+                Log::debug("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+                Log::debug("  This directory is frozen. Will postpone this task until it is thawed.");
                 postpone_task($task->id, 'frozen');
                 archive_task($task->id);
                 return;
@@ -1015,22 +210,22 @@ function execute_next_task() {
     }
     
     if (array_contains($sleep_before_task, $task->id)) {
-        $action = 'sleep';
-        gh_log(DEBUG, "Only locked files operations pending... Sleeping.");
-        $log_level = Config::get(CONFIG_LOG_LEVEL);
+        Log::setAction(ACTION_SLEEP);
+        Log::debug("Only locked files operations pending... Sleeping.");
+        $log_level = Log::getLevel();
         sleep($log_level == Log::DEBUG ? 10 : ($log_level == Log::TEST ? 1 : 600));
         $sleep_before_task = array();
         $locked_files = array();
     }
-    
-    $action = $task->action;
-    gh_log(INFO, "Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+
+    Log::setAction($task->action);
+    Log::info("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 
     switch ($task->action) {
         case 'balance':
-            gh_log(INFO, "Starting available space balancing");
+            Log::info("Starting available space balancing");
             gh_balance();
-            gh_log(INFO, "Available space balancing completed.");
+            Log::info("Available space balancing completed.");
             break;
         case 'fsck_file':
             set_fsck_options($task);
@@ -1057,7 +252,7 @@ function execute_next_task() {
                 
                 // New value
                 if ($new_conf_md5 == $last_md5) {
-                    gh_log(INFO, "Skipping fsck; --if-conf-changed was specified, and the configuration file didn't change since the last fsck.");
+                    Log::info("Skipping fsck; --if-conf-changed was specified, and the configuration file didn't change since the last fsck.");
                     break;
                 }
             }
@@ -1089,11 +284,11 @@ function execute_next_task() {
             $num_updated_rows = DB::getFirstValue("SELECT COUNT(*) AS num_updated_rows FROM tasks WHERE action = 'fsck_file' AND complete = 'yes' $where_clause", $params);
             if ($num_updated_rows > 0) {
                 // Updated some fsck_file to complete; let's just return here, to allow them to be executed first.
-                gh_log(INFO, "Will execute all ($num_updated_rows) pending fsck_file operations for $fsck_what_dir before running this fsck (task ID $task->id).");
+                Log::info("Will execute all ($num_updated_rows) pending fsck_file operations for $fsck_what_dir before running this fsck (task ID $task->id).");
                 return;
             }
 
-            gh_log(INFO, "Starting fsck for $fsck_what_dir");
+            Log::info("Starting fsck for $fsck_what_dir");
             initialize_fsck_report($fsck_what_dir);
             clearstatcache();
 
@@ -1104,7 +299,7 @@ function execute_next_task() {
                 foreach (Config::storagePoolDrives() as $sp_drive) {
                     $checksums_thread_ids[] = spawn_thread('md5-worker', array($sp_drive));
                 }
-                gh_log(DEBUG, "Spawned " . count($checksums_thread_ids) . " worker threads to calculate MD5 checksums. Will now wait for results, and check them as they come in.");
+                Log::debug("Spawned " . count($checksums_thread_ids) . " worker threads to calculate MD5 checksums. Will now wait for results, and check them as they come in.");
             }
 
             set_fsck_options($task);
@@ -1166,7 +361,7 @@ function execute_next_task() {
                         if ($fsck_type == FSCK_TYPE_METASTORE) {
                             // This is a metastore directory, so only kick off a metastore fsck for the indicated directory (this will not fsck the corresponding metastore path on other volumes)
                             $subdir = str_replace("$metastore", '', $fscked_dir);
-                            gh_log(DEBUG, "Starting metastore fsck for $metastore/$subdir");
+                            Log::debug("Starting metastore fsck for $metastore/$subdir");
                             gh_fsck_metastore($metastore, $subdir, $share);
                         } else {
                             // This isn't a metastore dir so we'll check the metastore of this path on all volumes
@@ -1175,7 +370,7 @@ function execute_next_task() {
                             } else {
                                 $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
                             }
-                            gh_log(DEBUG, "Starting metastores fsck for $subdir");
+                            Log::debug("Starting metastores fsck for $subdir");
                             foreach (get_metastores() as $metastore) {
                                 gh_fsck_metastore($metastore, $subdir, $share);
                             }
@@ -1183,7 +378,7 @@ function execute_next_task() {
                     }
                     if ($fsck_type != FSCK_TYPE_STORAGE_POOL_DRIVE && task_has_option($task, 'orphaned')) {
                         $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
-                        gh_log(DEBUG, "Starting orphans search for $subdir");
+                        Log::debug("Starting orphans search for $subdir");
                         foreach (Config::storagePoolDrives() as $sp_drive) {
                             if (is_greyhole_owned_drive($sp_drive)) {
                                 gh_fsck("$sp_drive/$subdir", $share, $sp_drive);
@@ -1192,7 +387,7 @@ function execute_next_task() {
                     }
                 }
             }
-            gh_log(INFO, "fsck for " . ($fscked_dir == '' ? 'All shares' : $fscked_dir) . " completed.");
+            Log::info("fsck for " . ($fscked_dir == '' ? 'All shares' : $fscked_dir) . " completed.");
             
             Settings::set('last_fsck_conf_md5', $new_conf_md5);
             
@@ -1200,7 +395,7 @@ function execute_next_task() {
                 // Email report for fsck
                 $fsck_report_mail = get_fsck_report();
                 $email_to = Config::get(CONFIG_EMAIL_TO);
-                gh_log(DEBUG, "Sending fsck report to $email_to");
+                Log::debug("Sending fsck report to $email_to");
                 mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report_mail);
             }
             break;
@@ -1245,13 +440,13 @@ function gh_rmdir($share, $full_path) {
         return;
     }
     
-    gh_log(INFO, "Directory deleted: $landing_zone/$full_path");
+    Log::info("Directory deleted: $landing_zone/$full_path");
     
     if (array_contains(ConfigHelper::$trash_share_names, $share)) {
         // Remove that directory from all trashes
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (@rmdir("$sp_drive/.gh_trash/$full_path")) {
-                gh_log(DEBUG, "  Removed copy from trash at $sp_drive/.gh_trash/$full_path");
+                Log::debug("  Removed copy from trash at $sp_drive/.gh_trash/$full_path");
             }
         }
         return;
@@ -1259,11 +454,11 @@ function gh_rmdir($share, $full_path) {
 
     foreach (Config::storagePoolDrives() as $sp_drive) {
         if (@rmdir("$sp_drive/$share/$full_path/")) {
-            gh_log(DEBUG, "  Removed copy at $sp_drive/$share/$full_path");
+            Log::debug("  Removed copy at $sp_drive/$share/$full_path");
         }
         $metastore = "$sp_drive/.gh_metastore";
         if (@rmdir("$metastore/$share/$full_path/")) {
-            gh_log(DEBUG, "  Removed metadata files directory $metastore/$share/$full_path");
+            Log::debug("  Removed metadata files directory $metastore/$share/$full_path");
         }
     }
 }
@@ -1278,13 +473,13 @@ function gh_unlink($share, $full_path, $task_id) {
         return;
     }
 
-    gh_log(INFO, "File deleted: $landing_zone/$full_path");
+    Log::info("File deleted: $landing_zone/$full_path");
     
     if (array_contains(ConfigHelper::$trash_share_names, $share)) {
         // Will delete the file in the trash which has no corresponding symlink in the Greyhole Trash share.
         // That symlink is what was deleted from that share to create the task we're currently working on.
         $full_path = preg_replace('/ copy [0-9]+$/', '', $full_path);
-        gh_log(DEBUG, "  Looking for corresponding file in trash to delete...");
+        Log::debug("  Looking for corresponding file in trash to delete...");
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (file_exists("$sp_drive/.gh_trash/$full_path")) {
                 $delete = TRUE;
@@ -1304,7 +499,7 @@ function gh_unlink($share, $full_path, $task_id) {
                 }
 
                 if ($delete) {
-                    gh_log(DEBUG, "    Deleting corresponding copy $sp_drive/.gh_trash/$full_path");
+                    Log::debug("    Deleting corresponding copy $sp_drive/.gh_trash/$full_path");
                     unlink("$sp_drive/.gh_trash/$full_path");
                     break;
                 }
@@ -1314,7 +509,7 @@ function gh_unlink($share, $full_path, $task_id) {
     }
 
     if (gh_file_exists("$landing_zone/$full_path") && !is_dir("$landing_zone/$full_path")) {
-        gh_log(DEBUG, "  File still exists in landing zone; a new file replaced the one deleted here. Skipping.");
+        Log::debug("  File still exists in landing zone; a new file replaced the one deleted here. Skipping.");
         return;
     }
 
@@ -1349,7 +544,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
     }
 
     if (is_dir("$landing_zone/$target_full_path") || is_a_metastore_dir($share, $full_path)) {
-        gh_log(INFO, "Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
+        Log::info("Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (!is_greyhole_owned_drive($sp_drive)) {
@@ -1363,31 +558,31 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                 gh_mkdir($path, $original_path);
 
                 gh_rename("$sp_drive/$share/$full_path", "$sp_drive/$share/$target_full_path");
-                gh_log(DEBUG, "  Directory moved: $sp_drive/$share/$full_path -> $sp_drive/$share/$target_full_path");
+                Log::debug("  Directory moved: $sp_drive/$share/$full_path -> $sp_drive/$share/$target_full_path");
             }
 
             list($path, $dirname) = explode_full_path("$sp_drive/.gh_metastore/$share/$target_full_path");
             gh_mkdir($path, $original_path);
             $result = @gh_rename("$sp_drive/.gh_metastore/$share/$full_path", "$sp_drive/.gh_metastore/$share/$target_full_path");
             if ($result) {
-                gh_log(DEBUG, "  Metadata Store directory moved: $sp_drive/.gh_metastore/$share/$full_path -> $sp_drive/.gh_metastore/$share/$target_full_path");
+                Log::debug("  Metadata Store directory moved: $sp_drive/.gh_metastore/$share/$full_path -> $sp_drive/.gh_metastore/$share/$target_full_path");
             }
             $result = @gh_rename("$sp_drive/.gh_metastore_backup/$share/$full_path", "$sp_drive/.gh_metastore_backup/$share/$target_full_path");
             if ($result) {
-                gh_log(DEBUG, "  Backup Metadata Store directory moved: $sp_drive/.gh_metastore_backup/$share/$full_path -> $sp_drive/.gh_metastore_backup/$share/$target_full_path");
+                Log::debug("  Backup Metadata Store directory moved: $sp_drive/.gh_metastore_backup/$share/$full_path -> $sp_drive/.gh_metastore_backup/$share/$target_full_path");
             }
         }
 
         foreach (get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles) {
-            gh_log(DEBUG, "Existing metadata files: " . count($existing_metafiles));
+            Log::debug("Existing metadata files: " . count($existing_metafiles));
             foreach ($existing_metafiles as $file_path => $file_metafiles) {
-                gh_log(DEBUG, "  File metafiles: " . count($file_metafiles));
+                Log::debug("  File metafiles: " . count($file_metafiles));
                 $new_file_metafiles = array();
                 $symlinked = FALSE;
                 foreach ($file_metafiles as $key => $metafile) {
                     $old_path = $metafile->path;
                     $metafile->path = str_replace("/$share/$full_path/$file_path", "/$share/$target_full_path/$file_path", $metafile->path);
-                    gh_log(DEBUG, "  Changing metadata file: $old_path -> $metafile->path");
+                    Log::debug("  Changing metadata file: $old_path -> $metafile->path");
                     $new_file_metafiles[$metafile->path] = $metafile;
 
                     // is_linked = is the target of the existing symlink
@@ -1404,11 +599,11 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                 }
                 
                 if (is_link("$landing_zone/$target_full_path/$file_path") && !empty($symlink_target) && readlink("$landing_zone/$target_full_path/$file_path") != $symlink_target) {
-                    gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $symlink_target");
+                    Log::debug("  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $symlink_target");
                     unlink("$landing_zone/$target_full_path/$file_path");
                     symlink($symlink_target, "$landing_zone/$target_full_path/$file_path");
                 } else if (is_link("$landing_zone/$full_path/$file_path") && !empty($symlink_target) && !file_exists(readlink("$landing_zone/$full_path/$file_path"))) {
-                    gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path/$file_path to point to $symlink_target");
+                    Log::debug("  Updating symlink at $landing_zone/$full_path/$file_path to point to $symlink_target");
                     unlink("$landing_zone/$full_path/$file_path");
                     symlink($symlink_target, "$landing_zone/$full_path/$file_path");
                 } else {
@@ -1420,12 +615,12 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
             }
         }
     } else {
-        gh_log(INFO, "File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
+        Log::info("File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
         
         // Check if another process locked this file before we work on it.
         global $locked_files;
         if (isset($locked_files[clean_dir("$share/$target_full_path")]) || file_is_locked($share, $target_full_path) !== FALSE) {
-            gh_log(DEBUG, "  File $landing_zone/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
+            Log::debug("  File $landing_zone/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
             postpone_task($task_id);
             $locked_files[clean_dir("$share/$target_full_path")] = TRUE;
             return;
@@ -1462,7 +657,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                 foreach ($existing_metafiles as $key => $metafile) {
                     $old_path = $metafile->path;
                     $metafile->path = str_replace("/$share/$full_path", "/$share/$target_full_path", $old_path);
-                    gh_log(DEBUG, "  Renaming copy at $old_path to $metafile->path");
+                    Log::debug("  Renaming copy at $old_path to $metafile->path");
 
                     // Make sure the target directory exists
                     list($metafile_dir_path, $metafile_filename) = explode_full_path($metafile->path);
@@ -1478,7 +673,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                             $symlink_target = $metafile->path;
                         }
                     } else {
-                        gh_log(WARN, "    Warning! An error occured while renaming file copy $old_path to $metafile->path.");
+                        Log::warn("    Warning! An error occured while renaming file copy $old_path to $metafile->path.");
                     }
                     $existing_metafiles[$key] = $metafile;
                 }
@@ -1495,12 +690,12 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                     // New link exists...
                     if (readlink("$landing_zone/$target_full_path") != $symlink_target) {
                         // ...and needs to be updated.
-                        gh_log(DEBUG, "  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
+                        Log::debug("  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
                         unlink("$landing_zone/$target_full_path");
                         symlink($symlink_target, "$landing_zone/$target_full_path");
                     }
                 } else if (is_link("$landing_zone/$full_path") && !file_exists(readlink("$landing_zone/$full_path"))) {
-                    gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $symlink_target");
+                    Log::debug("  Updating symlink at $landing_zone/$full_path to point to $symlink_target");
                     unlink("$landing_zone/$full_path");
                     symlink($symlink_target, "$landing_zone/$full_path");
                 } else {
@@ -1517,9 +712,9 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
     if (isset($fix_symlinks_scanned_dirs[$landing_zone])) {
         return;
     }
-    gh_log(INFO, "  Scanning $landing_zone for broken links... This can take a while!");
+    Log::info("  Scanning $landing_zone for broken links... This can take a while!");
     exec("find -L " . escapeshellarg($landing_zone) . " -type l", $broken_links);
-    gh_log(DEBUG, "    Found " . count($broken_links) . " broken links.");
+    Log::debug("    Found " . count($broken_links) . " broken links.");
     foreach ($broken_links as $broken_link) {
         $fixed_link_target = readlink($broken_link);
         foreach (Config::storagePoolDrives() as $sp_drive) {
@@ -1530,7 +725,7 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
             }
         }
         if (gh_is_file($fixed_link_target)) {
-            gh_log(DEBUG, "  Found a broken symlink to update: $broken_link. Old (broken) target: " . readlink($broken_link) . "; new (fixed) target: $fixed_link_target");
+            Log::debug("  Found a broken symlink to update: $broken_link. Old (broken) target: " . readlink($broken_link) . "; new (fixed) target: $fixed_link_target");
             unlink($broken_link);
             symlink($fixed_link_target, $broken_link);
         }
@@ -1543,7 +738,7 @@ function gh_file_exists($real_path, $log_message=null) {
     if (!file_exists($real_path)) {
         if ($log_message != null) {
             eval('$log_message = "' . str_replace('"', '\"', $log_message) . '";');
-            gh_log(INFO, $log_message);
+            Log::info($log_message);
         }
         return FALSE;
     }
@@ -1553,7 +748,7 @@ function gh_file_exists($real_path, $log_message=null) {
 function get_num_copies($share) {
     $num_copies = SharesConfig::get($share, CONFIG_NUM_COPIES);
     if (!$num_copies) {
-        gh_log(WARN, "Found a task on a share ($share) that disappeared from " . ConfigHelper::$config_file . ". Skipping.");
+        Log::warn("Found a task on a share ($share) that disappeared from " . ConfigHelper::$config_file . ". Skipping.");
         return -1;
     }
     if ($num_copies < 1) {
@@ -1573,7 +768,7 @@ function get_num_copies($share) {
 
 function file_is_locked($share, $full_path) {
     if (Config::get(CONFIG_CHECK_FOR_OPEN_FILES) === FALSE) {
-        gh_log(DEBUG, "  Skipping open file (lock) check.");
+        Log::debug("  Skipping open file (lock) check.");
         return FALSE;
     }
     
@@ -1653,14 +848,14 @@ function should_ignore_file($share, $full_path) {
 
     foreach (Config::get(CONFIG_IGNORED_FILES) as $ignored_file_re) {
         if (preg_match(';^' . $ignored_file_re . '$;', $filename)) {
-            gh_log(INFO, "Ignoring task because it matches the following '" . CONFIG_IGNORED_FILES . "' pattern: $ignored_file_re");
+            Log::info("Ignoring task because it matches the following '" . CONFIG_IGNORED_FILES . "' pattern: $ignored_file_re");
             return TRUE;
         }
     }
     foreach (Config::get(CONFIG_IGNORED_FOLDERS) as $ignored_folder_re) {
         $p = clean_dir("$share/$path");
         if (preg_match(';^' . $ignored_folder_re . '$;', $p)) {
-            gh_log(INFO, "Ignoring task because it matches the following '" . CONFIG_IGNORED_FOLDERS . "' pattern: $ignored_folder_re");
+            Log::info("Ignoring task because it matches the following '" . CONFIG_IGNORED_FOLDERS . "' pattern: $ignored_folder_re");
             return TRUE;
         }
     }
@@ -1683,14 +878,14 @@ function gh_write($share, $full_path, $task_id) {
     if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore.')) {
         $new_full_path = find_future_full_path($share, $full_path, $task_id);
         if ($new_full_path != $full_path && gh_is_file("$landing_zone/$new_full_path")) {
-            gh_log(DEBUG, "  Found that $full_path has been renamed to $new_full_path. Will work using that instead.");
+            Log::debug("  Found that $full_path has been renamed to $new_full_path. Will work using that instead.");
             if (is_link("$landing_zone/$new_full_path")) {
                 $source_file = clean_dir(readlink("$landing_zone/$new_full_path"));
             } else {
                 $source_file = clean_dir("$landing_zone/$new_full_path");
             }
         } else {
-            gh_log(INFO, "  Skipping.");
+            Log::info("  Skipping.");
             if (!gh_file_exists($landing_zone, '  Share "' . $share . '" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {
                 postpone_task($task_id);
             }
@@ -1711,12 +906,12 @@ function gh_write($share, $full_path, $task_id) {
         }
         clearstatcache();
         $filesize = gh_filesize($source_file);
-        if (Config::get(CONFIG_LOG_LEVEL) >= Log::DEBUG) {
-            gh_log(INFO, "File changed: $share/$full_path - " . bytes_to_human($filesize, FALSE));
+        if (Log::getLevel() >= Log::DEBUG) {
+            Log::info("File changed: $share/$full_path - " . bytes_to_human($filesize, FALSE));
         } else {
-            gh_log(INFO, "File changed: $share/$full_path");
+            Log::info("File changed: $share/$full_path");
         }
-        gh_log(DEBUG, "  Will use source file: $source_file");
+        Log::debug("  Will use source file: $source_file");
 
         foreach (get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
             // Remove old copies (but not the one that was updated!)
@@ -1729,7 +924,7 @@ function gh_write($share, $full_path, $task_id) {
                     $metafile->state = 'OK';
                     $found_source_file = TRUE;
                 } else {
-                    gh_log(DEBUG, "  Will remove copy at $metafile->path");
+                    Log::debug("  Will remove copy at $metafile->path");
                     $keys_to_remove[] = $metafile->path;
                 }
             }
@@ -1737,13 +932,13 @@ function gh_write($share, $full_path, $task_id) {
                 // This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
                 $key = array_shift($keys_to_remove);
                 $source_file = $existing_metafiles[$key]->path;
-                gh_log(DEBUG, "  Change of mind... Will use source file: $source_file");
+                Log::debug("  Change of mind... Will use source file: $source_file");
             }
             $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove);
             if (!empty($new_metafiles) && !isset($new_metafiles[$source_file])) {
                 // Delete source file; we copied it somewhere else
                 // Let's just make sure we have at least one OK file before we delete it!
-                gh_log(DEBUG, "  Source file is not needed anymore. Deleting...");
+                Log::debug("  Source file is not needed anymore. Deleting...");
                 $is_ok = FALSE;
                 foreach ($new_metafiles as $metafile) {
                     if ($metafile->state == 'OK') {
@@ -1755,7 +950,7 @@ function gh_write($share, $full_path, $task_id) {
                     // Ok, now we're sure.
                     gh_recycle($source_file);
                 } else {
-                    gh_log(DEBUG, "  Change of mind... Couldn't find any OK metadata file... Will keep the source!");
+                    Log::debug("  Change of mind... Couldn't find any OK metadata file... Will keep the source!");
                 }
             }
         }
@@ -1765,21 +960,21 @@ function gh_write($share, $full_path, $task_id) {
         }
         clearstatcache();
         $filesize = gh_filesize($source_file);
-        if (Config::get(CONFIG_LOG_LEVEL) >= Log::DEBUG) {
-            gh_log(INFO, "File created: $share/$full_path - " . bytes_to_human($filesize, FALSE));
+        if (Log::getLevel() >= Log::DEBUG) {
+            Log::info("File created: $share/$full_path - " . bytes_to_human($filesize, FALSE));
         } else {
-            gh_log(INFO, "File created: $share/$full_path");
+            Log::info("File created: $share/$full_path");
         }
 
         if (is_dir($source_file)) {
-            gh_log(INFO, "$share/$full_path is now a directory! Aborting.");
+            Log::info("$share/$full_path is now a directory! Aborting.");
             return;
         }
 
         // There might be old metafiles... for example, when a delete task was skipped.
         // Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_metafiles()
         foreach (get_metafiles($share, $path, $filename) as $existing_metafiles) {
-            gh_log(DEBUG, count($existing_metafiles) . " metafiles loaded.");
+            Log::debug(count($existing_metafiles) . " metafiles loaded.");
             if (count($existing_metafiles) > 0) {
                 foreach ($existing_metafiles as $metafile) {
                     gh_recycle($metafile->path);
@@ -1808,7 +1003,7 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
         // Check if another process locked this file before we work on it.
         global $locked_files;
         if (isset($locked_files[clean_dir("$share/$full_path")]) || ($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
-            gh_log(DEBUG, "  File $landing_zone/$full_path is locked by another process. Will wait until it's unlocked to work on it.");
+            Log::debug("  File $landing_zone/$full_path is locked by another process. Will wait until it's unlocked to work on it.");
             postpone_task($task_id);
             $locked_files[clean_dir("$share/$full_path")] = TRUE;
             return array();
@@ -1829,7 +1024,7 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
     $metafiles = create_metafiles($share, $full_path, $num_copies_required, $filesize, $existing_metafiles);
 
     if (count($metafiles) == 0) {
-        gh_log(WARN, "  No metadata files could be created. Will wait until metadata files can be created to work on this file.");
+        Log::warn("  No metadata files could be created. Will wait until metadata files can be created to work on this file.");
         postpone_task($task_id);
         return array();
     }
@@ -1862,18 +1057,18 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
         if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
         
         if ($metafile->path == $source_file && $metafile->state == 'OK' && gh_filesize($metafile->path) == gh_filesize($source_file)) {
-            gh_log(DEBUG, "  File copy at $metafile->path is already up to date.");
+            Log::debug("  File copy at $metafile->path is already up to date.");
             continue;
         }
         
         if ($missing_only && gh_file_exists($metafile->path) && $metafile->state == 'OK' && gh_filesize($metafile->path) == gh_filesize($source_file)) {
-            gh_log(DEBUG, "  File copy at $metafile->path is already up to date.");
+            Log::debug("  File copy at $metafile->path is already up to date.");
             continue;
         }
 
         $root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
         if (!is_greyhole_owned_drive($root_path)) {
-            gh_log(WARN, "  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+            Log::warn("  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
             $metafile->state = 'Gone';
             $metafiles[$key] = $metafile;
             continue;
@@ -1901,10 +1096,10 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
             if (file_exists("$landing_zone/$full_path")) {
                 global $current_task_id;
                 if ($current_task_id === 0) {
-                    gh_log(ERROR, "    Failed file copy (cont). We already retried this task. Aborting.");
+                    Log::error("    Failed file copy (cont). We already retried this task. Aborting.");
                     return;
                 }
-                gh_log(WARN, "    Failed file copy (cont). Will try to re-process this write task, since the source file seems intact.");
+                Log::warn("    Failed file copy (cont). Will try to re-process this write task, since the source file seems intact.");
                 // Queue a new write task, to replace the now gone copy.
                 global $next_task;
                 $next_task = (object) array(
@@ -1925,7 +1120,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
         }
         $link_next = FALSE;
         if ($metafile->is_linked) {
-            gh_log(DEBUG, "    Creating symlink in share pointing to the above file copy.");
+            Log::debug("    Creating symlink in share pointing to the above file copy.");
             symlink($metafile->path, "$landing_zone/$path/.gh_$filename");
             if (!file_exists("$landing_zone/$full_path") || unlink("$landing_zone/$full_path")) {
                 gh_rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
@@ -1955,9 +1150,9 @@ function gh_copy_file($source_file, &$destination_file) {
     }
 
     if (isset($source_size)) {
-        gh_log(DEBUG, "  Copying " . bytes_to_human($source_size, FALSE) . " file to $destination_file");
+        Log::debug("  Copying " . bytes_to_human($source_size, FALSE) . " file to $destination_file");
     } else {
-        gh_log(DEBUG, "  Copying file to $destination_file");
+        Log::debug("  Copying file to $destination_file");
     }
 
     $renamed = FALSE;
@@ -1965,7 +1160,7 @@ function gh_copy_file($source_file, &$destination_file) {
         $source_dev = gh_file_deviceid($source_file);
         $target_dev = gh_file_deviceid(dirname($destination_file));
         if ($source_dev === $target_dev && $source_dev !== FALSE) {
-            gh_log(DEBUG, "  (using rename)");
+            Log::debug("  (using rename)");
             gh_rename($source_file, $temp_path);
             $renamed = TRUE;
         }
@@ -1990,12 +1185,12 @@ function gh_copy_file($source_file, &$destination_file) {
     if ($it_worked) {
         if (time() - $start_time > 0) {
             $speed = number_format($source_size/1024/1024 / (time() - $start_time), 1);
-            gh_log(DEBUG, "    Copy created at $speed MBps.");
+            Log::debug("    Copy created at $speed MBps.");
         }
         gh_rename($temp_path, $destination_file);
         gh_chperm($destination_file, gh_get_file_infos($source_file));
     } else {
-        gh_log(WARN, "    Failed file copy. Will mark this metadata file 'Gone'.");
+        Log::warn("    Failed file copy. Will mark this metadata file 'Gone'.");
         if ($renamed) {
             // Do NOT delete $temp_path if the file was renamed... Just move it back!
             gh_rename($temp_path, $source_file);
@@ -2042,17 +1237,17 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
                             // Bingo!
                             $parent_directory = normalize_utf8_characters($parent_directory);
                         } else {
-                            gh_log(WARN, "  Failed to create directory $parent_directory");
+                            Log::warn("  Failed to create directory $parent_directory");
                             return FALSE;
                         }
                     }
                 }
             }
             if (!chown($parent_directory, $dir_infos->fileowner)) {
-                gh_log(WARN, "  Failed to chown directory '$parent_directory'");
+                Log::warn("  Failed to chown directory '$parent_directory'");
             }
             if (!chgrp($parent_directory, $dir_infos->filegroup)) {
-                gh_log(WARN, "  Failed to chgrp directory '$parent_directory'");
+                Log::warn("  Failed to chgrp directory '$parent_directory'");
             }
             if (!isset($dir_parts[$i])) {
                 break;
@@ -2178,7 +1373,7 @@ function get_metafiles($share, $path, $filename=null, $load_nok_metafiles=FALSE,
 
 function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
     if (!$quiet) {
-        gh_log(DEBUG, "Loading metafiles for " . clean_dir($share . (!empty($path) ? "/$path" : "") . "/$filename") . ' ...');
+        Log::debug("Loading metafiles for " . clean_dir($share . (!empty($path) ? "/$path" : "") . "/$filename") . ' ...');
     }
     $metafiles_data_file = get_metafile_data_filename($share, $path, $filename);
     clearstatcache();
@@ -2202,14 +1397,14 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
             if ($metafile->state == 'OK' && $share_file_link_to !== FALSE) {
                 if (@$metafile->is_linked && $metafile->path != $share_file_link_to) {
                     if (!$quiet) {
-                        gh_log(DEBUG, '  Changing is_linked to FALSE for ' . $metafile->path);
+                        Log::debug('  Changing is_linked to FALSE for ' . $metafile->path);
                     }
                     $metafile->is_linked = FALSE;
                     $metafiles[$key] = $metafile;
                     save_metafiles($share, $path, $filename, $metafiles);
                 } else if (empty($metafile->is_linked) && $metafile->path == $share_file_link_to) {
                     if (!$quiet) {
-                        gh_log(DEBUG, '  Changing is_linked to TRUE for ' . $metafile->path);
+                        Log::debug('  Changing is_linked to TRUE for ' . $metafile->path);
                     }
                     $metafile->is_linked = TRUE;
                     $metafiles[$key] = $metafile;
@@ -2239,29 +1434,29 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
             $ok_metafiles[$key] = $metafile;
         } else {
             if (!$valid_path) {
-                gh_log(WARN, "Found a metadata file pointing to a drive not defined in your storage pool: '$metafile->path'. Will mark it as Gone.");
+                Log::warn("Found a metadata file pointing to a drive not defined in your storage pool: '$metafile->path'. Will mark it as Gone.");
                 $metafile->state = 'Gone';
                 $metafiles[$key] = $metafile;
                 save_metafiles($share, $path, $filename, $metafiles);
             } else {
-                #gh_log(DEBUG, "Found a metadata file, pointing to '$metafile->path', with state = '$metafile->state'. We just want 'OK' metadata files; will not use this metadata file.");
+                #Log::debug("Found a metadata file, pointing to '$metafile->path', with state = '$metafile->state'. We just want 'OK' metadata files; will not use this metadata file.");
             }
         }
     }
     $metafiles = $ok_metafiles;
     
     if (!$quiet) {
-        gh_log(DEBUG, "  Got " . count($metafiles) . " metadata files.");
+        Log::debug("  Got " . count($metafiles) . " metadata files.");
     }
     return $metafiles;
 }
 
 function remove_metafiles($share, $path, $filename) {
-    gh_log(DEBUG, "  Removing metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+    Log::debug("  Removing metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
     
     foreach (get_metafile_data_filenames($share, $path, $filename) as $f) {
         @unlink($f);
-        gh_log(DEBUG, "    Removed metadata file at $f");
+        Log::debug("    Removed metadata file at $f");
         clearstatcache();
     }
 }
@@ -2275,7 +1470,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
     // We don't care about the keys (we'll re-create them on load), so let's not waste disk space, and use numeric indexes.
     $metafiles = array_values($metafiles);
 
-    gh_log(DEBUG, "  Saving " . count($metafiles) . " metadata files for " . clean_dir($share . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : "")));
+    Log::debug("  Saving " . count($metafiles) . " metadata files for " . clean_dir($share . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : "")));
     $paths_used = array();
     foreach (get_metastores() as $metastore) {
         $sp_drive = str_replace('/.gh_metastore', '', $metastore);
@@ -2284,7 +1479,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
         foreach ($metafiles as $metafile) {
             if (get_storage_volume_from_path($metafile->path) == $sp_drive && is_greyhole_owned_drive($sp_drive)) {
                 gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
-                gh_log(DEBUG, "    Saving metadata in " . clean_dir("$data_filepath/$filename"));
+                Log::debug("    Saving metadata in " . clean_dir("$data_filepath/$filename"));
                 if (is_dir("$data_filepath/$filename")) {
                     exec("rm -rf " . escapeshellarg("$data_filepath/$filename"));
                 }
@@ -2317,7 +1512,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
                 $metastore_backup_drive = $metastore_backup_drives[1];
             }
             $data_filepath = "$metastore_backup_drive/$share/$path";
-            gh_log(DEBUG, "    Saving backup metadata file in $data_filepath/$filename");
+            Log::debug("    Saving backup metadata file in $data_filepath/$filename");
             gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
             file_put_contents("$data_filepath/$filename", serialize($metafiles));
         }
@@ -2325,10 +1520,9 @@ function save_metafiles($share, $path, $filename, $metafiles) {
 }
 
 function simplify_tasks() {
-    global $action;
-    $action = 'simplify_tasks';
-    
-    gh_log(DEBUG, "Simplifying pending tasks.");
+    Log::setAction(ACTION_SIMPLIFY_TASKS);
+
+    Log::debug("Simplifying pending tasks.");
     
     // Remove locked write tasks
     $query = "SELECT share, full_path FROM tasks WHERE action = 'write' and complete = 'no'";
@@ -2349,7 +1543,7 @@ function samba_get_version() {
 }
 
 function samba_restart() {
-      gh_log(INFO, "The Samba daemon will now restart...");
+      Log::info("The Samba daemon will now restart...");
       if (is_file('/etc/init/smbd.conf')) {
           exec("/sbin/restart smbd");
       } else if (is_file('/etc/init.d/samba')) {
@@ -2361,7 +1555,7 @@ function samba_restart() {
       } else if (is_file('/etc/systemd/system/multi-user.target.wants/smb.service')) {
           exec("systemctl restart smb.service");
       } else {
-          gh_log(CRITICAL, "Couldn't find how to restart Samba. Please restart the Samba daemon manually.");
+          Log::critical("Couldn't find how to restart Samba. Please restart the Samba daemon manually.");
       }
 }
 
@@ -2393,20 +1587,20 @@ function samba_check_vfs() {
 
     $vfs_file = "$target_libdir/samba/vfs/greyhole.so";
 
-    gh_log(DEBUG, "Checking symlink at $vfs_file...");
+    Log::debug("Checking symlink at $vfs_file...");
       if (is_file($vfs_file)) {
           // Get VFS symlink target
           $vfs_target = @readlink($vfs_file);
 
           if (strpos($vfs_target, "/greyhole-samba$version.so") !== FALSE) {
-            gh_log(DEBUG, "  Is OK.");
+            Log::debug("  Is OK.");
               $vfs_is_ok = TRUE;
           }
       }
 
       if (!$vfs_is_ok) {
           $vfs_target = "$source_libdir/greyhole/greyhole-samba$version.so";
-          gh_log(WARN, "  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
+          Log::warn("  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
           if (is_file($vfs_file)) {
               unlink($vfs_file);
           }
@@ -2416,10 +1610,7 @@ function samba_check_vfs() {
 }
 
 function parse_samba_spool($simplify_after_parse=TRUE) {
-    global $action;
-
-    $old_action = $action;
-    $action = 'read_smb_spool';
+    Log::setAction(ACTION_READ_SAMBA_POOL);
 
     // Just in case the spool folder is missing!
     if (!file_exists('/var/spool/greyhole')) {
@@ -2435,9 +1626,9 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
     $num_rows = (int) DB::getFirstValue($query);
     $max_queued_tasks = Config::get(CONFIG_MAX_QUEUED_TASKS);
     if ($num_rows >= ($max_queued_tasks * 0.9)) {
-        $action = $old_action;
+        Log::restorePreviousAction();
         if (time() % 10 == 0) {
-            gh_log(DEBUG, "  More than " . ($max_queued_tasks * 0.9) . " tasks queued... Won't queue any more at this time.");
+            Log::debug("  More than " . ($max_queued_tasks * 0.9) . " tasks queued... Won't queue any more at this time.");
         }
         return;
     }
@@ -2456,7 +1647,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
         }
 
         if ($last_line === FALSE) {
-            gh_log(DEBUG, "Processing Samba spool...");
+            Log::debug("Processing Samba spool...");
         }
         
         foreach ($files as $file) {
@@ -2496,7 +1687,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
             }
             $result = array_pop($line);
             if (string_starts_with($result, 'failed')) {
-                gh_log(DEBUG, "Failed $act in $share/$line[0]. Skipping.");
+                Log::debug("Failed $act in $share/$line[0]. Skipping.");
                 continue;
             }
             unset($fullpath);
@@ -2551,7 +1742,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 
             // If we have enough queued tasks ($max_queued_tasks), let's stop parsing the log, and get some work done.
             if ($num_rows+$new_tasks >= $max_queued_tasks) {
-                gh_log(DEBUG, "  We now have more than $max_queued_tasks tasks queued... Will stop parsing for now.");
+                Log::debug("  We now have more than $max_queued_tasks tasks queued... Will stop parsing for now.");
                 break;
             }
         }
@@ -2571,7 +1762,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
     close_all_tasks($close_tasks);
 
     if ($new_tasks > 0) {
-        gh_log(DEBUG, "Found $new_tasks new tasks in spool.");
+        Log::debug("Found $new_tasks new tasks in spool.");
 
         if ($simplify_after_parse) {
             $query = "SELECT COUNT(*) num_rows FROM tasks";
@@ -2583,8 +1774,8 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
             }
         }
     }
-    
-    $action = $old_action;
+
+    Log::restorePreviousAction();
 }
 
 // See explanation in close_task() about armv5 VFS modules
@@ -2646,7 +1837,7 @@ function close_all_tasks($tasks) {
                 DB::execute($query, array('task_id' => $row->id));
             } else {
                 // Ignore
-                gh_log(DEBUG, "File pointer to $row->full_path was closed without being written to. Ignoring.");
+                Log::debug("File pointer to $row->full_path was closed without being written to. Ignoring.");
             }
         }
 
@@ -2708,25 +1899,25 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
     foreach (Config::storagePoolDrives() as $sp_drive) {
         if (!isset($dfs[$sp_drive])) {
             if (!is_dir($sp_drive)) {
-                gh_log(ERROR, "The directory at $sp_drive doesn't exist. This drive will never be used!");
+                Log::error("The directory at $sp_drive doesn't exist. This drive will never be used!");
                 if (file_exists('/usr/bin/hdactl')) {
-                    gh_log(ERROR, "You should de-select, then re-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page, to fix this problem.");
+                    Log::error("You should de-select, then re-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page, to fix this problem.");
                 } else {
-                    gh_log(ERROR, "See the INSTALL file for instructions on how to prepare partitions to include in your storage pool.");
+                    Log::error("See the INSTALL file for instructions on how to prepare partitions to include in your storage pool.");
                 }
             } else if (!file_exists("$sp_drive/.greyhole_used_this") && is_greyhole_owned_drive($sp_drive)) {
-                gh_log(ERROR, "Can't find how much free space is left on $sp_drive. This partition will never be used!");
-                gh_log(ERROR, "Please report this using the 'Bugs Tracker' link found on http://greyhole.net. You should include the following information in your ticket:");
-                gh_log(ERROR, "===== Error report starts here =====");
-                gh_log(ERROR, "Unknown free space for partition: $sp_drive");
-                gh_log(ERROR, "df_command: " . ConfigHelper::$df_command);
+                Log::error("Can't find how much free space is left on $sp_drive. This partition will never be used!");
+                Log::error("Please report this using the 'Bugs Tracker' link found on http://greyhole.net. You should include the following information in your ticket:");
+                Log::error("===== Error report starts here =====");
+                Log::error("Unknown free space for partition: $sp_drive");
+                Log::error("df_command: " . ConfigHelper::$df_command);
                 unset($responses);
                 exec(ConfigHelper::$df_command, $responses);
-                gh_log(ERROR, "Result of df_command: " . var_export($responses, TRUE));
+                Log::error("Result of df_command: " . var_export($responses, TRUE));
                 unset($responses);
                 exec('df -k 2>&1', $responses);
-                gh_log(ERROR, "Result of df -k: " . var_export($responses, TRUE));
-                gh_log(ERROR, "===== Error report ends here =====");
+                Log::error("Result of df -k: " . var_export($responses, TRUE));
+                Log::error("===== Error report ends here =====");
             }
             continue;
         }
@@ -2786,11 +1977,11 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
     
     // Email notification when all drives are over-capacity
     if (count($sorted_target_drives) == 0) {
-        gh_log(WARN, "  Warning! All storage pool drives are over-capacity!");
+        Log::warn("  Warning! All storage pool drives are over-capacity!");
         if (!isset($last_OOS_notification)) {
             $setting = Settings::get('last_OOS_notification');
             if ($setting === FALSE) {
-                gh_log(WARN, "Received no rows when querying settings for 'last_OOS_notification'; expected one.");
+                Log::warn("Received no rows when querying settings for 'last_OOS_notification'; expected one.");
                 $setting = Settings::set('last_OOS_notification', 0);
             }
             $last_OOS_notification = $setting;
@@ -2798,7 +1989,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
         if ($last_OOS_notification < strtotime('-1 day')) {
             $email_to = Config::get(CONFIG_EMAIL_TO);
 
-            gh_log(INFO, "  Sending email notification to $email_to");
+            Log::info("  Sending email notification to $email_to");
 
             $hostname = exec('hostname');
             $body = "This is an automated email from Greyhole.
@@ -2818,27 +2009,27 @@ You probably want to do something about this!
         }
     }
     
-    if (Config::get(CONFIG_LOG_LEVEL) >= Log::DEBUG) {
+    if (Log::getLevel() >= Log::DEBUG) {
         if (count($sorted_target_drives) > 0) {
             $log = $log_prefix ."Drives with available space: ";
             foreach ($sorted_target_drives as $sp_drive => $space) {
                 $log .= "$sp_drive (" . bytes_to_human($space*1024, FALSE) . " " . ($algo == 'most_available_space' ? 'avail' : 'used') . ") - ";
             }
-            gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
+            Log::debug(mb_substr($log, 0, mb_strlen($log)-2));
         }
         if (count($last_resort_sorted_target_drives) > 0) {
             $log = $log_prefix ."Drives with enough free space, but no available space: ";
             foreach ($last_resort_sorted_target_drives as $sp_drive => $space) {
                 $log .= "$sp_drive (" . bytes_to_human($space*1024, FALSE) . " " . ($algo == 'most_available_space' ? 'avail' : 'used') . ") - ";
             }
-            gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
+            Log::debug(mb_substr($log, 0, mb_strlen($log)-2));
         }
         if (count($full_drives) > 0) {
             $log = $log_prefix ."Drives full: ";
             foreach ($full_drives as $sp_drive => $free_space) {
                 $log .= "$sp_drive (" . bytes_to_human($free_space*1024, FALSE) . " free) - ";
             }
-            gh_log(DEBUG, mb_substr($log, 0, mb_strlen($log)-2));
+            Log::debug(mb_substr($log, 0, mb_strlen($log)-2));
         }
     }
 
@@ -2931,7 +2122,7 @@ You probably want to do something about this!
                     }
                 }
                 $drives = array_merge($priority_drives, $drives);
-                gh_log(DEBUG, $log_prefix . "Reordered drives, per sticky_files config: " . implode(' - ', $drives));
+                Log::debug($log_prefix . "Reordered drives, per sticky_files config: " . implode(' - ', $drives));
                 break;
             }
         }
@@ -2956,13 +2147,13 @@ function gh_fsck_reset_du($share, $full_path=null) {
 function gh_fsck($path, $share, $storage_path = FALSE) {
     global $fsck_report, $options;
     
-    gh_log(DEBUG, "Entering $path");
+    Log::debug("Entering $path");
     $fsck_report['landing_zone']['num_dirs']++;
 
     $list = array();
     $handle = @opendir($path);
     if ($handle === FALSE) {
-        gh_log(ERROR, "  Couldn't open $path to list content. Skipping...");
+        Log::error("  Couldn't open $path to list content. Skipping...");
         return;
     }
     while (($filename = readdir($handle)) !== FALSE) {
@@ -2993,7 +2184,7 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
                         check_md5_workers();
 
                         while ($count_md5 > 500) {
-                            gh_log(DEBUG, "MD5 tasks pending: $count_md5");
+                            Log::debug("MD5 tasks pending: $count_md5");
                             $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete = 'yes' AND action = 'md5' ORDER BY id ASC LIMIT 1";
                             $task = DB::getFirst($query);
                             if ($task) {
@@ -3023,7 +2214,7 @@ function gh_fsck_metastore($root, $path, $share) {
             return;
         }
     }
-    gh_log(DEBUG, "Entering metastore " . clean_dir($root . $path));
+    Log::debug("Entering metastore " . clean_dir($root . $path));
 
     $handle = opendir("$root$path");
     while (($filename = readdir($handle)) !== FALSE) {
@@ -3050,7 +2241,7 @@ function gh_fsck_metastore($root, $path, $share) {
 }
 
 function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_path = FALSE) {
-    global $fsck_report, $options, $action;
+    global $fsck_report, $options;
     $landing_zone = get_share_landing_zone($share);
     if($storage_path === FALSE) {
         $file_path = trim(mb_substr($path, mb_strlen($landing_zone)+1), '/');
@@ -3077,7 +2268,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
     if ($file_type == 'file') {
         if($storage_path === FALSE) {
             // Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
-            gh_log(INFO, "$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
+            Log::info("$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
             $query = "INSERT INTO tasks SET action = 'write', share = :share, full_path = :full_path, complete = 'yes'";
             DB::insert($query, array('share' => $share, 'full_path' => clean_dir("$file_path/$filename")));
             return;
@@ -3090,10 +2281,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                 $file_type = FALSE;
             }
             if ($file_type === FALSE) {
-                if ($action != 'fsck_file') {
+                if (!Log::actionIs(ACTION_FSCK_FILE)) {
                     // Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
                     // We'll queue this file fsck (to restore the symlink) for when all other file operations have been executed.
-                    gh_log(DEBUG, "  Queuing a new fsck_file task for " . clean_dir("$share/$file_path/$filename"));
+                    Log::debug("  Queuing a new fsck_file task for " . clean_dir("$share/$file_path/$filename"));
                     $query = "INSERT INTO tasks SET action = 'fsck_file', share = :share, full_path = :full_path, complete = 'idle', additional_info = :fsck_options";
                     $params = array(
                         'share' => $share,
@@ -3119,10 +2310,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
         if ($storage_path !== FALSE) {
             if (@$options['find-orphans']) {
-                gh_log(INFO, "$full_path is an orphaned file; we'll proceed to find all copies and symlink this file appropriately.");
+                Log::info("$full_path is an orphaned file; we'll proceed to find all copies and symlink this file appropriately.");
                 $fsck_report['orphaned']['num_orphans']++;
             } else {
-                gh_log(INFO, "$full_path is an orphaned file, but we're not looking for orphans. For Greyhole to recognize this file, initiate a fsck with the --find-orphaned-files option.");
+                Log::info("$full_path is an orphaned file, but we're not looking for orphans. For Greyhole to recognize this file, initiate a fsck with the --find-orphaned-files option.");
                 return;
             }
         }
@@ -3157,10 +2348,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                 // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
                 $root_path = str_replace(normalize_utf8_characters(clean_dir("/$share/$file_path/$filename")), '', normalize_utf8_characters($metafile->path));
                 if ($root_path == $metafile->path) {
-                    gh_log(WARN, "Couldn't find root path for $metafile->path");
+                    Log::warn("Couldn't find root path for $metafile->path");
                 }
                 if ($inode_number !== FALSE && $metafile->state == 'OK') {
-                    gh_log(DEBUG, "Found $metafile->path");
+                    Log::debug("Found $metafile->path");
                 }
             }
 
@@ -3180,7 +2371,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                 $link_target = readlink($metafile->path);
                 if (array_contains($file_copies_inodes, $link_target)) {
                     // This link points to another file copy. Bad, bad!
-                    gh_log(WARN, "Warning! Found a symlink in your storage pool: $metafile->path -> $link_target. Deleting.");
+                    Log::warn("Warning! Found a symlink in your storage pool: $metafile->path -> $link_target. Deleting.");
                     gh_recycle($metafile->path);
                 }
                 $inode_number = FALSE;
@@ -3195,7 +2386,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                     $fsck_report['gone_ok']++;
                 }
             } else if (is_dir($metafile->path)) {
-                gh_log(DEBUG, "Found a directory that should be a file! Will try to remove it, if it's empty.");
+                Log::debug("Found a directory that should be a file! Will try to remove it, if it's empty.");
                 @rmdir($metafile->path);
                 $metafile->state = 'Gone';
                 $metafile->is_linked = FALSE;
@@ -3213,7 +2404,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
     $num_copies_required = get_num_copies($share);
     if ($num_copies_required == -1) {
-        gh_log(CRITICAL, "Tried to fsck a share that is missing from greyhole.conf. Quitting.");
+        Log::critical("Tried to fsck a share that is missing from greyhole.conf. Quitting.");
     }
     
     if (count($file_copies_inodes) > 0) {
@@ -3308,10 +2499,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
                 if ($file_size === FALSE) {
                     // Empty file; just delete it.
-                    gh_log(WARN, "  An empty file copy was found: $real_full_path is 0 bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.");
+                    Log::warn("  An empty file copy was found: $real_full_path is 0 bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.");
                     unlink($real_full_path);
                 } else {
-                    gh_log(WARN, "  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.");
+                    Log::warn("  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.");
                     gh_recycle($real_full_path);
                     $fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
                 }
@@ -3328,11 +2519,11 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             // Re-create symlink...
             if (!$found_linked_metafile) {
                 // ... the old one points to a drive that was replaced
-                gh_log(INFO, '  Symlink target moved. Updating symlink.');
+                Log::info('  Symlink target moved. Updating symlink.');
                 $fsck_report['symlink_target_moved']++;
             } else {
                 // ... it was missing
-                gh_log(INFO, '  Symlink was missing. Creating new symlink.');
+                Log::info('  Symlink was missing. Creating new symlink.');
             }
             foreach ($file_metafiles as $key => $metafile) {
                 if ($metafile->is_linked) {
@@ -3343,14 +2534,14 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             save_metafiles($share, $file_path, $filename, $file_metafiles);
         }
     } else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
-        gh_log(WARN, '  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')));
+        Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')));
         if ($source == 'metastore' || get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
             $fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
         }
         if (is_link("$landing_zone/$file_path/$filename")) {
             gh_recycle("$landing_zone/$file_path/$filename");
         } else if (gh_is_file("$landing_zone/$file_path/$filename")) {
-            gh_log(INFO, "$share/$file_path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
+            Log::info("$share/$file_path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
             $query = "INSERT INTO tasks SET action = 'write', share = :share, full_path = :full_path, complete = 'yes'";
             $params = array(
                 'share' => $share,
@@ -3365,7 +2556,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
         }
     } else if (count($file_copies_inodes) < $num_copies_required && $num_copies_required > 0) {
         // Create new copies
-        gh_log(INFO, "  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
+        Log::info("  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
         if (isset($fsck_report['missing_copies'])) {
             $fsck_report['missing_copies']++;
         }
@@ -3473,9 +2664,9 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             }
         }
         if (count($file_copies_inodes) > $num_copies_required) {
-            gh_log(INFO, "  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will try to remove some.");
+            Log::info("  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will try to remove some.");
             if (file_is_locked($share, "$file_path/$filename") !== FALSE) {
-                gh_log(INFO, "  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
+                Log::info("  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
                 return;
             }
             $fsck_report['too_many_copies']++;
@@ -3484,19 +2675,19 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             while (count($file_copies_inodes) > $num_copies_required && !empty($local_target_drives)) {
                 $sp_drive = array_pop($local_target_drives);
                 $key = clean_dir("$sp_drive/$share/$file_path/$filename");
-                gh_log(DEBUG, "  Looking for copy at $key");
+                Log::debug("  Looking for copy at $key");
                 if (isset($file_metafiles[$key]) || gh_file_exists($key)) {
                     if (isset($file_metafiles[$key])) {
                         $metafile = $file_metafiles[$key];
                     }
                     if (gh_file_exists($key) || $metafile->state == 'OK') {
-                        gh_log(DEBUG, "    Found file copy at $key, or metadata file is marked OK.");
+                        Log::debug("    Found file copy at $key, or metadata file is marked OK.");
                         if (real_file_is_locked($key) !== FALSE) {
-                            gh_log(DEBUG, "    File copy is locked. Won't remove it.");
+                            Log::debug("    File copy is locked. Won't remove it.");
                             continue;
                         }
                         $fsck_report['too_many_files'][] = $key;
-                        gh_log(DEBUG, "    Removing copy at $key");
+                        Log::debug("    Removing copy at $key");
                         unset($file_copies_inodes[gh_fileinode($key)]);
                         gh_recycle($key);
                         if (isset($file_metafiles[$key])) {
@@ -3549,7 +2740,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 function gh_fsck_update_symlink($target, $symlink, $share, $file_path, $filename) {
     clearstatcache();
     if (!file_exists($symlink)) {
-        gh_log(DEBUG, "  Missing symlink... A pending unlink transaction maybe?");
+        Log::debug("  Missing symlink... A pending unlink transaction maybe?");
         parse_samba_spool(FALSE);
         $query = "SELECT * FROM tasks WHERE action = 'unlink' AND share = :share AND full_path = :full_path";
         $params = array(
@@ -3558,13 +2749,13 @@ function gh_fsck_update_symlink($target, $symlink, $share, $file_path, $filename
         );
         $task = DB::getFirst($query, $params);
         if ($task) {
-            gh_log(DEBUG, "    Indeed! Pending unlink task found. Will not re-create this symlink.");
+            Log::debug("    Indeed! Pending unlink task found. Will not re-create this symlink.");
             return;
         }
-        gh_log(DEBUG, "    No... Found no good reason for the symlink to be missing! Let's re-create it.");
+        Log::debug("    No... Found no good reason for the symlink to be missing! Let's re-create it.");
     }
     
-    gh_log(DEBUG, "  Updating symlink at $symlink to point to $target");
+    Log::debug("  Updating symlink at $symlink to point to $target");
     gh_recycle($symlink);
     gh_mkdir(dirname($symlink), dirname($target));
     symlink($target, $symlink);
@@ -3726,7 +2917,7 @@ function gh_recycle($real_path) {
     if ($should_move_to_trash) {
         // Move to trash
         if (!isset($trash_path)) {
-            gh_log(WARN, "  Warning! Can't find trash for $real_path. Won't delete this file!");
+            Log::warn("  Warning! Can't find trash for $real_path. Won't delete this file!");
             return FALSE;
         }
         
@@ -3751,7 +2942,7 @@ function gh_recycle($real_path) {
             exec("rm -rf " . escapeshellarg($target_path));
         }
         if (@gh_rename($real_path, $target_path)) {
-            gh_log(DEBUG, "  Moved copy from $real_path to trash: $target_path");
+            Log::debug("  Moved copy from $real_path to trash: $target_path");
             
             // Create a symlink in the Greyhole Trash share, to allow the user to remove this file using that share
             create_trash_share_symlink($target_path, $trash_path);
@@ -3760,7 +2951,7 @@ function gh_recycle($real_path) {
     } else {
         if (@unlink($real_path)) {
             if (!$is_symlink) {
-                gh_log(DEBUG, "  Deleted copy at $real_path");
+                Log::debug("  Deleted copy at $real_path");
             }
             return TRUE;
         }
@@ -3875,25 +3066,27 @@ function gh_get_dir_perms($directory) {
 }
 
 function gh_balance() {
-    global $is_sticky, $is_forced;
+    global $is_sticky;
 
     // Start with shares that have sticky files, so that subsequent shares will be used to try to balance what moving files into stick_into drives could debalance...
     // Then start with the shares for which we keep the most # copies;
     // That way, if the new drive fails soon, it won't take with it files for which we only have one copy!
     $sorted_shares_options = SharesConfig::getShares();
+    unset($sorted_shares_options[CONFIG_TRASH_SHARE]);
     uasort($sorted_shares_options, 'compare_share_balance');
+    $skip_stickies = FALSE;
     foreach ($sorted_shares_options as $share_name => $share_options) {
         if ($share_options[CONFIG_NUM_COPIES] == count(Config::storagePoolDrives())) {
             // Files are everywhere; won't be able to use that share to balance available space!
             continue;
         }
         
-        if (@$skip_stickies && is_share_sticky($share_name)) {
-            gh_log(DEBUG, "Skipping sticky share $share_name.");
+        if ($skip_stickies && is_share_sticky($share_name)) {
+            Log::debug("Skipping sticky share $share_name.");
             continue;
         }
 
-         gh_log(DEBUG, "Balancing share: $share_name");
+         Log::debug("Balancing share: $share_name");
 
         // Move files from the drive with the less available space to the drive with the most available space.
         $sorted_pool_drives = sort_storage_drives_available_space();
@@ -3911,21 +3104,20 @@ function gh_balance() {
 
         foreach ($sorted_pool_drives as $source_drive) {
             $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
-            gh_log(DEBUG, "Balancing storage pool drive: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
+            Log::debug("Balancing storage pool drive: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
 
             // Files candidate to get moved
             $files = array();
             if (is_dir("$source_drive/$share_name")) {
                 exec("find ". escapeshellarg("$source_drive/$share_name") ." -type f -size +10M", $files);
             }
-            gh_log(DEBUG, "Found ". count($files) ." files that can be moved.");
+            Log::debug("Found ". count($files) ." files that can be moved.");
             
             // Repeat until all drives' available space is balanced.
-            $file_everywhere_counter = 0;
             foreach ($files as $file) {
                 // Let's not try to move locked files!
                 if (real_file_is_locked($file) !== FALSE) {
-                    gh_log(DEBUG, "  File $file is locked by another process. Skipping.");
+                    Log::debug("  File $file is locked by another process. Skipping.");
                     continue;
                 }
 
@@ -3933,7 +3125,7 @@ function gh_balance() {
 
                 $full_path = mb_substr($file, mb_strlen("$source_drive/$share_name/"));
                 list($path, $filename) = explode_full_path($full_path);
-                gh_log(DEBUG, "  Working on file: $share_name/$full_path (". bytes_to_human($filesize*1024, FALSE) .")");
+                Log::debug("  Working on file: $share_name/$full_path (". bytes_to_human($filesize*1024, FALSE) .")");
 
                 // $is_sticky and $is_forced are set in order_target_drives(), based on $share_name & $path
                 $sp_drives = order_target_drives($filesize, FALSE, $share_name, $path, '  ');
@@ -3944,14 +3136,14 @@ function gh_balance() {
                         // Only drive full is the source drive. Let's move files away from there!
                     } else if (count($sp_drives) < $num_total_drives) {
                         $skip_stickies = TRUE;
-                        gh_log(DEBUG, "  Some drives are full. Skipping sticky shares until all drives have some free space.");
+                        Log::debug("  Some drives are full. Skipping sticky shares until all drives have some free space.");
                         break;
                     }
                     
                     $sticky_drives = array_slice($sp_drives, 0, get_num_copies($share_name));
                     if (array_contains($sticky_drives, $source_drive)) {
                         // Source drive is a stick_into drive; let's not move that file!
-                        gh_log(DEBUG, "  Source is sticky. Skipping.");
+                        Log::debug("  Source is sticky. Skipping.");
                         continue;
                     }
                     $already_stuck_copies = 0;
@@ -3975,30 +3167,30 @@ function gh_balance() {
                 if (!isset($sp_drive)) {
                     // Can't find a drive that doesn't have this file; skipping.
                     if ($is_sticky) {
-                        gh_log(DEBUG, "  Sticky file is already where it should be. Skipping.");
+                        Log::debug("  Sticky file is already where it should be. Skipping.");
                     }
                     continue;
                 }
 
-                gh_log(DEBUG, "  Target drive: $sp_drive (". bytes_to_human($pool_drives_avail_space[$sp_drive]*1024, FALSE) ." available)");
+                Log::debug("  Target drive: $sp_drive (". bytes_to_human($pool_drives_avail_space[$sp_drive]*1024, FALSE) ." available)");
 
                 if ($is_sticky) {
-                    gh_log(DEBUG, "  Moving sticky file, even if that means it won't help balancing available space.");
+                    Log::debug("  Moving sticky file, even if that means it won't help balancing available space.");
                 } else if ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$sp_drive]-$filesize
                         || $pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space
                         || ($balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] > $target_avail_space)
                         || (!$balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] < $target_avail_space)) {
-                    gh_log(DEBUG, "  Moving this file wouldn't help balancing available space. Skipping.");
-                    #gh_log(DEBUG, "    Reason 1: " . var_export($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$sp_drive]-$filesize, TRUE));
-                    #gh_log(DEBUG, "    Reason 2: " . var_export($pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space, TRUE));
-                    #gh_log(DEBUG, "    Reason 3: " . var_export($balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] > $target_avail_space, TRUE));
-                    #gh_log(DEBUG, "    Reason 4: " . var_export(!$balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] < $target_avail_space, TRUE));
-                    #gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize+1GB = " . ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024));
-                    #gh_log(DEBUG, "    pool_drives_avail_space[source]+filesize = " . ($pool_drives_avail_space[$source_drive]+$filesize));
-                    #gh_log(DEBUG, "    pool_drives_avail_space[target_drive] = " . ($pool_drives_avail_space[$sp_drive]));
-                    #gh_log(DEBUG, "    pool_drives_avail_space[target_drive]-filesize = " . ($pool_drives_avail_space[$sp_drive]-$filesize));
-                    #gh_log(DEBUG, "    target_avail_space = " . ($target_avail_space));
-                    #gh_log(DEBUG, "    balance_direction_asc[target_drive] = " . var_export($balance_direction_asc[$sp_drive], TRUE));
+                    Log::debug("  Moving this file wouldn't help balancing available space. Skipping.");
+                    #Log::debug("    Reason 1: " . var_export($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024 /*1GB*/ > $pool_drives_avail_space[$sp_drive]-$filesize, TRUE));
+                    #Log::debug("    Reason 2: " . var_export($pool_drives_avail_space[$source_drive]+$filesize > $target_avail_space, TRUE));
+                    #Log::debug("    Reason 3: " . var_export($balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] > $target_avail_space, TRUE));
+                    #Log::debug("    Reason 4: " . var_export(!$balance_direction_asc[$sp_drive] && $pool_drives_avail_space[$sp_drive] < $target_avail_space, TRUE));
+                    #Log::debug("    pool_drives_avail_space[source]+filesize+1GB = " . ($pool_drives_avail_space[$source_drive]+$filesize+1*1024*1024));
+                    #Log::debug("    pool_drives_avail_space[source]+filesize = " . ($pool_drives_avail_space[$source_drive]+$filesize));
+                    #Log::debug("    pool_drives_avail_space[target_drive] = " . ($pool_drives_avail_space[$sp_drive]));
+                    #Log::debug("    pool_drives_avail_space[target_drive]-filesize = " . ($pool_drives_avail_space[$sp_drive]-$filesize));
+                    #Log::debug("    target_avail_space = " . ($target_avail_space));
+                    #Log::debug("    balance_direction_asc[target_drive] = " . var_export($balance_direction_asc[$sp_drive], TRUE));
                     continue;
                 }
 
@@ -4010,7 +3202,7 @@ function gh_balance() {
                 // Move the file
                 $temp_path = get_temp_filename("$sp_drive/$share_name/$full_path");
                 $file_infos = gh_get_file_infos($file);
-                gh_log(DEBUG, "  Moving file copy...");
+                Log::debug("  Moving file copy...");
                 $it_worked = gh_rename($file, $temp_path);
                 if ($it_worked) {
                     gh_rename($temp_path, "$sp_drive/$share_name/$full_path");
@@ -4019,7 +3211,7 @@ function gh_balance() {
                     $pool_drives_avail_space[$sp_drive] -= $filesize;
                     $pool_drives_avail_space[$source_drive] += $filesize;
                 } else {
-                    gh_log(WARN, "    Failed file copy. Skipping.");
+                    Log::warn("    Failed file copy. Skipping.");
                     @unlink($temp_path);
                     continue;
                 }
@@ -4035,7 +3227,7 @@ function gh_balance() {
                                 // Re-create correct symlink
                                 $landing_zone = $share_options[CONFIG_LANDING_ZONE];
                                 if (is_link("$landing_zone/$full_path")) {
-                                    gh_log(DEBUG, "  Updating symlink at $landing_zone/$full_path to point to $metafile->path");
+                                    Log::debug("  Updating symlink at $landing_zone/$full_path to point to $metafile->path");
                                     if (gh_recycle("$landing_zone/$full_path")) {
                                         @symlink($metafile->path, "$landing_zone/$full_path");
                                         // Creating this symlink can fail if the parent dir was removed
@@ -4049,21 +3241,21 @@ function gh_balance() {
                     }
                 }    
                 $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
-                gh_log(DEBUG, "Balancing storage pool drive: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
+                Log::debug("Balancing storage pool drive: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
             }
-            gh_log(DEBUG, "Done balancing storage pool drive: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
+            Log::debug("Done balancing storage pool drive: $source_drive (". bytes_to_human($pool_drives_avail_space[$source_drive]*1024, FALSE) ." available)");
         }
-        gh_log(DEBUG, "Done balancing share: $share_name");
+        Log::debug("Done balancing share: $share_name");
     }
     
     if (@$skip_stickies) {
         // We skipped some stickies... Let's re-balance to move those, and continue balancing.
         $arr = debug_backtrace();
         if (count($arr) < 93) {
-            gh_log(DEBUG, "Some shares with sticky files were skipped. Balancing will now re-start to continue moving those sticky files as needed, and further balance. Recursion level = " . count($arr));
+            Log::debug("Some shares with sticky files were skipped. Balancing will now re-start to continue moving those sticky files as needed, and further balance. Recursion level = " . count($arr));
             gh_balance();
         } else {
-            gh_log(WARN, "Maximum number of consecutive balance reached. You'll need to re-execute --balance if you want to balance further.");
+            Log::warn("Maximum number of consecutive balance reached. You'll need to re-execute --balance if you want to balance further.");
         }
     }
 }
@@ -4128,14 +3320,13 @@ function postpone_task($task_id, $complete='yes') {
 // If running on Amahi, loop until the config works.
 // User might configure Greyhole later, and they don't want to show Greyhole 'offline' until then. Users are easy to confused! ;)
 function process_config() {
-    global $action;
     while (!ConfigHelper::parse()) {
         // Sleep for a while, if running on Amahi.
-        if (file_exists('/usr/bin/hdactl') && $action == 'daemon') {
+        if (file_exists('/usr/bin/hdactl') && Log::actionIs(ACTION_DAEMON)) {
             sleep(600); // 10 minutes
         } else {
             // Otherwise, die.
-            gh_log(CRITICAL, "Config file parsing failed. Exiting.");
+            Log::critical("Config file parsing failed. Exiting.");
         }
     }
     // Config is OK; go on!
@@ -4192,13 +3383,13 @@ function set_metastore_backup($try_restore=TRUE) {
         return;
     }
 
-    gh_log(DEBUG, "Loading metadata store backup directories...");
+    Log::debug("Loading metadata store backup directories...");
     $metastore_backup_drives = Config::get(CONFIG_METASTORE_BACKUPS);
     if (empty($metastore_backup_drives)) {
         // In the DB ?
         $metastore_backup_drives = Settings::get('metastore_backup_directory', TRUE);
         if ($metastore_backup_drives) {
-            gh_log(DEBUG, "  Found " . count($metastore_backup_drives) . " directories in the settings table.");
+            Log::debug("  Found " . count($metastore_backup_drives) . " directories in the settings table.");
         } else if ($try_restore) {
             // Try to load a backup from the data drive, if we can find one.
             if (Settings::restore()) {
@@ -4215,7 +3406,7 @@ function set_metastore_backup($try_restore=TRUE) {
         foreach ($metastore_backup_drives as $key => $metastore_backup_drive) {
             if (!is_greyhole_owned_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
                 // Directory is now invalid; stop using it.
-                gh_log(DEBUG, "Removing $metastore_backup_drive from available 'metastore_backup_directories' - this directory isn't a Greyhole storage pool drive (anymore?)");
+                Log::debug("Removing $metastore_backup_drive from available 'metastore_backup_directories' - this directory isn't a Greyhole storage pool drive (anymore?)");
                 unset($metastore_backup_drives[$key]);
             } else if (!is_dir($metastore_backup_drive)) {
                 // Directory is invalid, but needs to be created (was rm'ed?)
@@ -4225,7 +3416,7 @@ function set_metastore_backup($try_restore=TRUE) {
     }
     
     if (empty($metastore_backup_drives) || count($metastore_backup_drives) < $num_metastore_backups_needed) {
-        gh_log(DEBUG, "  Missing some drives. Need $num_metastore_backups_needed, currently have " . count($metastore_backup_drives) . ". Will select more...");
+        Log::debug("  Missing some drives. Need $num_metastore_backups_needed, currently have " . count($metastore_backup_drives) . ". Will select more...");
         $metastore_backup_drives_hash = array();
         if (count($metastore_backup_drives) > 0) {
             $metastore_backup_drives_hash[array_shift($metastore_backup_drives)] = TRUE;
@@ -4238,7 +3429,7 @@ function set_metastore_backup($try_restore=TRUE) {
             if (!is_dir($metastore_backup_drive)) {
                 mkdir($metastore_backup_drive);
             }
-            gh_log(DEBUG, "    Randomly picked $metastore_backup_drive");
+            Log::debug("    Randomly picked $metastore_backup_drive");
         }
         $metastore_backup_drives = array_keys($metastore_backup_drives_hash);
 
@@ -4279,9 +3470,9 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
             gh_mkdir($path, $dir_infos);
         }
         if (@symlink($filepath_in_trash, $filepath_in_trash_share)) {
-            gh_log(DEBUG, "  Created symlink to deleted file in {$trash_share['name']} share ($filename).");
+            Log::debug("  Created symlink to deleted file in {$trash_share['name']} share ($filename).");
         } else {
-            gh_log(WARN, "  Warning! Couldn't create symlink to deleted file in {$trash_share['name']} share ($filename).");
+            Log::warn("  Warning! Couldn't create symlink to deleted file in {$trash_share['name']} share ($filename).");
         }
     }
 }
@@ -4289,34 +3480,34 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
 function process_command_line() {
     $opts_actions = 'DPRfClBsSLaqiU5X';
     $longopts_actions = array(
-        'daemon',
-        'pause',
-        'resume',
-        'fsck',
-        'cancel-fsck',
-        'balance',
-        'cancel-balance',
-        'stats',
-        'status',
-        'logs',
-        'empty-trash',
-        'view-queue',
-        'iostat',
-        'getuid',
-        'md5-worker',
-        'fix-symlinks'
+        ACTION_DAEMON,
+        ACTION_PAUSE,
+        ACTION_RESUME,
+        ACTION_FSCK,
+        ACTION_CANCEL_FSCK,
+        ACTION_BALANCE,
+        ACTION_CANCEL_BALANCE,
+        ACTION_STATS,
+        ACTION_STATUS,
+        ACTION_LOGS,
+        ACTION_EMPTY_TRASH,
+        ACTION_VIEW_QUEUE,
+        ACTION_IOSTAT,
+        ACTION_GETUID,
+        ACTION_MD5_WORKER,
+        ACTION_FIX_SYMLINKS
     );
 
     $opts_actions_with_values = 'r::w::g::n::t::b:p:U:';
     $longopts_actions_with_values = array(
-        'replace::',
-        'wait-for::',
-        'gone::',
-        'going::',
-        'thaw::',
-        'debug:',
-        'delete-metadata:',
-        'remove-share:'
+        ACTION_REPLACE . '::',
+        ACTION_WAIT_FOR . '::',
+        ACTION_GONE . '::',
+        ACTION_GOING . '::',
+        ACTION_THAW . '::',
+        ACTION_DEBUG . ':',
+        ACTION_DELETE_METADATA . ':',
+        ACTION_REMOVE_SHARE . ':'
     );
 
     $opts_options = 'eycokmj';
@@ -4339,7 +3530,7 @@ function process_command_line() {
     $command_line_options = _getopt($opts_actions.$opts_actions_with_values.$opts_options.$opts_options_with_values,
         array_merge($longopts_actions, $longopts_actions_with_values, $longopts_options, $longopts_options_with_values));
 
-    $action = 'unknown';
+    Log::setAction(ACTION_UNKNOWN);
     $options = array();
 
     // Transform short options to long options
@@ -4369,17 +3560,17 @@ function process_command_line() {
     // Find action and options, from command_line_options
     foreach ($longopts_actions as $longopt) {
         if (isset($command_line_options[$longopt])) {
-            $action = $longopt;
+            Log::setAction($longopt);
             break;
         }
     }
     foreach ($longopts_actions_with_values as $longopt) {
         $longopt_action = str_replace(':', '', $longopt);
         if (isset($command_line_options[$longopt_action])) {
-            $action = $longopt_action;
-            if ($action == 'debug') {
+            Log::setAction($longopt_action);
+            if (Log::actionIs(ACTION_DEBUG)) {
                 $options['debug_filename'] = $command_line_options[$longopt_action];
-            } else if ($action == 'gone' || $action == 'going' || $action == 'wait-for' || $action == 'replace') {
+            } else if (Log::actionIs(ACTION_GONE) || Log::actionIs(ACTION_GOING) || Log::actionIs(ACTION_WAIT_FOR) || Log::actionIs(ACTION_REPLACE)) {
                 if ($command_line_options[$longopt_action] !== FALSE) {
                     $options['drive'] = $command_line_options[$longopt_action];
                 }
@@ -4404,94 +3595,7 @@ function process_command_line() {
         }
     }
 
-    return array($action, $options);
-}
-
-function print_usage() {
-    echo "greyhole, version %VERSION%, for linux-gnu (noarch)\n";
-    echo "This software comes with ABSOLUTELY NO WARRANTY. This is free software,\n";
-    echo "and you are welcome to modify and redistribute it under the GPL v3 license.\n";
-    echo "\n";
-    echo "Usage: greyhole [ACTION] [OPTIONS]\n";
-    echo "\n";
-    echo "Where ACTION is one of:\n";
-    echo "  -?, --help            Display this help and exit.\n";
-    echo "  -D, --daemon          Start the daemon.\n";
-    echo "  -P, --pause           Pause the daemon.\n";
-    echo "  -R, --resume          Resume a paused daemon.\n";
-    echo "  -f, --fsck            Schedule a fsck.\n";
-    echo "  -C, --cancel-fsck     Cancel any ongoing or scheduled fsck operations.\n";
-    echo "  -l, --balance         Balance available space on storage pool drives.\n";
-    echo "  -B, --cancel-balance  Cancel any ongoing or scheduled balance operations.\n";
-    echo "  -s, --stats           Display storage pool statistics.\n";
-    echo "  -i, --iostat          I/O statistices for your storage pool drives.\n";
-    echo "  -L, --logs            Display new greyhole.log entries as they are logged.\n";
-    echo "  -S, --status          Display what the Greyhole daemon is currently doing.\n";
-    echo "  -q, --view-queue      Display the current work queue.\n";
-    echo "  -a, --empty-trash     Empty the trash.\n";
-    echo "  -b, --debug=filename  Debug past file operations.\n";
-    echo "  -t, --thaw[=path]     Thaw a frozen directory. Greyhole will start working on\n";
-    echo "                        files inside <path>. If you don't supply an option, the list\n";
-    echo "                        of frozen directories will be displayed.\n";
-    echo "  -w, --wait-for[=path] Tell Greyhole that the missing drive at <path> will return\n";
-    echo "                        soon, and that it shouldn't re-create additional file copies\n";
-    echo "                        to replace it. If you don't supply an option, the available\n";
-    echo "                        options (paths) will be displayed.\n";
-    echo "  -g, --gone[=path]     Tell Greyhole that the missing drive at <path> is gone for\n";
-    echo "                        good. Greyhole will start replacing the missing file copies\n";
-    echo "                        instantly. If you don't supply an option, the available\n";
-    echo "                        options (paths) will be displayed.\n";
-    echo "  -n, --going[=path]    Tell Greyhole that you want to remove a drive. Greyhole will\n";
-    echo "                        then make sure you don't loose any files, and that the\n";
-    echo "                        correct number of file copies are created to replace the\n";
-    echo "                        missing drive. If you don't supply an option, the available\n";
-    echo "                        options (paths) will be displayed.\n";
-    echo "  -r, --replace[=path]  Tell Greyhole that you replaced the drive at <path>.\n";
-    echo "  -X, --fix-symlinks    Try to find a good file copy to point to for all broken\n";
-    echo "                        symlinks found on your shares.\n";
-    echo "  -p, --delete-metadata<=path>\n";
-    echo "                        Delete all metadata files for <path>, which should be a\n";
-    echo "                        share name, followed by the path to a file that is gone\n";
-    echo "                        from your storage pool.\n";
-    echo "  -U, --remove-share<=share_name>\n";
-    echo "                        Move the files currently inside the specified share from the\n";
-    echo "                        storage pool into the shared folder (landing zone),\n";
-    echo "                        effectively removing the share from Greyhole's storage pool.\n";
-    
-    echo "\n";
-    echo "For --stats and --view-queue, the available OPTIONS are:\n";
-    echo "  -j, --json            Output the result as JSON, instead of human-readable text.\n";
-    echo "\n";
-    echo "For --fsck, the available OPTIONS are:\n";
-    echo "  -e, --email-report    Send an email when fsck completes, to report on what was\n";
-    echo "                        checked, and any error that was found.\n";
-    echo "  -y, --dont-walk-metadata-store\n";
-    echo "                        Speed up fsck by skipping the scan of the metadata store\n";
-    echo "                        directories. Scanning the metadata stores is only required to\n";
-    echo "                        re-create symbolic links that might be missing from your\n";
-    echo "                        shared directories.\n";
-    echo "  -c, --if-conf-changed Only fsck if greyhole.conf or smb.conf paths changed since\n";
-    echo "                        the last fsck.\n";
-    echo "                        Used in the daily cron to prevent unneccesary fsck runs.\n";
-    echo "  -d, --dir=path        Only scan a specific directory, and all sub-directories.\n";
-    echo "                        The specified directory should be a Samba share, a\n";
-    echo "                        sub-directory of a Samba share, or any directory on a \n";
-    echo "                        storage pool drive.\n";
-    echo "  -o, --find-orphaned-files\n";
-    echo "                        Scan for files with no metadata in the storage pool drives.\n";
-    echo "                        This will allow you to include existing files on a drive\n";
-    echo "                        in your storage pool without having to copy them manually.\n";
-    echo "  -k, --checksums       Read ALL files in your storage pool, and check that\n";
-    echo "                        file copies are identical. This will identify any problem\n";
-    echo "                        you might have with your file-systems.\n";
-    echo "                        NOTE: this can take a LONG time to complete, since it will read\n";
-    echo "                        everything from all your drives!\n";
-    echo "  -m, --delete-orphaned-metadata\n";
-    echo "                        When fsck find metadata files with no file copies, delete those\n";
-    echo "                        metadata files. If the file copies re-appear later, you'll need\n";
-    echo "                        to run fsck with --find-orphaned-files to have them reappear in\n";
-    echo "                        your shares.\n";
-    exit(1);
+    return $options;
 }
 
 function get_conf_md5() {
@@ -4520,32 +3624,6 @@ function how_long_ago($past_time) {
     return "$ago ago";
 }
 
-// This unique identifier will be used when Greyhole calls home, to uniquely (and anonymously) identify this Greyhole instance.
-function set_uniq_id() {
-    $uniq_id = Settings::get('uniq_id');
-
-    if (!$uniq_id) {
-        // No uid found in DB; look on filesystem
-        foreach (Config::storagePoolDrives() as $sp_drive) {
-            $f = "$sp_drive/.greyhole_uses_this";
-            if (file_exists($f) && filesize($f) == 23) {
-                // Found a valid uid
-                $uniq_id = file_get_contents($f);
-                break;
-            }
-        }
-
-        if (!$uniq_id) {
-            // No uid found; generate a new one
-            $uniq_id = uniqid('', TRUE);
-        }
-
-        Settings::set('uniq_id', $uniq_id);
-    }
-    
-    return $uniq_id;
-}
-
 function get_copy_cmd($source, $destination) {
     if (Config::get('copy_method') == 'rsync') {
         return "rsync -t " . escapeshellarg($source) . " " . escapeshellarg($destination);
@@ -4562,7 +3640,7 @@ function spawn_thread($action, $arguments) {
     // Don't spawn duplicate threads
     $num_worker_thread = (int) exec('ps ax | grep "/usr/bin/greyhole --' . $action . '" | grep "drive='. implode('" | grep "drive=', $arguments) . '" | grep -v grep | wc -l');
     if ($num_worker_thread > 0) {
-        gh_log(DEBUG, "Won't span a duplicate thread; 'greyhole --$action --drive=$arguments[0]' is already running");
+        Log::debug("Won't span a duplicate thread; 'greyhole --$action --drive=$arguments[0]' is already running");
         return 1;
     }
 
@@ -4570,58 +3648,6 @@ function spawn_thread($action, $arguments) {
     exec("$cmd 1>/var/run/greyhole_thread.pid 2>&1 &");
     usleep(100000); // 1/10s
     return (int) file_get_contents('/var/run/greyhole_thread.pid');
-}
-
-function md5_worker_thread($drives) {
-    $drives_clause = '';
-    $params = array();
-    $i = 1;
-    foreach ($drives as $drive) {
-        if ($drives_clause != '') {
-            $drives_clause .= ' OR ';
-        }
-        $key = 'drive' . ($i++);
-        $drives_clause .= "additional_info LIKE :$key";
-        $params[$key] = "$drive%";
-    }
-
-    $query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND ($drives_clause) ORDER BY id ASC LIMIT 100";
-    
-    $last_check_time = time();
-    while (TRUE) {
-        $task = FALSE;
-        if (!empty($new_tasks)) {
-            $task = array_shift($new_tasks);
-        }
-        if ($task === FALSE) {
-            $new_tasks = DB::getAll($query, $params);
-            $task = array_shift($new_tasks);
-        }
-        if ($task === FALSE) {
-            // Nothing new to process
-            
-            // Stop this thread once we have nothing more to do, and we have waited 1 hour for more work.
-            if (time() - $last_check_time > 3600) {
-                gh_log(DEBUG, "MD5 worker thread for " . implode(', ', $drives) . " will now exit; it has nothing more to do.");
-                break;
-            }
-            
-            sleep(5);
-            continue;
-        }
-        $last_check_time = time();
-
-        gh_log(INFO, "Working on MD5 task ID $task->id: $task->additional_info");
-        $md5 = md5_file($task->additional_info);
-        gh_log(DEBUG, "  MD5 for $task->additional_info = $md5");
-        
-        $update_query = "UPDATE tasks SET complete = 'yes', additional_info = :additional_info WHERE id = :task_id";
-        $params = array(
-            'task_id' => $task->id,
-            'additional_info' => "$task->additional_info=$md5"
-        );
-        DB::execute($update_query, $params);
-    }
 }
 
 function gh_check_md5($task) {
@@ -4646,20 +3672,20 @@ function gh_check_md5($task) {
         // If there's no worker thread alive, spawn all of them. The idle ones will just die.
         $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
         if ($num_worker_threads == 0) {
-            gh_log(DEBUG, "  Will spawn new worker threads to work on this.");
+            Log::debug("  Will spawn new worker threads to work on this.");
             foreach (Config::storagePoolDrives() as $sp_drive) {
                 spawn_thread('md5-worker', array($sp_drive));
             }
         } else {
             // Give the worker thread some time to catch up
-            gh_log(DEBUG, "  Will wait some to allow for MD5 worker threads to complete.");
+            Log::debug("  Will wait some to allow for MD5 worker threads to complete.");
             sleep(5);
         }
         return;
     }
     
     // We have all of them; let's check the MD5 checksums
-    gh_log(DEBUG, "Checking MD5 checksums for " . clean_dir("$task->share/$task->full_path"));
+    Log::debug("Checking MD5 checksums for " . clean_dir("$task->share/$task->full_path"));
     $result_tasks = DB::getAll("SELECT * FROM tasks WHERE id IN ($complete_tasks->ids)");
     $md5s = array();
     foreach ($result_tasks as $t) {
@@ -4680,7 +3706,7 @@ function gh_check_md5($task) {
                 "  The underlying filesystem probably contains errors. You should unmount that partition, and check it using e2fsck -cfp"
             );
         } else {
-            gh_log(DEBUG, "  All copies have the same MD5 checksum: $md5");
+            Log::debug("  All copies have the same MD5 checksum: $md5");
         }
     }
     else if (count($md5s) > 1) {
@@ -4712,8 +3738,8 @@ function gh_check_md5($task) {
                     }
                 }
 
-                gh_log(WARN, "  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5");
-                gh_log(WARN, "  This copy will be deleted, and replaced with a new copy from $original_file_path");
+                Log::warn("  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5");
+                Log::warn("  This copy will be deleted, and replaced with a new copy from $original_file_path");
                 gh_recycle($latest_file_copy);
 
                 $metafiles = array();
@@ -4725,11 +3751,11 @@ function gh_check_md5($task) {
                 }
                 create_copies_from_metafiles($metafiles, $task->share, $task->full_path, $original_file_path, TRUE);
 
-                gh_log(DEBUG, "  Calculating MD5 for new file copy at $latest_file_copy ...");
+                Log::debug("  Calculating MD5 for new file copy at $latest_file_copy ...");
                 $md5 = md5_file($latest_file_copy);
-                gh_log(DEBUG, "    MD5 = $md5");
+                Log::debug("    MD5 = $md5");
                 if ($md5 == $original_md5) {
-                    gh_log(DEBUG, "  All copies have the same MD5 checksum: $md5");
+                    Log::debug("  All copies have the same MD5 checksum: $md5");
                     delete_tasks($complete_tasks->ids);
                     return;
                 }
@@ -4752,13 +3778,13 @@ function gh_check_md5($task) {
     if (isset($logs)) {
         // Write to greyhole.log
         foreach ($logs as $log) {
-            gh_log(ERROR, $log);
+            Log::error($log);
         }
 
         // Write in fsck_checksums.log too
         $flog = fopen(FSCKLogFile::PATH . '/fsck_checksums.log', 'a');
         if (!$flog) {
-            gh_log(CRITICAL, "Couldn't open log file: " . FSCKLogFile::PATH . "/fsck_checksums.log");
+            Log::critical("Couldn't open log file: " . FSCKLogFile::PATH . "/fsck_checksums.log");
         }
         fwrite($flog, $date = date("M d H:i:s") . ' ' . implode("\n", $logs) . "\n\n");
         fclose($flog);
@@ -4779,7 +3805,7 @@ function check_md5_workers() {
     if ($row) {
         $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
         if ($num_worker_threads == 0) {
-            gh_log(DEBUG, "Will spawn new worker threads to work on incomplete checksums calculations.");
+            Log::debug("Will spawn new worker threads to work on incomplete checksums calculations.");
             foreach (Config::storagePoolDrives() as $sp_drive) {
                 if (is_greyhole_owned_drive($sp_drive)) {
                     spawn_thread('md5-worker', array($sp_drive));
@@ -4810,16 +3836,6 @@ function remove_drive_definition($going_drive) {
     Settings::set('sp_drives_definitions', $drives_definitions);
 }
 
-function restart_service() {
-    if (is_file('/etc/init.d/greyhole')) {
-        exec("/etc/init.d/greyhole condrestart");
-    } else if (is_file('/etc/init/greyhole.conf')) {
-        exec("/sbin/restart greyhole");
-    } else {
-        echo "You should now restart the Greyhole daemon to stop any ongoing fsck.\n";
-    }
-}
-
 function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_is_enough=FALSE) {
     $file_copies_inodes = array();
     
@@ -4831,17 +3847,17 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
         $inode_number = @gh_fileinode($clean_full_path);
         if ($inode_number !== FALSE) {
             if (is_dir($clean_full_path)) {
-                gh_log(WARN, "Warning! Found a directory that should be a file! Will try to remove it, if it's empty.");
+                Log::warn("Warning! Found a directory that should be a file! Will try to remove it, if it's empty.");
                 @rmdir($clean_full_path);
                 continue;
             }
 
-            gh_log(DEBUG, "Found $clean_full_path");
+            Log::debug("Found $clean_full_path");
 
             if (!is_greyhole_owned_drive($sp_drive)) {
                 $state = 'Gone';
                 if (!$one_is_enough) {
-                    gh_log(INFO, "  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
+                    Log::info("  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");
                 }
             } else {
                 $state = 'OK';
@@ -4851,14 +3867,14 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
                 }
             }
             if (is_string($file_metafiles)) {
-                gh_log(CRITICAL, "Fatal error! \$file_metafiles is now a string: '$file_metafiles'.");
+                Log::critical("Fatal error! \$file_metafiles is now a string: '$file_metafiles'.");
             }
             $file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => $state);
             
             // Temp files leftovers of stopped Greyhole executions
             $temp_filename = get_temp_filename($clean_full_path);
             if (file_exists($temp_filename) && gh_is_file($temp_filename)) {
-                gh_log(INFO, "  Found temporary file $temp_filename ... deleting.");
+                Log::info("  Found temporary file $temp_filename ... deleting.");
                 $fsck_report['temp_files'][] = $temp_filename;
                 unlink($temp_filename);
             }

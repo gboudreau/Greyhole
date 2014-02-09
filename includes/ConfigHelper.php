@@ -49,7 +49,6 @@ define('CONFIG_DB_NAME', 'db_name');
 define('CONFIG_METASTORE_BACKUPS', 'metastore_backups');
 define('CONFIG_TRASH_SHARE', '===trash_share===');
 
-
 class ConfigHelper {
     static $config_file = '/etc/greyhole.conf';
     static $smb_config_file = '/etc/samba/smb.conf';
@@ -58,14 +57,12 @@ class ConfigHelper {
 
     public static function removeShare($share) {
         exec("/bin/sed -i 's/^.*num_copies\[".$share."\].*$//' " . escapeshellarg(static::$config_file));
-        restart_service();
     }
 
     public static function removeStoragePoolDrive($sp_drive) {
         $escaped_drive = str_replace('/', '\/', $sp_drive);
         exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' " . escapeshellarg(static::$config_file)); // Deprecated notation
         exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' " . escapeshellarg(static::$config_file));
-        restart_service();
     }
 
     public static function randomStoragePoolDrive() {
@@ -95,7 +92,7 @@ class ConfigHelper {
                 foreach ($deprecated_options as $old_name => $new_name) {
                     if (string_contains($name, $old_name)) {
                         $fixed_name = str_replace($old_name, $new_name, $name);
-                        gh_log(WARN, "Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
+                        Log::warn("Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
                         $name = $fixed_name;
                     }
                 }
@@ -243,8 +240,10 @@ class ConfigHelper {
             }
         }
 
+        Log::setLevel(Config::get(CONFIG_LOG_LEVEL));
+
         if (count(Config::storagePoolDrives()) == 0) {
-            gh_log(ERROR, "You have no '" . CONFIG_STORAGE_POOL_DRIVE . "' defined. Greyhole can't run.");
+            Log::error("You have no '" . CONFIG_STORAGE_POOL_DRIVE . "' defined. Greyhole can't run.");
             return FALSE;
         }
 
@@ -290,7 +289,7 @@ class ConfigHelper {
                 SharesConfig::set($share_name, CONFIG_NUM_COPIES, count(Config::storagePoolDrives()));
             }
             if (!isset($share_options[CONFIG_LANDING_ZONE])) {
-                gh_log(WARN, "Found a share ($share_name) defined in " . static::$config_file . " with no path in " . static::$smb_config_file . ". Either add this share in " . static::$smb_config_file . ", or remove it from " . static::$config_file . ", then restart Greyhole.");
+                Log::warn("Found a share ($share_name) defined in " . static::$config_file . " with no path in " . static::$smb_config_file . ". Either add this share in " . static::$smb_config_file . ", or remove it from " . static::$config_file . ", then restart Greyhole.");
                 return FALSE;
             }
             if (!isset($share_options[CONFIG_DELETE_MOVES_TO_TRASH])) {
@@ -310,10 +309,10 @@ class ConfigHelper {
             // Validate that the landing zone is NOT a subdirectory of a storage pool drive, and that storage pool drives are not subdirectories of the landing zone!
             foreach (Config::storagePoolDrives() as $sp_drive) {
                 if (string_starts_with($share_options[CONFIG_LANDING_ZONE], $sp_drive)) {
-                    gh_log(CRITICAL, "Found a share ($share_name), with path " . $share_options[CONFIG_LANDING_ZONE] . ", which is INSIDE a storage pool drive ($sp_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+                    Log::critical("Found a share ($share_name), with path " . $share_options[CONFIG_LANDING_ZONE] . ", which is INSIDE a storage pool drive ($sp_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
                 }
                 if (string_starts_with($sp_drive, $share_options[CONFIG_LANDING_ZONE])) {
-                    gh_log(CRITICAL, "Found a storage pool drive ($sp_drive), which is INSIDE a share landing zone (" . $share_options[CONFIG_LANDING_ZONE] . "), for share $share_name. Storage pool drives should never be inside a directory that you use as a share landing zone ('path' in smb.conf).\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+                    Log::critical("Found a storage pool drive ($sp_drive), which is INSIDE a share landing zone (" . $share_options[CONFIG_LANDING_ZONE] . "), for share $share_name. Storage pool drives should never be inside a directory that you use as a share landing zone ('path' in smb.conf).\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
                 }
             }
         }
@@ -358,7 +357,7 @@ class ConfigHelper {
 
     private static function assert($check, $error_message) {
         if ($check === FALSE) {
-            gh_log(CRITICAL, $error_message);
+            Log::critical($error_message);
         }
     }
 }
@@ -388,6 +387,9 @@ class Config {
         CONFIG_DF_CACHE_TIME               => 15,
     );
 
+    /**
+     * @return mixed
+     */
     public static function get($name, $index=NULL) {
         if ($index === NULL) {
             return isset(static::$config[$name]) ? static::$config[$name] : FALSE;
@@ -396,6 +398,9 @@ class Config {
         }
     }
 
+    /**
+     * @return array
+     */
     public static function storagePoolDrives() {
         return static::get(CONFIG_STORAGE_POOL_DRIVE);
     }

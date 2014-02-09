@@ -18,9 +18,10 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-include('includes/ConfigHelper.php');
-include('includes/DB.php');
-include('includes/Log.php');
+// Other helpers
+require_once('includes/ConfigHelper.php');
+require_once('includes/DB.php');
+require_once('includes/Log.php');
 
 define('PERF', 9);
 define('TEST', 8);
@@ -38,8 +39,6 @@ foreach($constarray['user'] as $key => $val) {
 define('FSCK_TYPE_SHARE', 1);
 define('FSCK_TYPE_STORAGE_POOL_DRIVE', 2);
 define('FSCK_TYPE_METASTORE', 3);
-
-$action = 'initialize';
 
 set_error_handler("gh_error_handler");
 register_shutdown_function("gh_shutdown");
@@ -84,7 +83,7 @@ function recursive_include_parser($file) {
             $ok_to_execute &= !($perms & 0x0002);
 
             if (!$ok_to_execute) {
-                gh_log(WARN, "Config file '{$file}' is executable but file permissions are insecure, only the file's contents will be included.");
+                Log::warn("Config file '{$file}' is executable but file permissions are insecure, only the file's contents will be included.");
             }
         }
 
@@ -118,50 +117,9 @@ function explode_full_path($full_path) {
     return array(dirname($full_path), basename($full_path));
 }
 
-function gh_log($local_log_level, $text) {
-    global $action;
-    $log_level = Config::get(CONFIG_LOG_LEVEL);
-    if ($local_log_level > $log_level) {
-        return;
-    }
-
-    $date = date("M d H:i:s");
-    if ($log_level >= Log::PERF) {
-        $utimestamp = microtime(true);
-        $timestamp = floor($utimestamp);
-        $date .= '.' . round(($utimestamp - $timestamp) * 1000000);
-    }
-    $log_text = sprintf("%s%s%s\n", 
-        "$date $local_log_level $action: ",
-        $text,
-        Config::get(CONFIG_LOG_MEMORY_USAGE) ? " [" . memory_get_usage() . "]" : ''
-    );
-
-    $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
-    if (strtolower($greyhole_log_file) == 'syslog') {
-        $worked = syslog($local_log_level, $log_text);
-    } else if (!empty($greyhole_log_file)) {
-        $greyhole_error_log_file = Config::get(CONFIG_GREYHOLE_ERROR_LOG_FILE);
-        if ($local_log_level <= WARN && !empty($greyhole_error_log_file)) {
-            $worked = @error_log($log_text, 3, $greyhole_error_log_file);
-        } else {
-            $worked = @error_log($log_text, 3, $greyhole_log_file);
-        }
-    } else {
-        $worked = FALSE;
-    }
-    if (!$worked) {
-        error_log(trim($log_text));
-    }
-    
-    if ($local_log_level === Log::CRITICAL) {
-        exit(1);
-    }
-}
-
 function gh_shutdown() {
     if ($err = error_get_last()) {
-        gh_log(ERROR, "PHP Fatal Error: " . $err['message'] . "; BT: " . basename($err['file']) . '[L' . $err['line'] . '] ');
+        Log::error("PHP Fatal Error: " . $err['message'] . "; BT: " . basename($err['file']) . '[L' . $err['line'] . '] ');
     }
 }
 
@@ -176,7 +134,7 @@ function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
     case E_PARSE:
     case E_CORE_ERROR:
     case E_COMPILE_ERROR:
-        gh_log(CRITICAL, "PHP Error [$errno]: $errstr in $errfile on line $errline");
+        Log::critical("PHP Error [$errno]: $errstr in $errfile on line $errline");
         break;
 
     case E_WARNING:
@@ -189,11 +147,11 @@ function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
             // What would have been logged will be echoed instead.
             return TRUE;
         }
-        gh_log(WARN, "PHP Warning [$errno]: $errstr in $errfile on line $errline; BT: " . get_debug_bt());
+        Log::warn("PHP Warning [$errno]: $errstr in $errfile on line $errline; BT: " . get_debug_bt());
         break;
 
     default:
-        gh_log(WARN, "PHP Unknown Error [$errno]: $errstr in $errfile on line $errline");
+        Log::warn("PHP Unknown Error [$errno]: $errstr in $errfile on line $errline");
         break;
     }
 
@@ -212,6 +170,9 @@ function get_debug_bt() {
         if (isset($d['file'])) {
             $prefix = basename($d['file']) . '[L' . $d['line'] . '] ';
         }
+        if (!isset($d['args'])) {
+            $d['args'] = array();
+        }
         foreach ($d['args'] as $k => $v) {
             if (is_object($v)) {
                 $d['args'][$k] = 'stdClass';
@@ -220,7 +181,7 @@ function get_debug_bt() {
                 $d['args'][$k] = str_replace("\n", "", var_export($v, TRUE));
             }
         }
-        $bt = $prefix . $d['function'] .'(' . implode(',', $d['args']) . ')' . $bt;
+        $bt = $prefix . $d['function'] .'(' . implode(',', @$d['args']) . ')' . $bt;
     }
     return $bt;
 }
@@ -274,7 +235,7 @@ function get_share_landing_zone($share) {
     } else if (array_contains(ConfigHelper::$trash_share_names, $share)) {
         return SharesConfig::get(CONFIG_TRASH_SHARE, CONFIG_LANDING_ZONE);
     } else {
-        gh_log(WARN, "  Found a share ($share) with no path in " . ConfigHelper::$smb_config_file . ", or missing it's num_copies[$share] config in " . ConfigHelper::$config_file . ". Skipping.");
+        Log::warn("  Found a share ($share) with no path in " . ConfigHelper::$smb_config_file . ", or missing it's num_copies[$share] config in " . ConfigHelper::$config_file . ". Skipping.");
         return FALSE;
     }
 }
@@ -398,7 +359,7 @@ function memory_check() {
     $used = $usage / Config::get(CONFIG_MEMORY_LIMIT);
     $used = $used * 100;
     if ($used > 95) {
-        gh_log(CRITICAL, "$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in /etc/greyhole.conf");
+        Log::critical("$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in /etc/greyhole.conf");
     }
 }
 
@@ -441,7 +402,7 @@ class metafile_iterator implements Iterator {
         while(count($this->directory_stack)>0 && $this->directory_stack !== NULL) {
             $this->dir = array_pop($this->directory_stack);
             if (!$this->quiet) {
-                gh_log(DEBUG, "Loading metadata files for (dir) " . clean_dir($this->share . (!empty($this->dir) ? "/" . $this->dir : "")) . " ...");
+                Log::debug("Loading metadata files for (dir) " . clean_dir($this->share . (!empty($this->dir) ? "/" . $this->dir : "")) . " ...");
             }
             for( $i = 0; $i < count($this->metastores); $i++ ) {
                 $metastore = $this->metastores[$i];
@@ -478,7 +439,7 @@ class metafile_iterator implements Iterator {
             
         }
         if (!$this->quiet) {
-            gh_log(DEBUG, 'Found ' . count($this->metafiles) . ' metadata files.');
+            Log::debug('Found ' . count($this->metafiles) . ' metadata files.');
         }
         return $this->metafiles;
     }
@@ -911,7 +872,7 @@ class DriveSelection {
             arsort($sorted_target_drives);
             arsort($last_resort_sorted_target_drives);
         } else {
-            gh_log(CRITICAL, "Unknown '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' found: " . $this->selection_algorithm);
+            Log::critical("Unknown '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' found: " . $this->selection_algorithm);
         }
         // Only keep drives that are in $this->drives
         $this->sorted_target_drives = array();
@@ -961,7 +922,7 @@ class DriveSelection {
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(least_used_space|most_available_space)/i', $config_string, $regs)) {
-            gh_log(CRITICAL, "Can't understand the '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' value: $config_string");
+            Log::critical("Can't understand the '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' value: $config_string");
         }
         $selection_algorithm = $regs[2];
         $groups = array_map('trim', explode(',', $regs[1]));
@@ -970,7 +931,7 @@ class DriveSelection {
             $num_drives = trim($group[0]);
             $group_name = trim($group[1]);
             if (!isset($drive_selection_groups[$group_name])) {
-                //gh_log(WARN, "Warning: drive selection group named '$group_name' is undefined.");
+                //Log::warn("Warning: drive selection group named '$group_name' is undefined.");
                 continue;
             }
             if (stripos(trim($num_drives), 'all') === 0 || $num_drives > count($drive_selection_groups[$group_name])) {
@@ -1113,14 +1074,14 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
             }
             mark_gone_drive_fscked($sp_drive);
             $missing_drives[] = $sp_drive;
-            gh_log(WARN, "Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
-            gh_log(DEBUG, "Email sent for gone drive: $sp_drive");
+            Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+            Log::debug("Email sent for gone drive: $sp_drive");
             $gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
         } else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_drive($sp_drive) && !empty($drives_definitions[$sp_drive])) {
             // $sp_drive is now back
             $needs_fsck = 2;
             $returned_drives[] = $sp_drive;
-            gh_log(DEBUG, "Email sent for revived drive: $sp_drive");
+            Log::debug("Email sent for revived drive: $sp_drive");
 
             mark_gone_ok($sp_drive, 'remove');
             mark_gone_drive_fscked($sp_drive, 'remove');
@@ -1184,21 +1145,21 @@ function check_storage_pool_drives($skip_fsck=FALSE) {
             if ($needs_fsck === 2) {
                 foreach ($returned_drives as $drive) {
                     $metastores = get_metastores_from_storage_volume($drive);
-                    gh_log(INFO, "Starting fsck for metadata store on $drive which came back online.");
+                    Log::info("Starting fsck for metadata store on $drive which came back online.");
                     foreach ($metastores as $metastore) {
                         foreach (SharesConfig::getShares() as $share_name => $share_options) {
                             gh_fsck_metastore($metastore,"/$share_name", $share_name);
                         }
                     }
-                    gh_log(INFO, "fsck for returning drive $drive's metadata store completed.");
+                    Log::info("fsck for returning drive $drive's metadata store completed.");
                 }
-                gh_log(INFO, "Starting fsck for all shares - caused by missing drive that came back online.");
+                Log::info("Starting fsck for all shares - caused by missing drive that came back online.");
             } else {
-                gh_log(INFO, "Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
+                Log::info("Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
                 fix_all_symlinks();
             }
             schedule_fsck_all_shares(array('email'));
-            gh_log(INFO, "  fsck for all shares scheduled.");
+            Log::info("  fsck for all shares scheduled.");
         }
 
         // Refresh $gone_ok_drives to it's real value (from the DB)
@@ -1225,7 +1186,7 @@ class FSCKLogFile {
         $last_mod_date = filemtime($logfile);
         if ($last_mod_date > $this->getLastEmailSentTime()) {
             $email_to = Config::get(CONFIG_EMAIL_TO);
-            gh_log(WARN, "Sending $logfile by email to $email_to");
+            Log::warn("Sending $logfile by email to $email_to");
             mail($email_to, $this->getSubject(), $this->getBody());
 
             $this->lastEmailSentTime = $last_mod_date;
@@ -1336,7 +1297,7 @@ class Settings {
             }
         }
         if (isset($backup_file)) {
-            gh_log(INFO, "Restoring settings from last backup: $backup_file");
+            Log::info("Restoring settings from last backup: $backup_file");
             $settings = unserialize(file_get_contents($backup_file));
             foreach ($settings as $setting) {
                 Settings::set($setting->name, $setting->value);
@@ -1366,11 +1327,11 @@ function gh_dir_uuid($dir) {
                         $dev = exec("ls -l /dev/disk/*/$dev_name | awk '{print \$(NF-2)}'");
                         if (empty($dev) && file_exists("/dev/$dev_name")) {
                             $dev = '/dev/$dev_name';
-                            gh_log(INFO, "Found a ZFS pool ($pool) that uses a device name in /dev/ ($dev). That is a bad idea, since those can easily change, which would prevent this pool from mounting automatically. You should use any of the /dev/disk/*/ links instead. For example, you could do: zpool export $pool && zpool import -d /dev/disk/by-id/ $pool. More details at http://zfsonlinux.org/faq.html#WhatDevNamesShouldIUseWhenCreatingMyPool");
+                            Log::info("Found a ZFS pool ($pool) that uses a device name in /dev/ ($dev). That is a bad idea, since those can easily change, which would prevent this pool from mounting automatically. You should use any of the /dev/disk/*/ links instead. For example, you could do: zpool export $pool && zpool import -d /dev/disk/by-id/ $pool. More details at http://zfsonlinux.org/faq.html#WhatDevNamesShouldIUseWhenCreatingMyPool");
                         }
                     }
                     if (empty($dev)) {
-                        gh_log(WARN, "Warning! Couldn't find the device used by your ZFS pool name $pool. That pool will never be used.");
+                        Log::warn("Warning! Couldn't find the device used by your ZFS pool name $pool. That pool will never be used.");
                         return FALSE;
                     }
                 }

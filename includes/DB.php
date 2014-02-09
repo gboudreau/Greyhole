@@ -39,7 +39,7 @@ class DB {
             static::$handle = @new PDO($connect_string, static::$options->user, static::$options->pass, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
         } catch (PDOException $ex) {
             echo "ERROR: Can't connect to database: " . $ex->getMessage() . "\n";
-            gh_log(CRITICAL, "Can't connect to database: " . $ex->getMessage());
+            Log::critical("Can't connect to database: " . $ex->getMessage());
         }
 
         if (static::$handle) {
@@ -62,7 +62,7 @@ class DB {
         } catch (PDOException $e) {
             $error = static::$handle->errorInfo();
             if (($error[1] == 144 || $error[1] == 145) && $attempt_repair) {
-                gh_log(INFO, "Error during MySQL query: " . $e->getMessage() . '. Will now try to repair the MySQL tables.');
+                Log::info("Error during MySQL query: " . $e->getMessage() . '. Will now try to repair the MySQL tables.');
                 DB::repairTables();
                 return DB::execute($q, $args, FALSE); // $attempt_repair = FALSE, to not go into an infinite loop, if the repair doesn't work.
             }
@@ -309,16 +309,15 @@ class DB {
     }
 
     public static function repairTables() {
-        global $action;
-        if ($action == 'daemon') {
-            gh_log(INFO, "Optimizing MySQL tables...");
+        if (Log::actionIs(ACTION_DAEMON)) {
+            Log::info("Optimizing MySQL tables...");
         }
         // Let's repair tables only if they need to!
         foreach (array('tasks', 'settings', 'du_stats', 'tasks_completed') as $table_name) {
             try {
                 DB::getFirst("SELECT * FROM $table_name LIMIT 1");
             } catch (Exception $e) {
-                gh_log(INFO, "Repairing $table_name MySQL table...");
+                Log::info("Repairing $table_name MySQL table...");
                 DB::execute("REPAIR TABLE $table_name", array(), FALSE);
             }
         }
@@ -330,9 +329,9 @@ class DB {
             return;
         }
         if (!is_int($executed_tasks_retention)) {
-            gh_log(CRITICAL, "Error: Invalid value for 'executed_tasks_retention' in greyhole.conf: '$executed_tasks_retention'. You need to use either 'forever' (no quotes), or a number of days.");
+            Log::critical("Error: Invalid value for 'executed_tasks_retention' in greyhole.conf: '$executed_tasks_retention'. You need to use either 'forever' (no quotes), or a number of days.");
         }
-        gh_log(INFO, "Cleaning executed tasks: keeping the last $executed_tasks_retention days of logs.");
+        Log::info("Cleaning executed tasks: keeping the last $executed_tasks_retention days of logs.");
         $query = sprintf("DELETE FROM tasks_completed WHERE event_date < NOW() - INTERVAL %d DAY", (int) $executed_tasks_retention);
         DB::execute($query);
     }
