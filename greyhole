@@ -34,114 +34,6 @@ $runner->run();
 // The runner has finished; let's clean up before quitting.
 $runner->finish();
 
-
-
-if ($action == 'pause') {
-    $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | awk \'{print $1}\'');
-    if ($pid) {
-        exec('kill -STOP ' . $pid);
-        echo "The Greyhole deamon has been paused. Use 'greyhole --resume' to restart it.\n";
-        exit(0);
-    } else {
-        echo "Couldn't find a Greyhole daemon running.\n";
-        exit(1);
-    }
-}
-if ($action == 'resume') {
-    $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | awk \'{print $1}\'');
-    if ($pid) {
-        exec('kill -CONT ' . $pid);
-        echo "The Greyhole deamon has resumed.\n";
-        exit(0);
-    } else {
-        echo "Couldn't find a Greyhole daemon running.\n";
-        exit(1);
-    }
-}
-
-
-function terminology_conversion() {
-    convert_folders('.gh_graveyard','.gh_metastore');
-    convert_folders('.gh_graveyard_backup','.gh_metastore_backup');
-    convert_folders('.gh_attic','.gh_trash');
-    convert_database();
-    convert_sp_drives_tag_files();
-}
-
-function convert_sp_drives_tag_files() {
-    global $going_drive;
-
-    $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
-    if (!$drives_definitions) {
-        $drives_definitions = array();
-    }
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (isset($going_drive) && $sp_drive == $going_drive) { continue; }
-        $drive_uuid = gh_dir_uuid($sp_drive);
-        if (!isset($drives_definitions[$sp_drive])) {
-            if (is_dir($sp_drive)) {
-                $drives_definitions[$sp_drive] = $drive_uuid;
-            }
-        }
-        if (!isset($drives_definitions[$sp_drive])) {
-            continue;
-        }
-        if ($drives_definitions[$sp_drive] === FALSE) {
-            unset($drives_definitions[$sp_drive]);
-            continue;
-        }
-        if (file_exists("$sp_drive/.greyhole_uses_this") && $drive_uuid != 'remote') {
-            unlink("$sp_drive/.greyhole_uses_this");
-        }
-        if ($drives_definitions[$sp_drive] != $drive_uuid) {
-            Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
-        }
-    }
-    foreach ($drives_definitions as $sp_drive => $uuid) {
-        if (!array_contains(Config::storagePoolDrives(), $sp_drive)) {
-            unset($drives_definitions[$sp_drive]);
-        }
-    }
-
-    // Check that the user is not using two sp drives on the same device
-    $devices = array();
-    foreach ($drives_definitions as $sp_drive => $device_id) {
-        $devices[$device_id][] = $sp_drive;
-    }
-    foreach ($devices as $device_id => $sp_drives) {
-        if (count($sp_drives) > 1 && $device_id !== 0 && $device_id != 'remote') {
-            if (Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
-                Log::info("The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf '" . CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE . "' options, you chose to ignore this normally critical error.");
-            } else {
-                Log::critical("ERROR: The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ". The Greyhole daemon will now stop.");
-            }
-        }
-    }
-
-    Settings::set('sp_drives_definitions', $drives_definitions);
-    return $drives_definitions;
-}
-
-function convert_database() {
-    Settings::rename('graveyard_backup_directory', 'metastore_backup_directory');
-    $setting = Settings::get('metastore_backup_directory', FALSE, '%graveyard%');
-    if ($setting) {
-        $new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting);
-        Settings::set('metastore_backup_directory', $new_value);
-    }
-}
-
-function convert_folders($old,$new) {
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        $old_term = clean_dir("$sp_drive/".$old);
-        $new_term = clean_dir("$sp_drive/".$new);
-        if (file_exists($old_term)) {
-            Log::info("Moving $old_term to $new_term...");
-            gh_rename($old_term,$new_term);
-        }
-    }
-}
-
 function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
     $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed')" . (!$incl_md5 ? " AND action != 'md5'" : "") . " ORDER BY id ASC LIMIT 20";
     $tasks = DB::getAll($query);
@@ -156,7 +48,7 @@ function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
 }
 
 function execute_next_task() {
-    global $fsck_report, $sleep_before_task, $next_task, $current_task_id, $locked_files, $fix_symlinks_scanned_dirs;
+    global $sleep_before_task, $next_task, $current_task_id, $locked_files, $fix_symlinks_scanned_dirs;
 
     if (isset($next_task)) {
         $task = $next_task;
@@ -3830,7 +3722,7 @@ function set_fsck_options($task) {
 function remove_drive_definition($going_drive) {
     $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
     if (!$drives_definitions) {
-        $drives_definitions = convert_sp_drives_tag_files();
+        $drives_definitions = MigrationHelper::convertStoragePoolDrivesTagFiles();
     }
     unset($drives_definitions[$going_drive]);
     Settings::set('sp_drives_definitions', $drives_definitions);

@@ -22,14 +22,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 require_once('includes/ConfigHelper.php');
 require_once('includes/DB.php');
 require_once('includes/Log.php');
-
-define('PERF', 9);
-define('TEST', 8);
-define('DEBUG', 7);
-define('INFO',  6);
-define('WARN',  4);
-define('ERROR', 3);
-define('CRITICAL', 2);
+require_once('includes/Settings.php');
+require_once('includes/MigrationHelper.php');
 
 $constarray = get_defined_constants(true);
 foreach($constarray['user'] as $key => $val) {
@@ -965,7 +959,7 @@ function is_greyhole_owned_drive($sp_drive) {
     if (!$is_greyhole_owned_drive) {
         $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
         if (!$drives_definitions) {
-            $drives_definitions = convert_sp_drives_tag_files();
+            $drives_definitions = MigrationHelper::convertStoragePoolDrivesTagFiles();
         }
         $drive_uuid = gh_dir_uuid($sp_drive);
         $is_greyhole_owned_drive = @$drives_definitions[$sp_drive] === $drive_uuid && $drive_uuid !== FALSE;
@@ -1242,69 +1236,6 @@ class FSCKLogFile {
         global $fsck_report;
         $logfile = self::PATH . '/fsck_files.log';
         file_put_contents($logfile, serialize($fsck_report));
-    }
-}
-
-class Settings {
-    public static function get($name, $unserialize=FALSE, $value=FALSE) {
-        $query = "SELECT * FROM settings WHERE name LIKE :name";
-        $params = array('name' => $name);
-        if ($value !== FALSE) {
-            $query .= " AND value LIKE :value";
-            $params['value'] = $value;
-        }
-        $setting = DB::getFirst($query, $params);
-        if ($setting === FALSE) {
-            return FALSE;
-        }
-        return $unserialize ? unserialize($setting->value) : $setting->value;
-    }
-
-    public static function set($name, $value) {
-        if (is_array($value)) {
-            $value = serialize($value);
-        }
-        $query = "INSERT INTO settings SET name = :name, value = :value ON DUPLICATE KEY UPDATE value = VALUES(value)";
-        DB::insert($query, array('name' => $name, 'value' => $value));
-        return (object) array('name' => $name, 'value' => $value);
-    }
-
-    public static function rename($from, $to) {
-        $query = "UPDATE settings SET name = :to WHERE name = :from";
-        DB::execute($query, array('from' => $from, 'to' => $to));
-    }
-
-    public static function backup() {
-        $settings = DB::getAll("SELECT * FROM settings");
-        foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (is_greyhole_owned_drive($sp_drive)) {
-                $settings_backup_file = "$sp_drive/.gh_settings.bak";
-                file_put_contents($settings_backup_file, serialize($settings));
-            }
-        }
-    }
-
-    public static function restore() {
-        foreach (Config::storagePoolDrives() as $sp_drive) {
-            $settings_backup_file = "$sp_drive/.gh_settings.bak";
-            $latest_backup_time = 0;
-            if (file_exists($settings_backup_file)) {
-                $last_mod_date = filemtime($settings_backup_file);
-                if ($last_mod_date > $latest_backup_time) {
-                    $backup_file = $settings_backup_file;
-                    $latest_backup_time = $last_mod_date;
-                }
-            }
-        }
-        if (isset($backup_file)) {
-            Log::info("Restoring settings from last backup: $backup_file");
-            $settings = unserialize(file_get_contents($backup_file));
-            foreach ($settings as $setting) {
-                Settings::set($setting->name, $setting->value);
-            }
-            return TRUE;
-        }
-        return FALSE;
     }
 }
 

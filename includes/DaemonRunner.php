@@ -57,7 +57,7 @@ class DaemonRunner extends AbstractRunner {
         GetGUIDCliRunner::setUniqID();
 		
 		// Terminology changed (attic > trash, graveyard > metadata store, tombstones > metadata files); this requires filesystem & database changes.
-        terminology_conversion();
+        MigrationHelper::terminologyConversion();
 
 		// For files which don't have extra copies, we at least create a copy of the metadata on a separate drive, in order to be able to identify the missing files if a hard drive fails.
         set_metastore_backup();
