@@ -203,7 +203,7 @@ static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, cons
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(handle->conn->params->service);
-		snprintf(filename, 39 + sizeof(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
+		snprintf(filename, 39 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
 		spoolf = fopen(filename, "wt");
 		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
 			share,
@@ -226,7 +226,7 @@ static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, con
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(handle->conn->params->service);
-		snprintf(filename, 39 + sizeof(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
+		snprintf(filename, 39 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
 		spoolf = fopen(filename, "wt");
 		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
 			share,
