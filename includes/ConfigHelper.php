@@ -433,7 +433,13 @@ class SharesConfig {
     }
 
     public static function getShares() {
-        return static::$shares_config;
+        $result = array();
+        foreach (static::$shares_config as $share_name => $share_config) {
+            if ($share_name != CONFIG_TRASH_SHARE) {
+                $result[$share_name] = $share_config;
+            }
+        }
+        return $result;
     }
 
     public static function getConfigForShare($share) {
