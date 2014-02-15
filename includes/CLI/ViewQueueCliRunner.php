@@ -59,7 +59,7 @@ class ViewQueueCliRunner extends AbstractAnonymousCliRunner {
             'num_fsck_pending' => $total_num_fsck_pending,
         );
 
-        $queues['Spooled'] = (int) exec("find -L /var/spool/greyhole -type f | wc -l");
+        $queues['Spooled'] = (int) exec("find -L /var/spool/greyhole -type f 2> /dev/null | wc -l");
 
         if (isset($this->options['json'])) {
             echo json_encode($queues);
