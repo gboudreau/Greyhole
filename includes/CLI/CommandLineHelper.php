@@ -132,8 +132,6 @@ class CommandLineHelper {
             exit(0);
         }
         
-        Log::setAction(str_replace(':', '', $this->actionCmd->getOpt()));
-
         if ($this->actionCmd->getLongOpt() == 'md5-worker') {
             // Any forking needs to happen before DB::connect(), or the parent exiting will close the child's DB connection!
             $cliRunner = new MD5WorkerCliRunner($this->options);

@@ -60,6 +60,16 @@ class Log {
     const ERROR    = 3;
     const CRITICAL = 2;
 
+    private static $log_level_names = array(
+        9 => 'PERF',
+        8 => 'TEST',
+        7 => 'DEBUG',
+        6 => 'INFO',
+        4 => 'WARN',
+        3 => 'ERROR',
+        2 => 'CRITICAL',
+    );
+
     private static $action = ACTION_INITIALIZE;
     private static $old_action;
     private static $level;
@@ -110,20 +120,24 @@ class Log {
             return;
         }
 
+        $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
+        $use_syslog = strtolower($greyhole_log_file) == 'syslog';
+
         $date = date("M d H:i:s");
         if (static::$level >= static::PERF) {
             $utimestamp = microtime(true);
             $timestamp = floor($utimestamp);
             $date .= '.' . round(($utimestamp - $timestamp) * 1000000);
         }
+
+        $log_level_string = $use_syslog ? $local_log_level : static::$log_level_names[$local_log_level];
         $log_text = sprintf("%s%s%s\n",
-            "$date $local_log_level " . static::$action . ": ",
+            "$date $log_level_string " . static::$action . ": ",
             $text,
             Config::get(CONFIG_LOG_MEMORY_USAGE) ? " [" . memory_get_usage() . "]" : ''
         );
 
-        $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
-        if (strtolower($greyhole_log_file) == 'syslog') {
+        if ($use_syslog) {
             $worked = sys_log($local_log_level, $log_text);
         } else if (!empty($greyhole_log_file)) {
             $greyhole_error_log_file = Config::get(CONFIG_GREYHOLE_ERROR_LOG_FILE);
