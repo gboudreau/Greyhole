@@ -11,7 +11,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 
 1. Read the following documentation pages.
    The first page will help you understand why you're doing the next steps.
-   The second page will help you choose your Landing Zones (/path/to/share, in the next step) correctly.
+   The second page will help you choose your Landing Zones (/path/to/landing_zone/share_name, in the next step) correctly.
 
    How Greyhole Works:     https://github.com/gboudreau/Greyhole/wiki/HowGreyholeWorks
    About the Landing Zone: https://github.com/gboudreau/Greyhole/wiki/AboutLZ
@@ -28,7 +28,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 
 	Example share definition:
 		[share_name]
-		    path = /path/to/share
+		    path = /path/to/landing_zone/share_name
 		    create mask = 0770
 		    directory mask = 0770
 		    read only = no
@@ -68,7 +68,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	Debian: service greyhole start
 
 
-Check for errors in the Greyhole log: greyhole --logs
+Check for errors, or check what the Greyhole service is working on, in the Greyhole log: greyhole --logs
 
 
 If you use any application that needs to use files on your shares, you'll need to mount the shares locally, and point your applications to those mounts.
