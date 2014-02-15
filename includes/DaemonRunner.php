@@ -45,7 +45,6 @@ class DaemonRunner extends AbstractRunner {
 	
 	private static function isRunning() {
         $num_daemon_processes = exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
-        file_put_contents('/home/gb/Greyhole/tmp.txt', $num_daemon_processes);
 	    return $num_daemon_processes > 1;
 	}
     
