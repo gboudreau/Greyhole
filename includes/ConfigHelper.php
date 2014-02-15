@@ -317,6 +317,21 @@ class ConfigHelper {
             }
         }
 
+        // Check that all drives are included in at least one $drive_selection_algorithm
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            $found = FALSE;
+            foreach (SharesConfig::getShares() as $share_name => $share_options) {
+                foreach ($share_options[CONFIG_DRIVE_SELECTION_ALGORITHM] as $ds) {
+                    if (array_contains($ds->drives, $sp_drive)) {
+                        $found = TRUE;
+                    }
+                }
+            }
+            if (!$found) {
+                Log::warn("The storage pool drive '$sp_drive' is not part of any drive_selection_algorithm definition, and will thus never be used to receive any files.");
+            }
+        }
+
         $memory_limit = Config::get(CONFIG_MEMORY_LIMIT);
         ini_set('memory_limit', $memory_limit);
         if (preg_match('/G$/i',$memory_limit)) {
