@@ -1,9 +1,11 @@
 ARCH=i386
 
 deb: build
+	rm build_vfs.sh
 	rm initd_script.sh
 	rm greyhole
 	rm greyhole-dfree
+	rm greyhole-mv
 	rm logrotate.greyhole
 	rm schema-mysql.sql
 	rm schema-sqlite.sql
@@ -18,8 +20,8 @@ deb: build
 	rm COPYING
 	rm INSTALL
 	rm USAGE
-	rm -rf samba-module/ docs/
-	
+	rm -rf samba-module/ docs/ includes/ web-app/
+
 build:
 	mkdir -p $(DESTDIR)etc/init.d/
 	mkdir -p $(DESTDIR)etc/init/
