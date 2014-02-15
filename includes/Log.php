@@ -150,7 +150,7 @@ class Log {
             $worked = FALSE;
         }
         if (!$worked) {
-            error__log(trim($log_text));
+            error_log(trim($log_text));
         }
 
         if ($local_log_level === static::CRITICAL) {
