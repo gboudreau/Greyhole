@@ -49,7 +49,60 @@ chdir($config->test_dir);
 /*** Tests ***/
 
 $tests = array(
-	(object) array(
+    (object) array(
+        'name' => 'GH-108',
+        'repetitions' => 2,
+        'code' => function($run_num) { $i = 1;
+                mkdir('_UNPACK_dir1');
+                file_put_contents('_UNPACK_dir1/file1', 'a');
+                wait($i++, $run_num);
+                file_put_contents('_UNPACK_dir1/file2', 'b');
+                wait($i++, $run_num);
+                mkdir('_UNPACK_dir1/dir2');
+                file_put_contents('_UNPACK_dir1/dir2/file3', 'c');
+                wait($i++, $run_num);
+
+                rename('_UNPACK_dir1', 'dir1');
+
+                $ok = file_get_contents('dir1/file1') == 'a';
+                wait();
+                $ok &= file_get_contents('dir1/file2') == 'b';
+                wait();
+                $ok &= file_get_contents('dir1/dir2/file3') == 'c';
+                wait();
+
+                $found_in_storage_pool = FALSE;
+                global $config;
+                foreach ($config->pool_dirs as $sp_drive) {
+                    if (file_exists("$sp_drive/dir1/file1")) {
+                        $found_in_storage_pool = TRUE;
+                        break;
+                    }
+                }
+                $ok &= $found_in_storage_pool;
+
+                $ok &= file_get_contents('dir1/file1') == 'a';
+                wait();
+                $ok &= file_get_contents('dir1/file2') == 'b';
+                wait();
+                $ok &= file_get_contents('dir1/dir2/file3') == 'c';
+                wait();
+
+                unlink('dir1/file1');
+                $ok &= !file_exists('dir1/file1');
+                unlink('dir1/file2');
+                $ok &= !file_exists('dir1/file2');
+                unlink('dir1/dir2/file3');
+                $ok &= !file_exists('dir1/dir2/file3');
+                rmdir('dir1/dir2');
+                $ok &= !file_exists('dir1/dir2');
+                rmdir('dir1');
+                $ok &= !file_exists('dir1');
+                return $ok;
+            }
+    ),
+
+    (object) array(
 		'name' => 'file creation',
 		'repetitions' => 2,
 		'code' => function($run_num) { $i = 1;

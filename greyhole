@@ -465,6 +465,13 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
             }
         }
 
+        // Let look in the LZ too, for files we didn't process yet (maybe the folder was ignored before it was renamed)
+        exec('find ' . escapeshellarg("$landing_zone/$target_full_path") . ' -type f', $files_in_lz);
+        foreach ($files_in_lz as $file_in_lz) {
+            list($file_path, $filename) = explode_full_path($file_in_lz);
+            gh_fsck_file($file_path, $filename, 'file', 'landing_zone', $share);
+        }
+
         foreach (get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles) {
             Log::debug("Existing metadata files: " . count($existing_metafiles));
             foreach ($existing_metafiles as $file_path => $file_metafiles) {
@@ -2155,7 +2162,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
         $fsck_report['metastore']['num_files']++;
     }
     if ($file_type !== FALSE) {
-        $fsck_report['landing_zone']['num_files']++;
+        @$fsck_report['landing_zone']['num_files']++;
     }
     if ($file_type == 'file') {
         if($storage_path === FALSE) {
