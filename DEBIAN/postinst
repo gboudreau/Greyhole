@@ -44,6 +44,14 @@ SOURCE_LIB="${SOURCE_LIBDIR}/greyhole/${LIB_FILE}"
 rm -f ${TARGET_SYMLINK}
 ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
 
+# Bugfix for Ubuntu 14 (Trusty) that is missing libsmbd_base.so, which is used to compile the VFS
+MAJOR_SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1}'`"
+if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
+    if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd_base.so -a -f ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ]; then
+        ln -s ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ${TARGET_LIBDIR}/samba/libsmbd_base.so
+    fi
+fi
+
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
 	# cifs client workaround
 	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
