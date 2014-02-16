@@ -110,8 +110,7 @@ class GoneCliRunner extends AbstractCliRunner {
         ConfigHelper::removeStoragePoolDrive($this->drive);
         $this->restart_service();
 
-        // For Amahi users
-        if (file_exists('/usr/bin/hdactl')) {
+        if (is_amahi()) {
             $this->log("\nYou should de-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page.");
         }
 

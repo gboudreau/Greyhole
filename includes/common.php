@@ -1330,4 +1330,8 @@ function string_starts_with($haystack, $needle) {
     return mb_strpos($haystack, $needle) === 0;
 }
 
+function is_amahi() {
+    return file_exists('/usr/bin/hda-ctl');
+}
+
 ?>
