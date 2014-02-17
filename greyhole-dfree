@@ -1,37 +1,34 @@
-#!/usr/bin/php
-<?php
-/*
-Copyright 2009-2014 Guillaume Boudreau
+#!/bin/sh
 
-This file is part of Greyhole.
+CACHE_DIR="/var/cache/greyhole-dfree"
+CACHE_TIME=15 # in seconds
 
-Greyhole is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+if [[ "$1" == /* ]]; then
+	DIR="$1" # absolute path given, ignore working directory
+else
+	DIR="$(pwd)/$1" # relative path given, use working directory
+fi
 
-Greyhole is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+TMP_FILE="$CACHE_DIR/${DIR//"/"/_}"
+RESULT="0 0 1024" # fail-safe default result
 
-You should have received a copy of the GNU General Public License
-along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
-*/
+if [ ! -e "$CACHE_DIR" ]; then
+	mkdir -p "$CACHE_DIR"
+fi
 
-include('includes/common.php');
-ConfigHelper::parse();
+if [ ! -e "$TMP_FILE" ]; then
+	RESULT=$(/usr/share/greyhole/greyhole-dfree.php $1)
+	echo "$RESULT" > "$TMP_FILE"
+else
+	MODIFIED=$(stat -c %Y "$TMP_FILE")
+	CURRENT=$(date +%s)
+	if [ $((CURRENT - MODIFIED)) -lt $CACHE_TIME ]; then
+		RESULT=$(cat "$TMP_FILE")
+	else
+		# update cache by running greyhole-dfree
+		RESULT=$(/usr/share/greyhole/greyhole-dfree.php $1)
+		echo "$RESULT" > "$TMP_FILE"
+	fi
+fi
 
-$total_space = 0;
-$total_free_space = 0;
-foreach (Config::storagePoolDrives() as $sp_drive) {
-	$response = explode(' ', exec("df -k ".escapeshellarg($sp_drive)." 2>/tmp/greyhole_df_error.log | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'"));
-	if (count($response) != 2) {
-		continue;
-	}
-	$total_space += $response[0];
-	$total_free_space += $response[1];
-}
-
-echo "$total_space $total_free_space 1024\n";
-?>
+echo "$RESULT"

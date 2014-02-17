@@ -31,7 +31,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/man/man5/
 
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
-install -m 0755 -D -p greyhole-dfree-cached ${RPM_BUILD_ROOT}%{_bindir}
+install -m 0755 -D -p greyhole-dfree.php ${RPM_BUILD_ROOT}/usr/share/greyhole/
 
 install -m 0644 -D -p schema-mysql.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0644 -D -p schema-sqlite.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
@@ -161,6 +161,9 @@ fi
 rm -f /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so
 rm -f /usr/lib64/samba/vfs/greyhole.so
 rm -f /usr/lib/samba/vfs/greyhole.so
+
+# Delete cache folder
+rm -rf /var/cache/greyhole-dfree
 
 if [ "$1" != 0 ]; then
 	/sbin/service greyhole condrestart 2>&1 > /dev/null

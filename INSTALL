@@ -35,10 +35,11 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	GREYHOLE_INSTALL_DIR=`pwd`
 	mkdir -p /var/spool/greyhole
 	chmod 777 /var/spool/greyhole
+	mkdir -p /usr/share/greyhole
 	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
 	install -m 0755 -D -p greyhole /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
-	install -m 0755 -D -p greyhole-dfree-cached /usr/bin
+	install -m 0755 -D -p greyhole-dfree.php /usr/share/greyhole
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	install -m 0644 -D -p greyhole.example.conf /etc/greyhole.conf
@@ -47,13 +48,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0644 -D -p docs/greyhole.1.gz /usr/share/man/man1/
 	install -m 0644 -D -p docs/greyhole-dfree.1.gz /usr/share/man/man1/
 	install -m 0644 -D -p docs/greyhole.conf.5.gz /usr/share/man/man5/
-	if [ -f includes/common.php ]; then
-		include_path=`php -i | grep include_path | awk -F':' '{print $NF}'`
-		mkdir "$include_path/includes"
-		install -m 0644 -D -p includes/common.php "$include_path/includes"
-		install -m 0644 -D -p includes/sql.php "$include_path/includes"
-	fi
-    
+
 	# What version of Samba are you running ?
     SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
     echo "You appear to be running Samba $SMB_VERSION"

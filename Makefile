@@ -55,7 +55,7 @@ dist:
 
     # Inject require()'d files
 	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole)
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole-dfree)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole-dfree.php)
 	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php web-app/index.php)
 
     # Create tgz
