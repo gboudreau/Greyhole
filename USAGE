@@ -37,7 +37,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 		    writable = yes
 		    guest ok = no
 		    printable = no
-		    dfree command = /usr/bin/greyhole-dfree
+		    dfree command = /usr/bin/greyhole-dfree-cached
 		    vfs objects = greyhole
 
 	Fedora: service smb restart

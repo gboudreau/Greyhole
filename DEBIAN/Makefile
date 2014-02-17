@@ -5,6 +5,7 @@ deb: build
 	rm initd_script.sh
 	rm greyhole
 	rm greyhole-dfree
+	rm greyhole-dfree-cached
 	rm greyhole-mv
 	rm logrotate.greyhole
 	rm schema-mysql.sql
@@ -37,6 +38,7 @@ build:
 
 	install -m 0755 -D -p greyhole $(DESTDIR)usr/bin
 	install -m 0755 -D -p greyhole-dfree $(DESTDIR)usr/bin
+	install -m 0755 -D -p greyhole-dfree-cached $(DESTDIR)usr/bin
 
 	install -m 0644 -D -p schema-mysql.sql $(DESTDIR)usr/share/greyhole/
 	install -m 0644 -D -p schema-sqlite.sql $(DESTDIR)usr/share/greyhole/
