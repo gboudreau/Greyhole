@@ -1508,13 +1508,30 @@ function samba_check_vfs() {
       }
 }
 
+function create_mem_spool() {
+    $mounted_already = exec('mount | grep /var/spool/greyhole/mem | wc -l');
+    if (!$mounted_already) {
+        if (!file_exists('/var/spool/greyhole/mem')) {
+            mkdir('/var/spool/greyhole/mem', 0777, TRUE);
+            chmod('/var/spool/greyhole/mem', 0777); // mkdir mode is affected by the umask, so we need to insure proper mode on that folder.
+        }
+        exec('mount -o size=4M -t tmpfs none /var/spool/greyhole/mem 2> /dev/null', $mount_result);
+        if (!empty($mount_result)) {
+            Log::error("Error mounting tmpfs in /var/spool/greyhole/mem: $mount_result");
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+
 function parse_samba_spool($simplify_after_parse=TRUE) {
     Log::setAction(ACTION_READ_SAMBA_POOL);
 
     // Just in case the spool folder is missing!
-    if (!file_exists('/var/spool/greyhole')) {
-        mkdir('/var/spool/greyhole', 0777, TRUE);
-        chmod('/var/spool/test', 0777); // mkdir mode is affected by the umask, so we need to insure proper mode on that folder.
+    if (!file_exists('/var/spool/greyhole/mem')) {
+        mkdir('/var/spool/greyhole/mem', 0777, TRUE);
+        chmod('/var/spool/greyhole', 0777); // mkdir mode is affected by the umask, so we need to insure proper mode on that folder.
+        chmod('/var/spool/greyhole/mem', 0777);
     }
 
     // If we have enough queued tasks (90% of $max_queued_tasks), let's not parse the log at this time, and get some work done.
@@ -1550,7 +1567,7 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
         }
         
         foreach ($files as $file) {
-            // Remove timestamp prefix from $file, to get the complete filename
+            // Remove timestamp prefix from $file (%T@ above), to get the complete filename
             $file = explode(' ', $file);
             array_shift($file);
             $filename = implode(' ', $file);

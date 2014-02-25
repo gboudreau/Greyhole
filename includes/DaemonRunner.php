@@ -66,6 +66,9 @@ class DaemonRunner extends AbstractRunner {
 		
 		// Check that the Greyhole VFS module used by Samba is the correct one for the current Samba version. This is needed when Samba is updated to a new major version after Greyhole is installed.
         samba_check_vfs();
+
+        // Check if the in-memory spool folder exists, and if no, create it and mount a tmpfs there. VFS will write there recvfile (etc.) operations.
+        create_mem_spool();
 		
 		// Process the spool directory, and insert each task found there into the database.
         parse_samba_spool();

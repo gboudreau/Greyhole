@@ -25,6 +25,7 @@ require_once('includes/CLI/CliOptionDefinition.php');
 require_once('includes/CLI/BalanceCliRunner.php');
 require_once('includes/CLI/CancelBalanceCliRunner.php');
 require_once('includes/CLI/CancelFsckCliRunner.php');
+require_once('includes/CLI/CreateMemSpoolRunner.php');
 require_once('includes/CLI/DebugCliRunner.php');
 require_once('includes/CLI/DeleteMetadataCliRunner.php');
 require_once('includes/CLI/EmptyTrashCliRunner.php');
@@ -75,6 +76,7 @@ class CommandLineHelper {
             new CliCommandDefinition('remove-share:',    'U:',  '=share_name', 'RemoveShareCliRunner',    "Move the files currently inside the specified share from the storage pool into the shared folder (landing zone), effectively removing the share from Greyhole's storage pool."),
             new CliCommandDefinition('md5-worker',       '',    null,          null,                      null),
             new CliCommandDefinition('getuid',           'G',   null,          'GetGUIDCliRunner',        null),
+            new CliCommandDefinition('create-mem-spool', '',    null,          'CreateMemSpoolRunner',    null),
         );
         
         $this->cliOptionsDefinitions = array(
