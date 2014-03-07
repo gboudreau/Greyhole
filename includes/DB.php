@@ -306,6 +306,16 @@ class DB {
                 }
             }
         }
+
+        // Migration #10 (UTF8 name column in settings table)
+        {
+            $query = "SELECT character_set_name FROM information_schema.`COLUMNS` C WHERE table_schema = :schema AND table_name = :table AND column_name = :field";
+            $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => 'settings', 'field' => 'name'));
+            if ($charset == "ascii") {
+                // migrate
+                DB::execute("ALTER TABLE settings CHANGE name name TINYTEXT CHARACTER SET utf8 NOT NULL");
+            }
+        }
     }
 
     public static function repairTables() {
