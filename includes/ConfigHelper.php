@@ -458,6 +458,9 @@ class SharesConfig {
     }
 
     public static function getConfigForShare($share) {
+        if (!static::exists($share)) {
+            return FALSE;
+        }
         return static::$shares_config[$share];
     }
 
