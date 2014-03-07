@@ -268,7 +268,7 @@ class ConfigHelper {
         }
 
         $drive_selection_algorithm = Config::get(CONFIG_DRIVE_SELECTION_ALGORITHM);
-        if (isset($drive_selection_algorithm)) {
+        if (!empty($drive_selection_algorithm)) {
             foreach ($drive_selection_algorithm as $ds) {
                 $ds->update();
             }
