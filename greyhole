@@ -847,7 +847,7 @@ function gh_write($share, $full_path, $task_id) {
                 }
                 if ($is_ok) {
                     // Ok, now we're sure.
-                    gh_recycle($source_file);
+                    gh_recycle($source_file, TRUE);
                 } else {
                     Log::debug("  Change of mind... Couldn't find any OK metadata file... Will keep the source!");
                 }
@@ -913,7 +913,7 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
     if ($keys_to_remove !== NULL) {
         foreach ($keys_to_remove as $key) {
             if ($existing_metafiles[$key]->path != $source_file) {
-                gh_recycle($existing_metafiles[$key]->path);
+                gh_recycle($existing_metafiles[$key]->path, TRUE);
             }
         }
         // Empty the existing metafiles array, to be able to recreate all new copies on the correct drives, per the dir_selection_algorithm
@@ -2799,7 +2799,7 @@ Trash size:\n";
     return $report;
 }
 
-function gh_recycle($real_path) {
+function gh_recycle($real_path, $file_was_modified=FALSE) {
     $is_symlink = FALSE;
     clearstatcache();
     if (is_link($real_path)) {
@@ -2826,7 +2826,11 @@ function gh_recycle($real_path) {
 
             $share = mb_substr($full_path, 0, mb_strpos($full_path, '/'));
 
-            $should_move_to_trash = SharesConfig::get($share, CONFIG_DELETE_MOVES_TO_TRASH);
+            if ($file_was_modified) {
+                $should_move_to_trash = SharesConfig::get($share, CONFIG_MODIFIED_MOVES_TO_TRASH);
+            } else {
+                $should_move_to_trash = SharesConfig::get($share, CONFIG_DELETE_MOVES_TO_TRASH);
+            }
         }
     }
     
