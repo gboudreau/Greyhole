@@ -846,8 +846,11 @@ function gh_write($share, $full_path, $task_id) {
                     }
                 }
                 if ($is_ok) {
-                    // Ok, now we're sure.
-                    gh_recycle($source_file);
+                    // check if setting is enabled
+                    if (SharesConfig::get($share, CONFIG_MODIFIED_MOVES_TO_TRASH)) {
+                        // Ok, now we're sure.
+                        gh_recycle($source_file);
+                    }
                 } else {
                     Log::debug("  Change of mind... Couldn't find any OK metadata file... Will keep the source!");
                 }
@@ -913,7 +916,11 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
     if ($keys_to_remove !== NULL) {
         foreach ($keys_to_remove as $key) {
             if ($existing_metafiles[$key]->path != $source_file) {
-                gh_recycle($existing_metafiles[$key]->path);
+                // check if setting is enabled
+                if (SharesConfig::get($share, CONFIG_MODIFIED_MOVES_TO_TRASH)) {
+                    // Ok, now we're sure.
+                    gh_recycle($existing_metafiles[$key]->path);
+                }
             }
         }
         // Empty the existing metafiles array, to be able to recreate all new copies on the correct drives, per the dir_selection_algorithm

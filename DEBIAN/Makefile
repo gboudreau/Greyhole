@@ -6,7 +6,7 @@ deb: build
 	rm greyhole
 	rm greyhole-dfree
 	rm greyhole-dfree.php
-	rm greyhole-mv
+#	rm greyhole-mv
 	rm logrotate.greyhole
 	rm schema-mysql.sql
 	rm schema-sqlite.sql

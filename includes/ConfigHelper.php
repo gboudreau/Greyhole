@@ -20,6 +20,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 define('CONFIG_LOG_LEVEL', 'log_level');
 define('CONFIG_DELETE_MOVES_TO_TRASH', 'delete_moves_to_trash');
+define('CONFIG_MODIFIED_MOVES_TO_TRASH', 'modified_moves_to_trash');
 define('CONFIG_LOG_MEMORY_USAGE', 'log_memory_usage');
 define('CONFIG_CHECK_FOR_OPEN_FILES', 'check_for_open_files');
 define('CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE', 'allow_multiple_sp_per_device');
@@ -107,6 +108,7 @@ class ConfigHelper {
 
                     // Booleans
                     case CONFIG_DELETE_MOVES_TO_TRASH:
+                    case CONFIG_MODIFIED_MOVES_TO_TRASH:
                     case CONFIG_LOG_MEMORY_USAGE:
                     case CONFIG_CHECK_FOR_OPEN_FILES:
                     case CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE:
@@ -201,6 +203,11 @@ class ConfigHelper {
                             $value = strtolower(trim($value));
                             $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
                             SharesConfig::set($share, CONFIG_DELETE_MOVES_TO_TRASH, $bool);
+                        } else if (string_starts_with($name, CONFIG_MODIFIED_MOVES_TO_TRASH)) {
+                            $share = mb_substr($name, 24, mb_strlen($name)-25);
+                            $value = strtolower(trim($value));
+                            $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
+                            SharesConfig::set($share, CONFIG_MODIFIED_MOVES_TO_TRASH, $bool);
                         } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_GROUPS)) {
                             $share = mb_substr($name, 23, mb_strlen($name)-24);
                             if (preg_match("/(.+):(.+)/", $value, $regs)) {
@@ -295,6 +302,9 @@ class ConfigHelper {
             if (!isset($share_options[CONFIG_DELETE_MOVES_TO_TRASH])) {
                 SharesConfig::set($share_name, CONFIG_DELETE_MOVES_TO_TRASH, Config::get(CONFIG_DELETE_MOVES_TO_TRASH));
             }
+            if (!isset($share_options[CONFIG_MODIFIED_MOVES_TO_TRASH])) {
+                SharesConfig::set($share_name, CONFIG_MODIFIED_MOVES_TO_TRASH, Config::get(CONFIG_MODIFIED_MOVES_TO_TRASH));
+            }
             if (isset($share_options[CONFIG_DRIVE_SELECTION_ALGORITHM])) {
                 foreach ($share_options[CONFIG_DRIVE_SELECTION_ALGORITHM] as $ds) {
                     $ds->update();
@@ -382,6 +392,7 @@ class Config {
     public static $config = array(
         CONFIG_LOG_LEVEL                   => Log::DEBUG,
         CONFIG_DELETE_MOVES_TO_TRASH       => TRUE,
+        CONFIG_MODIFIED_MOVES_TO_TRASH     => TRUE,
         CONFIG_LOG_MEMORY_USAGE            => FALSE,
         CONFIG_CHECK_FOR_OPEN_FILES        => TRUE,
         CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE => FALSE,
