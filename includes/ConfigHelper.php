@@ -285,6 +285,10 @@ class ConfigHelper {
         }
         Config::set(CONFIG_DRIVE_SELECTION_ALGORITHM, $drive_selection_algorithm);
 
+        if (!Config::exists(CONFIG_MODIFIED_MOVES_TO_TRASH)) {
+            Config::set(CONFIG_MODIFIED_MOVES_TO_TRASH, Config::get(CONFIG_DELETE_MOVES_TO_TRASH));
+        }
+
         foreach (SharesConfig::getShares() as $share_name => $share_options) {
             if (array_contains(static::$trash_share_names, $share_name)) {
                 SharesConfig::set(CONFIG_TRASH_SHARE, 'name', $share_name);
@@ -303,7 +307,7 @@ class ConfigHelper {
                 SharesConfig::set($share_name, CONFIG_DELETE_MOVES_TO_TRASH, Config::get(CONFIG_DELETE_MOVES_TO_TRASH));
             }
             if (!isset($share_options[CONFIG_MODIFIED_MOVES_TO_TRASH])) {
-                SharesConfig::set($share_name, CONFIG_MODIFIED_MOVES_TO_TRASH, Config::get(CONFIG_MODIFIED_MOVES_TO_TRASH));
+                SharesConfig::set($share_name, CONFIG_MODIFIED_MOVES_TO_TRASH, SharesConfig::get($share_name, CONFIG_DELETE_MOVES_TO_TRASH));
             }
             if (isset($share_options[CONFIG_DRIVE_SELECTION_ALGORITHM])) {
                 foreach ($share_options[CONFIG_DRIVE_SELECTION_ALGORITHM] as $ds) {
@@ -392,7 +396,6 @@ class Config {
     public static $config = array(
         CONFIG_LOG_LEVEL                   => Log::DEBUG,
         CONFIG_DELETE_MOVES_TO_TRASH       => TRUE,
-        CONFIG_MODIFIED_MOVES_TO_TRASH     => TRUE,
         CONFIG_LOG_MEMORY_USAGE            => FALSE,
         CONFIG_CHECK_FOR_OPEN_FILES        => TRUE,
         CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE => FALSE,
@@ -422,6 +425,10 @@ class Config {
         } else {
             return isset(static::$config[$name][$index]) ? static::$config[$name][$index] : FALSE;
         }
+    }
+
+    public static function exists($name) {
+        return isset(static::$config[$name]);
     }
 
     /**
