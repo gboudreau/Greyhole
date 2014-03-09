@@ -2320,7 +2320,8 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
     $num_copies_required = get_num_copies($share);
     if ($num_copies_required == -1) {
-        Log::critical("Tried to fsck a share that is missing from greyhole.conf. Quitting.");
+        Log::warn("Tried to fsck a share that is missing from greyhole.conf. Skipping.");
+        return;
     }
     
     if (count($file_copies_inodes) > 0) {
