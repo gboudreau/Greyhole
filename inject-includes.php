@@ -1,11 +1,11 @@
-#!/usr/bin/php
+#!/usr/bin/php -d open_basedir=/
 <?php
 
 if ($argc != 2) {
     die("Usage: $argv[0] [php_file]\n");
 }
 
-file_put_contents($argv[1], "#!/usr/bin/php\n" . inject_in_file($argv[1]));
+file_put_contents($argv[1], "#!/usr/bin/php -d open_basedir=/\n" . inject_in_file($argv[1]));
 
 $require_once_already_included = array();
 

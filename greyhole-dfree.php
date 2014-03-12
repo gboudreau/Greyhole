@@ -1,4 +1,4 @@
-#!/usr/bin/php
+#!/usr/bin/php -d open_basedir=/
 <?php
 /*
 Copyright 2009-2014 Guillaume Boudreau

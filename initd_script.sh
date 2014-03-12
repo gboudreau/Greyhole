@@ -75,7 +75,7 @@ start () {
 		n=1
 	fi
 	if [ -f /sbin/start-stop-daemon ]; then
-		start-stop-daemon --start --pidfile $PIDFILE --exec /usr/bin/php --nicelevel $n --background -- /usr/bin/greyhole --daemon
+		start-stop-daemon --start --pidfile $PIDFILE --exec /usr/bin/php --nicelevel $n --background -- -d open_basedir=/ /usr/bin/greyhole --daemon
 		RETVAL=$?
 		if [ $RETVAL -eq 0 ]; then
 			echo "OK"
