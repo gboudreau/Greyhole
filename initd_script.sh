@@ -13,7 +13,7 @@
 # chkconfig:         2345 20 80
 # description:       Starts the Greyhole daemon.
 
-# Copyright 2009 Guillaume Boudreau
+# Copyright 2009-2014 Guillaume Boudreau
 # 
 # This file is part of Greyhole.
 # 
