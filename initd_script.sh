@@ -10,7 +10,7 @@
 ### END INIT INFO
 
 ### For CentOS
-# chkconfig:         2345 20 80
+# chkconfig:         2345 30 80
 # description:       Starts the Greyhole daemon.
 
 # Copyright 2009-2014 Guillaume Boudreau
@@ -59,11 +59,9 @@ daemon_start () {
 	if [ "$n" = "" ]; then
 		n=1
 	fi
-	nice -n $n $DAEMON --daemon > /dev/null &
+	nice -n $n /usr/bin/greyhole --daemon > /dev/null &
 	RETVAL=$?
-	if [ $RETVAL -eq 0 ]; then
-		ps ax | grep "$DAEMON --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
-	fi
+	[ $RETVAL -eq 0 ] && ps ax | grep "greyhole --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
 	return $RETVAL
 }
 
