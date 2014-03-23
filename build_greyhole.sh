@@ -128,7 +128,7 @@ ssh ${HOST} ${PATH_TO_REPOS_UPDATER}/update_yum_repodata.sh
 echo
 echo "*******************"
 echo "You now need to execute the following command in the SSH shell that will open:"
-echo "  ${PATH_TO_REPOS_UPDATER}/update_deb_repodata.sh $VERSION ; exit"
+echo "  ${PATH_TO_REPOS_UPDATER}/update_deb_repodata.sh $VERSION $BUILD_NUMBER ; exit"
 echo "*******************"
 ssh ${HOST}
 
