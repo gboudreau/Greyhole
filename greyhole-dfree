@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 CACHE_DIR="/var/cache/greyhole-dfree"
 CACHE_TIME=15 # in seconds
