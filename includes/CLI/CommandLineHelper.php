@@ -139,14 +139,19 @@ class CommandLineHelper {
             $cliRunner = new MD5WorkerCliRunner($this->options);
         }
 
-        process_config();
-        DB::connect();
+        if ($this->actionCmd->getLongOpt() == 'create-mem-spool') {
+            // This can be executed during Greyhole install, so it needs to run before the config parsing runs (and fails)
+            $cliRunner = new CreateMemSpoolRunner($this->options);
+        } else {
+            process_config();
+            DB::connect();
 
-        if (!isset($cliRunner)) {
-            $cliRunner = $this->actionCmd->getNewRunner($this->options);
-            if ($cliRunner === FALSE) {
-                $this->printUsage();
-                exit(0);
+            if (!isset($cliRunner)) {
+                $cliRunner = $this->actionCmd->getNewRunner($this->options);
+                if ($cliRunner === FALSE) {
+                    $this->printUsage();
+                    exit(0);
+                }
             }
         }
         
