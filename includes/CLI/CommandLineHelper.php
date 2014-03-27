@@ -155,6 +155,8 @@ class CommandLineHelper {
             exit(1);
         }
         
+        Log::setAction($this->actionCmd->getLongOpt());
+
         return $cliRunner;
     }
     

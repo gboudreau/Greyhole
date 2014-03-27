@@ -84,7 +84,7 @@ class Log {
 
     public static function setAction($action) {
         static::$old_action = static::$action;
-        static::$action = $action;
+        static::$action = str_replace(':', '', $action);
     }
 
     public static function actionIs($action) {
