@@ -73,7 +73,7 @@ class GoneCliRunner extends AbstractCliRunner {
             Log::info("Storage pool drive " . $this->drive . " will be removed from the storage pool.");
             echo("Storage pool drive " . $this->drive . " will be removed from the storage pool.\n");
 
-            // global $going_drive; // Used in function is_greyhole_owned_drive()
+            global $going_drive; // Used in function is_greyhole_owned_drive()
             $going_drive = $this->drive;
 
             // For the fsck_file calls to be able to use the files on $going_drive if needed, to create extra copies.
