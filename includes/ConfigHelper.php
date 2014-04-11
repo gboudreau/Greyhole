@@ -72,6 +72,11 @@ class ConfigHelper {
     }
 
     public static function parse() {
+        if (!ini_get('date.timezone')) {
+            // To prevent warnings that would be logged if something gets logged before the timezone setting is parsed and applied.
+            date_default_timezone_set('UTC');
+        }
+
         $deprecated_options = array(
             'delete_moves_to_attic' => CONFIG_DELETE_MOVES_TO_TRASH,
             'storage_pool_directory' => CONFIG_STORAGE_POOL_DRIVE,
