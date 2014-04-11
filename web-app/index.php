@@ -66,7 +66,7 @@ if ($level_min > 1) {
 		'depth' => $level_min
 	);
 }
-$rows = DB::getAll($query) or die("SQL error: " . DB::error());
+$rows = DB::getAll($query, $params) or die("SQL error: " . DB::error());
 
 $total_bytes_subfolders = 0;
 $results_rows = array();
