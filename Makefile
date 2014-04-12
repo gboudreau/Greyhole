@@ -45,6 +45,11 @@ dist:
 	(cd /tmp/Greyhole.git; git log --pretty=oneline --reverse | cut -d ' ' -f2-  | grep -v '^Tag: ' > /tmp/Greyhole-CHANGES)
 	cp /tmp/Greyhole-CHANGES release/$(PACKAGE)-$(VERSION)/CHANGES
 
+    # Inject require()'d files
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole-dfree.php)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php web-app/index.php)
+
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Release:\(\s*\).BUILD_NUMBER\s*$$/Release:\1$(BUILD_NUMBER)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' greyhole)
@@ -52,11 +57,6 @@ dist:
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole-dfree.1)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/%VERSION%/$(VERSION)/' docs/greyhole.conf.5)
 	(cd release/$(PACKAGE)-$(VERSION)/docs/ && gzip -9 greyhole.1 && gzip -9 greyhole-dfree.1 && gzip -9 greyhole.conf.5)
-
-    # Inject require()'d files
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole)
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole-dfree.php)
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php web-app/index.php)
 
     # Create tgz
 	(cd release/ && tar -czvf $(PACKAGE)-$(VERSION).tar.gz $(PACKAGE)-$(VERSION))
