@@ -1487,25 +1487,29 @@ function samba_check_vfs() {
     $vfs_file = "$target_libdir/samba/vfs/greyhole.so";
 
     Log::debug("Checking symlink at $vfs_file...");
-      if (is_file($vfs_file)) {
-          // Get VFS symlink target
-          $vfs_target = @readlink($vfs_file);
-
-          if (strpos($vfs_target, "/greyhole-samba$version.so") !== FALSE) {
+    if (is_file($vfs_file)) {
+        // Get VFS symlink target
+        $vfs_target = @readlink($vfs_file);
+        if (strpos($vfs_target, "/greyhole-samba$version.so") !== FALSE) {
             Log::debug("  Is OK.");
-              $vfs_is_ok = TRUE;
-          }
-      }
+            $vfs_is_ok = TRUE;
+        }
+    }
+    if (!$vfs_is_ok) {
+        $vfs_target = "$source_libdir/greyhole/greyhole-samba$version.so";
+        Log::warn("  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
+        if (is_file($vfs_file)) {
+            unlink($vfs_file);
+        }
+        symlink($vfs_target, $vfs_file);
+        samba_restart();
+    }
 
-      if (!$vfs_is_ok) {
-          $vfs_target = "$source_libdir/greyhole/greyhole-samba$version.so";
-          Log::warn("  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
-          if (is_file($vfs_file)) {
-              unlink($vfs_file);
-          }
-          symlink($vfs_target, $vfs_file);
-          samba_restart();
-      }
+    # Bugfix for Ubuntu 14 (Trusty) that is missing libsmbd_base.so, which is used to compile the VFS
+    if (file_exists("$target_libdir/samba/libsmbd_base.so.0") && !file_exists("$target_libdir/samba/libsmbd_base.so")) {
+        Log::info("  Ubuntu 14 bugfix: creating symlink pointing to libsmbd_base.so.0 as libsmbd_base.so.");
+        symlink("$target_libdir/samba/libsmbd_base.so.0", "$target_libdir/samba/libsmbd_base.so");
+    }
 }
 
 function create_mem_spool() {
