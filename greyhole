@@ -1058,7 +1058,7 @@ function gh_copy_file($source_file, &$destination_file) {
     if (gh_is_file($source_file)) {
         $source_dev = gh_file_deviceid($source_file);
         $target_dev = gh_file_deviceid(dirname($destination_file));
-        if ($source_dev === $target_dev && $source_dev !== FALSE) {
+        if ($source_dev === $target_dev && $source_dev !== FALSE && !Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
             Log::debug("  (using rename)");
             gh_rename($source_file, $temp_path);
             $renamed = TRUE;
