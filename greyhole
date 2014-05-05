@@ -171,9 +171,9 @@ function execute_next_task() {
             DB::execute("DELETE FROM tasks WHERE action = 'md5' $where_clause", $params);
 
             // Second, let's make sure all fsck_file tasks marked idle get executed.
-            $query = "UPDATE tasks SET complete = 'yes' WHERE action = 'fsck_file' AND complete = 'idle' $where_clause";
+            $query = "UPDATE tasks SET complete = 'yes' WHERE action = 'fsck_file' AND complete = 'idle' AND id < $task->id $where_clause";
             DB::execute($query, $params);
-            $num_updated_rows = DB::getFirstValue("SELECT COUNT(*) AS num_updated_rows FROM tasks WHERE action = 'fsck_file' AND complete = 'yes' $where_clause", $params);
+            $num_updated_rows = DB::getFirstValue("SELECT COUNT(*) AS num_updated_rows FROM tasks WHERE action = 'fsck_file' AND complete = 'yes' AND id < $task->id $where_clause", $params);
             if ($num_updated_rows > 0) {
                 // Updated some fsck_file to complete; let's just return here, to allow them to be executed first.
                 Log::info("Will execute all ($num_updated_rows) pending fsck_file operations for $fsck_what_dir before running this fsck (task ID $task->id).");
