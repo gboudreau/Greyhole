@@ -309,11 +309,55 @@ class DB {
 
         // Migration #10 (UTF8 name column in settings table)
         {
+            // Deprecated by migration #11
+        }
+
+        // Migration #11 (correct UTF8 columns and tables!)
+        {
+            $tables = array(
+                'du_stats',
+                'settings',
+                'tasks',
+                'tasks_completed'
+            );
+            $columns = array(
+                'du_stats|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
+                'du_stats|full_path|TEXT CHARACTER SET utf8 NOT NULL',
+                'settings|name|TINYTEXT CHARACTER SET utf8 NOT NULL',
+                'settings|value|TEXT CHARACTER SET utf8 NOT NULL',
+                'tasks|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
+                'tasks|full_path|TEXT CHARACTER SET utf8 NULL',
+                'tasks|additional_info|TEXT CHARACTER SET utf8 NULL',
+                'tasks_completed|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
+                'tasks_completed|full_path|TEXT CHARACTER SET utf8 NULL',
+                'tasks_completed|additional_info|TEXT CHARACTER SET utf8 NULL',
+            );
+
+            $query = "SELECT CCSA.character_set_name FROM information_schema.`TABLES` T, information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` CCSA WHERE CCSA.collation_name = T.table_collation AND T.table_schema = :schema AND T.table_name = :table";
+            foreach ($tables as $table_name) {
+                $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => $table_name));
+                if ($charset != "utf8") {
+                    Log::info("Updating $table_name table to UTF-8");
+                    try {
+                        DB::execute("ALTER TABLE `$table_name` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci");
+                    } catch (Exception $ex) {
+                        try {
+                            DB::execute("ALTER TABLE `$table_name` CHARACTER SET utf8 COLLATE utf8_general_ci");
+                        } catch (Exception $ex) {
+                            Log::warn("  ALTER TABLE failed.");
+                        }
+                    }
+                }
+            }
+
             $query = "SELECT character_set_name FROM information_schema.`COLUMNS` C WHERE table_schema = :schema AND table_name = :table AND column_name = :field";
-            $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => 'settings', 'field' => 'name'));
-            if ($charset == "ascii") {
-                // migrate
-                DB::execute("ALTER TABLE settings CHANGE name name TINYTEXT CHARACTER SET utf8 NOT NULL");
+            foreach ($columns as $value) {
+                list($table_name, $column_name, $definition) = explode('|', $value);
+                $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => $table_name, 'field' => $column_name));
+                if ($charset != "utf8") {
+                    Log::info("Updating $table_name.$column_name column to UTF-8");
+                    DB::execute("ALTER TABLE `$table_name` CHANGE `$column_name` `$column_name` $definition");
+                }
             }
         }
     }
