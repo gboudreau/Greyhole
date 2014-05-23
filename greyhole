@@ -616,6 +616,7 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
     Log::debug("    Found " . count($broken_links) . " broken links.");
     foreach ($broken_links as $broken_link) {
         $fixed_link_target = readlink($broken_link);
+        Log::debug("    Found a broken symlink to update: $broken_link. Broken target: $fixed_link_target");
         foreach (Config::storagePoolDrives() as $sp_drive) {
             $fixed_link_target = str_replace(clean_dir("$sp_drive/$share/$full_path/"), clean_dir("$sp_drive/$share/$target_full_path/"), $fixed_link_target);
             if ($fixed_link_target == "$sp_drive/$share/$full_path") {
@@ -624,7 +625,7 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
             }
         }
         if (gh_is_file($fixed_link_target)) {
-            Log::debug("  Found a broken symlink to update: $broken_link. Old (broken) target: " . readlink($broken_link) . "; new (fixed) target: $fixed_link_target");
+            Log::debug("      New (fixed) target: $fixed_link_target");
             unlink($broken_link);
             symlink($fixed_link_target, $broken_link);
         }
