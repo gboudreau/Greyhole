@@ -21,6 +21,21 @@ else
     TARGET_LIBDIR="/usr/lib"
 fi
 
+if [ ! -d ${TARGET_LIBDIR}/samba/vfs/ ]; then
+    # Maybe samba-vfs-modules is missing?
+    if [ -d /usr/lib/x86_64-linux-gnu ]; then
+        SOURCE_LIBDIR="/usr/lib64" # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
+        TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"
+    else
+        SOURCE_LIBDIR="/usr/lib"
+        TARGET_LIBDIR="/usr/lib"
+    fi
+fi
+
+if [ ! -d ${TARGET_LIBDIR}/samba/vfs/ ]; then
+    mkdir ${TARGET_LIBDIR}/samba/vfs/
+fi
+
 TARGET_SYMLINK="${TARGET_LIBDIR}/samba/vfs/greyhole.so"
 
 SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
