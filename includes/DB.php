@@ -307,9 +307,16 @@ class DB {
             }
         }
 
-        // Migration #10 (UTF8 name column in settings table)
+        // Migration #10 (preparing du_stats `uniqness` index for UTF8 (was too large before)
         {
-            // Deprecated by migration #11
+            $q = "SHOW INDEX FROM du_stats WHERE key_name = 'uniqness' AND column_name = 'full_path'";
+            $index_def = DB::getFirst($q);
+            if ($index_def->Sub_part > 269) {
+                $q = "ALTER TABLE du_stats DROP INDEX uniqness";
+                DB::execute($q);
+                $q = "ALTER TABLE du_stats ADD UNIQUE INDEX `uniqness` (share(64), full_path(269))";
+                DB::execute($q);
+            }
         }
 
         // Migration #11 (correct UTF8 columns and tables!)
