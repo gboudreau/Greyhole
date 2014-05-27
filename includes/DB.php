@@ -307,7 +307,7 @@ class DB {
             }
         }
 
-        // Migration #10 (preparing du_stats `uniqness` index for UTF8 (was too large before)
+        // Migration #10-a (preparing du_stats `uniqness` index for UTF8 (was too large before)
         {
             $q = "SHOW INDEX FROM du_stats WHERE key_name = 'uniqness' AND column_name = 'full_path'";
             $index_def = DB::getFirst($q);
@@ -315,6 +315,18 @@ class DB {
                 $q = "ALTER TABLE du_stats DROP INDEX uniqness";
                 DB::execute($q);
                 $q = "ALTER TABLE du_stats ADD UNIQUE INDEX `uniqness` (share(64), full_path(269))";
+                DB::execute($q);
+            }
+        }
+
+        // Migration #10-b (preparing tasks `md5_checker` index for UTF8 (was too large before)
+        {
+            $q = "SHOW INDEX FROM tasks WHERE key_name = 'md5_checker' AND column_name = 'full_path'";
+            $index_def = DB::getFirst($q);
+            if ($index_def->Sub_part > 265) {
+                $q = "ALTER TABLE tasks DROP INDEX md5_checker";
+                DB::execute($q);
+                $q = "ALTER TABLE tasks ADD INDEX `md5_checker` (action, share(64), full_path(265), complete)";
                 DB::execute($q);
             }
         }
