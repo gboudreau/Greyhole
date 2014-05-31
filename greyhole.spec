@@ -86,6 +86,8 @@ echo "Executing post-install script..."
 mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
 /usr/bin/greyhole --create-mem-spool >/dev/null
+mkdir -p /var/cache/greyhole-dfree
+chmod 777 /var/cache/greyhole-dfree
 
 if [ -d /usr/lib/x86_64-linux-gnu ]; then 
     SOURCE_LIBDIR="/usr/lib64"

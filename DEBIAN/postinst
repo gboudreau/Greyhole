@@ -4,6 +4,8 @@ set -e
 mkdir -p /var/spool/greyhole
 chmod 777 /var/spool/greyhole
 /usr/bin/greyhole --create-mem-spool >/dev/null
+mkdir -p /var/cache/greyhole-dfree
+chmod 777 /var/cache/greyhole-dfree
 
 if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]; then
     SOURCE_LIBDIR="/usr/lib64" # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile

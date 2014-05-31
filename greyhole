@@ -1109,13 +1109,22 @@ function gh_chperm($real_file_path, $file_infos) {
 }
 
 function gh_mkdir($directory, $original_directory_or_dir_infos) {
-    if (!is_dir($directory)) {
-        if (is_string($original_directory_or_dir_infos)) {
-            $dir_infos = gh_get_file_infos($original_directory_or_dir_infos);
-        } else {
-            $dir_infos = $original_directory_or_dir_infos;
+    if (is_string($original_directory_or_dir_infos)) {
+        $dir_infos = gh_get_file_infos($original_directory_or_dir_infos);
+    } else {
+        $dir_infos = $original_directory_or_dir_infos;
+    }
+    if (is_dir($directory)) {
+        if (!chown($directory, $dir_infos->fileowner)) {
+            Log::warn("  Failed to chown directory '$directory'");
         }
-        
+        if (!chgrp($directory, $dir_infos->filegroup)) {
+            Log::warn("  Failed to chgrp directory '$directory'");
+        }
+        if (!chmod($directory, $dir_infos->fileperms)) {
+            Log::warn("  Failed to chmod directory '$directory'");
+        }
+    } else {
         // Need to mkdir & chown/chgrp all dirs that don't exists, up to the full path ($directory)
         $dir_parts = explode('/', $directory);
         
