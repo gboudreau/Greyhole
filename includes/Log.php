@@ -115,12 +115,16 @@ class Log {
     }
 
     private static function _log($local_log_level, $text) {
-        if ($local_log_level > static::$level) {
-            return;
+        if (static::$action == 'test-config') {
+            $greyhole_log_file = NULL;
+            $use_syslog = FALSE;
+        } else {
+            if ($local_log_level > static::$level) {
+                return;
+            }
+            $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
+            $use_syslog = strtolower($greyhole_log_file) == 'syslog';
         }
-
-        $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
-        $use_syslog = strtolower($greyhole_log_file) == 'syslog';
 
         $date = date("M d H:i:s");
         if (static::$level >= static::PERF) {

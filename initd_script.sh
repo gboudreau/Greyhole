@@ -72,22 +72,34 @@ start () {
 	if [ "$n" = "" ]; then
 		n=1
 	fi
+	/usr/bin/greyhole --test-config > /dev/null
+    TESTRESULT=$?
 	if [ -f /sbin/start-stop-daemon ]; then
-		start-stop-daemon --start --pidfile $PIDFILE --exec /usr/bin/php --nicelevel $n --background -- -d open_basedir=/ /usr/bin/greyhole --daemon
-		RETVAL=$?
-		if [ $RETVAL -eq 0 ]; then
-			echo "OK"
-		else
-			echo "FAILED"
-		fi
+    	if [ $TESTRESULT -eq 1 ]; then
+    	    echo "FAILED"
+            RETVAL=$TESTRESULT
+    	else
+            start-stop-daemon --start --pidfile $PIDFILE --exec /usr/bin/php --nicelevel $n --background -- -d open_basedir=/ /usr/bin/greyhole --daemon
+            RETVAL=$?
+            if [ $RETVAL -eq 0 ]; then
+                echo "OK"
+            else
+                echo "FAILED"
+            fi
+        fi
 	else
-		daemon +5 --check $DAEMON $0 daemon_start
-		RETVAL=$?
-		if [ $RETVAL -eq 0 ]; then
-			success $"$base startup"
-		else
-			failure $"$base startup"
-		fi
+    	if [ $TESTRESULT -eq 1 ]; then
+            failure $"$base startup"
+            RETVAL=$TESTRESULT
+        else
+            daemon +5 --check $DAEMON $0 daemon_start
+            RETVAL=$?
+            if [ $RETVAL -eq 0 ]; then
+                success $"$base startup"
+            else
+                failure $"$base startup"
+            fi
+        fi
 		echo
 	fi
 	sleep 1 # Allow some time for the daemon to appear in the processes list

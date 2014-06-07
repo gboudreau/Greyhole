@@ -41,6 +41,7 @@ require_once('includes/CLI/RemoveShareCliRunner.php');
 require_once('includes/CLI/ReplaceCliRunner.php');
 require_once('includes/CLI/StatsCliRunner.php');
 require_once('includes/CLI/StatusCliRunner.php');
+require_once('includes/CLI/TestCliRunner.php');
 require_once('includes/CLI/ThawCliRunner.php');
 require_once('includes/CLI/ViewQueueCliRunner.php');
 require_once('includes/CLI/WaitForCliRunner.php');
@@ -77,6 +78,7 @@ class CommandLineHelper {
             new CliCommandDefinition('md5-worker',       '',    null,          null,                      null),
             new CliCommandDefinition('getuid',           'G',   null,          'GetGUIDCliRunner',        null),
             new CliCommandDefinition('create-mem-spool', '',    null,          'CreateMemSpoolRunner',    null),
+            new CliCommandDefinition('test-config',      '',    null,          'TestCliRunner',           null),
         );
         
         $this->cliOptionsDefinitions = array(
@@ -143,8 +145,11 @@ class CommandLineHelper {
             // This can be executed during Greyhole install, so it needs to run before the config parsing runs (and fails)
             $cliRunner = new CreateMemSpoolRunner($this->options);
         } else {
-            process_config();
-            DB::connect();
+            if ($this->actionCmd->getLongOpt() != 'test-config') {
+                // Those will be tested in TestCliRunner
+                process_config();
+                DB::connect();
+            }
 
             if (!isset($cliRunner)) {
                 $cliRunner = $this->actionCmd->getNewRunner($this->options);
