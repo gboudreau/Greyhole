@@ -287,6 +287,7 @@ class DB {
             $row = DB::getFirst($query);
             if ($row === FALSE) {
                 // migrate
+                DB::execute("TRUNCATE `du_stats`");
                 DB::execute("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (269))");
             }
         }
