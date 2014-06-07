@@ -35,7 +35,16 @@ $runner->run();
 $runner->finish();
 
 function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
-    $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed')" . (!$incl_md5 ? " AND action != 'md5'" : "") . " ORDER BY id ASC LIMIT 20";
+    global $locked_shares;
+    $where_clause = "";
+    if (!empty($locked_shares)) {
+        $where_clause .= " AND share NOT IN ('" . implode("','", array_keys($locked_shares)) . "')";
+    }
+    if (!$incl_md5) {
+        $where_clause .= " AND action != 'md5'";
+    }
+
+    $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed', 'written') $where_clause ORDER BY id ASC LIMIT 20";
     $tasks = DB::getAll($query);
 
     if ($tasks === FALSE && $update_idle) {
@@ -48,7 +57,7 @@ function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
 }
 
 function execute_next_task() {
-    global $sleep_before_task, $next_task, $current_task_id, $locked_files, $fix_symlinks_scanned_dirs;
+    global $sleep_before_task, $next_task, $next_tasks, $current_task_id, $locked_files, $locked_shares, $fix_symlinks_scanned_dirs;
 
     if (isset($next_task)) {
         $task = $next_task;
@@ -79,6 +88,7 @@ function execute_next_task() {
                 $log_level = Log::getLevel();
                 sleep($log_level == Log::DEBUG ? 10 : ($log_level == Log::TEST || $log_level == Log::PERF ? 1 : 600));
                 $locked_files = array();
+                $locked_shares = array();
 
                 return;
             }
@@ -112,6 +122,18 @@ function execute_next_task() {
 
     Log::setAction($task->action);
     Log::info("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+
+    if ($task->complete == 'written') {
+        Log::debug("  File $task->share/$task->full_path is still being written to. Will wait until it's unlocked to work on any file in this share.");
+        $locked_files[clean_dir("$task->share/$task->full_path")] = TRUE;
+        $locked_shares[$task->share] = TRUE;
+        return;
+    }
+
+    if (!empty($locked_shares) && array_contains(array_keys($locked_shares), $task->share)) {
+        Log::info("  Share is locked because another file operation is waiting for a file handle to be released. Skipping.");
+        return;
+    }
 
     switch ($task->action) {
         case 'balance':
@@ -294,11 +316,17 @@ function execute_next_task() {
         case 'mkdir':
             break;
         case 'write':
-            gh_write($task->share, $task->full_path, $task->id);
+            $result = gh_write($task->share, $task->full_path, $task->id);
+            if (!$result) {
+                return;
+            }
             break;
         case 'rename':
             $fix_symlinks_scanned_dirs = array();
-            gh_mv($task->share, $task->full_path, $task->additional_info, $task->id);
+            $result = gh_mv($task->share, $task->full_path, $task->additional_info, $task->id);
+            if (!$result) {
+                return;
+            }
             break;
         case 'unlink':
             gh_unlink($task->share, $task->full_path, $task->id);
@@ -428,11 +456,11 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
     global $sleep_before_task;
     $landing_zone = get_share_landing_zone($share);
     if (!$landing_zone) {
-        return;
+        return TRUE;
     }
     
     if (should_ignore_file($share, $target_full_path)) {
-        return;
+        return TRUE;
     }
 
     if (is_dir("$landing_zone/$target_full_path") || is_a_metastore_dir($share, $full_path)) {
@@ -517,12 +545,12 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
         Log::info("File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
         
         // Check if another process locked this file before we work on it.
-        global $locked_files;
+        global $locked_files, $locked_shares;
         if (isset($locked_files[clean_dir("$share/$target_full_path")]) || file_is_locked($share, $target_full_path) !== FALSE) {
-            Log::debug("  File $landing_zone/$target_full_path is locked by another process. Will wait until it's unlocked to work on it.");
-            postpone_task($task_id);
+            Log::debug("  File $landing_zone/$target_full_path is locked by another process. Will wait until it's unlocked to work on any file in this share.");
             $locked_files[clean_dir("$share/$target_full_path")] = TRUE;
-            return;
+            $locked_shares[$share] = TRUE;
+            return FALSE;
         }
 
         list($path, $filename) = explode_full_path($full_path);
@@ -604,6 +632,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
         }
     }
     $sleep_before_task = array();
+    return TRUE;
 }
 
 function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
@@ -768,11 +797,11 @@ function gh_write($share, $full_path, $task_id) {
     
     $landing_zone = get_share_landing_zone($share);
     if (!$landing_zone) {
-        return;
+        return TRUE;
     }
 
     if (should_ignore_file($share, $full_path)) {
-        return;
+        return TRUE;
     }
     
     if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore.')) {
@@ -789,13 +818,13 @@ function gh_write($share, $full_path, $task_id) {
             if (!gh_file_exists($landing_zone, '  Share "' . $share . '" landing zone "$real_path" doesn\'t exist anymore. Will not process this task until it re-appears...')) {
                 postpone_task($task_id);
             }
-            return;
+            return TRUE;
         }
     }
     
     $num_copies_required = get_num_copies($share);
     if ($num_copies_required === -1) {
-        return;
+        return TRUE;
     }
 
     list($path, $filename) = explode_full_path($full_path);
@@ -835,6 +864,9 @@ function gh_write($share, $full_path, $task_id) {
                 Log::debug("  Change of mind... Will use source file: $source_file");
             }
             $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove);
+            if ($new_metafiles === FALSE) {
+                return FALSE;
+            }
             if (!empty($new_metafiles) && !isset($new_metafiles[$source_file])) {
                 // Delete source file; we copied it somewhere else
                 // Let's just make sure we have at least one OK file before we delete it!
@@ -868,7 +900,7 @@ function gh_write($share, $full_path, $task_id) {
 
         if (is_dir($source_file)) {
             Log::info("$share/$full_path is now a directory! Aborting.");
-            return;
+            return TRUE;
         }
 
         // There might be old metafiles... for example, when a delete task was skipped.
@@ -888,10 +920,13 @@ function gh_write($share, $full_path, $task_id) {
                     }
                 }
             }
-            gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
+            $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
+            if ($new_metafiles === FALSE) {
+                return FALSE;
+            }
         }
     }
-
+    return TRUE;
 }
 
 function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove=NULL) {
@@ -901,12 +936,12 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
     // Only need to check for locking if we have something to do!
     if ($num_copies_required > 1 || count($existing_metafiles) == 0) {
         // Check if another process locked this file before we work on it.
-        global $locked_files;
+        global $locked_files, $locked_shares;
         if (isset($locked_files[clean_dir("$share/$full_path")]) || ($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
-            Log::debug("  File $landing_zone/$full_path is locked by another process. Will wait until it's unlocked to work on it.");
-            postpone_task($task_id);
+            Log::debug("  File $landing_zone/$full_path is locked by another process. Will wait until it's unlocked to work on any file in this share.");
             $locked_files[clean_dir("$share/$full_path")] = TRUE;
-            return array();
+            $locked_shares[$share] = TRUE;
+            return FALSE;
         }
         $sleep_before_task = array();
     }
@@ -1428,20 +1463,6 @@ function save_metafiles($share, $path, $filename, $metafiles) {
     }
 }
 
-function simplify_tasks() {
-    Log::setAction(ACTION_SIMPLIFY_TASKS);
-
-    Log::debug("Simplifying pending tasks.");
-    
-    // Remove locked write tasks
-    $query = "SELECT share, full_path FROM tasks WHERE action = 'write' and complete = 'no'";
-    $rows = DB::getAll($query);
-    foreach ($rows as $row) {
-        $query = "DELETE FROM tasks WHERE action = 'write' and complete = 'yes' AND share = :share AND full_path = :full_path";
-        DB::execute($query, (array) $row);
-    }
-}
-
 function update_last_read_log_smbd_line($fp) {
     $f_seek_point = ftell($fp);
     Settings::set('last_read_log_smbd_line', $f_seek_point);
@@ -1538,7 +1559,7 @@ function create_mem_spool() {
     return FALSE;
 }
 
-function parse_samba_spool($simplify_after_parse=TRUE) {
+function parse_samba_spool() {
     Log::setAction(ACTION_READ_SAMBA_POOL);
 
     // Just in case the spool folder is missing!
@@ -1693,16 +1714,6 @@ function parse_samba_spool($simplify_after_parse=TRUE) {
 
     if ($new_tasks > 0) {
         Log::debug("Found $new_tasks new tasks in spool.");
-
-        if ($simplify_after_parse) {
-            $query = "SELECT COUNT(*) num_rows FROM tasks";
-            $num_rows = DB::getFirstValue($query);
-            if ($num_rows < 1000 || $num_rows % 5 == 0) { // Runs 1/5 of the times when num_rows > 1000
-                if ($num_rows < 5000 || $num_rows % 100 == 0) { // Runs 1/100 of the times when num_rows > 5000
-                    simplify_tasks();
-                }
-            }
-        }
     }
 
     Log::restorePreviousAction();
@@ -2421,7 +2432,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                     continue;
                 }
                 // A pending write transaction maybe?
-                parse_samba_spool(FALSE);
+                parse_samba_spool();
                 $query = "SELECT * FROM tasks WHERE action = 'write' AND share = :share AND full_path = :full_path";
                 $task = DB::getFirst($query, array('share' => $share, 'full_path' => "$file_path/$filename"));
                 if ($task) {
@@ -2674,7 +2685,7 @@ function gh_fsck_update_symlink($target, $symlink, $share, $file_path, $filename
     clearstatcache();
     if (!file_exists($symlink)) {
         Log::debug("  Missing symlink... A pending unlink transaction maybe?");
-        parse_samba_spool(FALSE);
+        parse_samba_spool();
         $query = "SELECT * FROM tasks WHERE action = 'unlink' AND share = :share AND full_path = :full_path";
         $params = array(
             'share' => $share,

@@ -47,7 +47,6 @@ define('ACTION_REMOVE_SHARE', 'remove-share');
 
 define('ACTION_CHECK_POOL', 'check_pool');
 define('ACTION_SLEEP', 'sleep');
-define('ACTION_SIMPLIFY_TASKS', 'simplify_tasks');
 define('ACTION_READ_SAMBA_POOL', 'read_smb_spool');
 define('ACTION_FSCK_FILE', 'fsck_file');
 

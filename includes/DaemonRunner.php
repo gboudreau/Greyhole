@@ -73,9 +73,6 @@ class DaemonRunner extends AbstractRunner {
 		// Process the spool directory, and insert each task found there into the database.
         parse_samba_spool();
 		
-		// Simplify the list of tasks in the database. Writing the same file over and over will result in Greyhole only processing one write task.
-        simplify_tasks();
-
         // Create the dfree cache folder, if it doesn't exist
         gh_mkdir('/var/cache/greyhole-dfree', (object) array('fileowner' => 0, 'filegroup' => 0, 'fileperms' => (int) base_convert("0777", 8, 10)));
 	}
