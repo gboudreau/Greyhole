@@ -47,7 +47,7 @@ function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
     $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed', 'written') $where_clause ORDER BY id ASC LIMIT 20";
     $tasks = DB::getAll($query);
 
-    if ($tasks === FALSE && $update_idle) {
+    if (empty($tasks) && $update_idle) {
         // No more complete = yes|thawed; let's look for complete = 'idle' tasks.
         $query = "UPDATE tasks SET complete = 'yes' WHERE complete = 'idle'";
         DB::execute($query);
