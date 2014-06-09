@@ -18,17 +18,9 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-require_once('includes/CLI/AbstractCliRunner.php');
+require_once('includes/CLI/PauseCliRunner.php');
 
-class TestCliRunner extends AbstractCliRunner {
-    public function run() {
-        process_config();
-        DB::connect();
-        DB::repairTables();
-        MigrationHelper::convertStoragePoolDrivesTagFiles();
-        echo "Config is OK\n";
-        exit(0);
-    }
+class ResumeCliRunner extends PauseCliRunner {
 }
 
 ?>

@@ -37,7 +37,9 @@ require_once('includes/CLI/GoneCliRunner.php');
 require_once('includes/CLI/IoStatsCliRunner.php');
 require_once('includes/CLI/LogsCliRunner.php');
 require_once('includes/CLI/MD5WorkerCliRunner.php');
+require_once('includes/CLI/PauseCliRunner.php');
 require_once('includes/CLI/RemoveShareCliRunner.php');
+require_once('includes/CLI/ResumeCliRunner.php');
 require_once('includes/CLI/ReplaceCliRunner.php');
 require_once('includes/CLI/StatsCliRunner.php');
 require_once('includes/CLI/StatusCliRunner.php');
@@ -56,6 +58,8 @@ class CommandLineHelper {
         $this->cliCommandsDefinitions = array(
             new CliCommandDefinition('help',             '?',   null,          null,                      "Display this help and exit."),
             new CliCommandDefinition('daemon',           'D',   null,          'DaemonRunner',            "Start the daemon."),
+            new CliCommandDefinition('pause',            'P',   null,          'PauseCliRunner',          "Pause the daemon."),
+            new CliCommandDefinition('resume',           'M',   null,          'ResumeCliRunner',         "Resume a paused daemon."),
             new CliCommandDefinition('fsck',             'f',   null,          'FsckCliRunner',           "Schedule a fsck."),
             new CliCommandDefinition('cancel-fsck',      'C',   null,          'CancelFsckCliRunner',     "Cancel any ongoing or scheduled fsck operations."),
             new CliCommandDefinition('balance',          'l',   null,          'BalanceCliRunner',        "Balance available space on storage pool drives."),

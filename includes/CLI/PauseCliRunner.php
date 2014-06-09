@@ -20,14 +20,22 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 require_once('includes/CLI/AbstractCliRunner.php');
 
-class TestCliRunner extends AbstractCliRunner {
+class PauseCliRunner extends AbstractCliRunner {
     public function run() {
-        process_config();
-        DB::connect();
-        DB::repairTables();
-        MigrationHelper::convertStoragePoolDrivesTagFiles();
-        echo "Config is OK\n";
-        exit(0);
+        $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | awk \'{print $1}\'');
+        if ($pid) {
+            if ($this instanceof ResumeCliRunner) {
+                exec('kill -CONT ' . $pid);
+                echo "The Greyhole daemon has resumed.\n";
+            } else {
+                exec('kill -STOP ' . $pid);
+                echo "The Greyhole daemon has been paused. Use `greyhole --resume` to restart it.\n";
+            }
+            exit(0);
+        } else {
+            echo "Couldn't find a Greyhole daemon running.\n";
+            exit(1);
+        }
     }
 }
 
