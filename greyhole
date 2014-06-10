@@ -240,15 +240,26 @@ function execute_next_task() {
                     }
                 }
             } else {
-                $share_options = get_share_options_from_full_path($fscked_dir);
                 $storage_volume = FALSE;
+                $share_options = get_share_options_from_full_path($fscked_dir);
                 if ($share_options === FALSE) {
                     // Since share_options is FALSE we didn't get a share path, maybe we got a storage volume path, let's check 
                     $storage_volume = get_storage_volume_from_path($fscked_dir);
                     $share_options = get_share_options_from_storage_volume($fscked_dir, $storage_volume);
                 }
-                
-                if ($share_options !== FALSE) {
+                Log::debug("  Storage volume? " . ($storage_volume ? $storage_volume : 'No'));
+                Log::debug("  Share? " . ($share_options ? $share_options['name'] : 'No'));
+
+                if ($share_options === FALSE) {
+                    if ($storage_volume !== FALSE) {
+                        // fsck a full storage pool drive
+                        foreach (SharesConfig::getShares() as $share_name => $share_options) {
+                            gh_fsck("$storage_volume/$share_name", $share_name, $storage_volume);
+                        }
+                    } else {
+                        Log::error("Unknown folder to fsck. You should specify a storage pool folder, a metadata store folder, a shared folder, or a subdirectory of any of those.");
+                    }
+                } else {
                     $share = $share_options['name'];
                     $metastore = get_metastore_from_path($fscked_dir);
 
