@@ -148,7 +148,7 @@ function execute_next_task() {
             list($path, $filename) = explode_full_path($task->full_path);
             FSCKLogFile::loadFSCKReport('Missing files'); // Create or load the fsck_report from disk
             gh_fsck_file($path, $filename, $file_type, 'metastore', $task->share);
-            if (task_has_option($task, 'email')) {
+            if (task_has_option($task, OPTION_EMAIL)) {
                 // Save the report to disk to be able to email it when we're done with all fsck_file tasks
                 FSCKLogFile::saveFSCKReport();
             }
@@ -158,7 +158,7 @@ function execute_next_task() {
             break;
         case 'fsck':
             $new_conf_md5 = get_conf_md5();
-            if (task_has_option($task, 'if-conf-changed')) {
+            if (task_has_option($task, OPTION_IF_CONF_CHANGED)) {
                 // Let's check if the conf file changed since the last fsck
 
                 // Last value
@@ -206,7 +206,7 @@ function execute_next_task() {
             initialize_fsck_report($fsck_what_dir);
             clearstatcache();
 
-            if (task_has_option($task, 'checksums')) {
+            if (task_has_option($task, OPTION_CHECKSUMS)) {
                 // Spawn md5 worker threads; those will calculate files MD5, and save the result in the DB.
                 // The Greyhole daemon will then read those, and check them against each other to make sure all is fine.
                 $checksums_thread_ids = array();
@@ -223,14 +223,14 @@ function execute_next_task() {
                     gh_fsck_reset_du($share_name);
                     gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
                 }
-                if (task_has_option($task, 'metastore')) {
+                if (!task_has_option($task, OPTION_SKIP_METASTORE)) {
                     foreach (get_metastores() as $metastore) {
                         foreach (SharesConfig::getShares() as $share_name => $share_options) {
                             gh_fsck_metastore($metastore, "/$share_name", $share_name);
                         }
                     }
                 }
-                if (task_has_option($task, 'orphaned')) {
+                if (task_has_option($task, OPTION_ORPHANED)) {
                     foreach (Config::storagePoolDrives() as $sp_drive) {
                         if (is_greyhole_owned_drive($sp_drive)) {
                             foreach (SharesConfig::getShares() as $share_name => $share_options) {
@@ -282,7 +282,8 @@ function execute_next_task() {
                         gh_fsck($fscked_dir, $share, $storage_volume);
                     }
 
-                    if (task_has_option($task, 'metastore') !== FALSE) {
+                    Log::debug("  Scan metadata stores? " . (task_has_option($task, OPTION_SKIP_METASTORE) ? 'No' : 'Yes'));
+                    if (task_has_option($task, OPTION_SKIP_METASTORE) === FALSE) {
                         if ($fsck_type == FSCK_TYPE_METASTORE) {
                             // This is a metastore directory, so only kick off a metastore fsck for the indicated directory (this will not fsck the corresponding metastore path on other volumes)
                             $subdir = str_replace("$metastore", '', $fscked_dir);
@@ -301,7 +302,7 @@ function execute_next_task() {
                             }
                         }
                     }
-                    if ($fsck_type != FSCK_TYPE_STORAGE_POOL_DRIVE && task_has_option($task, 'orphaned')) {
+                    if ($fsck_type != FSCK_TYPE_STORAGE_POOL_DRIVE && task_has_option($task, OPTION_ORPHANED)) {
                         $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
                         Log::debug("Starting orphans search for $subdir");
                         foreach (Config::storagePoolDrives() as $sp_drive) {
@@ -316,7 +317,7 @@ function execute_next_task() {
             
             Settings::set('last_fsck_conf_md5', $new_conf_md5);
             
-            if (task_has_option($task, 'email')) {
+            if (task_has_option($task, OPTION_EMAIL)) {
                 // Email report for fsck
                 $fsck_report_mail = get_fsck_report();
                 $email_to = Config::get(CONFIG_EMAIL_TO);
@@ -3682,9 +3683,9 @@ function get_count_md5() {
 function set_fsck_options($task) {
     global $options;
     $options['all-fsck-options'] = $task->additional_info;
-    $options['find-orphans'] = task_has_option($task, 'orphaned');
-    $options['verify-checksums'] = task_has_option($task, 'checksums');
-    $options['del-orphaned-metadata'] = task_has_option($task, 'del-orphaned-metadata');
+    $options['find-orphans'] = task_has_option($task, OPTION_ORPHANED);
+    $options['verify-checksums'] = task_has_option($task, OPTION_CHECKSUMS);
+    $options['del-orphaned-metadata'] = task_has_option($task, OPTION_DEL_ORPHANED_METADATA);
 }
 
 function remove_drive_definition($going_drive) {

@@ -23,7 +23,7 @@ require_once('includes/CLI/AbstractCliRunner.php');
 define('OPTION_EMAIL', 'email');
 define('OPTION_IF_CONF_CHANGED', 'if-conf-changed');
 define('OPTION_CHECKSUMS','checksums');
-define('OPTION_METASTORE','metastore');
+define('OPTION_SKIP_METASTORE','skip-metastore');
 define('OPTION_ORPHANED','orphaned');
 define('OPTION_DU','du');
 define('OPTION_DEL_ORPHANED_METADATA','del-orphaned-metadata');
@@ -34,7 +34,7 @@ class FsckCliRunner extends AbstractCliRunner {
     
     private static $available_options = array(
        'email-report' => OPTION_EMAIL,
-       'dont-walk-metadata-store' => OPTION_METASTORE,
+       'dont-walk-metadata-store' => OPTION_SKIP_METASTORE,
        'if-conf-changed' => OPTION_IF_CONF_CHANGED,
        'disk-usage-report' => OPTION_DU,
        'find-orphaned-files' => OPTION_ORPHANED,
