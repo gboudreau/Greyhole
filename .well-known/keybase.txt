@@ -1,0 +1,65 @@
+==================================================================
+https://keybase.io/gboudreau
+--------------------------------------------------------------------
+
+I hereby claim:
+
+  * I am an admin of http://www.greyhole.net
+  * I am gboudreau (https://keybase.io/gboudreau) on keybase.
+  * I have a public key with fingerprint EEEC EA5D AB9D BA25 21C6  5248 4536 901B F6B0 FCFA
+
+To claim this, I am signing this object:
+
+{
+    "body": {
+        "key": {
+            "fingerprint": "eeecea5dab9dba2521c652484536901bf6b0fcfa",
+            "host": "keybase.io",
+            "key_id": "4536901bf6b0fcfa",
+            "uid": "4a42599b45415150e32c3d378ab56e00",
+            "username": "gboudreau"
+        },
+        "service": {
+            "hostname": "www.greyhole.net",
+            "protocol": "http:"
+        },
+        "type": "web_service_binding",
+        "version": 1
+    },
+    "ctime": 1402451445,
+    "expire_in": 157680000,
+    "prev": "b512045ab252dc9c79bbe13997ca7250826f571468835a57443bc4fc91263ead",
+    "seqno": 6,
+    "tag": "signature"
+}
+
+with the aforementioned key, yielding the PGP signature:
+
+-----BEGIN PGP MESSAGE-----
+Version: Keybase OpenPGP v0.1.21
+Comment: https://keybase.io/crypto
+
+yMH2AnicbZFfSFtXHMdjNIoWu7Y4kIgPu9C9+O/+O/dPjEJWC5NZKhURZ9d4zr0n
+8VK9N7u5MbpEFJwMGRZHTd3qQ7tqWaovfcjAPlTDqEPQdMVKkZZ2MGxrRxl0pIJW
+pyfWvu28HM739/l9v+ec373CbFtB1mlhtGTz9s521lJyM2RrGv/1bYRChtpLuSLU
+RXyw+TTdj82AqekW5aIwxgqGQIVIVhFkAcsoAmB5iQecINMM8gmI9ik+SJVTHUYw
+00FsEAziSs0gGjl4NZWo/8OH3hcgzwJZRjzgGcAAGnOswqmcKEEEBEzTGTCITR12
+YUL7kRFSTQxDVF85ReRuTSFy5CD7EAmHw5V+E/d2GJ24UscWMQiYhmUoRiepdlhW
+wJVptnoDBzRG3kMfL9J0lTyeNHRjM6gZOuViCKlYWsaY4WmWBwzPg3IK9wQ0E3u1
+DAFEQaLJysTgbmKJAMPSPICI/JaqyIooI4QZTpZFBYosoCVW8AGR4QVJ4gAEIs9z
+SOF9isywAoehSvKD+GvdoFwCuSb0E8ug5tehFTIx1fdb8nyOLavAluuwZ8ZnK8g/
+9mGo8e/y9trHYsmFj6u5VwM5elVPYq94TpoE8Z8CO55o42q8f1puXW3Vc39Y3/10
+8KPWqnRNwv7iwnrttPjSHlhLCV0Re2xOPFW/4fnGPTXjrC+bP/K01JM9tTQBf19M
+LJbGU6mbVx78Ul/kdp11NJQKl7/9s7Eub3nrxvLKrYqjnzy69vO/Vx3PhlB6NfrO
+eenEYCp/Zndk9EvHhBv/7WL/YWLp62PgP0udrB0YkY9vzP/1RVfLeHRruPn5Z+47
+Dc6dWAx/lVzIbTnXLDUVf59yvn5YONQTfbN9N60nfqxoPxn/fJFf+aNu9kx/0WZ1
+Xtva7DZz3/N4OBZuKOPaSmCN+WQfGh8Ykg==
+=lmp7
+-----END PGP MESSAGE-----
+
+And finally, I am proving ownership of this host by posting or
+appending to this document.
+
+View my publicly-auditable identity here: https://keybase.io/gboudreau
+
+==================================================================

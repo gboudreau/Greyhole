@@ -1,0 +1,216 @@
+<!--A Design by W3layouts
+Author: W3layout
+Author URL: http://w3layouts.com
+License: Creative Commons Attribution 3.0 Unported
+License URL: http://creativecommons.org/licenses/by/3.0/
+-->
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Greyhole - Redundant Storage Pooling using Samba</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link rel="icon" href="http://www.greyhole.net/favicon.ico" type="image/x-icon" />
+    <link rel="shortcut icon" href="http://www.greyhole.net/favicon.ico" type="image/x-icon" />
+    <link href="http://www.greyhole.net/rss/" rel="alternate" title="Greyhole Blog" type="application/atom+xml" />
+    <link href="http://www.greyhole.net/rss/downloads/" rel="alternate" title="Greyhole Releases" type="application/atom+xml" />
+    <link href="http://www.greyhole.net/rss/commits/" rel="alternate" title="Greyhole Commits" type="application/atom+xml" />
+    <link href="css/style.css?a=7" rel="stylesheet" type="text/css" media="all" />
+    <link href='http://fonts.googleapis.com/css?family=Montserrat' rel='stylesheet' type='text/css'>
+</head>
+<body>
+<div class="header">
+    <div class="header-top">
+        <div class="wrap">
+            <div class="logo">
+                <a href="/"><img src="images/greyhole-logo-small.png" alt="Greyhole logo" /><span>Greyhole</span></a>
+            </div>
+            <div class="cssmenu">
+                <ul>
+                    <li id="menu-features" class="menu"><a href="#features" class="scroll">Features</a></li>
+                    <li id="menu-install" class="menu"><a href="#install" class="scroll">Install</a></li>
+                    <li id="menu-doc" class="menu"><a href="#doc" class="scroll">Documentation</a></li>
+                    <li id="menu-support" class="menu"><a href="#support" class="scroll">Support</a></li>
+                    <li id="menu-donate" class="menu"><a href="#donate" class="scroll">Donate</a></li>
+                </ul>
+            </div>
+            <div class="clear"></div>
+        </div>
+    </div>
+    <div class="header-bottom waypoint" id="features">
+        <div class="wrap">
+            <h1>What is <span>Greyhole</span>?</h1>
+            <div class="clear"></div>
+            <p class="desc">An application that uses <span>Samba</span> to create a <span>storage pool</span>
+                of all your available hard drives, and allows you to create <span>redundant copies</span>
+                of the files you store, in order to <span>prevent data loss</span> when part of your hardware fails.</p>
+            <div class="but"><a href="#install" class="scroll">Install<img src="images/arrow.png" alt=""></a></div>
+
+            <br/><br/>
+            <h1>Features</h1>
+            <div class="section group">
+                <div class="grid_1_of_3 images_1_of_3">
+                    <!-- <a href="images/t-pic.jpg" class="swipebox" title="Image Title"> <img src="images/pic.jpg" alt=""><span class="zoom-icon"></span> </a> -->
+                    <div class="support-desc">
+                        <h4>JBOD concatenation storage pool</h4>
+                        <p>Configure <span>as many hard drives as you'd like</span> to be included in your pool.
+                            Your storage pool size will be the <span>sum of the free space</span> in all the hard drives you include.
+                            Your hard drives can be internal, external, or even mount of remote file systems,
+                            and you can include hard drives of <span>any size</span> in your pool.</p>
+                    </div>
+                </div>
+                <div class="grid_1_of_3 images_1_of_3">
+                    <!-- <a href="images/t-pic1.jpg" class="swipebox" title="Image Title"> <img src="images/pic1.jpg" alt=""><span class="zoom-icon"></span> </a> -->
+                    <div class="support-desc">
+                        <h4>Per-share redundancy</h4>
+                        <p>For each of your shares that use the space of your storage pool,
+                            indicate <span>how many copies</span> of each file you want to keep.
+                            Each of those copies will be stored in a <span>different hard drive</span>,
+                            in order to <span>prevent data loss</span> when one or more hard drives fail.
+                            For very important files, you can even specify you’d like to keep copies on all available hard drives.</p>
+                    </div>
+                </div>
+                <div class="grid_1_of_3 images_1_of_3">
+                    <!-- <a href="images/t-pic2.jpg" class="swipebox" title="Image Title"> <img src="images/pic2.jpg" alt=""><span class="zoom-icon"></span> </a> -->
+                    <div class="support-desc">
+                        <h4>Easy migrations</h4>
+                        <p>Greyhole file copies are <span>regular files</span>, visible on any machine, <span>without any hardware or software required</span>.
+                            If you take out one hard drive from your pool, and mount it anywhere else,
+                            you’ll be able to see all the files that Greyhole stored on it.
+                            They will have the same filenames, and they’ll be in the same directories you’d expect them to be.</p>
+                    </div>
+                </div>
+                <div class="clear"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="main">
+    <div class="features waypoint" id="install">
+        <div class="wrap">
+            <h1><span>Installing</span> Greyhole</h1>
+
+            <h2>Step 1</h2>
+
+            <h3>Using <span>APT</span> (Ubuntu, Debian)</h3>
+             <pre style="max-width: 790px"><span class="command">sudo sh</span> -c 'echo "deb <span class="url">http://www.greyhole.net/releases/deb</span> stable main" > <span class="filename">/etc/apt/sources.list.d/greyhole.list</span>'
+<span class="command">curl</span> -s <span class="url">http://www.greyhole.net/releases/deb/greyhole-debsig.asc</span> | <span class="command">sudo apt-key</span> add -
+<span class="command">sudo apt-get</span> update
+<span class="command">sudo apt-get</span> install greyhole</pre>
+            <br/>
+
+            <h3>Using <span>Yum</span> (CentOS, Fedora, RHEL)</h3>
+             <pre style="max-width: 660px"><span class="command">sudo curl</span> -o <span class="filename">/etc/yum.repos.d/greyhole.repo</span> <span class="url">http://www.greyhole.net/releases/rpm/greyhole.repo</span>
+<span class="command">sudo yum</span> install greyhole</pre>
+            <br/>
+
+            <h3>Manually</h3>
+            <p class="desc" style="font-size: 1em">Downloads are hosted on the <a href="https://github.com/gboudreau/Greyhole/releases" target="_blank">Github Releases page</a>.<br/>
+                Just download the latest .tar.gz file (using the green button).<br/>
+                Then follow the instructions from the <a href="https://raw.github.com/gboudreau/Greyhole/master/INSTALL" target="_blank">INSTALL</a> file.</p>
+
+            <br/><br/>
+            <h2>Step 2</h2>
+
+            <h3>Configuration</h3>
+            <p class="desc" style="font-size: 1em">Follow the instructions from the <a href="https://raw.github.com/gboudreau/Greyhole/master/USAGE" target="_blank">USAGE</a> file.<br/>
+                There is also a copy of this file in <span>/usr/share/greyhole/USAGE</span></p>
+        </div>
+    </div>
+    <div class="features waypoint" id="doc">
+        <div class="wrap">
+            <h1>Documentation</h1>
+            <div class="bullets">
+                <p class="desc">Greyhole is open-source, and <a href="https://github.com/gboudreau/Greyhole" target="_blank">hosted on Github</a>.</p>
+                <p class="desc">The <a href="https://github.com/gboudreau/Greyhole/wiki" target="_blank">wiki</a> is filled with useful information, tips and recommendations.</p>
+                <p class="desc">How to install and configure Greyhole in 10 minutes, a video walkthrough:<br/>
+                    <iframe width="420" height="315" src="https://www.youtube.com/embed/uZ5JhxULj8k?rel=0" frameborder="0" allowfullscreen></iframe>
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="features waypoint" id="support">
+        <div class="wrap">
+            <h1>Support</h1>
+            <div class="bullets">
+                <p class="desc"><a href="#doc" class="scroll">RTFM</a></p>
+                <p class="desc"><a href="http://www.greyhole.net/irc/">Live chat logs</a> - search here to see if your questions was answered already.</p>
+                <p class="desc"><a href="http://www.greyhole.net/chat/">Live chat</a> #greyhole on FreeNode</p>
+                <p class="desc"><a href="http://getsatisfaction.com/greyhole">Forum</a> on GetSatisfaction</p>
+            </div>
+        </div>
+    </div>
+    <div class="features waypoint" id="donate">
+        <div class="wrap">
+            <h1>Donate</h1>
+            <p class="desc"><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=PQWHEND8E3CKW" target="_blank">Donations are welcome</a></p>
+
+            <br/><br/><br/>
+            <h3>Follow us</h3>
+            <div class="social-icons">
+                <ul>
+                    <li><a class="twitter" href="https://twitter.com/greyholeapp" target="_blank"></a></li>
+                    <li><a class="facebook" href="https://www.facebook.com/greyholeapp" target="_blank"> </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="footer">
+    <div class="wrap">
+        <!-- <div class="footer-menu">
+            <ul>
+                <li><a href="#">About</a></li>
+                <li><a href="#">Careers</a></li>
+                <li><a href="#">Privacy Policy</a></li>
+                <li><a href="#">Press & Media</a></li>
+                <li><a href="#">Contact</a></li>
+            </ul>
+        </div> -->
+        <div class="copy">
+            <p class="copy">
+                © 2011-2014 <a href="http://www.pommepause.com" target="_blank">Guillaume Boudreau</a><br/>
+                © 2013 Website design by <a href="http://w3layouts.com" target="_blank">w3layouts</a></p>
+        </div>
+        <div class="clear"></div>
+    </div>
+</div>
+<!-- Start Google Analytics -->
+<script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-79918-24']);
+    _gaq.push(['_trackPageview']);
+    (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+</script>
+<!-- End Google Analytics -->
+<script src="js/jquery.min.js"></script>
+<script src="js/waypoints.min.js"></script>
+<script src="js/headroom.min.js"></script>
+<script type="text/javascript">
+    jQuery(document).ready(function($) {
+        $(".scroll").click(function(event){
+            event.preventDefault();
+            $('html,body').animate({scrollTop:$(this.hash).offset().top}, 700);
+        });
+        $('.waypoint').waypoint(function(direction) {
+            if (direction == 'down') {
+                $('.menu').removeClass('active');
+                $('#menu-'+this.id).toggleClass('active');
+            } else {
+                $('.menu').removeClass('active');
+                $('#menu-'+this.id).prev().toggleClass('active');
+            }
+        }, {
+            offset: '50%'
+        });
+
+        var headroom  = new Headroom($(".header-top")[0]);
+        headroom.init();
+    });
+</script>
+</body>
+</html>
