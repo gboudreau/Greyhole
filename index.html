@@ -1,30 +1,32 @@
+<!DOCTYPE html>
+<html itemscope itemtype="http://schema.org/SoftwareApplication">
 <!--A Design by W3layouts
 Author: W3layout
 Author URL: http://w3layouts.com
 License: Creative Commons Attribution 3.0 Unported
 License URL: http://creativecommons.org/licenses/by/3.0/
 -->
-<!DOCTYPE HTML>
-<html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>Greyhole - Redundant Storage Pooling using Samba</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <link rel="icon" href="http://www.greyhole.net/favicon.ico" type="image/x-icon" />
     <link rel="shortcut icon" href="http://www.greyhole.net/favicon.ico" type="image/x-icon" />
     <link href="http://www.greyhole.net/rss/" rel="alternate" title="Greyhole Blog" type="application/atom+xml" />
     <link href="http://www.greyhole.net/rss/downloads/" rel="alternate" title="Greyhole Releases" type="application/atom+xml" />
     <link href="http://www.greyhole.net/rss/commits/" rel="alternate" title="Greyhole Commits" type="application/atom+xml" />
-    <link href="css/style.css?a=7" rel="stylesheet" type="text/css" media="all" />
-    <link href='http://fonts.googleapis.com/css?family=Montserrat' rel='stylesheet' type='text/css'>
+    <link href="css/style.css?a=1" rel="stylesheet" type="text/css" media="all" />
+    <link href='http://fonts.googleapis.com/css?family=Montserrat' rel='stylesheet' type='text/css' />
+    <link href="https://plus.google.com/116455304664644891067/" rel="publisher" />
 </head>
 <body>
 <div class="header">
     <div class="header-top">
         <div class="wrap">
             <div class="logo">
-                <a href="/"><img src="images/greyhole-logo-small.png" alt="Greyhole logo" /><span>Greyhole</span></a>
+                <a href="http://www.greyhole.net" itemprop="url"><img itemprop="image" src="images/greyhole-logo-small.png" alt="Greyhole logo" /><span itemprop="name">Greyhole</span></a>
             </div>
+            <span class="desc" itemprop="description">Easily expandable and redundant storage pool for home servers</span>
             <div class="cssmenu">
                 <ul>
                     <li id="menu-features" class="menu"><a href="#features" class="scroll">Features</a></li>
@@ -41,10 +43,10 @@ License URL: http://creativecommons.org/licenses/by/3.0/
         <div class="wrap">
             <h1>What is <span>Greyhole</span>?</h1>
             <div class="clear"></div>
-            <p class="desc">An application that uses <span>Samba</span> to create a <span>storage pool</span>
+            <p class="desc" itemprop="description">An application that uses <span>Samba</span> to create a <span>storage pool</span>
                 of all your available hard drives, and allows you to create <span>redundant copies</span>
                 of the files you store, in order to <span>prevent data loss</span> when part of your hardware fails.</p>
-            <div class="but"><a href="#install" class="scroll">Install<img src="images/arrow.png" alt=""></a></div>
+            <div class="but"><a href="#install" class="scroll">Install<img src="images/arrow.png" alt="&gt;" /></a></div>
 
             <br/><br/>
             <h1>Features</h1>
@@ -124,7 +126,7 @@ License URL: http://creativecommons.org/licenses/by/3.0/
                 <p class="desc">Greyhole is open-source, and <a href="https://github.com/gboudreau/Greyhole" target="_blank">hosted on Github</a>.</p>
                 <p class="desc">The <a href="https://github.com/gboudreau/Greyhole/wiki" target="_blank">wiki</a> is filled with useful information, tips and recommendations.</p>
                 <p class="desc">How to install and configure Greyhole in 10 minutes, a video walkthrough:<br/>
-                    <iframe width="420" height="315" src="https://www.youtube.com/embed/uZ5JhxULj8k?rel=0" frameborder="0" allowfullscreen></iframe>
+                    <iframe width="420" height="315" src="https://www.youtube.com/embed/uZ5JhxULj8k?rel=0" allowfullscreen></iframe>
                 </p>
             </div>
         </div>
@@ -143,7 +145,7 @@ License URL: http://creativecommons.org/licenses/by/3.0/
     <div class="features waypoint" id="donate">
         <div class="wrap">
             <h1>Donate</h1>
-            <p class="desc"><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=PQWHEND8E3CKW" target="_blank">Donations are welcome</a></p>
+            <p class="desc"><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=PQWHEND8E3CKW" target="_blank">Donations are welcome</a></p>
 
             <br/><br/><br/>
             <h3>Follow us</h3>
@@ -169,12 +171,16 @@ License URL: http://creativecommons.org/licenses/by/3.0/
         </div> -->
         <div class="copy">
             <p class="copy">
-                © 2011-2014 <a href="http://www.pommepause.com" target="_blank">Guillaume Boudreau</a><br/>
+                © 2011-2014 <span itemscope itemtype="http://schema.org/Person"><a href="http://about.me/guillaume.boudreau?rel=author" target="_blank" itemprop="url"><span itemprop="name">Guillaume Boudreau</span></a></span><br/>
                 © 2013 Website design by <a href="http://w3layouts.com" target="_blank">w3layouts</a></p>
         </div>
         <div class="clear"></div>
     </div>
 </div>
+<span style="display:none">
+	<span itemprop="softwareApplicationCategory">NetworkingApplication</span>
+	<span itemprop="softwareApplicationSubCategory">Storage</span>
+</span>
 <!-- Start Google Analytics -->
 <script type="text/javascript">
     var _gaq = _gaq || [];
@@ -187,9 +193,9 @@ License URL: http://creativecommons.org/licenses/by/3.0/
     })();
 </script>
 <!-- End Google Analytics -->
-<script src="js/jquery.min.js"></script>
-<script src="js/waypoints.min.js"></script>
-<script src="js/headroom.min.js"></script>
+<script type="text/javascript" src="js/jquery.min.js"></script>
+<script type="text/javascript" src="js/waypoints.min.js"></script>
+<script type="text/javascript" src="js/headroom.min.js"></script>
 <script type="text/javascript">
     jQuery(document).ready(function($) {
         $(".scroll").click(function(event){
