@@ -57,7 +57,7 @@ function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
 }
 
 function execute_next_task() {
-    global $sleep_before_task, $next_task, $next_tasks, $current_task_id, $locked_files, $locked_shares, $fix_symlinks_scanned_dirs;
+    global $sleep_before_task, $next_task, $next_tasks, $current_task_id, $locked_files, $locked_shares, $written_files, $fix_symlinks_scanned_dirs;
 
     if (isset($next_task)) {
         $task = $next_task;
@@ -124,10 +124,29 @@ function execute_next_task() {
     Log::info("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 
     if ($task->complete == 'written') {
-        Log::debug("  File $task->share/$task->full_path is still being written to. Will wait until it's unlocked to work on any file in this share.");
-        $locked_files[clean_dir("$task->share/$task->full_path")] = TRUE;
-        $locked_shares[$task->share] = TRUE;
-        return;
+        // Check if it's been 10 minutes since the file size changed. If so, process this normally.
+        $filename = get_share_landing_zone($task->share) . '/' . $task->full_path;
+        $filesize = gh_filesize($filename);
+        if (empty($written_files[clean_dir("$task->share/$task->full_path")])) {
+            $written_files[clean_dir("$task->share/$task->full_path")] = (object) array('since' => time(), 'filesize' => $filesize);
+        } else {
+            $infos = $written_files[clean_dir("$task->share/$task->full_path")];
+            if ($infos->filesize == $filesize) {
+                if (time() - $infos->since > 10*60) {
+                    Log::debug("  File is still being written to (" . bytes_to_human($filesize, FALSE) . "). But it's been at least 10 minutes since the file size changed. We can probably assume we should work on this file now. Let do this!");
+                    unset($written_files[clean_dir("$task->share/$task->full_path")]);
+                }
+            } else {
+                $written_files[clean_dir("$task->share/$task->full_path")] = (object) array('since' => time(), 'filesize' => $filesize);
+            }
+        }
+
+        if (!empty($written_files[clean_dir("$task->share/$task->full_path")])) {
+            Log::debug("  File is still being written to (" . bytes_to_human($filesize, FALSE) . "). Postponing.");
+            $locked_files[clean_dir("$task->share/$task->full_path")] = TRUE;
+            $locked_shares[$task->share] = TRUE;
+            return;
+        }
     }
 
     if (!empty($locked_shares) && array_contains(array_keys($locked_shares), $task->share)) {
