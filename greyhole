@@ -3539,7 +3539,10 @@ function gh_check_md5($task) {
         'full_path' => $task->full_path
     );
     $rows = DB::getAll($query, $params);
-    $complete_tasks = array_shift($rows); // ORDER BY complete ASC in the above query will always return complete='yes' first, and there will always be at least one ($task)
+    $complete_tasks = array_shift($rows); // ORDER BY complete ASC in the above query will always return complete='yes' first
+    if (empty($complete_tasks)) {
+        Log::debug("  Already checked this file. Skipping.");
+    }
     $incomplete_tasks = @array_shift($rows);
     if (empty($incomplete_tasks)) {
         $incomplete_tasks = array();
