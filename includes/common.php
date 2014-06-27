@@ -348,6 +348,12 @@ if ($arch != 'x86_64') {
     }
 }
 
+function gh_symlink($target, $link) {
+    symlink($target, $link);
+    # Or, if you have issues with the above, comment it out, and de-comment this one:
+    # exec("ln -s " . escapeshellarg($target) . " " . escapeshellarg($link));
+}
+
 function memory_check() {
     $usage = memory_get_usage();
     $used = $usage / Config::get(CONFIG_MEMORY_LIMIT);
@@ -1298,7 +1304,7 @@ function fix_symlinks_on_share($share_name) {
                 $new_link_target = clean_dir("$sp_drive/$share_name/$file_to_relink");
                 if (gh_is_file($new_link_target)) {
                     unlink($file_to_relink);
-                    symlink($new_link_target, $file_to_relink);
+                    gh_symlink($new_link_target, $file_to_relink);
                     break;
                 }
             }

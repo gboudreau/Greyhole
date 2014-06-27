@@ -559,11 +559,11 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                 if (is_link("$landing_zone/$target_full_path/$file_path") && !empty($symlink_target) && readlink("$landing_zone/$target_full_path/$file_path") != $symlink_target) {
                     Log::debug("  Updating symlink at $landing_zone/$target_full_path/$file_path to point to $symlink_target");
                     unlink("$landing_zone/$target_full_path/$file_path");
-                    symlink($symlink_target, "$landing_zone/$target_full_path/$file_path");
+                    gh_symlink($symlink_target, "$landing_zone/$target_full_path/$file_path");
                 } else if (is_link("$landing_zone/$full_path/$file_path") && !empty($symlink_target) && !file_exists(readlink("$landing_zone/$full_path/$file_path"))) {
                     Log::debug("  Updating symlink at $landing_zone/$full_path/$file_path to point to $symlink_target");
                     unlink("$landing_zone/$full_path/$file_path");
-                    symlink($symlink_target, "$landing_zone/$full_path/$file_path");
+                    gh_symlink($symlink_target, "$landing_zone/$full_path/$file_path");
                 } else {
                     fix_symlinks($landing_zone, $share, "$full_path/$file_path", "$target_full_path/$file_path");
                 }
@@ -650,12 +650,12 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                         // ...and needs to be updated.
                         Log::debug("  Updating symlink at $landing_zone/$target_full_path to point to $symlink_target");
                         unlink("$landing_zone/$target_full_path");
-                        symlink($symlink_target, "$landing_zone/$target_full_path");
+                        gh_symlink($symlink_target, "$landing_zone/$target_full_path");
                     }
                 } else if (is_link("$landing_zone/$full_path") && !file_exists(readlink("$landing_zone/$full_path"))) {
                     Log::debug("  Updating symlink at $landing_zone/$full_path to point to $symlink_target");
                     unlink("$landing_zone/$full_path");
-                    symlink($symlink_target, "$landing_zone/$full_path");
+                    gh_symlink($symlink_target, "$landing_zone/$full_path");
                 } else {
                     fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
                 }
@@ -687,7 +687,7 @@ function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
         if (gh_is_file($fixed_link_target)) {
             Log::debug("      New (fixed) target: $fixed_link_target");
             unlink($broken_link);
-            symlink($fixed_link_target, $broken_link);
+            gh_symlink($fixed_link_target, $broken_link);
         }
     }
     $fix_symlinks_scanned_dirs[$landing_zone] = TRUE;
@@ -1087,7 +1087,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
         $link_next = FALSE;
         if ($metafile->is_linked) {
             Log::debug("    Creating symlink in share pointing to the above file copy.");
-            symlink($metafile->path, "$landing_zone/$path/.gh_$filename");
+            gh_symlink($metafile->path, "$landing_zone/$path/.gh_$filename");
             if (!file_exists("$landing_zone/$full_path") || unlink("$landing_zone/$full_path")) {
                 gh_rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
             } else {
@@ -1563,14 +1563,14 @@ function samba_check_vfs() {
         if (is_file($vfs_file)) {
             unlink($vfs_file);
         }
-        symlink($vfs_target, $vfs_file);
+        gh_symlink($vfs_target, $vfs_file);
         samba_restart();
     }
 
     # Bugfix for Ubuntu 14 (Trusty) that is missing libsmbd_base.so, which is used to compile the VFS
     if (file_exists("$target_libdir/samba/libsmbd_base.so.0") && !file_exists("$target_libdir/samba/libsmbd_base.so")) {
         Log::info("  Ubuntu 14 bugfix: creating symlink pointing to libsmbd_base.so.0 as libsmbd_base.so.");
-        symlink("$target_libdir/samba/libsmbd_base.so.0", "$target_libdir/samba/libsmbd_base.so");
+        gh_symlink("$target_libdir/samba/libsmbd_base.so.0", "$target_libdir/samba/libsmbd_base.so");
     }
 }
 
@@ -2755,7 +2755,7 @@ function gh_fsck_update_symlink($target, $symlink, $share, $file_path, $filename
     Log::debug("  Updating symlink at $symlink to point to $target");
     gh_recycle($symlink);
     gh_mkdir(dirname($symlink), dirname($target));
-    symlink($target, $symlink);
+    gh_symlink($target, $symlink);
 }
 
 function initialize_fsck_report($what) {
@@ -3230,7 +3230,7 @@ function gh_balance() {
                                 if (is_link("$landing_zone/$full_path")) {
                                     Log::debug("  Updating symlink at $landing_zone/$full_path to point to $metafile->path");
                                     if (gh_recycle("$landing_zone/$full_path")) {
-                                        @symlink($metafile->path, "$landing_zone/$full_path");
+                                        @gh_symlink($metafile->path, "$landing_zone/$full_path");
                                         // Creating this symlink can fail if the parent dir was removed
                                     }
                                 }
@@ -3470,7 +3470,7 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
             );
             gh_mkdir($path, $dir_infos);
         }
-        if (@symlink($filepath_in_trash, $filepath_in_trash_share)) {
+        if (@gh_symlink($filepath_in_trash, $filepath_in_trash_share)) {
             Log::debug("  Created symlink to deleted file in {$trash_share['name']} share ($filename).");
         } else {
             Log::warn("  Warning! Couldn't create symlink to deleted file in {$trash_share['name']} share ($filename).");
