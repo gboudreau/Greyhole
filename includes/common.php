@@ -349,9 +349,9 @@ if ($arch != 'x86_64') {
 }
 
 function gh_symlink($target, $link) {
-    symlink($target, $link);
+    return symlink($target, $link);
     # Or, if you have issues with the above, comment it out, and de-comment this one:
-    # exec("ln -s " . escapeshellarg($target) . " " . escapeshellarg($link));
+    # exec("ln -s " . escapeshellarg($target) . " " . escapeshellarg($link)); return gh_is_file($link);
 }
 
 function memory_check() {
