@@ -438,7 +438,7 @@ function gh_unlink($share, $full_path, $task_id) {
                 $trash_share = SharesConfig::getConfigForShare(CONFIG_TRASH_SHARE);
                 if ($trash_share) {
                     list($path, $filename) = explode_full_path("{$trash_share[CONFIG_LANDING_ZONE]}/$full_path");
-                    if ($dh = opendir($path)) {
+                    if ($dh = @opendir($path)) {
                         while (($file = readdir($dh)) !== FALSE) {
                             if ($file == '.' || $file == '..') { continue; }
                             if (is_link("$path/$file") && readlink("$path/$file") == "$sp_drive/.gh_trash/$full_path") {
