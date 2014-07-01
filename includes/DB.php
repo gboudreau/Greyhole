@@ -144,240 +144,247 @@ class DB {
         return static::$options->error;
     }
 
-	private static function migrate() {
-        // Migration #1 (complete = frozen|thawed)
-        {
-            $query = "DESCRIBE tasks";
-            $rows = DB::getAll($query);
-            foreach ($rows as $row) {
-                if ($row->Field == 'complete') {
-                    if ($row->Type == "enum('yes','no')") {
-                        // migrate
-                        DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
-                        DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
-                    }
-                    break;
+    private static function migrate() {
+        DB::migrate_1_frozen_thaw();
+        DB::migrate_2_idle();
+        DB::migrate_3_larger_settings();
+        DB::migrate_4_find_next_task_index();
+        DB::migrate_5_find_next_task_index();
+        DB::migrate_6_md5_worker_indexes();
+        DB::migrate_7_larger_full_path();
+        DB::migrate_8_du_stats();
+        DB::migrate_9_complete_writen();
+        DB::migrate_10_utf8();
+    }
+
+    // Migration #1 (complete = frozen|thawed)
+    private static function migrate_1_frozen_thaw() {
+        $query = "DESCRIBE tasks";
+        $rows = DB::getAll($query);
+        foreach ($rows as $row) {
+            if ($row->Field == 'complete') {
+                if ($row->Type == "enum('yes','no')") {
+                    // migrate
+                    DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
+                    DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
                 }
+                break;
             }
         }
+    }
 
-        // Migration #2 (complete = idle)
-        {
-            $query = "DESCRIBE tasks";
-            $rows = DB::getAll($query);
-            foreach ($rows as $row) {
-                if ($row->Field == 'complete') {
-                    if ($row->Type == "enum('yes','no','frozen','thawed')") {
-                        // migrate
-                        DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
-                        DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
-                    }
-                    break;
+    // Migration #2 (complete = idle)
+    private static function migrate_2_idle() {
+        $query = "DESCRIBE tasks";
+        $rows = DB::getAll($query);
+        foreach ($rows as $row) {
+            if ($row->Field == 'complete') {
+                if ($row->Type == "enum('yes','no','frozen','thawed')") {
+                    // migrate
+                    DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
+                    DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
                 }
+                break;
             }
         }
+    }
 
-        // Migration #3 (larger settings.value: tinytext > text)
-        {
-            $query = "DESCRIBE settings";
-            $rows = DB::getAll($query);
-            foreach ($rows as $row) {
-                if ($row->Field == 'value') {
-                    if ($row->Type == "tinytext") {
-                        // migrate
-                        DB::execute("ALTER TABLE settings CHANGE value value TEXT CHARACTER SET utf8 NOT NULL");
-                    }
-                    break;
+    // Migration #3 (larger settings.value: tinytext > text)
+    private static function migrate_3_larger_settings() {
+        $query = "DESCRIBE settings";
+        $rows = DB::getAll($query);
+        foreach ($rows as $row) {
+            if ($row->Field == 'value') {
+                if ($row->Type == "tinytext") {
+                    // migrate
+                    DB::execute("ALTER TABLE settings CHANGE value value TEXT CHARACTER SET utf8 NOT NULL");
                 }
+                break;
             }
         }
+    }
 
-        // Migration #4 (new index for find_next_task function, used by simplify_task, and also for execute_next_task function; also remove deprecated indexes)
-        {
-            $query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task'";
-            $row = DB::getFirst($query);
-            if ($row === FALSE) {
-                // migrate
-                DB::execute("ALTER TABLE tasks ADD INDEX find_next_task (complete, share(64), id)");
-            }
-
-            $query = "SHOW INDEX FROM tasks WHERE Key_name = 'incomplete_open'";
-            $row = DB::getFirst($query);
-            if ($row) {
-                // migrate
-                DB::execute("ALTER TABLE tasks DROP INDEX incomplete_open");
-            }
-
-            $query = "SHOW INDEX FROM tasks WHERE Key_name = 'subsequent_writes'";
-            $row = DB::getFirst($query);
-            if ($row) {
-                // migrate
-                DB::execute("ALTER TABLE tasks DROP INDEX subsequent_writes");
-            }
-
-            $query = "SHOW INDEX FROM tasks WHERE Key_name = 'unneeded_unlinks'";
-            $row = DB::getFirst($query);
-            if ($row) {
-                // migrate
-                DB::execute("ALTER TABLE tasks DROP INDEX unneeded_unlinks");
-            }
+    // Migration #4 (new index for find_next_task function, used by simplify_task, and also for execute_next_task function; also remove deprecated indexes)
+    private static function migrate_4_find_next_task_index() {
+        $query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task'";
+        $row = DB::getFirst($query);
+        if ($row === FALSE) {
+            // migrate
+            DB::execute("ALTER TABLE tasks ADD INDEX find_next_task (complete, share(64), id)");
         }
 
-        // Migration #5 (fix find_next_task index)
-        {
-            $query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task' and Column_name = 'share'";
-            $row = DB::getFirst($query);
-            if ($row !== FALSE) {
-                // migrate
-                DB::execute("ALTER TABLE tasks DROP INDEX find_next_task");
-                DB::execute("ALTER TABLE tasks ADD INDEX find_next_task (complete, id)");
-            }
+        $query = "SHOW INDEX FROM tasks WHERE Key_name = 'incomplete_open'";
+        $row = DB::getFirst($query);
+        if ($row) {
+            // migrate
+            DB::execute("ALTER TABLE tasks DROP INDEX incomplete_open");
         }
 
-        // Migration #6 (new indexes for md5_worker_thread/gh_check_md5 functions)
-        {
-            $query = "SHOW INDEX FROM tasks WHERE Key_name = 'md5_worker'";
-            $row = DB::getFirst($query);
-            if ($row === FALSE) {
-                // migrate
-                DB::execute("ALTER TABLE tasks ADD INDEX md5_worker (action, complete, additional_info(100), id)");
-            }
+        $query = "SHOW INDEX FROM tasks WHERE Key_name = 'subsequent_writes'";
+        $row = DB::getFirst($query);
+        if ($row) {
+            // migrate
+            DB::execute("ALTER TABLE tasks DROP INDEX subsequent_writes");
+        }
 
-            $query = "SHOW INDEX FROM tasks WHERE Key_name = 'md5_checker'";
-            $row = DB::getFirst($query);
-            if ($row === FALSE) {
-                // migrate
-                DB::execute("ALTER TABLE tasks ADD INDEX md5_checker (action, share(64), full_path(265), complete)");
-            }
+        $query = "SHOW INDEX FROM tasks WHERE Key_name = 'unneeded_unlinks'";
+        $row = DB::getFirst($query);
+        if ($row) {
+            // migrate
+            DB::execute("ALTER TABLE tasks DROP INDEX unneeded_unlinks");
+        }
+    }
 
-            $query = "DESCRIBE tasks";
-            $rows = DB::getAll($query);
-            foreach ($rows as $row) {
-                if ($row->Field == 'additional_info') {
-                    if ($row->Type == "tinytext") {
-                        // migrate
-                        DB::execute("ALTER TABLE tasks CHANGE additional_info additional_info TEXT CHARACTER SET utf8 NULL");
-                    }
-                    break;
+    // Migration #5 (fix find_next_task index)
+    private static function migrate_5_find_next_task_index() {
+        $query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task' and Column_name = 'share'";
+        $row = DB::getFirst($query);
+        if ($row !== FALSE) {
+            // migrate
+            DB::execute("ALTER TABLE tasks DROP INDEX find_next_task");
+            DB::execute("ALTER TABLE tasks ADD INDEX find_next_task (complete, id)");
+        }
+    }
+
+    // Migration #6 (new indexes for md5_worker_thread/gh_check_md5 functions)
+    private static function migrate_6_md5_worker_indexes() {
+        $query = "SHOW INDEX FROM tasks WHERE Key_name = 'md5_worker'";
+        $row = DB::getFirst($query);
+        if ($row === FALSE) {
+            // migrate
+            DB::execute("ALTER TABLE tasks ADD INDEX md5_worker (action, complete, additional_info(100), id)");
+        }
+
+        $query = "SHOW INDEX FROM tasks WHERE Key_name = 'md5_checker'";
+        $row = DB::getFirst($query);
+        if ($row === FALSE) {
+            // migrate
+            DB::execute("ALTER TABLE tasks ADD INDEX md5_checker (action, share(64), full_path(265), complete)");
+        }
+
+        $query = "DESCRIBE tasks";
+        $rows = DB::getAll($query);
+        foreach ($rows as $row) {
+            if ($row->Field == 'additional_info') {
+                if ($row->Type == "tinytext") {
+                    // migrate
+                    DB::execute("ALTER TABLE tasks CHANGE additional_info additional_info TEXT CHARACTER SET utf8 NULL");
                 }
+                break;
             }
         }
+    }
 
-        // Migration #7 (full_path new size: 4096)
-        {
-            $query = "DESCRIBE tasks";
-            $rows = DB::getAll($query);
-            foreach ($rows as $row) {
-                if ($row->Field == 'full_path') {
-                    if ($row->Type == "tinytext") {
-                        // migrate
-                        DB::execute("ALTER TABLE tasks CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
-                        DB::execute("ALTER TABLE tasks_completed CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
-                    }
-                    break;
+    // Migration #7 (full_path new size: 4096)
+    private static function migrate_7_larger_full_path() {
+        $query = "DESCRIBE tasks";
+        $rows = DB::getAll($query);
+        foreach ($rows as $row) {
+            if ($row->Field == 'full_path') {
+                if ($row->Type == "tinytext") {
+                    // migrate
+                    DB::execute("ALTER TABLE tasks CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
+                    DB::execute("ALTER TABLE tasks_completed CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
                 }
+                break;
             }
         }
+    }
 
-        // Migration #8 (new du_stats table)
-        {
-            $query = "CREATE TABLE IF NOT EXISTS `du_stats` (`share` TINYTEXT NOT NULL, `full_path` TEXT NOT NULL, `depth` TINYINT(3) UNSIGNED NOT NULL, `size` BIGINT(20) UNSIGNED NOT NULL, UNIQUE KEY `uniqness` (`share`(64),`full_path`(269))) ENGINE = MYISAM DEFAULT CHARSET=utf8";
-            DB::execute($query);
-            $query = "SHOW INDEX FROM `du_stats` WHERE Key_name = 'uniqness'";
-            $row = DB::getFirst($query);
-            if ($row === FALSE) {
-                // migrate
-                DB::execute("TRUNCATE `du_stats`");
-                DB::execute("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (269))");
-            }
+    // Migration #8 (new du_stats table)
+    private static function migrate_8_du_stats() {
+        $query = "CREATE TABLE IF NOT EXISTS `du_stats` (`share` TINYTEXT NOT NULL, `full_path` TEXT NOT NULL, `depth` TINYINT(3) UNSIGNED NOT NULL, `size` BIGINT(20) UNSIGNED NOT NULL, UNIQUE KEY `uniqness` (`share`(64),`full_path`(269))) ENGINE = MYISAM DEFAULT CHARSET=utf8";
+        DB::execute($query);
+        $query = "SHOW INDEX FROM `du_stats` WHERE Key_name = 'uniqness'";
+        $row = DB::getFirst($query);
+        if ($row === FALSE) {
+            // migrate
+            DB::execute("TRUNCATE `du_stats`");
+            DB::execute("ALTER TABLE `du_stats` ADD UNIQUE `uniqness` (`share` (64), `full_path` (269))");
         }
+    }
 
-        // Migration #9 (complete = written)
-        {
-            $query = "DESCRIBE tasks";
-            $rows = DB::getAll($query);
-            foreach ($rows as $row) {
-                if ($row->Field == 'complete') {
-                    if ($row->Type == "enum('yes','no','frozen','thawed','idle')") {
-                        // migrate
-                        DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') NOT NULL");
-                        DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') NOT NULL");
-                    }
-                    break;
+    // Migration #9 (complete = written)
+    private static function migrate_9_complete_writen() {
+        $query = "DESCRIBE tasks";
+        $rows = DB::getAll($query);
+        foreach ($rows as $row) {
+            if ($row->Field == 'complete') {
+                if ($row->Type == "enum('yes','no','frozen','thawed','idle')") {
+                    // migrate
+                    DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') NOT NULL");
+                    DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') NOT NULL");
                 }
+                break;
             }
         }
+    }
 
-        // Migration #10-a (preparing du_stats `uniqness` index for UTF8 (was too large before)
-        {
-            $q = "SHOW INDEX FROM du_stats WHERE key_name = 'uniqness' AND column_name = 'full_path'";
-            $index_def = DB::getFirst($q);
-            if ($index_def->Sub_part > 269) {
-                $q = "ALTER TABLE du_stats DROP INDEX uniqness";
-                DB::execute($q);
-                $q = "ALTER TABLE du_stats ADD UNIQUE INDEX `uniqness` (share(64), full_path(269))";
-                DB::execute($q);
-            }
+    // Migration #10 (preparing du_stats `uniqness` index for UTF8 (was too large before)
+    // Migration #10 (preparing tasks `md5_checker` index for UTF8 (was too large before)
+    // Migration #10 (correct UTF8 columns and tables!)
+    private static function migrate_10_utf8() {
+        $q = "SHOW INDEX FROM du_stats WHERE key_name = 'uniqness' AND column_name = 'full_path'";
+        $index_def = DB::getFirst($q);
+        if ($index_def->Sub_part > 269) {
+            $q = "ALTER TABLE du_stats DROP INDEX uniqness";
+            DB::execute($q);
+            $q = "ALTER TABLE du_stats ADD UNIQUE INDEX `uniqness` (share(64), full_path(269))";
+            DB::execute($q);
         }
 
-        // Migration #10-b (preparing tasks `md5_checker` index for UTF8 (was too large before)
-        {
-            $q = "SHOW INDEX FROM tasks WHERE key_name = 'md5_checker' AND column_name = 'full_path'";
-            $index_def = DB::getFirst($q);
-            if ($index_def->Sub_part > 265) {
-                $q = "ALTER TABLE tasks DROP INDEX md5_checker";
-                DB::execute($q);
-                $q = "ALTER TABLE tasks ADD INDEX `md5_checker` (action, share(64), full_path(265), complete)";
-                DB::execute($q);
-            }
+        $q = "SHOW INDEX FROM tasks WHERE key_name = 'md5_checker' AND column_name = 'full_path'";
+        $index_def = DB::getFirst($q);
+        if ($index_def->Sub_part > 265) {
+            $q = "ALTER TABLE tasks DROP INDEX md5_checker";
+            DB::execute($q);
+            $q = "ALTER TABLE tasks ADD INDEX `md5_checker` (action, share(64), full_path(265), complete)";
+            DB::execute($q);
         }
 
-        // Migration #11 (correct UTF8 columns and tables!)
-        {
-            $tables = array(
-                'du_stats',
-                'settings',
-                'tasks',
-                'tasks_completed'
-            );
-            $columns = array(
-                'du_stats|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
-                'du_stats|full_path|TEXT CHARACTER SET utf8 NOT NULL',
-                'settings|name|TINYTEXT CHARACTER SET utf8 NOT NULL',
-                'settings|value|TEXT CHARACTER SET utf8 NOT NULL',
-                'tasks|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
-                'tasks|full_path|TEXT CHARACTER SET utf8 NULL',
-                'tasks|additional_info|TEXT CHARACTER SET utf8 NULL',
-                'tasks_completed|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
-                'tasks_completed|full_path|TEXT CHARACTER SET utf8 NULL',
-                'tasks_completed|additional_info|TEXT CHARACTER SET utf8 NULL',
-            );
+        $tables = array(
+            'du_stats',
+            'settings',
+            'tasks',
+            'tasks_completed'
+        );
+        $columns = array(
+            'du_stats|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
+            'du_stats|full_path|TEXT CHARACTER SET utf8 NOT NULL',
+            'settings|name|TINYTEXT CHARACTER SET utf8 NOT NULL',
+            'settings|value|TEXT CHARACTER SET utf8 NOT NULL',
+            'tasks|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
+            'tasks|full_path|TEXT CHARACTER SET utf8 NULL',
+            'tasks|additional_info|TEXT CHARACTER SET utf8 NULL',
+            'tasks_completed|share|TINYTEXT CHARACTER SET utf8 NOT NULL',
+            'tasks_completed|full_path|TEXT CHARACTER SET utf8 NULL',
+            'tasks_completed|additional_info|TEXT CHARACTER SET utf8 NULL',
+        );
 
-            $query = "SELECT CCSA.character_set_name FROM information_schema.`TABLES` T, information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` CCSA WHERE CCSA.collation_name = T.table_collation AND T.table_schema = :schema AND T.table_name = :table";
-            foreach ($tables as $table_name) {
-                $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => $table_name));
-                if ($charset != "utf8") {
-                    Log::info("Updating $table_name table to UTF-8");
+        $query = "SELECT CCSA.character_set_name FROM information_schema.`TABLES` T, information_schema.`COLLATION_CHARACTER_SET_APPLICABILITY` CCSA WHERE CCSA.collation_name = T.table_collation AND T.table_schema = :schema AND T.table_name = :table";
+        foreach ($tables as $table_name) {
+            $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => $table_name));
+            if ($charset != "utf8") {
+                Log::info("Updating $table_name table to UTF-8");
+                try {
+                    DB::execute("ALTER TABLE `$table_name` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci");
+                } catch (Exception $ex) {
                     try {
-                        DB::execute("ALTER TABLE `$table_name` CONVERT TO CHARACTER SET utf8 COLLATE utf8_general_ci");
+                        DB::execute("ALTER TABLE `$table_name` CHARACTER SET utf8 COLLATE utf8_general_ci");
                     } catch (Exception $ex) {
-                        try {
-                            DB::execute("ALTER TABLE `$table_name` CHARACTER SET utf8 COLLATE utf8_general_ci");
-                        } catch (Exception $ex) {
-                            Log::warn("  ALTER TABLE failed.");
-                        }
+                        Log::warn("  ALTER TABLE failed.");
                     }
                 }
             }
+        }
 
-            $query = "SELECT character_set_name FROM information_schema.`COLUMNS` C WHERE table_schema = :schema AND table_name = :table AND column_name = :field";
-            foreach ($columns as $value) {
-                list($table_name, $column_name, $definition) = explode('|', $value);
-                $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => $table_name, 'field' => $column_name));
-                if ($charset != "utf8") {
-                    Log::info("Updating $table_name.$column_name column to UTF-8");
-                    DB::execute("ALTER TABLE `$table_name` CHANGE `$column_name` `$column_name` $definition");
-                }
+        $query = "SELECT character_set_name FROM information_schema.`COLUMNS` C WHERE table_schema = :schema AND table_name = :table AND column_name = :field";
+        foreach ($columns as $value) {
+            list($table_name, $column_name, $definition) = explode('|', $value);
+            $charset = DB::getFirstValue($query, array('schema' => Config::get(CONFIG_DB_NAME), 'table' => $table_name, 'field' => $column_name));
+            if ($charset != "utf8") {
+                Log::info("Updating $table_name.$column_name column to UTF-8");
+                DB::execute("ALTER TABLE `$table_name` CHANGE `$column_name` `$column_name` $definition");
             }
         }
     }
