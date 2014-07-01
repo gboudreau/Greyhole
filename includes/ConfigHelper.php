@@ -328,7 +328,7 @@ class ConfigHelper {
             }
             return TRUE;
         }
-        if ($name == CONFIG_DRIVE_SELECTION_GROUPS) {
+        if ($name == CONFIG_DRIVE_SELECTION_ALGORITHM) {
             Config::set(CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, Config::get(CONFIG_DRIVE_SELECTION_GROUPS)));
             return TRUE;
         }
