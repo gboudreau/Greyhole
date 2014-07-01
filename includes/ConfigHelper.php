@@ -90,6 +90,12 @@ class ConfigHelper {
     static $config_file = '/etc/greyhole.conf';
     static $smb_config_file = '/etc/samba/smb.conf';
     static $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
+    static $deprecated_options = array(
+        'delete_moves_to_attic' => CONFIG_DELETE_MOVES_TO_TRASH,
+        'storage_pool_directory' => CONFIG_STORAGE_POOL_DRIVE,
+        'dir_selection_groups' => CONFIG_DRIVE_SELECTION_GROUPS,
+        'dir_selection_algorithm' => CONFIG_DRIVE_SELECTION_ALGORITHM,
+    );
     static $df_command;
 
     public static function removeShare($share) {
@@ -107,169 +113,172 @@ class ConfigHelper {
         return $storage_pool_drives[array_rand($storage_pool_drives)];
     }
 
+    private static function normalize_name(&$name) {
+        foreach (static::$deprecated_options as $old_name => $new_name) {
+            if (string_contains($name, $old_name)) {
+                $fixed_name = str_replace($old_name, $new_name, $name);
+                Log::warn("Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
+                $name = $fixed_name;
+            }
+        }
+    }
+
+    private static function parse_line($name, $value, &$parsing_drive_selection_groups) {
+        if ($name[0] == '#') {
+            return;
+        }
+
+        static::normalize_name($name);
+
+        $parsing_drive_selection_groups = FALSE;
+        switch($name) {
+            // Log level
+            case CONFIG_LOG_LEVEL:
+                static::assert(defined("Log::$value"), "Invalid value for log_level: '$value'");
+                Config::set(CONFIG_LOG_LEVEL, constant("Log::$value"));
+                break;
+
+            // Booleans
+            case CONFIG_DELETE_MOVES_TO_TRASH:
+            case CONFIG_MODIFIED_MOVES_TO_TRASH:
+            case CONFIG_LOG_MEMORY_USAGE:
+            case CONFIG_CHECK_FOR_OPEN_FILES:
+            case CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE:
+                $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
+                Config::set($name, $bool);
+                break;
+
+            // Storage pool drives
+            case CONFIG_STORAGE_POOL_DRIVE:
+                if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?([gmk])b?/i", $value, $regs)) {
+                    $sp_drive = '/' . trim(trim($regs[1]), '/');
+                    Config::add(CONFIG_STORAGE_POOL_DRIVE, $sp_drive);
+
+                    $units = strtolower($regs[3]);
+                    if ($units == 'g') {
+                        $value = (float) trim($regs[2]) * 1024.0 * 1024.0;
+                    } else if ($units == 'm') {
+                        $value = (float) trim($regs[2]) * 1024.0;
+                    } else if ($units == 'k') {
+                        $value = (float) trim($regs[2]);
+                    }
+                    Config::add(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $value, $sp_drive);
+                }
+                break;
+
+            // Sticky files
+            case CONFIG_STICKY_FILES:
+                global $last_sticky_files_dir;
+                $last_sticky_files_dir = trim($value, '/');
+                Config::add(CONFIG_STICKY_FILES, array(), $last_sticky_files_dir);
+                break;
+            case CONFIG_STICK_INTO:
+                global $last_sticky_files_dir;
+                $sticky_files = Config::get(CONFIG_STICKY_FILES);
+                $sticky_files[$last_sticky_files_dir][] = '/' . trim($value, '/');
+                Config::set(CONFIG_STICKY_FILES, $sticky_files);
+                break;
+
+            // Frozen directories
+            case CONFIG_FROZEN_DIRECTORY:
+                Config::add(CONFIG_FROZEN_DIRECTORY, trim($value, '/'));
+                break;
+
+            // Drive selection algorithms & groups
+            case CONFIG_DRIVE_SELECTION_GROUPS:
+                if (preg_match("/(.+):(.*)/", $value, $regs)) {
+                    $group_name = trim($regs[1]);
+                    $group_definition = array_map('trim', explode(',', $regs[2]));
+                    Config::add(CONFIG_DRIVE_SELECTION_GROUPS, $group_definition, $group_name);
+                    $parsing_drive_selection_groups = TRUE;
+                }
+                break;
+            case CONFIG_DRIVE_SELECTION_ALGORITHM:
+                Config::set(CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, Config::get(CONFIG_DRIVE_SELECTION_GROUPS)));
+                break;
+
+            // Ignored files, folders
+            case CONFIG_IGNORED_FILES:
+                Config::add(CONFIG_IGNORED_FILES, $value);
+                break;
+            case CONFIG_IGNORED_FOLDERS:
+                Config::add(CONFIG_IGNORED_FOLDERS, $value);
+                break;
+
+            case CONFIG_MAX_QUEUED_TASKS:
+            case CONFIG_EXECUTED_TASKS_RETENTION:
+            case CONFIG_DF_CACHE_TIME:
+                if (is_numeric($value)) {
+                    $value = (int) $value;
+                }
+            // Fall through
+
+            case CONFIG_DB_HOST:
+            case CONFIG_DB_USER:
+            case CONFIG_DB_PASS:
+            case CONFIG_DB_NAME:
+            case CONFIG_EMAIL_TO:
+            case CONFIG_GREYHOLE_LOG_FILE:
+            case CONFIG_GREYHOLE_ERROR_LOG_FILE:
+            case CONFIG_TIMEZONE:
+            case CONFIG_MEMORY_LIMIT:
+                Config::set($name, $value);
+                break;
+
+            default:
+                if (string_starts_with($name, CONFIG_NUM_COPIES)) {
+                    $share = mb_substr($name, 11, mb_strlen($name)-12);
+                    if (mb_stripos($value, 'max') === 0) {
+                        $value = 9999;
+                    }
+                    SharesConfig::set($share, CONFIG_NUM_COPIES, (int) $value);
+                } else if (string_starts_with($name, CONFIG_DELETE_MOVES_TO_TRASH)) {
+                    $share = mb_substr($name, 22, mb_strlen($name)-23);
+                    $value = strtolower(trim($value));
+                    $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
+                    SharesConfig::set($share, CONFIG_DELETE_MOVES_TO_TRASH, $bool);
+                } else if (string_starts_with($name, CONFIG_MODIFIED_MOVES_TO_TRASH)) {
+                    $share = mb_substr($name, 24, mb_strlen($name)-25);
+                    $value = strtolower(trim($value));
+                    $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
+                    SharesConfig::set($share, CONFIG_MODIFIED_MOVES_TO_TRASH, $bool);
+                } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_GROUPS)) {
+                    $share = mb_substr($name, 23, mb_strlen($name)-24);
+                    if (preg_match("/(.+):(.+)/", $value, $regs)) {
+                        $group_name = trim($regs[1]);
+                        $group_definition = array_map('trim', explode(',', $regs[2]));
+                        SharesConfig::add($share, CONFIG_DRIVE_SELECTION_GROUPS, $group_definition, $group_name);
+                        $parsing_drive_selection_groups = $share;
+                    }
+                } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_ALGORITHM)) {
+                    $share = mb_substr($name, 26, mb_strlen($name)-27);
+                    if (SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS) === FALSE) {
+                        SharesConfig::set($share, CONFIG_DRIVE_SELECTION_GROUPS, Config::get(CONFIG_DRIVE_SELECTION_GROUPS));
+                    }
+                    SharesConfig::set($share, CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS)));
+                } else {
+                    if (is_numeric($value)) {
+                        $value = (int) $value;
+                    }
+                    Config::set($name, $value);
+                }
+        }
+    }
+
     public static function parse() {
         if (!ini_get('date.timezone')) {
             // To prevent warnings that would be logged if something gets logged before the timezone setting is parsed and applied.
             date_default_timezone_set('UTC');
         }
 
-        $deprecated_options = array(
-            'delete_moves_to_attic' => CONFIG_DELETE_MOVES_TO_TRASH,
-            'storage_pool_directory' => CONFIG_STORAGE_POOL_DRIVE,
-            'dir_selection_groups' => CONFIG_DRIVE_SELECTION_GROUPS,
-            'dir_selection_algorithm' => CONFIG_DRIVE_SELECTION_ALGORITHM,
-        );
-
-        $parsing_drive_selection_groups = FALSE;
         $config_text = recursive_include_parser(static::$config_file);
 
+        $parsing_drive_selection_groups = FALSE;
         foreach (explode("\n", $config_text) as $line) {
             if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
                 $name = trim($regs[1]);
                 $value = trim($regs[2]);
-                if ($name[0] == '#') {
-                    continue;
-                }
-
-                foreach ($deprecated_options as $old_name => $new_name) {
-                    if (string_contains($name, $old_name)) {
-                        $fixed_name = str_replace($old_name, $new_name, $name);
-                        Log::warn("Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
-                        $name = $fixed_name;
-                    }
-                }
-
-                $parsing_drive_selection_groups = FALSE;
-                switch($name) {
-                    // Log level
-                    case CONFIG_LOG_LEVEL:
-                        static::assert(defined("Log::$value"), "Invalid value for log_level: '$value'");
-                        Config::set(CONFIG_LOG_LEVEL, constant("Log::$value"));
-                        break;
-
-                    // Booleans
-                    case CONFIG_DELETE_MOVES_TO_TRASH:
-                    case CONFIG_MODIFIED_MOVES_TO_TRASH:
-                    case CONFIG_LOG_MEMORY_USAGE:
-                    case CONFIG_CHECK_FOR_OPEN_FILES:
-                    case CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE:
-                        $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-                        Config::set($name, $bool);
-                        break;
-
-                    // Storage pool drives
-                    case CONFIG_STORAGE_POOL_DRIVE:
-                        if (preg_match("/(.*) ?, ?min_free ?: ?([0-9]+) ?([gmk])b?/i", $value, $regs)) {
-                            $sp_drive = '/' . trim(trim($regs[1]), '/');
-                            Config::add(CONFIG_STORAGE_POOL_DRIVE, $sp_drive);
-
-                            $units = strtolower($regs[3]);
-                            if ($units == 'g') {
-                                $value = (float) trim($regs[2]) * 1024.0 * 1024.0;
-                            } else if ($units == 'm') {
-                                $value = (float) trim($regs[2]) * 1024.0;
-                            } else if ($units == 'k') {
-                                $value = (float) trim($regs[2]);
-                            }
-                            Config::add(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $value, $sp_drive);
-                        }
-                        break;
-
-                    // Sticky files
-                    case CONFIG_STICKY_FILES:
-                        $last_sticky_files_dir = trim($value, '/');
-                        Config::add(CONFIG_STICKY_FILES, array(), $last_sticky_files_dir);
-                        break;
-                    case CONFIG_STICK_INTO:
-                        $sticky_files = Config::get(CONFIG_STICKY_FILES);
-                        $sticky_files[$last_sticky_files_dir][] = '/' . trim($value, '/');
-                        Config::set(CONFIG_STICKY_FILES, $sticky_files);
-                        break;
-
-                    // Frozen directories
-                    case CONFIG_FROZEN_DIRECTORY:
-                        Config::add(CONFIG_FROZEN_DIRECTORY, trim($value, '/'));
-                        break;
-
-                    // Drive selection algorithms & groups
-                    case CONFIG_DRIVE_SELECTION_GROUPS:
-                        if (preg_match("/(.+):(.*)/", $value, $regs)) {
-                            $group_name = trim($regs[1]);
-                            $group_definition = array_map('trim', explode(',', $regs[2]));
-                            Config::add(CONFIG_DRIVE_SELECTION_GROUPS, $group_definition, $group_name);
-                            $parsing_drive_selection_groups = TRUE;
-                        }
-                        break;
-                    case CONFIG_DRIVE_SELECTION_ALGORITHM:
-                        Config::set(CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, Config::get(CONFIG_DRIVE_SELECTION_GROUPS)));
-                        break;
-
-                    // Ignored files, folders
-                    case CONFIG_IGNORED_FILES:
-                        Config::add(CONFIG_IGNORED_FILES, $value);
-                        break;
-                    case CONFIG_IGNORED_FOLDERS:
-                        Config::add(CONFIG_IGNORED_FOLDERS, $value);
-                        break;
-
-                    case CONFIG_MAX_QUEUED_TASKS:
-                    case CONFIG_EXECUTED_TASKS_RETENTION:
-                    case CONFIG_DF_CACHE_TIME:
-                        if (is_numeric($value)) {
-                            $value = (int) $value;
-                        }
-                        // Fall through
-
-                    case CONFIG_DB_HOST:
-                    case CONFIG_DB_USER:
-                    case CONFIG_DB_PASS:
-                    case CONFIG_DB_NAME:
-                    case CONFIG_EMAIL_TO:
-                    case CONFIG_GREYHOLE_LOG_FILE:
-                    case CONFIG_GREYHOLE_ERROR_LOG_FILE:
-                    case CONFIG_TIMEZONE:
-                    case CONFIG_MEMORY_LIMIT:
-                        Config::set($name, $value);
-                        break;
-
-                    default:
-                        if (string_starts_with($name, CONFIG_NUM_COPIES)) {
-                            $share = mb_substr($name, 11, mb_strlen($name)-12);
-                            if (mb_stripos($value, 'max') === 0) {
-                                $value = 9999;
-                            }
-                            SharesConfig::set($share, CONFIG_NUM_COPIES, (int) $value);
-                        } else if (string_starts_with($name, CONFIG_DELETE_MOVES_TO_TRASH)) {
-                            $share = mb_substr($name, 22, mb_strlen($name)-23);
-                            $value = strtolower(trim($value));
-                            $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-                            SharesConfig::set($share, CONFIG_DELETE_MOVES_TO_TRASH, $bool);
-                        } else if (string_starts_with($name, CONFIG_MODIFIED_MOVES_TO_TRASH)) {
-                            $share = mb_substr($name, 24, mb_strlen($name)-25);
-                            $value = strtolower(trim($value));
-                            $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-                            SharesConfig::set($share, CONFIG_MODIFIED_MOVES_TO_TRASH, $bool);
-                        } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_GROUPS)) {
-                            $share = mb_substr($name, 23, mb_strlen($name)-24);
-                            if (preg_match("/(.+):(.+)/", $value, $regs)) {
-                                $group_name = trim($regs[1]);
-                                $group_definition = array_map('trim', explode(',', $regs[2]));
-                                SharesConfig::add($share, CONFIG_DRIVE_SELECTION_GROUPS, $group_definition, $group_name);
-                                $parsing_drive_selection_groups = $share;
-                            }
-                        } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_ALGORITHM)) {
-                            $share = mb_substr($name, 26, mb_strlen($name)-27);
-                            if (SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS) === FALSE) {
-                                SharesConfig::set($share, CONFIG_DRIVE_SELECTION_GROUPS, Config::get(CONFIG_DRIVE_SELECTION_GROUPS));
-                            }
-                            SharesConfig::set($share, CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS)));
-                        } else {
-                            if (is_numeric($value)) {
-                                $value = (int) $value;
-                            }
-                            Config::set($name, $value);
-                        }
-                }
+                static::parse_line($name, $value, $parsing_drive_selection_groups);
             } else if ($parsing_drive_selection_groups !== FALSE) {
                 $value = trim($line);
                 if (strlen($value) == 0 || $value[0] == '#') {
@@ -288,6 +297,10 @@ class ConfigHelper {
             }
         }
 
+        return static::init();
+    }
+
+    private static function init() {
         Log::setLevel(Config::get(CONFIG_LOG_LEVEL));
 
         if (count(Config::storagePoolDrives()) == 0) {
