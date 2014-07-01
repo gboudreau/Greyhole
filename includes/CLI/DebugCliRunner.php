@@ -33,7 +33,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         }
 
         $this->log("Debugging file operations for file named \"$filename\"");
-        $this->log("");
+        $this->log();
         $this->log("From DB");
         $this->log("=======");
 
@@ -77,7 +77,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
             }
         }
 
-        $this->log("");
+        $this->log();
         $this->log("From logs");
         $this->log("=========");
         $to_grep = array_keys($to_grep);
@@ -100,7 +100,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         ksort($result2);
         $this->log(implode("\n", $result2));
 
-        $this->log("");
+        $this->log();
         $this->log("From filesystem");
         $this->log("===============");
 
@@ -111,7 +111,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         $this->log("Landing Zone:");
         $this->logn("  "); passthru("ls -l " . escapeshellarg(get_share_landing_zone($share) . "/" . $full_path));
 
-        $this->log("");
+        $this->log();
         $this->log("Metadata store:");
         foreach (Config::storagePoolDrives() as $sp_drive) {
             $metastore = clean_dir("$sp_drive/.gh_metastore");
@@ -123,7 +123,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
             }
         }
 
-        $this->log("");
+        $this->log();
         $this->log("File copies:");
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (file_exists("$sp_drive/$share/$full_path")) {

@@ -59,7 +59,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
             // fsck shares with only 1 file copy to remove those from $this->drive
             initialize_fsck_report('Shares with only 1 copy');
             foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                $this->log("");
+                $this->log();
                 if ($share_options[CONFIG_NUM_COPIES] == 1) {
                     $this->logn("Moving file copies for share '$share_name'... Please be patient... ");
                     if (is_dir("$going_drive/$share_name")) {

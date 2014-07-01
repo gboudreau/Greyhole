@@ -64,12 +64,12 @@ class ViewQueueCliRunner extends AbstractAnonymousCliRunner {
         if (isset($this->options['json'])) {
             echo json_encode($queues);
         } else {
-            $this->log("");
+            $this->log();
             $this->log("Greyhole Work Queue Statistics");
             $this->log("==============================");
-            $this->log("");
+            $this->log();
             $this->log("This table gives you the number of pending operations queued for the Greyhole daemon, per share.");
-            $this->log("");
+            $this->log();
 
             $col_size = 7;
             foreach ($queues['Total'] as $num) {
@@ -96,13 +96,13 @@ class ViewQueueCliRunner extends AbstractAnonymousCliRunner {
                 );
             }
             $this->log($header);
-            $this->log("");
+            $this->log();
             $this->log("The following is the number of pending operations that the Greyhole daemon still needs to parse.");
             $this->log("Until it does, the nature of those operations is unknown.");
             $this->log("Spooled operations that have been parsed will be listed above and disappear from the count below.");
-            $this->log("");
+            $this->log();
             $this->log(sprintf("%-$max_share_strlen"."s  ", 'Spooled') . number_format($queues['Spooled'], 0));
-            $this->log("");
+            $this->log();
         }
     }
 }

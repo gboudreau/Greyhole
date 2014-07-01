@@ -24,24 +24,24 @@ class StatusCliRunner extends AbstractAnonymousCliRunner {
     public function run() {
         $num_dproc = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
         if ($num_dproc == 0) {
-            $this->log("");
+            $this->log();
             $this->log("Greyhole daemon is currently stopped.");
-            $this->log("");
+            $this->log();
             $this->finish(1);
         }
 
         $tasks = get_next_tasks(TRUE);
         if (empty($tasks)) {
-            $this->log("");
+            $this->log();
             $this->log("Currently idle.");
         } else {
             $task = array_shift($tasks);
-            $this->log("");
+            $this->log();
             $this->log("Currently working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
         }
 
         exec("tail -10 " . escapeshellarg(Config::get(CONFIG_GREYHOLE_LOG_FILE)), $last_log_lines);
-        $this->log("");
+        $this->log();
         $this->log("Recent log entries:");
         $this->log("  " . implode("\n  ", $last_log_lines));
 
@@ -51,10 +51,10 @@ class StatusCliRunner extends AbstractAnonymousCliRunner {
         $last_log_line = explode(' ', $raw_last_log_line);
         $last_action = str_replace(':', '', $last_log_line[1]);
 
-        $this->log("");
+        $this->log();
         $this->log("Last logged action: $last_action");
         $this->log("  on " . date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")");
-        $this->log("");
+        $this->log();
     }
 }
 

@@ -31,7 +31,7 @@ abstract class AbstractCliRunner extends AbstractRunner {
         $this->cli_command = $cli_command;
     }
 
-    protected function log($what) {
+    protected function log($what='') {
         echo "$what\n";
     }
     

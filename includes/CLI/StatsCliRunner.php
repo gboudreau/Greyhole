@@ -93,10 +93,10 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
         if (isset($this->options['json'])) {
             echo json_encode($stats);
         } else {
-            $this->log("");
+            $this->log();
             $this->log("Greyhole Statistics");
             $this->log("===================");
-            $this->log("");
+            $this->log();
             $this->log("Storage Pool");
             $this->log(sprintf("%$max_drive_strlen"."s    Total -   Used =   Free +  Trash = Possible", ''));
             foreach ($stats as $sp_drive => $stat) {
@@ -110,7 +110,7 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
                     $this->log(sprintf('%5.0f', $stat->total_space/1024/1024) . "G - " . sprintf('%5.0f', $stat->used_space/1024/1024) . "G = " . sprintf('%5.0f', $stat->free_space/1024/1024) . "G + " . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G = " . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G");
                 }
             }
-            $this->log("");
+            $this->log();
         }
     }
 }
