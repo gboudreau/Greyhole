@@ -34,6 +34,13 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
 
         $this->log("Debugging file operations for file named \"$filename\"");
         $this->log();
+
+        list($to_grep, $debug_tasks) = $this->getDBLogs($filename);
+        $this->getAppLogs($to_grep);
+        $this->getFilesystemDetails($debug_tasks);
+    }
+
+    private function getDBLogs($filename) {
         $this->log("From DB");
         $this->log("=======");
 
@@ -62,7 +69,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         ksort($debug_tasks);
         $to_grep = array();
         foreach ($debug_tasks as $task) {
-            $this->log("  [$task->event_date] Task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+            $this->log("[$task->event_date] Task ID $task->id: $task->action $task->share/$task->full_path" . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
             $to_grep["$task->share/$task->full_path"] = 1;
             if ($task->action == 'rename') {
                 $to_grep["$task->share/$task->additional_info"] = 1;
@@ -77,6 +84,10 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
             }
         }
 
+        return array($to_grep, $debug_tasks);
+    }
+
+    private function getAppLogs($to_grep) {
         $this->log();
         $this->log("From logs");
         $this->log("=========");
@@ -99,7 +110,9 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         }
         ksort($result2);
         $this->log(implode("\n", $result2));
+    }
 
+    private function getFilesystemDetails($debug_tasks) {
         $this->log();
         $this->log("From filesystem");
         $this->log("===============");
@@ -107,19 +120,17 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         $last_task = array_pop($debug_tasks);
         $share = $last_task->share;
         $full_path = $last_task->full_path;
-        list($path, $filename) = explode_full_path($full_path);
         $this->log("Landing Zone:");
-        $this->logn("  "); passthru("ls -l " . escapeshellarg(get_share_landing_zone($share) . "/" . $full_path));
+        passthru("ls -l " . escapeshellarg(get_share_landing_zone($share) . "/" . $full_path));
 
         $this->log();
         $this->log("Metadata store:");
         foreach (Config::storagePoolDrives() as $sp_drive) {
             $metastore = clean_dir("$sp_drive/.gh_metastore");
             if (file_exists("$metastore/$share/$full_path")) {
-                $this->logn("  "); passthru("ls -l " . escapeshellarg("$metastore/$share/$full_path"));
-                $data = var_export(unserialize(file_get_contents("$metastore/$share/$full_path")), TRUE);
-                $data = str_replace("\n", "\n    ", $data);
-                $this->log("    $data");
+                passthru("ls -l " . escapeshellarg("$metastore/$share/$full_path"));
+                $data = unserialize(file_get_contents("$metastore/$share/$full_path"));
+                $this->log(json_pretty_print($data));
             }
         }
 
