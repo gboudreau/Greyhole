@@ -142,12 +142,12 @@ class CommandLineHelper {
         
         if ($this->actionCmd->getLongOpt() == 'md5-worker') {
             // Any forking needs to happen before DB::connect(), or the parent exiting will close the child's DB connection!
-            $cliRunner = new MD5WorkerCliRunner($this->options);
+            $cliRunner = new MD5WorkerCliRunner($this->options, $this->actionCmd);
         }
 
         if ($this->actionCmd->getLongOpt() == 'create-mem-spool') {
             // This can be executed during Greyhole install, so it needs to run before the config parsing runs (and fails)
-            $cliRunner = new CreateMemSpoolRunner($this->options);
+            $cliRunner = new CreateMemSpoolRunner($this->options, $this->actionCmd);
         } else {
             if ($this->actionCmd->getLongOpt() != 'test-config') {
                 // Those will be tested in TestCliRunner
