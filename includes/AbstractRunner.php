@@ -28,7 +28,7 @@ abstract class AbstractRunner {
 	// Most commands can be executed only by root.
 	// The commands that don't have this requirement will need to extend AbstractAnonymousCliRunner instead of this class.
 	public function canRun() {
-		if (exec("whoami") != 'root') {
+		if (exec("/usr/bin/whoami") != 'root') {
 			return FALSE;
 		}
 		return TRUE;
