@@ -22,8 +22,8 @@ require_once('includes/CLI/AbstractCliRunner.php');
 
 class MD5WorkerCliRunner extends AbstractCliRunner {
     private $drives;
-    
-    function __construct($options) {
+
+    function __construct($options, $cli_command) {
         $pid = pcntl_fork();
         if ($pid == -1) {
             $this->log("Error spawning child md5-worker!");
@@ -31,7 +31,7 @@ class MD5WorkerCliRunner extends AbstractCliRunner {
         }
         if ($pid == 0) {
             // Child
-            parent::__construct($options);
+            parent::__construct($options, $cli_command);
             if (is_array($this->options['drive'])) {
                 $this->drives = $this->options['drive'];
             } else {

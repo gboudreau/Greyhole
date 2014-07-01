@@ -42,8 +42,8 @@ class FsckCliRunner extends AbstractCliRunner {
        'delete-orphaned-metadata' => OPTION_DEL_ORPHANED_METADATA
     );
 
-    function __construct($options) {
-        parent::__construct($options);
+    function __construct($options, $cli_command) {
+        parent::__construct($options, $cli_command);
 
         if (isset($this->options['dir'])) {
             $this->dir = $this->options['dir'];

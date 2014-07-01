@@ -18,35 +18,11 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-require_once('includes/CLI/AbstractCliRunner.php');
+require_once('includes/CLI/AbstractPoolDriveCliRunner.php');
 
-class GoneCliRunner extends AbstractCliRunner {
-    private $drive;
-    private $action;
-
-    function __construct($options) {
-        parent::__construct($options);
-
-        $this->action = $this->isGoing() ? 'going' : 'gone';
-
-        if (isset($this->options['cmd_param'])) {
-            $this->drive = $this->options['cmd_param'];
-            if (!array_contains(Config::storagePoolDrives(), $this->drive)) {
-                $this->drive = '/' . trim($this->drive, '/');
-            }
-        }
-
-        if (empty($this->drive) || !array_contains(Config::storagePoolDrives(), $this->drive)) {
-            if (!empty($this->drive)) {
-                $this->log("Directory $this->drive is not one of your defined storage pool drives.");
-            }
-            $this->log("Please use one of the following with the --$this->action option:");
-            $this->log("  " . implode("\n  ", Config::storagePoolDrives()));
-            $this->log("Note that the correct syntax for this command is:");
-            $this->log("  greyhole --$this->action=<drive>");
-            $this->log("The '=' character is mandatory.");
-            $this->finish(0);
-        }
+class GoneCliRunner extends AbstractPoolDriveCliRunner {
+    function __construct($options, $cli_command) {
+        parent::__construct($options, $cli_command);
 
         if ($this->isGoing()) {
             // Check that all scheduled fsck have completed; an incomplete fsck means some file copies might be missing!
@@ -125,7 +101,7 @@ class GoneCliRunner extends AbstractCliRunner {
             $this->log("All the files that were only on $this->drive have been copied somewhere else.");
             $this->log("A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.");
             unlink($this->drive . "/.greyhole_used_this");
-        } else { // $this->action == 'gone'
+        } else { // --gone
             $this->log("Sadly, file copies that were only on this drive, if any, are now lost!");
         }
     }

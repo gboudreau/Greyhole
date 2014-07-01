@@ -18,41 +18,10 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-require_once('includes/CLI/AbstractCliRunner.php');
+require_once('includes/CLI/AbstractPoolDriveCliRunner.php');
 
-class ReplaceCliRunner extends AbstractCliRunner {
-    private $drive;
-
-    function __construct($options) {
-        parent::__construct($options);
-
-        if (isset($this->options['cmd_param'])) {
-            $this->drive = $this->options['cmd_param'];
-            if (!array_contains(Config::storagePoolDrives(), $this->drive)) {
-                $this->drive = '/' . trim($this->drive, '/');
-            }
-        }
-
-        if (empty($this->drive) || !array_contains(Config::storagePoolDrives(), $this->drive)) {
-            if (!empty($this->drive)) {
-                $this->log("Drive $this->drive is not one of your defined storage pool drives.");
-            }
-            $this->log("Please use one of the following with the --replace option:");
-            $this->log("  " . implode("\n  ", Config::storagePoolDrives()));
-            $this->log("Note that the correct syntax for this command is:");
-            $this->log("  greyhole --replace=<drive>");
-            $this->log("The '=' character is mandatory.");
-            $this->finish(1);
-        }
-    }
-
+class ReplaceCliRunner extends AbstractPoolDriveCliRunner {
     public function run() {
-        if (!is_dir($this->drive)) {
-            Log::error("The directory $this->drive does not exists. Greyhole can't --replace directories that don't exits.");
-            $this->log("The directory $this->drive does not exists. Greyhole can't --replace directories that don't exits.");
-            $this->finish(2);
-        }
-
         remove_drive_definition($this->drive);
 
         Log::info("Storage pool drive $this->drive has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.");

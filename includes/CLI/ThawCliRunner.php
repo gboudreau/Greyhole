@@ -23,8 +23,8 @@ require_once('includes/CLI/AbstractCliRunner.php');
 class ThawCliRunner extends AbstractCliRunner {
     private $dir;
 
-    function __construct($options) {
-        parent::__construct($options);
+    function __construct($options, $cli_command) {
+        parent::__construct($options, $cli_command);
 
         $frozen_directories = Config::get(CONFIG_FROZEN_DIRECTORY);
 

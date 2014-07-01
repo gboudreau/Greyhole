@@ -23,8 +23,8 @@ require_once('includes/CLI/AbstractCliRunner.php');
 class RemoveShareCliRunner extends AbstractCliRunner {
     private $share;
 
-    function __construct($options) {
-        parent::__construct($options);
+    function __construct($options, $cli_command) {
+        parent::__construct($options, $cli_command);
         
         if (!isset($this->options['cmd_param'])) {
             $this->log("Please specify the share to remove.");

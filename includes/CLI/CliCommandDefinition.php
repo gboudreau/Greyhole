@@ -38,7 +38,7 @@ class CliCommandDefinition {
             return FALSE;
         }
         $ref = new ReflectionClass($this->cliRunnerClass);
-        return $ref->newInstance($options);
+        return $ref->newInstance($options, $this);
     }
     
     public function getOpt() {

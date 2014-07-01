@@ -18,34 +18,9 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-require_once('includes/CLI/AbstractCliRunner.php');
+require_once('includes/CLI/AbstractPoolDriveCliRunner.php');
 
-class WaitForCliRunner extends AbstractCliRunner {
-    private $drive;
-
-    function __construct($options) {
-        parent::__construct($options);
-
-        if (isset($this->options['cmd_param'])) {
-            $this->drive = $this->options['cmd_param'];
-            if (!array_contains(Config::storagePoolDrives(), $this->drive)) {
-                $this->drive = '/' . trim($this->drive, '/');
-            }
-        }
-
-        if (empty($this->drive) || !array_contains(Config::storagePoolDrives(), $this->drive)) {
-            if (!empty($this->drive)) {
-                $this->log("Directory $this->drive is not one of your defined storage pool drives.");
-            }
-            $this->log("Please use one of the following with the --wait-for option:");
-            $this->log("  " . implode("\n  ", Config::storagePoolDrives()));
-            $this->log("Note that the correct syntax for this command is:");
-            $this->log("  greyhole --wait-for=<drive>");
-            $this->log("The '=' character is mandatory.");
-            $this->finish(1);
-        }
-    }
-
+class WaitForCliRunner extends AbstractPoolDriveCliRunner {
     public function run() {
         mark_gone_ok($this->drive);
         Log::info("Storage pool drive $this->drive has been marked Temporarily-Gone");

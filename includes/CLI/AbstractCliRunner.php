@@ -23,10 +23,12 @@ require_once('includes/AbstractRunner.php');
 abstract class AbstractCliRunner extends AbstractRunner {
     
     protected $options;
+    protected $cli_command; // CliCommandDefinition
 
-    function __construct($options) {
+    function __construct($options, $cli_command) {
         parent::__construct();
         $this->options = $options;
+        $this->cli_command = $cli_command;
     }
 
     protected function log($what) {

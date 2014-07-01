@@ -23,8 +23,8 @@ require_once('includes/CLI/AbstractCliRunner.php');
 class DeleteMetadataCliRunner extends AbstractCliRunner {
     private $dir;
 
-    function __construct($options) {
-        parent::__construct($options);
+    function __construct($options, $cli_command) {
+        parent::__construct($options, $cli_command);
         if (!isset($this->options['cmd_param'])) {
             $this->log("Please specify the path to a file that is gone from your storage pool. Eg. 'Movies/HD/The Big Lebowski.mkv'");
             $this->finish(1);
