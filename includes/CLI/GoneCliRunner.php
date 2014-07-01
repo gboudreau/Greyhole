@@ -49,7 +49,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
             Log::info("Storage pool drive " . $this->drive . " will be removed from the storage pool.");
             echo("Storage pool drive " . $this->drive . " will be removed from the storage pool.\n");
 
-            global $going_drive; // Used in function is_greyhole_owned_drive()
+            global $going_drive; // Used in StoragePool::is_pool_drive()
             $going_drive = $this->drive;
 
             // For the fsck_file calls to be able to use the files on $going_drive if needed, to create extra copies.
@@ -86,11 +86,11 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
         ConfigHelper::removeStoragePoolDrive($this->drive);
         $this->restart_service();
 
-        if (is_amahi()) {
+        if (SystemHelper::is_amahi()) {
             $this->log("\nYou should de-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page.");
         }
 
-        mark_gone_ok($this->drive, 'remove');
+        StoragePool::mark_gone_ok($this->drive, 'remove');
         mark_gone_drive_fscked($this->drive, 'remove');
         Log::info("Storage pool drive $this->drive has been removed.");
         $this->log("Storage pool drive $this->drive has been removed from your pool, which means the missing file copies that are in this drive will be re-created during the next fsck.");

@@ -50,6 +50,42 @@ define('CONFIG_DB_NAME', 'db_name');
 define('CONFIG_METASTORE_BACKUPS', 'metastore_backups');
 define('CONFIG_TRASH_SHARE', '===trash_share===');
 
+function recursive_include_parser($file) {
+    $regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
+    $ok_to_execute = FALSE;
+
+    if (is_array($file) && count($file) > 1) {
+        $file = $file[1];
+    }
+
+    $file = trim($file);
+
+    if (file_exists($file)) {
+        if (is_executable($file)) {
+            $perms = fileperms($file);
+
+            // Not user-writable, or owned by root
+            $ok_to_execute = !($perms & 0x0080) || fileowner($file) === 0;
+
+            // Not group-writable, or group owner is root
+            $ok_to_execute &= !($perms & 0x0010) || filegroup($file) === 0;
+
+            // Not world-writable
+            $ok_to_execute &= !($perms & 0x0002);
+
+            if (!$ok_to_execute) {
+                Log::warn("Config file '{$file}' is executable but file permissions are insecure, only the file's contents will be included.");
+            }
+        }
+
+        $contents = $ok_to_execute ? shell_exec(escapeshellcmd($file)) : file_get_contents($file);
+
+        return preg_replace_callback($regex, 'recursive_include_parser', $contents);
+    } else {
+        return false;
+    }
+}
+
 class ConfigHelper {
     static $config_file = '/etc/greyhole.conf';
     static $smb_config_file = '/etc/samba/smb.conf';
@@ -165,7 +201,7 @@ class ConfigHelper {
                         }
                         break;
                     case CONFIG_DRIVE_SELECTION_ALGORITHM:
-                        Config::set(CONFIG_DRIVE_SELECTION_ALGORITHM, DriveSelection::parse($value, Config::get(CONFIG_DRIVE_SELECTION_GROUPS)));
+                        Config::set(CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, Config::get(CONFIG_DRIVE_SELECTION_GROUPS)));
                         break;
 
                     // Ignored files, folders
@@ -226,7 +262,7 @@ class ConfigHelper {
                             if (SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS) === FALSE) {
                                 SharesConfig::set($share, CONFIG_DRIVE_SELECTION_GROUPS, Config::get(CONFIG_DRIVE_SELECTION_GROUPS));
                             }
-                            SharesConfig::set($share, CONFIG_DRIVE_SELECTION_ALGORITHM, DriveSelection::parse($value, SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS)));
+                            SharesConfig::set($share, CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS)));
                         } else {
                             if (is_numeric($value)) {
                                 $value = (int) $value;
@@ -286,7 +322,7 @@ class ConfigHelper {
             }
         } else {
             // Default drive_selection_algorithm
-            $drive_selection_algorithm = DriveSelection::parse('most_available_space', null);
+            $drive_selection_algorithm = PoolDriveSelector::parse('most_available_space', null);
         }
         Config::set(CONFIG_DRIVE_SELECTION_ALGORITHM, $drive_selection_algorithm);
 

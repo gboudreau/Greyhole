@@ -45,7 +45,7 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
                 $stats[$sp_drive] = (object) array();
                 continue;
             }
-            if (!is_greyhole_owned_drive($sp_drive)) {
+            if (!StoragePool::is_pool_drive($sp_drive)) {
                 $stats[$sp_drive] = (object) array();
                 continue;
             }

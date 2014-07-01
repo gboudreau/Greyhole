@@ -22,8 +22,11 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 require_once('includes/ConfigHelper.php');
 require_once('includes/DB.php');
 require_once('includes/Log.php');
-require_once('includes/Settings.php');
 require_once('includes/MigrationHelper.php');
+require_once('includes/PoolDriveSelector.php');
+require_once('includes/Settings.php');
+require_once('includes/StoragePool.php');
+require_once('includes/SystemHelper.php');
 
 $constarray = get_defined_constants(true);
 foreach($constarray['user'] as $key => $val) {
@@ -47,47 +50,7 @@ if (!defined('PHP_VERSION_ID')) {
     define('PHP_VERSION_ID', ($version[0] * 10000 + $version[1] * 100 + $version[2]));
 }
 
-// Cached df results
-$last_df_time = 0;
-$last_dfs = array();
 $sleep_before_task = array();
-
-function recursive_include_parser($file) {
-    
-    $regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
-    $ok_to_execute = FALSE;
-
-    if (is_array($file) && count($file) > 1) {
-        $file = $file[1];
-    }
-
-    $file = trim($file);
-
-    if (file_exists($file)) {
-        if (is_executable($file)) {
-            $perms = fileperms($file);
-
-            // Not user-writable, or owned by root
-            $ok_to_execute = !($perms & 0x0080) || fileowner($file) === 0;
-
-            // Not group-writable, or group owner is root
-            $ok_to_execute &= !($perms & 0x0010) || filegroup($file) === 0;
-
-             // Not world-writable
-            $ok_to_execute &= !($perms & 0x0002);
-
-            if (!$ok_to_execute) {
-                Log::warn("Config file '{$file}' is executable but file permissions are insecure, only the file's contents will be included.");
-            }
-        }
-
-        $contents = $ok_to_execute ? shell_exec(escapeshellcmd($file)) : file_get_contents($file);
-        
-        return preg_replace_callback($regex, 'recursive_include_parser', $contents);
-    } else {
-        return false;
-    }
-}
 
 function clean_dir($dir) {
     if (empty($dir)) {
@@ -234,126 +197,6 @@ function get_share_landing_zone($share) {
     }
 }
 
-// Get CPU architecture (x86_64 or i386 or armv6l or armv5*)
-$arch = exec('uname -m');
-if ($arch != 'x86_64') {
-    function gh_filesize($filename) {
-        $result = exec("stat -c %s ".escapeshellarg($filename)." 2>/dev/null");
-        if (empty($result)) {
-            return FALSE;
-        }
-        return (float) $result;
-    }
-    
-    function gh_fileowner($filename) {
-        $result = exec("stat -c %u ".escapeshellarg($filename)." 2>/dev/null");
-        if (empty($result)) {
-            return FALSE;
-        }
-        return (int) $result;
-    }
-    
-    function gh_filegroup($filename) {
-        $result = exec("stat -c %g ".escapeshellarg($filename)." 2>/dev/null");
-        if (empty($result)) {
-            return FALSE;
-        }
-        return (int) $result;
-    }
-
-    function gh_fileperms($filename) {
-        $result = exec("stat -c %a ".escapeshellarg($filename)." 2>/dev/null");
-        if (empty($result)) {
-            return FALSE;
-        }
-        return "0" . $result;
-    }
-
-    function gh_is_file($filename) {
-        exec('[ -f '.escapeshellarg($filename).' ]', $tmp, $result);
-        return $result === 0;
-    }
-
-    function gh_fileinode($filename) {
-        // This function returns deviceid_inode to make sure this value will be different for files on different devices.
-        $result = exec("stat -c '%d_%i' ".escapeshellarg($filename)." 2>/dev/null");
-        if (empty($result)) {
-            return FALSE;
-        }
-        return (string) $result;
-    }
-
-    function gh_file_deviceid($filename) {
-        $result = exec("stat -c '%d' ".escapeshellarg($filename)." 2>/dev/null");
-        if (empty($result)) {
-            return FALSE;
-        }
-        return (string) $result;
-    }
-    
-    function gh_rename($filename, $target_filename) {
-        exec("mv ".escapeshellarg($filename)." ".escapeshellarg($target_filename)." 2>/dev/null", $output, $result);
-        return $result === 0;
-    }
-} else {
-    function gh_filesize(&$filename) {
-        $size = @filesize($filename);
-        // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
-        if ($size === FALSE) {
-            // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
-            $size = @filesize(normalize_utf8_characters($filename));
-            if ($size !== FALSE) {
-                // Bingo!
-                $filename = normalize_utf8_characters($filename);
-            }
-        }
-        return $size;
-    }
-    
-    function gh_fileowner($filename) {
-        return fileowner($filename);
-    }
-
-    function gh_filegroup($filename) {
-        return filegroup($filename);
-    }
-
-    function gh_fileperms($filename) {
-        return mb_substr(decoct(fileperms($filename)), -4);
-    }
-
-    function gh_is_file($filename) {
-        return is_file($filename);
-    }
-
-    function gh_fileinode($filename) {
-        // This function returns deviceid_inode to make sure this value will be different for files on different devices.
-        $stat = @stat($filename);
-        if ($stat === FALSE) {
-            return FALSE;
-        }
-        return $stat['dev'] . '_' . $stat['ino'];
-    }
-
-    function gh_file_deviceid($filename) {
-        $stat = @stat($filename);
-        if ($stat === FALSE) {
-            return FALSE;
-        }
-        return $stat['dev'];
-    }
-
-    function gh_rename($filename, $target_filename) {
-        return @rename($filename, $target_filename);
-    }
-}
-
-function gh_symlink($target, $link) {
-    return symlink($target, $link);
-    # Or, if you have issues with the above, comment it out, and de-comment this one:
-    # exec("ln -s " . escapeshellarg($target) . " " . escapeshellarg($link)); return gh_is_file($link);
-}
-
 function memory_check() {
     $usage = memory_get_usage();
     $used = $usage / Config::get(CONFIG_MEMORY_LIMIT);
@@ -449,356 +292,6 @@ class metafile_iterator implements Iterator {
     }
 }
 
-function kshift(&$arr) {
-    if (count($arr) == 0) {
-        return FALSE;
-    }
-    foreach ($arr as $k => $v) {
-        unset($arr[$k]);
-        break;
-    }
-    return array($k, $v);
-}
-
-function kshuffle(&$array) {
-    if (!is_array($array)) { return $array; }
-    $keys = array_keys($array);
-    shuffle($keys);
-    $random = array();
-    foreach ($keys as $key) {
-        $random[$key] = $array[$key];
-    }
-    $array = $random;
-}
-
-class DriveSelection {
-    var $num_drives_per_draft;
-    var $selection_algorithm;
-    var $drives;
-    var $is_forced;
-    
-    var $sorted_target_drives;
-    var $last_resort_sorted_target_drives;
-
-    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_forced) {
-        $this->num_drives_per_draft = $num_drives_per_draft;
-        $this->selection_algorithm = $selection_algorithm;
-        $this->drives = $drives;
-        $this->is_forced = $is_forced;
-    }
-    
-    public function isForced() {
-        return $this->is_forced;
-    }
-
-    function init(&$sorted_target_drives, &$last_resort_sorted_target_drives) {
-        // Sort by used space (asc) for least_used_space, or by available space (desc) for most_available_space
-        if ($this->selection_algorithm == 'least_used_space') {
-            $sorted_target_drives = $sorted_target_drives['used_space'];
-            $last_resort_sorted_target_drives = $last_resort_sorted_target_drives['used_space'];
-            asort($sorted_target_drives);
-            asort($last_resort_sorted_target_drives);
-        } else if ($this->selection_algorithm == 'most_available_space') {
-            $sorted_target_drives = $sorted_target_drives['available_space'];
-            $last_resort_sorted_target_drives = $last_resort_sorted_target_drives['available_space'];
-            arsort($sorted_target_drives);
-            arsort($last_resort_sorted_target_drives);
-        } else {
-            Log::critical("Unknown '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' found: " . $this->selection_algorithm);
-        }
-        // Only keep drives that are in $this->drives
-        $this->sorted_target_drives = array();
-        foreach ($sorted_target_drives as $sp_drive => $space) {
-            if (array_contains($this->drives, $sp_drive)) {
-                $this->sorted_target_drives[$sp_drive] = $space;
-            }
-        }
-        $this->last_resort_sorted_target_drives = array();
-        foreach ($last_resort_sorted_target_drives as $sp_drive => $space) {
-            if (array_contains($this->drives, $sp_drive)) {
-                $this->last_resort_sorted_target_drives[$sp_drive] = $space;
-            }
-        }
-    }
-    
-    function draft() {
-        $drives = array();
-        $drives_last_resort = array();
-        
-        while (count($drives)<$this->num_drives_per_draft) {
-            $arr = kshift($this->sorted_target_drives);
-            if ($arr === FALSE) {
-                break;
-            }
-            list($sp_drive, $space) = $arr;
-            if (!is_greyhole_owned_drive($sp_drive)) { continue; }
-            $drives[$sp_drive] = $space;
-        }
-        while (count($drives)+count($drives_last_resort)<$this->num_drives_per_draft) {
-            $arr = kshift($this->last_resort_sorted_target_drives);
-            if ($arr === FALSE) {
-                break;
-            }
-            list($sp_drive, $space) = $arr;
-            if (!is_greyhole_owned_drive($sp_drive)) { continue; }
-            $drives_last_resort[$sp_drive] = $space;
-        }
-        
-        return array($drives, $drives_last_resort);
-    }
-    
-    static function parse($config_string, $drive_selection_groups) {
-        $ds = array();
-        if ($config_string == 'least_used_space' || $config_string == 'most_available_space') {
-            $ds[] = new DriveSelection(count(Config::storagePoolDrives()), $config_string, Config::storagePoolDrives(), FALSE);
-            return $ds;
-        }
-        if (!preg_match('/forced ?\((.+)\) ?(least_used_space|most_available_space)/i', $config_string, $regs)) {
-            Log::critical("Can't understand the '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' value: $config_string");
-        }
-        $selection_algorithm = $regs[2];
-        $groups = array_map('trim', explode(',', $regs[1]));
-        foreach ($groups as $group) {
-            $group = explode(' ', preg_replace('/^([0-9]+)x/', '\\1 ', $group));
-            $num_drives = trim($group[0]);
-            $group_name = trim($group[1]);
-            if (!isset($drive_selection_groups[$group_name])) {
-                //Log::warn("Warning: drive selection group named '$group_name' is undefined.");
-                continue;
-            }
-            if (stripos(trim($num_drives), 'all') === 0 || $num_drives > count($drive_selection_groups[$group_name])) {
-                $num_drives = count($drive_selection_groups[$group_name]);
-            }
-            $ds[] = new DriveSelection($num_drives, $selection_algorithm, $drive_selection_groups[$group_name], TRUE);
-        }
-        return $ds;
-    }
-
-    function update() {
-        // Make sure num_drives_per_draft and drives have been set, in case storage_pool_drive lines appear after drive_selection_algorithm line(s) in the config file
-        if (!$this->is_forced && ($this->selection_algorithm == 'least_used_space' || $this->selection_algorithm == 'most_available_space')) {
-            $this->num_drives_per_draft = count(Config::storagePoolDrives());
-            $this->drives = Config::storagePoolDrives();
-        }
-    }
-}
-
-$greyhole_owned_drives = array();
-function is_greyhole_owned_drive($sp_drive) {
-    global $going_drive, $greyhole_owned_drives;
-    if (isset($going_drive) && $sp_drive == $going_drive) {
-        return FALSE;
-    }
-    $is_greyhole_owned_drive = isset($greyhole_owned_drives[$sp_drive]);
-    if ($is_greyhole_owned_drive && $greyhole_owned_drives[$sp_drive] < time() - Config::get(CONFIG_DF_CACHE_TIME)) {
-        unset($greyhole_owned_drives[$sp_drive]);
-        $is_greyhole_owned_drive = FALSE;
-    }
-    if (!$is_greyhole_owned_drive) {
-        $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
-        if (!$drives_definitions) {
-            $drives_definitions = MigrationHelper::convertStoragePoolDrivesTagFiles();
-        }
-        $drive_uuid = gh_dir_uuid($sp_drive);
-        $is_greyhole_owned_drive = @$drives_definitions[$sp_drive] === $drive_uuid && $drive_uuid !== FALSE;
-        if (!$is_greyhole_owned_drive) {
-            // Maybe this is a remote mount? Those don't have UUIDs, so we use the .greyhole_uses_this technique.
-            $is_greyhole_owned_drive = file_exists("$sp_drive/.greyhole_uses_this");
-            if ($is_greyhole_owned_drive && isset($drives_definitions[$sp_drive])) {
-                // This remote drive was listed in MySQL; it shouldn't be. Let's remove it.
-                unset($drives_definitions[$sp_drive]);
-                Settings::set('sp_drives_definitions', $drives_definitions);
-            }
-        }
-        if ($is_greyhole_owned_drive) {
-            $greyhole_owned_drives[$sp_drive] = time();
-        }
-    }
-    return $is_greyhole_owned_drive;
-}
-
-// Is it OK for a drive to be gone?
-function gone_ok($sp_drive, $refresh=FALSE) {
-    global $gone_ok_drives;
-    if ($refresh || !isset($gone_ok_drives)) {
-        $gone_ok_drives = get_gone_ok_drives();
-    }
-    if (isset($gone_ok_drives[$sp_drive])) {
-        return TRUE;
-    }
-    return FALSE;
-}
-
-function get_gone_ok_drives() {
-    global $gone_ok_drives;
-    $gone_ok_drives = Settings::get('Gone-OK-Drives', TRUE);
-    if (!$gone_ok_drives) {
-        $gone_ok_drives = array();
-        Settings::set('Gone-OK-Drives', $gone_ok_drives);
-    }
-    return $gone_ok_drives;
-}
-
-function mark_gone_ok($sp_drive, $action='add') {
-    if (!array_contains(Config::storagePoolDrives(), $sp_drive)) {
-        $sp_drive = '/' . trim($sp_drive, '/');
-    }
-    if (!array_contains(Config::storagePoolDrives(), $sp_drive)) {
-        return FALSE;
-    }
-
-    global $gone_ok_drives;
-    $gone_ok_drives = get_gone_ok_drives();
-    if ($action == 'add') {
-        $gone_ok_drives[$sp_drive] = TRUE;
-    } else {
-        unset($gone_ok_drives[$sp_drive]);
-    }
-
-    Settings::set('Gone-OK-Drives', $gone_ok_drives);
-    return TRUE;
-}
-
-function gone_fscked($sp_drive, $refresh=FALSE) {
-    global $fscked_gone_drives;
-    if ($refresh || !isset($fscked_gone_drives)) {
-        $fscked_gone_drives = get_fsck_gone_drives();
-    }
-    if (isset($fscked_gone_drives[$sp_drive])) {
-        return TRUE;
-    }
-    return FALSE;
-}
-
-function get_fsck_gone_drives() {
-    global $fscked_gone_drives;
-    $fscked_gone_drives = Settings::get('Gone-FSCKed-Drives', TRUE);
-    if (!$fscked_gone_drives) {
-        $fscked_gone_drives = array();
-        Settings::set('Gone-FSCKed-Drives', $fscked_gone_drives);
-    }
-    return $fscked_gone_drives;
-}
-
-function mark_gone_drive_fscked($sp_drive, $action='add') {
-    global $fscked_gone_drives;
-    $fscked_gone_drives = get_fsck_gone_drives();
-    if ($action == 'add') {
-        $fscked_gone_drives[$sp_drive] = TRUE;
-    } else {
-        unset($fscked_gone_drives[$sp_drive]);
-    }
-
-    Settings::set('Gone-FSCKed-Drives', $fscked_gone_drives);
-}
-
-function check_storage_pool_drives($skip_fsck=FALSE) {
-    global $gone_ok_drives;
-    $needs_fsck = FALSE;
-    $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
-    $returned_drives = array();
-    $missing_drives = array();
-    $i = 0; $j = 0;
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (!is_greyhole_owned_drive($sp_drive) && !gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this") && !empty($drives_definitions[$sp_drive])) {
-            if($needs_fsck !== 2){    
-                $needs_fsck = 1;
-            }
-            mark_gone_drive_fscked($sp_drive);
-            $missing_drives[] = $sp_drive;
-            Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
-            Log::debug("Email sent for gone drive: $sp_drive");
-            $gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
-        } else if ((gone_ok($sp_drive, $j++ == 0) || gone_fscked($sp_drive, $i++ == 0)) && is_greyhole_owned_drive($sp_drive) && !empty($drives_definitions[$sp_drive])) {
-            // $sp_drive is now back
-            $needs_fsck = 2;
-            $returned_drives[] = $sp_drive;
-            Log::debug("Email sent for revived drive: $sp_drive");
-
-            mark_gone_ok($sp_drive, 'remove');
-            mark_gone_drive_fscked($sp_drive, 'remove');
-            $i = 0; $j = 0;
-        }
-    }
-    if(count($returned_drives) > 0) {
-        $body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives came back:\n";
-        foreach ($returned_drives as $sp_drive) {
-              $body .= "$sp_drive was missing; it's now available again.\n";
-        }
-        if (!$skip_fsck) {
-            $body .= "\nA fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
-        }
-        $drive_string = join(", ", $returned_drives);
-        $subject = "Storage pool drive now online on " . exec ('hostname') . ": ";
-        $subject = $subject . $drive_string;
-        if (strlen($subject) > 255) {
-            $subject = substr($subject, 0, 255);
-        }
-        mail(Config::get(CONFIG_EMAIL_TO), $subject, $body);
-    }
-    if(count($missing_drives) > 0) {
-        $body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives has disappeared:\n";
-
-        foreach ($missing_drives as $sp_drive) {
-            if (!is_dir($sp_drive)) {
-                  $body .= "$sp_drive: directory doesn't exists\n";
-            } else {
-                $current_uuid = gh_dir_uuid($sp_drive);
-                if (empty($current_uuid)) {
-                    $current_uuid = 'N/A';
-                }
-                $body .= "$sp_drive: expected partition UUID: " . $drives_definitions[$sp_drive] . "; current partition UUID: $current_uuid\n";
-            }
-        }
-        $sp_drive = $missing_drives[0];
-        $body .= "\nThis either means this mount is currently unmounted, or you forgot to use 'greyhole --replace' when you changed this drive.\n\n";
-        $body .= "Here are your options:\n\n";
-        $body .= "- If you forgot to use 'greyhole --replace', you should do so now. Until you do, this drive will not be part of your storage pool.\n\n";
-        $body .= "- If the drive is gone, you should either re-mount it manually (if possible), or remove it from your storage pool. To do so, use the following command:\n  greyhole --gone=" . escapeshellarg($sp_drive) . "\n  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.\n\n";
-        $body .= "- If you know this drive will come back soon, and do NOT want Greyhole to re-create missing file copies for this drive until it reappears, you should execute this command:\n  greyhole --wait-for=" . escapeshellarg($sp_drive) . "\n\n";
-        if (!$skip_fsck) {
-            $body .= "A fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
-        }
-        $subject = "Missing storage pool drives on " . exec('hostname') . ": ";
-        $drive_string = join(",",$missing_drives);
-        $subject = $subject . $drive_string;
-        if (strlen($subject) > 255) {
-            $subject = substr($subject, 0, 255);
-        }
-        mail(Config::get(CONFIG_EMAIL_TO), $subject, $body);
-    }
-    if ($needs_fsck !== FALSE) {
-        set_metastore_backup();
-        get_metastores(FALSE); // FALSE => Resets the metastores cache
-        clearstatcache();
-
-        if (!$skip_fsck) {
-            initialize_fsck_report('All shares');
-            if ($needs_fsck === 2) {
-                foreach ($returned_drives as $drive) {
-                    $metastores = get_metastores_from_storage_volume($drive);
-                    Log::info("Starting fsck for metadata store on $drive which came back online.");
-                    foreach ($metastores as $metastore) {
-                        foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                            gh_fsck_metastore($metastore,"/$share_name", $share_name);
-                        }
-                    }
-                    Log::info("fsck for returning drive $drive's metadata store completed.");
-                }
-                Log::info("Starting fsck for all shares - caused by missing drive that came back online.");
-            } else {
-                Log::info("Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
-                fix_all_symlinks();
-            }
-            schedule_fsck_all_shares(array('email'));
-            Log::info("  fsck for all shares scheduled.");
-        }
-
-        // Refresh $gone_ok_drives to it's real value (from the DB)
-        get_gone_ok_drives();
-    }
-}
-
 class FSCKLogFile {
     const PATH = '/usr/share/greyhole';
 
@@ -877,46 +370,6 @@ class FSCKLogFile {
     }
 }
 
-function gh_dir_uuid($dir) {
-    $dev = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | grep \'/dev\' | awk \'{print $1}\'');
-    if (!is_dir($dir)) {
-        return FALSE;
-    }
-    if (empty($dev) || strpos($dev, '/dev/') !== 0) {
-        // ZFS pool maybe?
-        if (file_exists('/sbin/zpool')) {
-            $dataset = exec('df ' . escapeshellarg($dir) . ' 2> /dev/null | awk \'{print $1}\'');
-            if (strpos($dataset, '/') !== FALSE) {
-                $is_zfs = exec('mount | grep ' . escapeshellarg("$dataset .*zfs") . ' 2> /dev/null | wc -l');
-                if ($is_zfs == 1) {
-                    $p = explode('/', $dataset);
-                    $pool = $p[0];
-                    $dev_name = exec('/sbin/zpool list -v ' . escapeshellarg($pool) . ' 2> /dev/null | awk \'{print $1}\' | tail -n 1');
-                    if (!empty($dev_name)) {
-                        $dev = exec("ls -l /dev/disk/*/$dev_name | awk '{print \$(NF-2)}'");
-                        if (empty($dev) && file_exists("/dev/$dev_name")) {
-                            $dev = '/dev/$dev_name';
-                            Log::info("Found a ZFS pool ($pool) that uses a device name in /dev/ ($dev). That is a bad idea, since those can easily change, which would prevent this pool from mounting automatically. You should use any of the /dev/disk/*/ links instead. For example, you could do: zpool export $pool && zpool import -d /dev/disk/by-id/ $pool. More details at http://zfsonlinux.org/faq.html#WhatDevNamesShouldIUseWhenCreatingMyPool");
-                        }
-                    }
-                    if (empty($dev)) {
-                        Log::warn("Warning! Couldn't find the device used by your ZFS pool name $pool. That pool will never be used.");
-                        return FALSE;
-                    }
-                }
-            }
-        }
-        if (empty($dev)) {
-            return 'remote';
-        }
-    }
-    $uuid = trim(exec('/sbin/blkid '.$dev.' | awk -F\'UUID="\' \'{print $2}\' | awk -F\'"\' \'{print $1}\''));
-    if (empty($uuid)) {
-        return 'remote';
-    }
-    return $uuid;
-}
-
 function fix_all_symlinks() {
     foreach (SharesConfig::getShares() as $share_name => $share_options) {
         fix_symlinks_on_share($share_name);
@@ -932,7 +385,7 @@ function fix_symlinks_on_share($share_name) {
         if (is_link($file_to_relink)) {
             $file_to_relink = substr($file_to_relink, 2);
             foreach (Config::storagePoolDrives() as $sp_drive) {
-                if (!is_greyhole_owned_drive($sp_drive)) { continue; }
+                if (!StoragePool::is_pool_drive($sp_drive)) { continue; }
                 $new_link_target = clean_dir("$sp_drive/$share_name/$file_to_relink");
                 if (gh_is_file($new_link_target)) {
                     unlink($file_to_relink);
@@ -956,6 +409,28 @@ function schedule_fsck_all_shares($fsck_options=array()) {
     }
 }
 
+function kshift(&$arr) {
+    if (count($arr) == 0) {
+        return FALSE;
+    }
+    foreach ($arr as $k => $v) {
+        unset($arr[$k]);
+        break;
+    }
+    return array($k, $v);
+}
+
+function kshuffle(&$array) {
+    if (!is_array($array)) { return $array; }
+    $keys = array_keys($array);
+    shuffle($keys);
+    $random = array();
+    foreach ($keys as $key) {
+        $random[$key] = $array[$key];
+    }
+    $array = $random;
+}
+
 function array_contains($haystack, $needle) {
     return array_search($needle, $haystack) !== FALSE;
 }
@@ -966,10 +441,6 @@ function string_contains($haystack, $needle) {
 
 function string_starts_with($haystack, $needle) {
     return mb_strpos($haystack, $needle) === 0;
-}
-
-function is_amahi() {
-    return file_exists('/usr/bin/hda-ctl');
 }
 
 function json_pretty_print($json) {

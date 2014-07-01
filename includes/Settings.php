@@ -50,7 +50,7 @@ class Settings {
     public static function backup() {
         $settings = DB::getAll("SELECT * FROM settings");
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (is_greyhole_owned_drive($sp_drive)) {
+            if (StoragePool::is_pool_drive($sp_drive)) {
                 $settings_backup_file = "$sp_drive/.gh_settings.bak";
                 file_put_contents($settings_backup_file, serialize($settings));
             }

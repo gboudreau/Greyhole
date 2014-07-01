@@ -63,7 +63,7 @@ class RemoveShareCliRunner extends AbstractCliRunner {
                 #echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
                 continue;
             }
-            if (gh_dir_uuid("$sp_drive/$this->share") === gh_dir_uuid("$landing_zone")) {
+            if (SystemHelper::directory_uuid("$sp_drive/$this->share") === SystemHelper::directory_uuid("$landing_zone")) {
                 $more_free_space = 1024 * exec("du -sk " . escapeshellarg("$sp_drive/$this->share") . " | awk '{print $1}'");
                 $free_space += $more_free_space;
                 $this->log("      + " . bytes_to_human($more_free_space, FALSE) . " (file copies already on $sp_drive) = " . bytes_to_human($free_space, FALSE) . " (Total available space)");

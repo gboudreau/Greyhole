@@ -251,7 +251,7 @@ function execute_next_task() {
                 }
                 if (task_has_option($task, OPTION_ORPHANED)) {
                     foreach (Config::storagePoolDrives() as $sp_drive) {
-                        if (is_greyhole_owned_drive($sp_drive)) {
+                        if (StoragePool::is_pool_drive($sp_drive)) {
                             foreach (SharesConfig::getShares() as $share_name => $share_options) {
                                 gh_fsck("$sp_drive/$share_name", $share_name, $sp_drive);
                             }
@@ -325,7 +325,7 @@ function execute_next_task() {
                         $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
                         Log::debug("Starting orphans search for $subdir");
                         foreach (Config::storagePoolDrives() as $sp_drive) {
-                            if (is_greyhole_owned_drive($sp_drive)) {
+                            if (StoragePool::is_pool_drive($sp_drive)) {
                                 gh_fsck("$sp_drive/$subdir", $share, $sp_drive);
                             }
                         }
@@ -498,7 +498,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
         Log::info("Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (!is_greyhole_owned_drive($sp_drive)) {
+            if (!StoragePool::is_pool_drive($sp_drive)) {
                 continue;
             }
             list($original_path, $dirname) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
@@ -716,7 +716,7 @@ function get_num_copies($share) {
     }
     $max_copies = 0;
     foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (is_greyhole_owned_drive($sp_drive)) {
+        if (StoragePool::is_pool_drive($sp_drive)) {
             $max_copies++;
         }
     }
@@ -1033,7 +1033,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
         }
 
         $root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
-        if (!is_greyhole_owned_drive($root_path)) {
+        if (!StoragePool::is_pool_drive($root_path)) {
             Log::warn("  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
             $metafile->state = 'Gone';
             $metafiles[$key] = $metafile;
@@ -1255,7 +1255,7 @@ function create_metafiles($share, $full_path, $num_copies_required, $filesize, $
     $num_ok = count($metafiles);
     foreach ($metafiles as $key => $metafile) {
         $sp_drive = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
-        if (!is_greyhole_owned_drive($sp_drive)) {
+        if (!StoragePool::is_pool_drive($sp_drive)) {
             $metafile->state = 'Gone';
         }
 
@@ -1452,7 +1452,7 @@ function save_metafiles($share, $path, $filename, $metafiles) {
         $data_filepath = clean_dir("$metastore/$share/$path");
         $has_metafile = FALSE;
         foreach ($metafiles as $metafile) {
-            if (get_storage_volume_from_path($metafile->path) == $sp_drive && is_greyhole_owned_drive($sp_drive)) {
+            if (get_storage_volume_from_path($metafile->path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
                 gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
                 Log::debug("    Saving metadata in " . clean_dir("$data_filepath/$filename"));
                 if (is_dir("$data_filepath/$filename")) {
@@ -1669,7 +1669,7 @@ function parse_samba_spool() {
                 Log::debug("Directory created: $share/$line[0]");
                 foreach (Config::get(CONFIG_METASTORE_BACKUPS) as $metastore_backup_drive) {
                     $backup_drive = str_replace('/.gh_metastore_backup', '', $metastore_backup_drive);
-                    if (is_greyhole_owned_drive($backup_drive)) {
+                    if (StoragePool::is_pool_drive($backup_drive)) {
                         gh_mkdir("$backup_drive/$share/$line[0]", $dir_fullpath);
                     }
                 }
@@ -1826,6 +1826,9 @@ function close_all_tasks($tasks) {
     }
 }
 
+// Cached df results
+$last_df_time = 0;
+$last_dfs = array();
 function get_free_space_in_storage_pool_drives() {
     global $last_df_time, $last_dfs;
     if ($last_df_time > time() - Config::get(CONFIG_DF_CACHE_TIME)) {
@@ -1841,7 +1844,7 @@ function get_free_space_in_storage_pool_drives() {
     }
     $responses = $responses_arr;
     foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (!is_greyhole_owned_drive($sp_drive)) {
+        if (!StoragePool::is_pool_drive($sp_drive)) {
             continue;
         }
         $target_drive = '';
@@ -1880,12 +1883,12 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
         if (!isset($dfs[$sp_drive])) {
             if (!is_dir($sp_drive)) {
                 Log::error("The directory at $sp_drive doesn't exist. This drive will never be used!");
-                if (is_amahi()) {
+                if (SystemHelper::is_amahi()) {
                     Log::error("You should de-select, then re-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page, to fix this problem.");
                 } else {
                     Log::error("See the INSTALL file for instructions on how to prepare partitions to include in your storage pool.");
                 }
-            } else if (!file_exists("$sp_drive/.greyhole_used_this") && is_greyhole_owned_drive($sp_drive)) {
+            } else if (!file_exists("$sp_drive/.greyhole_used_this") && StoragePool::is_pool_drive($sp_drive)) {
                 Log::error("Can't find how much free space is left on $sp_drive. This partition will never be used!");
                 Log::error("Please report this using the 'Bugs Tracker' link found on http://greyhole.net. You should include the following information in your ticket:");
                 Log::error("===== Error report starts here =====");
@@ -1901,7 +1904,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
             }
             continue;
         }
-        if (!is_greyhole_owned_drive($sp_drive)) {
+        if (!StoragePool::is_pool_drive($sp_drive)) {
             continue;
         }
         $free_space = $dfs[$sp_drive]['free'];
@@ -2132,7 +2135,7 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
     $fsck_report['landing_zone']['num_dirs']++;
 
     foreach (Config::storagePoolDrives() as $sp_drive) {
-        if (get_storage_volume_from_path($path) == $sp_drive && is_greyhole_owned_drive($sp_drive)) {
+        if (get_storage_volume_from_path($path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
             $dir_path = str_replace(clean_dir("$sp_drive/$share"), '', $path);
             $dir_in_lz = clean_dir(get_share_landing_zone($share) . "/$dir_path");
             if (!file_exists($dir_in_lz)) {
@@ -2370,10 +2373,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                 }
                 $inode_number = FALSE;
             }
-            if ($inode_number === FALSE || !is_greyhole_owned_drive($root_path)) {
+            if ($inode_number === FALSE || !StoragePool::is_pool_drive($root_path)) {
                 $metafile->state = 'Gone';
                 $metafile->is_linked = FALSE;
-                if (gone_ok($root_path)) {
+                if (StoragePool::gone_ok($root_path)) {
                     // Let's not replace this copy yet...
                     $file_copies_inodes[$metafile->path] = $metafile->path;
                     $num_ok++;
@@ -2423,7 +2426,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
         if (!$found_linked_metafile) {
             foreach ($file_metafiles as $first_metafile) {
                 $root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $first_metafile->path);
-                if ($first_metafile->state == 'OK' && is_greyhole_owned_drive($root_path)) {
+                if ($first_metafile->state == 'OK' && StoragePool::is_pool_drive($root_path)) {
                     $first_metafile->is_linked = TRUE;
                     $expected_file_size = gh_filesize($first_metafile->path);
                     $original_file_path = $first_metafile->path;
@@ -2580,7 +2583,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
                 if ($metafile->state == 'Gone') {
                     foreach (Config::storagePoolDrives() as $sp_drive) {
-                        if (get_storage_volume_from_path($metafile_dir_path) == $sp_drive && is_greyhole_owned_drive($sp_drive)) {
+                        if (get_storage_volume_from_path($metafile_dir_path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
                             $metafile->state = 'Pending';
                             $file_metafiles[$key] = $metafile;
                             break;
@@ -2781,7 +2784,7 @@ function initialize_fsck_report($what) {
 }
 
 function get_fsck_report() {
-    global $fsck_report, $gone_ok_drives, $options;
+    global $fsck_report, $options;
     
     $fsck_report['end'] = time();
     
@@ -2873,7 +2876,7 @@ Trash size:\n";
   If this drive is gone for good, you should execute the following command, and remove the drive from your configuration file:
     greyhole --gone=path
   where path is one of:\n";
-            $report .= "    " . implode("\n    ", array_keys($gone_ok_drives)) . "\n\n";
+            $report .= "    " . implode("\n    ", array_keys(StoragePool::get_gone_ok_drives())) . "\n\n";
         }
     }
 
@@ -2975,12 +2978,12 @@ function get_metastores($use_cache=TRUE) {
     if (!isset($global_metastores) || !$use_cache) {
         $metastores = array();
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (is_greyhole_owned_drive($sp_drive)) {
+            if (StoragePool::is_pool_drive($sp_drive)) {
                 $metastores[] = "$sp_drive/.gh_metastore";
             }
         }
         foreach (Config::get(CONFIG_METASTORE_BACKUPS) as $metastore_backup_drive) {
-            if (is_greyhole_owned_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
+            if (StoragePool::is_pool_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
                 $metastores[] = $metastore_backup_drive;
             }
         }
@@ -3321,7 +3324,7 @@ function postpone_task($task_id, $complete='yes') {
 function process_config() {
     while (!ConfigHelper::parse()) {
         // Invalid config file; either it's missing storage_pool_drive, or it contains a share that isn't in smb.conf
-        if (is_amahi() && Log::actionIs(ACTION_DAEMON)) {
+        if (SystemHelper::is_amahi() && Log::actionIs(ACTION_DAEMON)) {
             // If running on Amahi, loop until the config works.
             // User might configure Greyhole later, and they don't want to show Greyhole 'offline' until then. Those users are easy to confuse! ;)
             sleep(600); // 10 minutes
@@ -3405,7 +3408,7 @@ function set_metastore_backup($try_restore=TRUE) {
         $metastore_backup_drives = array();
     } else {
         foreach ($metastore_backup_drives as $key => $metastore_backup_drive) {
-            if (!is_greyhole_owned_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
+            if (!StoragePool::is_pool_drive(str_replace('/.gh_metastore_backup', '', $metastore_backup_drive))) {
                 // Directory is now invalid; stop using it.
                 Log::debug("Removing $metastore_backup_drive from available 'metastore_backup_directories' - this directory isn't a Greyhole storage pool drive (anymore?)");
                 unset($metastore_backup_drives[$key]);
@@ -3691,7 +3694,7 @@ function check_md5_workers() {
         if ($num_worker_threads == 0) {
             Log::debug("Will spawn new worker threads to work on incomplete checksums calculations.");
             foreach (Config::storagePoolDrives() as $sp_drive) {
-                if (is_greyhole_owned_drive($sp_drive)) {
+                if (StoragePool::is_pool_drive($sp_drive)) {
                     spawn_thread('md5-worker', array($sp_drive));
                 }
             }
@@ -3738,7 +3741,7 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
 
             Log::debug("Found $clean_full_path");
 
-            if (!is_greyhole_owned_drive($sp_drive)) {
+            if (!StoragePool::is_pool_drive($sp_drive)) {
                 $state = 'Gone';
                 if (!$one_is_enough) {
                     Log::info("  Drive $sp_drive is not part of the Greyhole storage pool anymore. The above file will not be counted as a valid file copy, but can be used to create a new valid copy.");

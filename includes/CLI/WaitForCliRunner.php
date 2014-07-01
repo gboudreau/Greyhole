@@ -22,7 +22,7 @@ require_once('includes/CLI/AbstractPoolDriveCliRunner.php');
 
 class WaitForCliRunner extends AbstractPoolDriveCliRunner {
     public function run() {
-        mark_gone_ok($this->drive);
+        StoragePool::mark_gone_ok($this->drive);
         Log::info("Storage pool drive $this->drive has been marked Temporarily-Gone");
         $this->log("Storage pool drive $this->drive has been marked Temporarily-Gone, which means the missing file copies that are in this drive will not be re-created until it reappears.");
     }

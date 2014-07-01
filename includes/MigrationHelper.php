@@ -57,7 +57,7 @@ class MigrationHelper {
         }
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (isset($going_drive) && $sp_drive == $going_drive) { continue; }
-            $drive_uuid = gh_dir_uuid($sp_drive);
+            $drive_uuid = SystemHelper::directory_uuid($sp_drive);
             if (!isset($drives_definitions[$sp_drive])) {
                 if (is_dir($sp_drive)) {
                     $drives_definitions[$sp_drive] = $drive_uuid;

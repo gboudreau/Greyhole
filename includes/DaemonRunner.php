@@ -35,8 +35,7 @@ class DaemonRunner extends AbstractRunner {
             parse_samba_spool();
 
 			// Check that storage pool drives are OK (using their UUID, or .greyhole_uses_this files)
-            Log::setAction(ACTION_CHECK_POOL);
-            check_storage_pool_drives();
+            StoragePool::check_drives();
 
 			// Execute the next task from the tasks queue ('tasks' table in the database)
             execute_next_task();
