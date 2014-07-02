@@ -1,6 +1,8 @@
 Greyhole
 ========
 
+[![Code Climate](https://codeclimate.com/github/gboudreau/Greyhole.png)](https://codeclimate.com/github/gboudreau/Greyhole)
+
 Greyhole is an application that uses Samba to create a storage pool of all your available hard drives (whatever their size, however they're connected), and allows you to create redundant copies of the files you store, in order to prevent data loss when part of your hardware fails.
 
 Links
