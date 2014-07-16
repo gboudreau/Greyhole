@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-class MigrationHelper {
+final class MigrationHelper {
 
     public static function terminologyConversion() {
         static::convertFolders('.gh_graveyard', '.gh_metastore');

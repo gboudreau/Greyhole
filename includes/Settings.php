@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-class Settings {
+final class Settings {
     public static function get($name, $unserialize=FALSE, $value=FALSE) {
         $query = "SELECT * FROM settings WHERE name LIKE :name";
         $params = array('name' => $name);
@@ -58,9 +58,9 @@ class Settings {
     }
 
     public static function restore() {
+        $latest_backup_time = 0;
         foreach (Config::storagePoolDrives() as $sp_drive) {
             $settings_backup_file = "$sp_drive/.gh_settings.bak";
-            $latest_backup_time = 0;
             if (file_exists($settings_backup_file)) {
                 $last_mod_date = filemtime($settings_backup_file);
                 if ($last_mod_date > $latest_backup_time) {

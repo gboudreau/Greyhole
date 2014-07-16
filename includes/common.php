@@ -215,6 +215,7 @@ class metafile_iterator implements Iterator {
     private $metafiles;
     private $metastores;
     private $dir_handle;
+    private $directory_stack;
 
     public function __construct($share, $path, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
         $this->quiet = $quiet;
@@ -242,41 +243,43 @@ class metafile_iterator implements Iterator {
 
     public function next() {
         $this->metafiles = array();
-        while(count($this->directory_stack)>0 && $this->directory_stack !== NULL) {
-            $this->dir = array_pop($this->directory_stack);
+        while (count($this->directory_stack) > 0 && $this->directory_stack !== NULL) {
+            $dir = array_pop($this->directory_stack);
             if (!$this->quiet) {
-                Log::debug("Loading metadata files for (dir) " . clean_dir($this->share . (!empty($this->dir) ? "/" . $this->dir : "")) . " ...");
+                Log::debug("Loading metadata files for (dir) " . clean_dir($this->share . (!empty($dir) ? "/" . $dir : "")) . " ...");
             }
-            for( $i = 0; $i < count($this->metastores); $i++ ) {
+            for ($i = 0; $i < count($this->metastores); $i++) {
                 $metastore = $this->metastores[$i];
-                $this->base = "$metastore/".$this->share."/";
-                if(!file_exists($this->base.$this->dir)) {
+                $base = "$metastore/" . $this->share . "/";
+                if (!file_exists($base . $dir)) {
                     continue;
                 }    
-                if($this->dir_handle = opendir($this->base.$this->dir)) {
+                if ($this->dir_handle = opendir($base . $dir)) {
                     while (false !== ($file = readdir($this->dir_handle))) {
                         memory_check();
-                        if($file=='.' || $file=='..')
+                        if ($file=='.' || $file=='..') {
                             continue;
-                        if(!empty($this->dir)) {
-                            $full_filename = $this->dir . '/' . $file;
-                        }else
+                        }
+                        if (!empty($dir)) {
+                            $full_filename = $dir . '/' . $file;
+                        } else {
                             $full_filename = $file;
-                        if(is_dir($this->base.$full_filename))
+                        }
+                        if (is_dir($base . $full_filename)) {
                             $this->directory_stack[] = $full_filename;
-                        else{
+                        } else {
                             $full_filename = str_replace("$this->path/",'',$full_filename);
-                            if(isset($this->metafiles[$full_filename])) {
+                            if (isset($this->metafiles[$full_filename])) {
                                 continue;
                             }                        
-                            $this->metafiles[$full_filename] = get_metafiles_for_file($this->share, "$this->dir", $file, $this->load_nok_metafiles, $this->quiet, $this->check_symlink);
+                            $this->metafiles[$full_filename] = get_metafiles_for_file($this->share, $dir, $file, $this->load_nok_metafiles, $this->quiet, $this->check_symlink);
                         }
                     }
                     closedir($this->dir_handle);
                     $this->directory_stack = array_unique($this->directory_stack);
                 }
             }
-            if(count($this->metafiles) > 0) {
+            if (count($this->metafiles) > 0) {
                 break;
             }
             

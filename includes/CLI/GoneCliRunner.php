@@ -106,7 +106,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
         }
     }
 
-    private static function check_going_dir($path, $share, $going_drive) {
+    protected static function check_going_dir($path, $share, $going_drive) {
         $handle = @opendir($path);
         if ($handle === FALSE) {
             Log::error("Couldn't open $path to list content. Skipping...");

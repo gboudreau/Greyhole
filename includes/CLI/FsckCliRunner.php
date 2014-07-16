@@ -67,13 +67,13 @@ class FsckCliRunner extends AbstractCliRunner {
         } else {
             $query = "INSERT INTO tasks SET action = 'fsck', share = :full_path, additional_info = :fsck_options, complete = 'yes'";
             if (empty($this->fsck_options)) {
-                $this->fsck_options = NULL;
+                $fsck_options = NULL;
             } else {
-                $this->fsck_options = implode('|', $this->fsck_options);
+                $fsck_options = implode('|', $this->fsck_options);
             }
             $params = array(
                 'full_path' => $this->dir,
-                'fsck_options' => $this->fsck_options,
+                'fsck_options' => $fsck_options,
             );
             DB::insert($query, $params);
         }

@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-class StoragePool {
+final class StoragePool {
     private static $greyhole_owned_drives = array();
     private static $gone_ok_drives = NULL;
     private static $fscked_gone_drives = NULL;

@@ -20,7 +20,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 // Usage: $DB = new DatabaseHelper($options);
 
-class DB {
+final class DB {
 
 	protected static $options; // connection options
 	protected static $handle; // database handle
@@ -87,8 +87,7 @@ class DB {
     }
 
     public static function getFirstValue($q, $args = array()) {
-        $stmt = DB::execute($q, $args);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = DB::getFirst($q, $args);
         if (!is_array($row)) {
             return FALSE;
         }

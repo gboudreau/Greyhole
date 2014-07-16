@@ -50,7 +50,7 @@ define('ACTION_SLEEP', 'sleep');
 define('ACTION_READ_SAMBA_POOL', 'read_smb_spool');
 define('ACTION_FSCK_FILE', 'fsck_file');
 
-class Log {
+final class Log {
     const PERF     = 9;
     const TEST     = 8;
     const DEBUG    = 7;

@@ -86,11 +86,11 @@ function recursive_include_parser($file) {
     }
 }
 
-class ConfigHelper {
+final class ConfigHelper {
     static $df_command;
-    static $config_file = '/etc/greyhole.conf';
-    static $smb_config_file = '/etc/samba/smb.conf';
-    static $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
+    public static $config_file = '/etc/greyhole.conf';
+    public static $smb_config_file = '/etc/samba/smb.conf';
+    public static $trash_share_names = array('Greyhole Attic', 'Greyhole Trash', 'Greyhole Recycle Bin');
     static $deprecated_options = array(
         'delete_moves_to_attic' => CONFIG_DELETE_MOVES_TO_TRASH,
         'storage_pool_directory' => CONFIG_STORAGE_POOL_DRIVE,
@@ -532,7 +532,7 @@ class ConfigHelper {
     }
 }
 
-class Config {
+final class Config {
     // Defaults
     public static $config = array(
         CONFIG_LOG_LEVEL                   => Log::DEBUG,
@@ -592,7 +592,7 @@ class Config {
     }
 }
 
-class SharesConfig {
+final class SharesConfig {
     private static $shares_config;
 
     private static function _getConfig($share) {

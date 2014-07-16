@@ -18,7 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-class SystemHelper {
+final class SystemHelper {
 
     public static function is_amahi() {
         return file_exists('/usr/bin/hda-ctl');
