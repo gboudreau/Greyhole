@@ -87,7 +87,7 @@ final class DB {
     }
 
     public static function getFirstValue($q, $args = array()) {
-        $row = DB::getFirst($q, $args);
+        $row = (array) DB::getFirst($q, $args);
         if (!is_array($row)) {
             return FALSE;
         }
