@@ -28,14 +28,8 @@ class ThawCliRunner extends AbstractCliRunner {
 
         $frozen_directories = Config::get(CONFIG_FROZEN_DIRECTORY);
 
-        if (isset($this->options['cmd_param'])) {
-            $this->dir = $this->options['cmd_param'];
-            if (array_search($this->dir, $frozen_directories) === FALSE) {
-                $this->dir = '/' . trim($this->dir, '/');
-            }
-        }
-
-        if (empty($this->dir) || array_search($this->dir, $frozen_directories) === FALSE) {
+        $this->dir = $this->parseCmdParamAsDriveAndExpect($frozen_directories);
+        if ($this->dir === FALSE) {
             $this->printUsage();
         }
     }

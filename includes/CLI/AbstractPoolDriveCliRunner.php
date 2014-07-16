@@ -31,14 +31,8 @@ abstract class AbstractPoolDriveCliRunner extends AbstractCliRunner {
 
     protected function asserPoolDriveSpecified() {
         $simple_long_opt = str_replace(':', '', $this->cli_command->getLongOpt());
-        if (isset($this->options['cmd_param'])) {
-            $this->drive = $this->options['cmd_param'];
-            if (!array_contains(Config::storagePoolDrives(), $this->drive)) {
-                $this->drive = '/' . trim($this->drive, '/');
-            }
-        }
-
-        if (empty($this->drive) || !array_contains(Config::storagePoolDrives(), $this->drive)) {
+        $this->drive = $this->parseCmdParamAsDriveAndExpect(Config::storagePoolDrives());
+        if ($this->drive === FALSE) {
             if (!empty($this->drive)) {
                 $this->log("Drive $this->drive is not one of your defined storage pool drives.");
             }

@@ -52,19 +52,16 @@ class CliCommandDefinition {
     public function paramSpecified($command_line_options) {
         $simple_opt = str_replace(':', '', $this->opt);
         $simple_long_opt = str_replace(':', '', $this->longOpt);
+        $options = array($simple_opt, $simple_long_opt);
 
         $keys = array_keys($command_line_options);
-        if (array_contains($keys, $simple_opt)) {
-            if (empty($command_line_options[$simple_opt])) {
-                return TRUE;
+        foreach ($options as $opt) {
+            if (array_contains($keys, $opt)) {
+                if (empty($command_line_options[$opt])) {
+                    return TRUE;
+                }
+                return $command_line_options[$opt];
             }
-            return $command_line_options[$simple_opt];
-        }
-        if (array_contains($keys, $simple_long_opt)) {
-            if (empty($command_line_options[$simple_long_opt])) {
-                return TRUE;
-            }
-            return $command_line_options[$simple_long_opt];
         }
         return FALSE;
     }

@@ -48,6 +48,19 @@ abstract class AbstractCliRunner extends AbstractRunner {
             $this->log("You should now restart the Greyhole daemon.");
         }
     }
+
+    protected function parseCmdParamAsDriveAndExpect($expectedParamValues) {
+        if (isset($this->options['cmd_param'])) {
+            $dir = $this->options['cmd_param'];
+            if (!array_contains($expectedParamValues, $dir)) {
+                $dir = '/' . trim($dir, '/');
+            }
+        }
+        if (empty($dir) || !array_contains($expectedParamValues, $dir)) {
+            return FALSE;
+        }
+        return $dir;
+    }
 }
 
 ?>
