@@ -141,7 +141,7 @@ final class Log {
         );
 
         if ($use_syslog) {
-            $worked = sys_log($local_log_level, $log_text);
+            $worked = syslog($local_log_level, $log_text);
         } else if (!empty($greyhole_log_file)) {
             $greyhole_error_log_file = Config::get(CONFIG_GREYHOLE_ERROR_LOG_FILE);
             if ($local_log_level <= static::WARN && !empty($greyhole_error_log_file)) {
