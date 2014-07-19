@@ -65,10 +65,21 @@ final class SystemHelper {
     }
 }
 
+$use_alt_symlinks_creation = FALSE;
 function gh_symlink($target, $link) {
-    return symlink($target, $link);
-    # Or, if you have issues with the above, comment it out, and de-comment this one:
-    # exec("ln -s " . escapeshellarg($target) . " " . escapeshellarg($link)); return gh_is_file($link);
+    global $use_alt_symlinks_creation;
+    $success = !$use_alt_symlinks_creation && symlink($target, $link);
+    if (!$success) {
+        exec("ln -s " . escapeshellarg($target) . " " . escapeshellarg($link));
+        $success = gh_is_file($link);
+        if ($success) {
+            if (!$use_alt_symlinks_creation) {
+                Log::info("Will use exec() instead of symlink() to create all symlinks.");
+            }
+            $use_alt_symlinks_creation = TRUE;
+        }
+    }
+    return $success;
 }
 
 // Get CPU architecture (x86_64 or i386 or armv6l or armv5*)
