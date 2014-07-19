@@ -29,30 +29,30 @@ final class DB {
         if (is_array($options)) {
             $options = (object) $options;
         }
-		static::$options = $options;
+		self::$options = $options;
 	}
 
 	public static function connect() {
-        $connect_string = 'mysql:host=' . static::$options->host . ';dbname=' . static::$options->name;
+        $connect_string = 'mysql:host=' . self::$options->host . ';dbname=' . self::$options->name;
 
         try {
-            static::$handle = @new PDO($connect_string, static::$options->user, static::$options->pass, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
+            self::$handle = @new PDO($connect_string, self::$options->user, self::$options->pass, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
         } catch (PDOException $ex) {
             echo "ERROR: Can't connect to database: " . $ex->getMessage() . "\n";
             Log::critical("Can't connect to database: " . $ex->getMessage());
         }
 
-        if (static::$handle) {
+        if (self::$handle) {
             DB::execute("SET SESSION group_concat_max_len = 1048576");
             DB::execute("SET SESSION wait_timeout = 86400"); # Allow 24h fsck!
             DB::migrate();
         }
 
-        return static::$handle;
+        return self::$handle;
     }
 
     public static function execute($q, $args = array(), $attempt_repair=TRUE) {
-        $stmt = static::$handle->prepare($q);
+        $stmt = self::$handle->prepare($q);
         foreach ($args as $key => $value) {
             $stmt->bindValue(":$key", $value);
         }
@@ -60,7 +60,7 @@ final class DB {
             $stmt->execute();
             return $stmt;
         } catch (PDOException $e) {
-            $error = static::$handle->errorInfo();
+            $error = self::$handle->errorInfo();
             if (($error[1] == 144 || $error[1] == 145) && $attempt_repair) {
                 Log::info("Error during MySQL query: " . $e->getMessage() . '. Will now try to repair the MySQL tables.');
                 DB::repairTables();
@@ -135,12 +135,12 @@ final class DB {
     }
 
     public static function quote($string) {
-        $escaped_string = static::$handle->quote($string);
+        $escaped_string = self::$handle->quote($string);
         return substr($escaped_string, 1, -1);
     }
 
     public static function error() {
-        return static::$options->error;
+        return self::$options->error;
     }
 
     private static function migrate() {

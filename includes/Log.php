@@ -74,52 +74,52 @@ final class Log {
     private static $level;
 
     public static function setLevel($level) {
-        static::$level = $level;
+        self::$level = $level;
     }
 
     public static function getLevel() {
-        return static::$level;
+        return self::$level;
     }
 
     public static function setAction($action) {
-        static::$old_action = static::$action;
-        static::$action = str_replace(':', '', $action);
+        self::$old_action = self::$action;
+        self::$action = str_replace(':', '', $action);
     }
 
     public static function actionIs($action) {
-        return static::$action == $action;
+        return self::$action == $action;
     }
 
     public static function restorePreviousAction() {
-        static::$action = static::$old_action;
+        self::$action = self::$old_action;
     }
 
     public static function debug($text) {
-        static::_log(static::DEBUG, $text);
+        self::_log(self::DEBUG, $text);
     }
 
     public static function info($text) {
-        static::_log(static::INFO, $text);
+        self::_log(self::INFO, $text);
     }
 
     public static function warn($text) {
-        static::_log(static::WARN, $text);
+        self::_log(self::WARN, $text);
     }
 
     public static function error($text) {
-        static::_log(static::ERROR, $text);
+        self::_log(self::ERROR, $text);
     }
 
     public static function critical($text) {
-        static::_log(static::CRITICAL, $text);
+        self::_log(self::CRITICAL, $text);
     }
 
     private static function _log($local_log_level, $text) {
-        if (static::$action == 'test-config') {
+        if (self::$action == 'test-config') {
             $greyhole_log_file = NULL;
             $use_syslog = FALSE;
         } else {
-            if ($local_log_level > static::$level) {
+            if ($local_log_level > self::$level) {
                 return;
             }
             $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
@@ -127,15 +127,15 @@ final class Log {
         }
 
         $date = date("M d H:i:s");
-        if (static::$level >= static::PERF) {
+        if (self::$level >= self::PERF) {
             $utimestamp = microtime(true);
             $timestamp = floor($utimestamp);
             $date .= '.' . round(($utimestamp - $timestamp) * 1000000);
         }
 
-        $log_level_string = $use_syslog ? $local_log_level : static::$log_level_names[$local_log_level];
+        $log_level_string = $use_syslog ? $local_log_level : self::$log_level_names[$local_log_level];
         $log_text = sprintf("%s%s%s\n",
-            "$date $log_level_string " . static::$action . ": ",
+            "$date $log_level_string " . self::$action . ": ",
             $text,
             Config::get(CONFIG_LOG_MEMORY_USAGE) ? " [" . memory_get_usage() . "]" : ''
         );
@@ -144,7 +144,7 @@ final class Log {
             $worked = syslog($local_log_level, $log_text);
         } else if (!empty($greyhole_log_file)) {
             $greyhole_error_log_file = Config::get(CONFIG_GREYHOLE_ERROR_LOG_FILE);
-            if ($local_log_level <= static::WARN && !empty($greyhole_error_log_file)) {
+            if ($local_log_level <= self::WARN && !empty($greyhole_error_log_file)) {
                 $worked = @error_log($log_text, 3, $greyhole_error_log_file);
             } else {
                 $worked = @error_log($log_text, 3, $greyhole_log_file);
@@ -156,7 +156,7 @@ final class Log {
             error_log(trim($log_text));
         }
 
-        if ($local_log_level === static::CRITICAL) {
+        if ($local_log_level === self::CRITICAL) {
             exit(1);
         }
     }

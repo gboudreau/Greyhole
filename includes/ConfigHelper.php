@@ -124,13 +124,13 @@ final class ConfigHelper {
     );
 
     public static function removeShare($share) {
-        exec("/bin/sed -i 's/^.*num_copies\[".$share."\].*$//' " . escapeshellarg(static::$config_file));
+        exec("/bin/sed -i 's/^.*num_copies\[".$share."\].*$//' " . escapeshellarg(self::$config_file));
     }
 
     public static function removeStoragePoolDrive($sp_drive) {
         $escaped_drive = str_replace('/', '\/', $sp_drive);
-        exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' " . escapeshellarg(static::$config_file)); // Deprecated notation
-        exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' " . escapeshellarg(static::$config_file));
+        exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' " . escapeshellarg(self::$config_file)); // Deprecated notation
+        exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' " . escapeshellarg(self::$config_file));
     }
 
     public static function randomStoragePoolDrive() {
@@ -144,7 +144,7 @@ final class ConfigHelper {
             date_default_timezone_set('UTC');
         }
 
-        $config_text = recursive_include_parser(static::$config_file);
+        $config_text = recursive_include_parser(self::$config_file);
 
         global $parsing_drive_selection_groups;
 
@@ -152,7 +152,7 @@ final class ConfigHelper {
             if (preg_match("/^[ \t]*([^=\t]+)[ \t]*=[ \t]*([^#]+)/", $line, $regs)) {
                 $name = trim($regs[1]);
                 $value = trim($regs[2]);
-                static::parse_line($name, $value);
+                self::parse_line($name, $value);
             } else if ($parsing_drive_selection_groups !== FALSE) {
                 $value = trim($line);
                 if (strlen($value) == 0 || $value[0] == '#') {
@@ -171,7 +171,7 @@ final class ConfigHelper {
             }
         }
 
-        return static::init();
+        return self::init();
     }
 
     private static function parse_line($name, $value) {
@@ -180,40 +180,40 @@ final class ConfigHelper {
         }
 
         // Handles old notations for some config options
-        static::normalize_name($name);
+        self::normalize_name($name);
 
         global $parsing_drive_selection_groups;
         $parsing_drive_selection_groups = FALSE;
 
         // Booleans
-        if (static::parse_line_bool($name, $value)) return;
+        if (self::parse_line_bool($name, $value)) return;
 
         // Numbers
-        if (static::parse_line_number($name, $value)) return;
+        if (self::parse_line_number($name, $value)) return;
 
         // Strings
-        if (static::parse_line_string($name, $value)) return;
+        if (self::parse_line_string($name, $value)) return;
 
         // Log level
-        if (static::parse_line_log($name, $value)) return;
+        if (self::parse_line_log($name, $value)) return;
 
         // Storage pool drives
-        if (static::parse_line_pool_drive($name, $value)) return;
+        if (self::parse_line_pool_drive($name, $value)) return;
 
         // Drive selection algorithms & groups
-        if (static::parse_line_drive_selection($name, $value)) return;
+        if (self::parse_line_drive_selection($name, $value)) return;
 
         // Sticky files
-        if (static::parse_line_sticky($name, $value)) return;
+        if (self::parse_line_sticky($name, $value)) return;
 
         // Frozen directories
-        if (static::parse_line_frozen($name, $value)) return;
+        if (self::parse_line_frozen($name, $value)) return;
 
         // Ignored files, folders
-        if (static::parse_line_ignore($name, $value)) return;
+        if (self::parse_line_ignore($name, $value)) return;
 
         // Share options
-        if (static::parse_line_share_option($name, $value)) return;
+        if (self::parse_line_share_option($name, $value)) return;
 
         // Unknown
         if (is_numeric($value)) {
@@ -223,7 +223,7 @@ final class ConfigHelper {
     }
 
     private static function normalize_name(&$name) {
-        foreach (static::$deprecated_options as $old_name => $new_name) {
+        foreach (self::$deprecated_options as $old_name => $new_name) {
             if (string_contains($name, $old_name)) {
                 $fixed_name = str_replace($old_name, $new_name, $name);
                 Log::warn("Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
@@ -233,7 +233,7 @@ final class ConfigHelper {
     }
 
     private static function parse_line_bool($name, $value) {
-        if (array_contains(static::$config_options['bool'], $name)) {
+        if (array_contains(self::$config_options['bool'], $name)) {
             $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
             Config::set($name, $bool);
             return TRUE;
@@ -242,7 +242,7 @@ final class ConfigHelper {
     }
 
     private static function parse_line_number($name, $value) {
-        if (array_contains(static::$config_options['number'], $name)) {
+        if (array_contains(self::$config_options['number'], $name)) {
             if (is_numeric($value)) {
                 $value = (int) $value;
             }
@@ -253,7 +253,7 @@ final class ConfigHelper {
     }
 
     private static function parse_line_string($name, $value) {
-        if (array_contains(static::$config_options['string'], $name)) {
+        if (array_contains(self::$config_options['string'], $name)) {
             Config::set($name, $value);
             return TRUE;
         }
@@ -262,7 +262,7 @@ final class ConfigHelper {
 
     private static function parse_line_log($name, $value) {
         if ($name == CONFIG_LOG_LEVEL) {
-            static::assert(defined("Log::$value"), "Invalid value for log_level: '$value'");
+            self::assert(defined("Log::$value"), "Invalid value for log_level: '$value'");
             Config::set(CONFIG_LOG_LEVEL, constant("Log::$value"));
             return TRUE;
         }
@@ -393,20 +393,20 @@ final class ConfigHelper {
             return FALSE;
         }
 
-        static::$df_command = "df -k";
+        self::$df_command = "df -k";
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            static::$df_command .= " " . escapeshellarg($sp_drive);
+            self::$df_command .= " " . escapeshellarg($sp_drive);
         }
-        static::$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\"";
+        self::$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\"";
 
-        exec('testparm -s ' . escapeshellarg(static::$smb_config_file) . ' 2> /dev/null', $config_text);
+        exec('testparm -s ' . escapeshellarg(self::$smb_config_file) . ' 2> /dev/null', $config_text);
         foreach ($config_text as $line) {
             $line = trim($line);
             if (mb_strlen($line) == 0) { continue; }
             if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
                 $share_name = $regs[1];
             }
-            if (isset($share_name) && !SharesConfig::exists($share_name) && !array_contains(static::$trash_share_names, $share_name)) {
+            if (isset($share_name) && !SharesConfig::exists($share_name) && !array_contains(self::$trash_share_names, $share_name)) {
                 continue;
             }
             if (isset($share_name) && preg_match('/^\s*path[ \t]*=[ \t]*(.+)$/i', $line, $regs)) {
@@ -431,7 +431,7 @@ final class ConfigHelper {
         }
 
         foreach (SharesConfig::getShares() as $share_name => $share_options) {
-            if (array_contains(static::$trash_share_names, $share_name)) {
+            if (array_contains(self::$trash_share_names, $share_name)) {
                 SharesConfig::set(CONFIG_TRASH_SHARE, 'name', $share_name);
                 SharesConfig::set(CONFIG_TRASH_SHARE, CONFIG_LANDING_ZONE, SharesConfig::get($share_name, CONFIG_LANDING_ZONE));
                 SharesConfig::removeShare($share_name);
@@ -441,7 +441,7 @@ final class ConfigHelper {
                 SharesConfig::set($share_name, CONFIG_NUM_COPIES, count(Config::storagePoolDrives()));
             }
             if (!isset($share_options[CONFIG_LANDING_ZONE])) {
-                Log::warn("Found a share ($share_name) defined in " . static::$config_file . " with no path in " . static::$smb_config_file . ". Either add this share in " . static::$smb_config_file . ", or remove it from " . static::$config_file . ", then restart Greyhole.");
+                Log::warn("Found a share ($share_name) defined in " . self::$config_file . " with no path in " . self::$smb_config_file . ". Either add this share in " . self::$smb_config_file . ", or remove it from " . self::$config_file . ", then restart Greyhole.");
                 return FALSE;
             }
             if (!isset($share_options[CONFIG_DELETE_MOVES_TO_TRASH])) {
@@ -562,32 +562,32 @@ final class Config {
      */
     public static function get($name, $index=NULL) {
         if ($index === NULL) {
-            return isset(static::$config[$name]) ? static::$config[$name] : FALSE;
+            return isset(self::$config[$name]) ? self::$config[$name] : FALSE;
         } else {
-            return isset(static::$config[$name][$index]) ? static::$config[$name][$index] : FALSE;
+            return isset(self::$config[$name][$index]) ? self::$config[$name][$index] : FALSE;
         }
     }
 
     public static function exists($name) {
-        return isset(static::$config[$name]);
+        return isset(self::$config[$name]);
     }
 
     /**
      * @return array
      */
     public static function storagePoolDrives() {
-        return static::get(CONFIG_STORAGE_POOL_DRIVE);
+        return self::get(CONFIG_STORAGE_POOL_DRIVE);
     }
 
     public static function set($name, $value) {
-        static::$config[$name] = $value;
+        self::$config[$name] = $value;
     }
 
     public static function add($name, $value, $index=NULL) {
         if ($index === NULL) {
-            static::$config[$name][] = $value;
+            self::$config[$name][] = $value;
         } else {
-            static::$config[$name][$index] = $value;
+            self::$config[$name][$index] = $value;
         }
     }
 }
@@ -596,19 +596,19 @@ final class SharesConfig {
     private static $shares_config;
 
     private static function _getConfig($share) {
-        if (!static::exists($share)) {
-            static::$shares_config[$share] = array();
+        if (!self::exists($share)) {
+            self::$shares_config[$share] = array();
         }
-        return static::$shares_config[$share];
+        return self::$shares_config[$share];
     }
 
     public static function exists($share) {
-        return isset(static::$shares_config[$share]);
+        return isset(self::$shares_config[$share]);
     }
 
     public static function getShares() {
         $result = array();
-        foreach (static::$shares_config as $share_name => $share_config) {
+        foreach (self::$shares_config as $share_name => $share_config) {
             if ($share_name != CONFIG_TRASH_SHARE) {
                 $result[$share_name] = $share_config;
             }
@@ -617,25 +617,25 @@ final class SharesConfig {
     }
 
     public static function getConfigForShare($share) {
-        if (!static::exists($share)) {
+        if (!self::exists($share)) {
             return FALSE;
         }
-        return static::$shares_config[$share];
+        return self::$shares_config[$share];
     }
 
     public static function removeShare($share) {
-        unset(static::$shares_config[$share]);
+        unset(self::$shares_config[$share]);
     }
 
     public static function remove($share, $name) {
-        unset(static::$shares_config[$share][$name]);
+        unset(self::$shares_config[$share][$name]);
     }
 
     public static function get($share, $name, $index=NULL) {
-        if (!static::exists($share)) {
+        if (!self::exists($share)) {
             return FALSE;
         }
-        $config = static::$shares_config[$share];
+        $config = self::$shares_config[$share];
         if ($index === NULL) {
             return isset($config[$name]) ? $config[$name] : FALSE;
         } else {
@@ -644,19 +644,19 @@ final class SharesConfig {
     }
 
     public static function set($share, $name, $value) {
-        $config = static::_getConfig($share);
+        $config = self::_getConfig($share);
         $config[$name] = $value;
-        static::$shares_config[$share] = $config;
+        self::$shares_config[$share] = $config;
     }
 
     public static function add($share, $name, $value, $index=NULL) {
-        $config = static::_getConfig($share);
+        $config = self::_getConfig($share);
         if ($index === NULL) {
             $config[$name][] = $value;
         } else {
             $config[$name][$index] = $value;
         }
-        static::$shares_config[$share] = $config;
+        self::$shares_config[$share] = $config;
     }
 }
 

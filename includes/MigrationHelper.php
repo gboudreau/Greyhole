@@ -21,11 +21,11 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 final class MigrationHelper {
 
     public static function terminologyConversion() {
-        static::convertFolders('.gh_graveyard', '.gh_metastore');
-        static::convertFolders('.gh_graveyard_backup', '.gh_metastore_backup');
-        static::convertFolders('.gh_attic', '.gh_trash');
-        static::convertDatabase();
-        static::convertStoragePoolDrivesTagFiles();
+        self::convertFolders('.gh_graveyard', '.gh_metastore');
+        self::convertFolders('.gh_graveyard_backup', '.gh_metastore_backup');
+        self::convertFolders('.gh_attic', '.gh_trash');
+        self::convertDatabase();
+        self::convertStoragePoolDrivesTagFiles();
     }
 
 	private static function convertFolders($old, $new) {

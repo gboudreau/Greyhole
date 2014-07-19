@@ -28,9 +28,9 @@ final class StoragePool {
         if (isset($going_drive) && $sp_drive == $going_drive) {
             return FALSE;
         }
-        $is_greyhole_owned_drive = isset(static::$greyhole_owned_drives[$sp_drive]);
-        if ($is_greyhole_owned_drive && static::$greyhole_owned_drives[$sp_drive] < time() - Config::get(CONFIG_DF_CACHE_TIME)) {
-            unset(static::$greyhole_owned_drives[$sp_drive]);
+        $is_greyhole_owned_drive = isset(self::$greyhole_owned_drives[$sp_drive]);
+        if ($is_greyhole_owned_drive && self::$greyhole_owned_drives[$sp_drive] < time() - Config::get(CONFIG_DF_CACHE_TIME)) {
+            unset(self::$greyhole_owned_drives[$sp_drive]);
             $is_greyhole_owned_drive = FALSE;
         }
         if (!$is_greyhole_owned_drive) {
@@ -50,7 +50,7 @@ final class StoragePool {
                 }
             }
             if ($is_greyhole_owned_drive) {
-                static::$greyhole_owned_drives[$sp_drive] = time();
+                self::$greyhole_owned_drives[$sp_drive] = time();
             }
         }
         return $is_greyhole_owned_drive;
@@ -64,23 +64,23 @@ final class StoragePool {
         $missing_drives = array();
         $i = 0; $j = 0;
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (!static::is_pool_drive($sp_drive) && !static::gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this") && !empty($drives_definitions[$sp_drive])) {
+            if (!self::is_pool_drive($sp_drive) && !self::gone_fscked($sp_drive, $i++ == 0) && !file_exists("$sp_drive/.greyhole_used_this") && !empty($drives_definitions[$sp_drive])) {
                 if($needs_fsck !== 2){
                     $needs_fsck = 1;
                 }
-                static::mark_gone_drive_fscked($sp_drive);
+                self::mark_gone_drive_fscked($sp_drive);
                 $missing_drives[] = $sp_drive;
                 Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
                 Log::debug("Email sent for gone drive: $sp_drive");
-                static::$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
-            } else if ((static::gone_ok($sp_drive, $j++ == 0) || static::gone_fscked($sp_drive, $i++ == 0)) && static::is_pool_drive($sp_drive) && !empty($drives_definitions[$sp_drive])) {
+                self::$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
+            } else if ((self::gone_ok($sp_drive, $j++ == 0) || self::gone_fscked($sp_drive, $i++ == 0)) && self::is_pool_drive($sp_drive) && !empty($drives_definitions[$sp_drive])) {
                 // $sp_drive is now back
                 $needs_fsck = 2;
                 $returned_drives[] = $sp_drive;
                 Log::debug("Email sent for revived drive: $sp_drive");
 
-                static::mark_gone_ok($sp_drive, 'remove');
-                static::mark_gone_drive_fscked($sp_drive, 'remove');
+                self::mark_gone_ok($sp_drive, 'remove');
+                self::mark_gone_drive_fscked($sp_drive, 'remove');
                 $i = 0; $j = 0;
             }
         }
@@ -158,34 +158,34 @@ final class StoragePool {
                 Log::info("  fsck for all shares scheduled.");
             }
 
-            static::reload_gone_ok_drives();
+            self::reload_gone_ok_drives();
         }
     }
 
     // Is it OK for a drive to be gone?
     public static function gone_ok($sp_drive, $force_reload=FALSE) {
-        if ($force_reload || static::$gone_ok_drives === NULL) {
-            static::reload_gone_ok_drives();
+        if ($force_reload || self::$gone_ok_drives === NULL) {
+            self::reload_gone_ok_drives();
         }
-        if (isset(static::$gone_ok_drives[$sp_drive])) {
+        if (isset(self::$gone_ok_drives[$sp_drive])) {
             return TRUE;
         }
         return FALSE;
     }
 
     public static function reload_gone_ok_drives() {
-        static::$gone_ok_drives = Settings::get('Gone-OK-Drives', TRUE);
-        if (!static::$gone_ok_drives) {
-            static::$gone_ok_drives = array();
-            Settings::set('Gone-OK-Drives', static::$gone_ok_drives);
+        self::$gone_ok_drives = Settings::get('Gone-OK-Drives', TRUE);
+        if (!self::$gone_ok_drives) {
+            self::$gone_ok_drives = array();
+            Settings::set('Gone-OK-Drives', self::$gone_ok_drives);
         }
     }
 
     public static function get_gone_ok_drives() {
-        if (static::$gone_ok_drives === NULL) {
-            static::reload_gone_ok_drives();
+        if (self::$gone_ok_drives === NULL) {
+            self::reload_gone_ok_drives();
         }
-        return static::$gone_ok_drives;
+        return self::$gone_ok_drives;
     }
 
     public static function mark_gone_ok($sp_drive, $action='add') {
@@ -196,43 +196,43 @@ final class StoragePool {
             return FALSE;
         }
 
-        static::reload_gone_ok_drives();
+        self::reload_gone_ok_drives();
         if ($action == 'add') {
-            static::$gone_ok_drives[$sp_drive] = TRUE;
+            self::$gone_ok_drives[$sp_drive] = TRUE;
         } else {
-            unset(static::$gone_ok_drives[$sp_drive]);
+            unset(self::$gone_ok_drives[$sp_drive]);
         }
 
-        Settings::set('Gone-OK-Drives', static::$gone_ok_drives);
+        Settings::set('Gone-OK-Drives', self::$gone_ok_drives);
         return TRUE;
     }
 
     public static function gone_fscked($sp_drive, $force_reload=FALSE) {
-        if ($force_reload || static::$fscked_gone_drives == NULL) {
-            static::reload_fsck_gone_drives();
+        if ($force_reload || self::$fscked_gone_drives == NULL) {
+            self::reload_fsck_gone_drives();
         }
-        if (isset(static::$fscked_gone_drives[$sp_drive])) {
+        if (isset(self::$fscked_gone_drives[$sp_drive])) {
             return TRUE;
         }
         return FALSE;
     }
 
     public static function reload_fsck_gone_drives() {
-        static::$fscked_gone_drives = Settings::get('Gone-FSCKed-Drives', TRUE);
-        if (!static::$fscked_gone_drives) {
-            static::$fscked_gone_drives = array();
-            Settings::set('Gone-FSCKed-Drives', static::$fscked_gone_drives);
+        self::$fscked_gone_drives = Settings::get('Gone-FSCKed-Drives', TRUE);
+        if (!self::$fscked_gone_drives) {
+            self::$fscked_gone_drives = array();
+            Settings::set('Gone-FSCKed-Drives', self::$fscked_gone_drives);
         }
     }
 
     public static function mark_gone_drive_fscked($sp_drive, $action='add') {
-        static::reload_fsck_gone_drives();
+        self::reload_fsck_gone_drives();
         if ($action == 'add') {
-            static::$fscked_gone_drives[$sp_drive] = TRUE;
+            self::$fscked_gone_drives[$sp_drive] = TRUE;
         } else {
-            unset(static::$fscked_gone_drives[$sp_drive]);
+            unset(self::$fscked_gone_drives[$sp_drive]);
         }
-        Settings::set('Gone-FSCKed-Drives', static::$fscked_gone_drives);
+        Settings::set('Gone-FSCKed-Drives', self::$fscked_gone_drives);
     }
 }
 
