@@ -558,7 +558,9 @@ final class Config {
     );
 
     /**
-     * @return mixed
+     * @param string $name The name of the config you want.
+     * @param string $index (optional) If the specified config is an array, you can specify which element you want.
+     * @return mixed|false FALSE if config is not found. Otherwise, its value.
      */
     public static function get($name, $index=NULL) {
         if ($index === NULL) {

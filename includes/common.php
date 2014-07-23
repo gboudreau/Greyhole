@@ -423,17 +423,6 @@ function kshift(&$arr) {
     return array($k, $v);
 }
 
-function kshuffle(&$array) {
-    if (!is_array($array)) { return $array; }
-    $keys = array_keys($array);
-    shuffle($keys);
-    $random = array();
-    foreach ($keys as $key) {
-        $random[$key] = $array[$key];
-    }
-    $array = $random;
-}
-
 function array_contains($haystack, $needle) {
     return array_search($needle, $haystack) !== FALSE;
 }

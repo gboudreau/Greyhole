@@ -91,7 +91,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
         }
 
         StoragePool::mark_gone_ok($this->drive, 'remove');
-        mark_gone_drive_fscked($this->drive, 'remove');
+        StoragePool::mark_gone_drive_fscked($this->drive, 'remove');
         Log::info("Storage pool drive $this->drive has been removed.");
         $this->log("Storage pool drive $this->drive has been removed from your pool, which means the missing file copies that are in this drive will be re-created during the next fsck.");
 
