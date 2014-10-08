@@ -30,3 +30,9 @@ Greyhole file copies are regular files, visible on any machine, without any hard
 Documentation
 -------------
 The [GitHub Wiki](https://github.com/gboudreau/Greyhole/wiki) contains the Greyhole documentation.
+
+Acks
+----
+Greyhole is developed mainly using a free open-source license of  
+![PHPStorm](http://www.jetbrains.com/phpstorm/documentation/docs/logo_phpstorm.png)  
+kindly provided by [JetBrains](http://www.jetbrains.com/). Thanks guys!
