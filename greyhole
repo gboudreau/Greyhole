@@ -1982,7 +1982,7 @@ You probably want to do something about this!
 
 ";
             foreach ($last_resort_sorted_target_drives as $sp_drive => $free_space) {
-                $minimum_free_space = (int) Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive) * 1024 * 1024;
+                $minimum_free_space = (int) Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive) / 1024 / 1024;
                 $body .= "$sp_drive has " . number_format($free_space/1024/1024, 2) . " GB free; minimum specified in greyhole.conf: $minimum_free_space GB.\n";
             }
             mail($email_to, "Greyhole is out of space on $hostname!", $body);
