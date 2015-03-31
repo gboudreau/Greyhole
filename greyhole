@@ -1929,8 +1929,6 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
         $l = $last_resort_sorted_target_drives;
         $ds->init($s, $l);
     }
-    $sorted_target_drives = $s;
-    $last_resort_sorted_target_drives = $l;
 
     $sorted_target_drives = array();
     $last_resort_sorted_target_drives = array();
