@@ -1127,6 +1127,7 @@ function gh_copy_file($source_file, &$destination_file) {
         $target_dev = gh_file_deviceid(dirname($destination_file));
         if ($source_dev === $target_dev && $source_dev !== FALSE && !Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
             Log::debug("  (using rename)");
+            $original_file_infos = gh_get_file_infos($source_file);
             gh_rename($source_file, $temp_path);
             $renamed = TRUE;
         }
@@ -1135,6 +1136,7 @@ function gh_copy_file($source_file, &$destination_file) {
     if (!$renamed) {
         // Wasn't renamed; need to be copied.
         $copy_source = is_link($source_file) ? readlink($source_file) : $source_file;
+        $original_file_infos = gh_get_file_infos($copy_source);
         exec(get_copy_cmd($copy_source, $temp_path));
     }
 
@@ -1154,7 +1156,7 @@ function gh_copy_file($source_file, &$destination_file) {
             Log::debug("    Copy created at $speed MBps.");
         }
         gh_rename($temp_path, $destination_file);
-        gh_chperm($destination_file, gh_get_file_infos($source_file));
+        gh_chperm($destination_file, $original_file_infos);
     } else {
         Log::warn("    Failed file copy. Will mark this metadata file 'Gone'.");
         if ($renamed) {
