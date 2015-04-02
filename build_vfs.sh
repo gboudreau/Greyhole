@@ -4,7 +4,7 @@
 # Run this script on:
 #   - x86_64: gb@fileserver2:~
 #   - i386:   bougu@macbook:~/VirtualBox VMs/Ubuntu (32-bit)
-#   - ARM:    gb@fileserver2:~/qemu-arm
+#   - ARM:    gb@fileserver2:~/qemu-arm ; ./boot.sh ; sleep xx ; ssh -p 2223 gb@127.0.0.1
 # And don't forget to get the latest version of the samba-module from fileserver2 first:
 #   scp gb@192.168.155.88:Greyhole/samba-module/* ~/Greyhole/samba-module/
 
@@ -65,6 +65,16 @@ cd samba-4.1.4
     make -j4
 cd ..
 
+cd samba-4.2.0
+    if  [ ! -f source3/modules/vfs_greyhole.c ]; then
+        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.2.patch
+        ./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads
+    fi
+    rm -f source3/modules/vfs_greyhole.c
+    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.2.c source3/modules/vfs_greyhole.c
+    make -j4
+cd ..
+
 echo
 echo "****************************************"
 echo
@@ -114,12 +124,20 @@ if  [ -f samba-4.1.4/bin/default/source3/modules/libvfs-greyhole.so ]; then
     echo
 fi
 
+if  [ -f samba-4.2.0/bin/default/source3/modules/libvfs_module_greyhole.so ]; then
+    ls -1 samba-4.2.0/bin/default/source3/modules/libvfs_module_greyhole.so
+    cp samba-4.2.0/bin/default/source3/modules/libvfs_module_greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.2/greyhole-$ARCH.so
+    echo " was copied to "
+    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.2/greyhole-$ARCH.so
+    echo
+fi
+
 echo "****************************************"
 echo
 
 exit
 
-SSH_HOST="gb@192.168.155.206"
+SSH_HOST="gb@192.168.155.203"
 ARCH="i386"
 cd ~/git/Greyhole/samba-module/bin/
 scp $SSH_HOST:Greyhole/samba-module/bin/3.4/greyhole-$ARCH.so 3.4/greyhole-$ARCH.so
@@ -127,6 +145,7 @@ scp $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyhole-$ARCH
 scp $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
 scp $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
 scp $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
+scp $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
 
 SSH_HOST="gb@192.168.155.88"
 ARCH="x86_64"
@@ -136,6 +155,7 @@ scp $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyhole-$ARCH
 scp $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
 scp $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
 scp $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
+scp $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
 
 SSH_HOST="gb@127.0.0.1"
 ARCH="armhf"
@@ -145,6 +165,7 @@ scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyho
 scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
 scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
 scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
+scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
 
 SSH_HOST="gb@192.168.155.88"
 ARCH="armhf"
@@ -154,3 +175,4 @@ scp $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyhole-$ARCH
 scp $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
 scp $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
 scp $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
+scp $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
