@@ -26,7 +26,7 @@
 #   3. Update the APT & YUM repositories (manual intervention required)
 #   4. Install the new version locally (using apt-get or yum, depending on what's available)
 #	5. Tag the git branch
-#   6. Update the CHANGELOG on http://www.greyhole.net/releases/CHANGELOG
+#   6. Update the CHANGELOG on https://www.greyhole.net/releases/CHANGELOG
 #   7. Send 'New version available' notifications by email, Twitter (@GreyholeApp), Facebook (Greyhole) and IRC (#greyhole on Freenode).
 
 
@@ -61,7 +61,7 @@ PATH_TO_RELEASES='www/greyhole.net/releases'
 PATH_TO_REPOS_UPDATER='www/greyhole.net'
 
 # URL of the CHANGELOG file; URL should point to $HOST:$PATH_TO_RELEASES/CHANGELOG
-CHANGELOG_URL='http://www.greyhole.net/releases/CHANGELOG'
+CHANGELOG_URL='https://www.greyhole.net/releases/CHANGELOG'
 
 # Email address that will receive a new version notification, including the CHANGELOG
 ANNOUNCE_EMAIL='releases-announce@greyhole.net'
@@ -204,8 +204,8 @@ release_url=`php -r '$o=json_decode(file_get_contents("/tmp/response.json"));ech
 
 if [ "$BUILD_NUMBER" = "1" ]; then
 	/usr/local/bin/twitter set "New version available: $VERSION - ChangeLog: http://t.co/hZheYwg"
-	/usr/local/bin/fbcmd PPOST Greyhole "New version available: $VERSION - Downloads: http://www.greyhole.net/download/ or just use your package manager to update." 'ChangeLog' "${CHANGELOG_URL}"
-	./irc_notif.sh "New version available $VERSION - Changelog: http://www.greyhole.net/releases/CHANGELOG" $VERSION
+	/usr/local/bin/fbcmd PPOST Greyhole "New version available: $VERSION - Downloads: https://www.greyhole.net/ or just use your package manager to update." 'ChangeLog' "${CHANGELOG_URL}"
+	./irc_notif.sh "New version available $VERSION - Changelog: https://www.greyhole.net/releases/CHANGELOG" $VERSION
 else
 	/usr/local/bin/twitter set "New packages available: $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one."
 	/usr/local/bin/fbcmd PPOST Greyhole "New packages available: $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one." 'ChangeLog' "${CHANGELOG_URL}"

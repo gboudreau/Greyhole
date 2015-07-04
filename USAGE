@@ -42,7 +42,8 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 
 	Fedora: service smb restart
 	Ubuntu (< 10): /etc/init.d/samba restart
-	Ubuntu (10+): restart smbd
+	Ubuntu (10-14): restart smbd
+	Ubuntu (15+): service smb restart
 	Debian: service samba restart
 
 3. Setup the database:
@@ -50,7 +51,8 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	# Make sure your MySQL server service (mysqld) is running, and runs on boot.
 	Fedora: service mysqld start; chkconfig mysqld on
 	Ubuntu (< 10): /etc/init.d/mysqld start; update-rc.d mysqld defaults
-	Ubuntu (10+): start mysql
+	Ubuntu (10-14): start mysql
+	Ubuntu (15+): service mysql start
 	Debian: service mysql start
 		
 	# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
@@ -64,7 +66,8 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 
 	Fedora: service greyhole start
 	Ubuntu (< 10): /etc/init.d/greyhole start
-	Ubuntu (10+): start greyhole
+	Ubuntu (10-14): start greyhole
+	Ubuntu (15+): service greyhole start
 	Debian: service greyhole start
 
 

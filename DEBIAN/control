@@ -1,7 +1,7 @@
 Section: net
 Priority: extra
 Maintainer: Guillaume Boudreau <guillaume@greyhole.net>
-Homepage: http://www.greyhole.net
+Homepage: https://www.greyhole.net
 Package: greyhole
 Version: 0.9.3-1
 Architecture: i386

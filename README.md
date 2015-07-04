@@ -7,10 +7,9 @@ Greyhole is an application that uses Samba to create a storage pool of all your 
 
 Links
 -----
-* [Official website](http://www.greyhole.net/)
-* [Downloads](http://www.greyhole.net/download/)
-* [Support](http://getsatisfaction.com/greyhole)
-* [Live chat (IRC)](http://www.greyhole.net/chat/)
+* [Official website](https://www.greyhole.net/)
+* [Support](http://support.greyhole.net)
+* [Live chat (IRC)](https://www.greyhole.net/chat/)
 
 Features
 --------

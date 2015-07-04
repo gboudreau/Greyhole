@@ -66,12 +66,13 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	# For Samba 4.2: #
 		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.2/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.2/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.2/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
-	Ubuntu (10+): install the Upstart script:
+	Ubuntu (10-14): install the Upstart script:
 		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
 		rm /etc/init.d/greyhole
 
 	Fedora: service smb restart
-	Ubuntu: /etc/init.d/samba restart, or restart smbd
+	Ubuntu (14-): /etc/init.d/samba restart, or restart smbd
+	Ubuntu (15+): /etc/init.d/smbd restart
 	Debian: service samba restart
 
 3. For Samba >4.2: The greyhole.so files packaged with Greyhole won't work on your system.
@@ -98,7 +99,8 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
 	Fedora: chkconfig --add greyhole; chkconfig greyhole on
 	Ubuntu (< 10): update-rc.d greyhole defaults 98 20
-	Ubuntu (10+): [nothing to do]
+	Ubuntu (10-14): [nothing to do]
+	Ubuntu (15): update-rc.d greyhole defaults
 	Debian: update-rc.d greyhole defaults
 
 5. Work around problems with the CIFS client (as root):
