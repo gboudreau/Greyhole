@@ -104,7 +104,7 @@ else
 	    sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
     fi
     if [ -f /etc/init.d/smbd ]; then
-        sed -i 's/smb/smbd/' /etc/init.d/greyhole
+        sed -i 's/smb$/smbd/' /etc/init.d/greyhole
     elif [ -f /etc/init.d/samba ]; then
         sed -i 's/smb/samba/' /etc/init.d/greyhole
     fi
