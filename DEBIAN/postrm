@@ -11,18 +11,17 @@ if [ "$1" = purge ]; then
 	# not an update, a complete uninstall
 	
 	# Service removal
-	if [ -f /sbin/start ]; then
-		# Using Upstart instead of SYSV init.d
-		if [ -f /etc/init/greyhole.conf ]; then
-			stop greyhole 2> /dev/null > /dev/null || true
-		fi
-	else
-		# (SYSV) Service stop & uninstall
-		if [ -f /etc/init.d/greyhole ]; then
-			/sbin/service greyhole stop 2>&1 > /dev/null || true
-		fi
-		update-rc.d greyhole remove
-	fi
+
+    # Using Upstart
+    if [ -f /etc/init/greyhole.conf ]; then
+        stop greyhole 2> /dev/null > /dev/null || true
+    fi
+
+    # (SYSV) Service stop & uninstall
+    if [ -f /etc/init.d/greyhole ]; then
+        /sbin/service greyhole stop 2>&1 > /dev/null || true
+        update-rc.d greyhole remove
+    fi
 
 	# Remove Greyhole from /etc/samba/smb.conf
 	grep -v "dfree.*greyhole" /etc/samba/smb.conf > /etc/samba/smb.conf.new
