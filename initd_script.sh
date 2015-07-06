@@ -46,10 +46,10 @@ status () {
 	PID=`cat $PIDFILE 2> /dev/null`
     DAEMON_RUNNING=`ps ax | grep "^ *$PID.*greyhole --daemon\|^ *$PID.*greyhole -D" | grep -v grep | wc -l`
 	if [ -f $PIDFILE -a "$DAEMON_RUNNING" -eq "1" ]; then
-		[ "$COMMAND" = "status" ] && echo "Greyhole is running."
+		[ "$COMMAND" = "status" -o "$COMMAND" = "stat" ] && echo "Greyhole is running."
 		return 0
 	else
-		[ "$COMMAND" = "status" ] && echo "Greyhole isn't running."
+		[ "$COMMAND" = "status" -o "$COMMAND" = "stat" ] && echo "Greyhole isn't running."
 		return 1
 	fi
 }
@@ -134,6 +134,9 @@ condrestart () {
 }
 
 case "$COMMAND" in
+	stat)
+		status
+		;;
 	status)
 		status
 		;;
@@ -156,7 +159,7 @@ case "$COMMAND" in
 		condrestart
 		;;
 	*)
-		echo $"Usage: $0 {start|stop|status|condrestart|restart}"
+		echo "Usage: $0 {start|stop|status|condrestart|restart}"
 		exit 1
 		;;
 esac

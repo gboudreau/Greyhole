@@ -151,7 +151,7 @@ else
 	/usr/sbin/update-rc.d greyhole defaults
 fi
 if [ -f /etc/rc.d/init.d/greyhole ]; then
-	if [ "`service greyhole status 2> /dev/null | grep 'is running' | wc -l`" = "1" ]; then
+	if [ "`service greyhole stat 2> /dev/null | grep 'is running' | wc -l`" = "1" ]; then
 		service greyhole restart
 		running=1
 	fi
