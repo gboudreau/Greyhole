@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2015 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -23,6 +23,7 @@ require_once('includes/CLI/CliOptionDefinition.php');
 
 // Runners
 require_once('includes/CLI/BalanceCliRunner.php');
+require_once('includes/CLI/BootInitCliRunner.php');
 require_once('includes/CLI/CancelBalanceCliRunner.php');
 require_once('includes/CLI/CancelFsckCliRunner.php');
 require_once('includes/CLI/CreateMemSpoolRunner.php');
@@ -83,6 +84,7 @@ class CommandLineHelper {
             new CliCommandDefinition('getuid',           'G',   null,          'GetGUIDCliRunner',        null),
             new CliCommandDefinition('create-mem-spool', '',    null,          'CreateMemSpoolRunner',    null),
             new CliCommandDefinition('test-config',      '',    null,          'TestCliRunner',           null),
+            new CliCommandDefinition('boot-init',        '',    null,          'BootInitCliRunner',       null),
         );
         
         $this->cliOptionsDefinitions = array(
