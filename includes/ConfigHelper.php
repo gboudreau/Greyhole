@@ -544,7 +544,7 @@ final class Config {
         CONFIG_MIN_FREE_SPACE_POOL_DRIVE   => array(),
         CONFIG_STICKY_FILES                => array(),
         CONFIG_FROZEN_DIRECTORY            => array(),
-        CONFIG_MEMORY_LIMIT                => '128M',
+        CONFIG_MEMORY_LIMIT                => '512M',
         CONFIG_TIMEZONE                    => FALSE,
         CONFIG_DRIVE_SELECTION_GROUPS      => array(),
         CONFIG_IGNORED_FILES               => array(),
