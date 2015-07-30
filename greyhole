@@ -1174,6 +1174,7 @@ function gh_chperm($real_file_path, $file_infos) {
     chmod($real_file_path, $file_infos->fileperms);
     chown($real_file_path, $file_infos->fileowner);
     chgrp($real_file_path, $file_infos->filegroup);
+    touch($real_file_path, $file_infos->filemtime, time());
 }
 
 function gh_mkdir($directory, $original_directory_or_dir_infos) {
@@ -3052,7 +3053,8 @@ function gh_get_file_infos($real_path) {
         return (object) array(
             'fileowner' => 0,
             'filegroup' => 0,
-            'fileperms' => (int) base_convert("0777", 8, 10)
+            'fileperms' => (int) base_convert("0777", 8, 10),
+            'filemtime' => time()
         );
     }
     if (is_link($real_path)) {
@@ -3061,7 +3063,8 @@ function gh_get_file_infos($real_path) {
     return (object) array(
         'fileowner' => (int) gh_fileowner($real_path),
         'filegroup' => (int) gh_filegroup($real_path),
-        'fileperms' => (int) base_convert(gh_fileperms($real_path), 8, 10)
+        'fileperms' => (int) base_convert(gh_fileperms($real_path), 8, 10),
+        'filemtime' => filemtime($real_path),
     );
 }
 
