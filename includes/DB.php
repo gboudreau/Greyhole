@@ -32,12 +32,16 @@ final class DB {
 		self::$options = $options;
 	}
 
-	public static function connect() {
+	public static function connect($retry_until_successful=FALSE) {
         $connect_string = 'mysql:host=' . self::$options->host . ';dbname=' . self::$options->name;
 
         try {
             self::$handle = @new PDO($connect_string, self::$options->user, self::$options->pass, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
         } catch (PDOException $ex) {
+            if ($retry_until_successful) {
+                sleep(2);
+                return DB::connect(TRUE);
+            }
             echo "ERROR: Can't connect to database: " . $ex->getMessage() . "\n";
             Log::critical("Can't connect to database: " . $ex->getMessage());
         }

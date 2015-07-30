@@ -154,7 +154,8 @@ class CommandLineHelper {
             if ($this->actionCmd->getLongOpt() != 'test-config') {
                 // Those will be tested in TestCliRunner
                 process_config();
-                DB::connect();
+                $retry_until_successful = ( $this->actionCmd->getLongOpt() == 'boot-init' );
+                DB::connect($retry_until_successful);
             }
 
             if (!isset($cliRunner)) {
