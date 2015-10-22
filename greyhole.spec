@@ -168,6 +168,9 @@ if [ $running -eq 0 ]; then
 	echo "==========================================================================="
 fi
 
+man logrotate > /dev/null 2>&1 || echo "Warning! logrotate is not installed. You should install logrotate to make sure the Greyhole logs don't fill your root partition.
+  Greyhole already installed the necessary conf file for logrotate; simply installing the logrotate package is enough."
+
 %preun
 
 # Delete VFS module symlinks, if any
