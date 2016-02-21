@@ -23,6 +23,7 @@ require_once('includes/CLI/CliOptionDefinition.php');
 
 // Runners
 require_once('includes/CLI/BalanceCliRunner.php');
+require_once('includes/CLI/BalanceStatusCliRunner.php');
 require_once('includes/CLI/BootInitCliRunner.php');
 require_once('includes/CLI/CancelBalanceCliRunner.php');
 require_once('includes/CLI/CancelFsckCliRunner.php');
@@ -64,6 +65,7 @@ class CommandLineHelper {
             new CliCommandDefinition('fsck',             'f',   null,          'FsckCliRunner',           "Schedule a fsck."),
             new CliCommandDefinition('cancel-fsck',      'C',   null,          'CancelFsckCliRunner',     "Cancel any ongoing or scheduled fsck operations."),
             new CliCommandDefinition('balance',          'l',   null,          'BalanceCliRunner',        "Balance available space on storage pool drives."),
+            new CliCommandDefinition('balance-status',   '',    null,          'BalanceStatusCliRunner',  "Verify how balanced are the storage pool drives."),
             new CliCommandDefinition('cancel-balance',   'B',   null,          'CancelBalanceCliRunner',  "Cancel any ongoing or scheduled balance operations."),
             new CliCommandDefinition('stats',            's',   null,          'StatsCliRunner',          "Display storage pool statistics."),
             new CliCommandDefinition('iostat',           'i',   null,          'IoStatsCliRunner',        "I/O statistics for your storage pool drives."),
