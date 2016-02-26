@@ -77,8 +77,12 @@ class CliCommandDefinition {
         $full_width = 80;
         $prefix_length = 24;
         $padded_newline = "\n" . str_repeat(' ', $prefix_length);
-        
-        $prefix = sprintf("%-" . $prefix_length . "s", "  -$simple_opt, --$simple_long_opt" . (!empty($this->paramName) ? $this->paramName : ''));
+
+        $simple_opt_usage = '';
+        if (!empty($simple_opt)) {
+            $simple_opt_usage = "-$simple_opt, ";
+        }
+        $prefix = sprintf("%-" . $prefix_length . "s", "  $simple_opt_usage--$simple_long_opt" . (!empty($this->paramName) ? $this->paramName : ''));
         if (strlen($prefix) > $prefix_length) {
             $prefix .= $padded_newline;
         }
