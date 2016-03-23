@@ -85,15 +85,16 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Fedora: yum -y install patch gcc python-devel gnutls-devel
 	Ubuntu: apt-get -y install build-essential python-dev libgnutls-dev
 
-	SAMBA_VERSION=4.3.0 # Or whatever is the latest version of Samba4.
+	SAMBA_VERSION=4.4.0 # Or whatever is the latest version of Samba4.
 	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
 	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm -f samba-${SAMBA_VERSION}.tar.gz
 	cd samba-${SAMBA_VERSION}
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.3.c source3/modules/vfs_greyhole.c
-	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.3.patch
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.4.c source3/modules/vfs_greyhole.c
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.4.patch
 	./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads && make
 
     # Create a symlink in the Samba VFS modules dir pointing to the compiled VFS
+    # NOTE: For Samba 4.4, this file is named libvfs_module_greyhole.so
     if [ -d /usr/lib/x86_64-linux-gnu ]; then LIBDIR=/usr/lib/x86_64-linux-gnu; elif [ "`uname -m`" = "x86_64" ]; then LIBDIR=/usr/lib64; else LIBDIR=/usr/lib; fi
     ln -s bin/default/source3/modules/libvfs-greyhole.so ${LIBDIR}/samba/vfs/greyhole.so
 
