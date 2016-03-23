@@ -85,6 +85,20 @@ cd samba-4.3.0
     make -j
 cd ..
 
+if [ ! -d samba-4.4.0 ]; then
+	wget http://samba.org/samba/ftp/stable/samba-4.4.0.tar.gz
+	tar zxf samba-4.4.0.tar.gz && rm -f samba-4.4.0.tar.gz
+fi
+cd samba-4.4.0
+    if  [ ! -f source3/modules/vfs_greyhole.c ]; then
+        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.4.patch
+        ./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads
+    fi
+    rm -f source3/modules/vfs_greyhole.c
+    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.4.c source3/modules/vfs_greyhole.c
+    make -j
+cd ..
+
 echo
 echo "****************************************"
 echo
@@ -147,6 +161,15 @@ if  [ -f samba-4.3.0/bin/default/source3/modules/libvfs_module_greyhole.so ]; th
     cp samba-4.3.0/bin/default/source3/modules/libvfs_module_greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.3/greyhole-$ARCH.so
     echo " was copied to "
     ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.3/greyhole-$ARCH.so
+    echo
+fi
+
+if  [ -f samba-4.4.0/bin/default/source3/modules/libvfs_module_greyhole.so ]; then
+    ls -1 samba-4.4.0/bin/default/source3/modules/libvfs_module_greyhole.so
+    mkdir -p ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.4
+    cp samba-4.4.0/bin/default/source3/modules/libvfs_module_greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.4/greyhole-$ARCH.so
+    echo " was copied to "
+    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.4/greyhole-$ARCH.so
     echo
 fi
 
