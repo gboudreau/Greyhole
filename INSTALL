@@ -97,7 +97,9 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 
     # Create a symlink in the Samba VFS modules dir pointing to the compiled VFS
     if [ -d /usr/lib/x86_64-linux-gnu ]; then LIBDIR=/usr/lib/x86_64-linux-gnu; elif [ "`uname -m`" = "x86_64" ]; then LIBDIR=/usr/lib64; else LIBDIR=/usr/lib; fi
-    ln -s bin/default/source3/modules/libvfs-greyhole.so ${LIBDIR}/samba/vfs/greyhole.so
+    V=`/usr/sbin/smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1$2}'`
+    cp bin/default/source3/modules/libvfs*greyhole.so greyhole-samba${V}.so
+    ln -s `pwd`/greyhole-samba${V}.so ${LIBDIR}/samba/vfs/greyhole.so
 
 4. Add Greyhole to services that start on boot:
 
