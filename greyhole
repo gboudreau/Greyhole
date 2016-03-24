@@ -124,6 +124,11 @@ function execute_next_task() {
     Log::info("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
 
     if ($task->complete == 'written') {
+        if (should_ignore_file($task->share, $task->full_path)) {
+            archive_task($task->id);
+            return;
+        }
+
         // Check if it's been 10 minutes since the file size changed. If so, process this normally.
         $filename = get_share_landing_zone($task->share) . '/' . $task->full_path;
         $filesize = gh_filesize($filename);
