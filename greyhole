@@ -829,8 +829,6 @@ function should_ignore_file($share, $full_path) {
 }
 
 function gh_write($share, $full_path, $task_id) {
-    global $sleep_before_task;
-    
     $landing_zone = get_share_landing_zone($share);
     if (!$landing_zone) {
         return TRUE;
@@ -979,6 +977,7 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
             $locked_shares[$share] = TRUE;
             return FALSE;
         }
+        global $sleep_before_task;
         $sleep_before_task = array();
     }
 
