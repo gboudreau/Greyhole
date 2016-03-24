@@ -5,219 +5,97 @@
 #   - x86_64: gb@fileserver2:~
 #   - i386:   bougu@macbook:~/VirtualBox VMs/Ubuntu (32-bit)
 #   - ARM:    gb@fileserver2:~/qemu-arm ; ./boot.sh ; sleep xx ; ssh -p 2223 gb@127.0.0.1
-# And don't forget to get the latest version of the samba-module from fileserver2 first:
-#   scp gb@192.168.155.88:Greyhole/samba-module/* ~/Greyhole/samba-module/
+
+# rsync -av --exclude .git --exclude release gb@192.168.155.88:Greyhole/ ~/Greyhole
+# screen
 
 export GREYHOLE_INSTALL_DIR="/home/gb/Greyhole"
 export HOME="/home/gb"
 
 ###
 
-cd "$HOME"
-
-cd samba-3.4.9/source3
-    if  [ ! -f modules/vfs_greyhole.c ]; then
-        ./configure
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.4.patch
-    fi
-    rm -f modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.4.c modules/vfs_greyhole.c
-    make -j
-cd ../..
-
-cd samba-3.5.4/source3
-    if  [ ! -f modules/vfs_greyhole.c ]; then
-        ./configure
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.5.patch
-    fi
-    rm -f modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.5.c modules/vfs_greyhole.c
-    make -j
-cd ../..
-
-cd samba-3.6.9/source3
-    if  [ ! -f modules/vfs_greyhole.c ]; then
-        ./configure
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-3.6.patch
-    fi
-    rm -f modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-3.6.c modules/vfs_greyhole.c
-    make -j
-cd ../..
-
-cd samba-4.0.14
-    if  [ ! -f source3/modules/vfs_greyhole.c ]; then
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.0.patch
-        ./configure --enable-debug --enable-selftest --disable-symbol-versions
-    fi
-    rm -f source3/modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.0.c source3/modules/vfs_greyhole.c
-    make -j
-cd ..
-
-cd samba-4.1.4
-    if  [ ! -f source3/modules/vfs_greyhole.c ]; then
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.1.patch
-        ./configure --enable-debug --enable-selftest --disable-symbol-versions
-    fi
-    rm -f source3/modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.1.c source3/modules/vfs_greyhole.c
-    make -j
-cd ..
-
-cd samba-4.2.0
-    if  [ ! -f source3/modules/vfs_greyhole.c ]; then
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.2.patch
-        ./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads
-    fi
-    rm -f source3/modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.2.c source3/modules/vfs_greyhole.c
-    make -j
-cd ..
-
-cd samba-4.3.0
-    if  [ ! -f source3/modules/vfs_greyhole.c ]; then
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.3.patch
-        ./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads
-    fi
-    rm -f source3/modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.3.c source3/modules/vfs_greyhole.c
-    make -j
-cd ..
-
-if [ ! -d samba-4.4.0 ]; then
-	wget http://samba.org/samba/ftp/stable/samba-4.4.0.tar.gz
-	tar zxf samba-4.4.0.tar.gz && rm -f samba-4.4.0.tar.gz
-fi
-cd samba-4.4.0
-    if  [ ! -f source3/modules/vfs_greyhole.c ]; then
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.4.patch
-        ./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads
-    fi
-    rm -f source3/modules/vfs_greyhole.c
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.4.c source3/modules/vfs_greyhole.c
-    make -j
-cd ..
-
-echo
-echo "****************************************"
-echo
-
 ARCH="`uname -i`"
 if [ "$ARCH" = "unknown" ]; then
     ARCH="armhf"
 fi
 
-if  [ -f samba-3.4.9/source3/bin/greyhole.so ]; then
-    ls -1 samba-3.4.9/source3/bin/greyhole.so
-    cp samba-3.4.9/source3/bin/greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/3.4/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/3.4/greyhole-$ARCH.so
-    echo
-fi
+cd "$HOME"
 
-if  [ -f samba-3.5.4/source3/bin/greyhole.so ]; then
-    ls -1 samba-3.5.4/source3/bin/greyhole.so
-    cp samba-3.5.4/source3/bin/greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/3.5/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/3.5/greyhole-$ARCH.so
-    echo
-fi
+for version in 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
+	echo "Working on samba-${version} ... "
+	if [ ! -d samba-${version} ]; then
+		wget http://samba.org/samba/ftp/stable/samba-${version}.tar.gz && tar zxf samba-${version}.tar.gz && rm -f samba-${version}.tar.gz
+	fi
 
-if  [ -f samba-3.6.9/source3/bin/greyhole.so ]; then
-    ls -1 samba-3.6.9/source3/bin/greyhole.so
-    cp samba-3.6.9/source3/bin/greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/3.6/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/3.6/greyhole-$ARCH.so
-    echo
-fi
+	M=`echo ${version} | awk -F'.' '{print $1}'` # major
+	m=`echo ${version} | awk -F'.' '{print $2}'` # minor
+	B=`echo ${version} | awk -F'.' '{print $3}'` # build
 
-if  [ -f samba-4.0.14/bin/default/source3/modules/libvfs-greyhole.so ]; then
-    ls -1 samba-4.0.14/bin/default/source3/modules/libvfs-greyhole.so
-    cp samba-4.0.14/bin/default/source3/modules/libvfs-greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.0/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.0/greyhole-$ARCH.so
-    echo
-fi
+	cd samba-${version}
+		NEEDS_CONFIGURE=
+		if  [ ! -f source3/modules/vfs_greyhole.c ]; then
+			NEEDS_CONFIGURE=1
+		fi
 
-if  [ -f samba-4.1.4/bin/default/source3/modules/libvfs-greyhole.so ]; then
-    ls -1 samba-4.1.4/bin/default/source3/modules/libvfs-greyhole.so
-    cp samba-4.1.4/bin/default/source3/modules/libvfs-greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.1/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.1/greyhole-$ARCH.so
-    echo
-fi
+	    rm -f source3/modules/vfs_greyhole.c source3/bin/greyhole.so bin/default/source3/modules/libvfs*greyhole.so
+	    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-$M.$m.c source3/modules/vfs_greyhole.c
 
-if  [ -f samba-4.2.0/bin/default/source3/modules/libvfs_module_greyhole.so ]; then
-    ls -1 samba-4.2.0/bin/default/source3/modules/libvfs_module_greyhole.so
-    cp samba-4.2.0/bin/default/source3/modules/libvfs_module_greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.2/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.2/greyhole-$ARCH.so
-    echo
-fi
+		if [ $M -eq 3 ]; then
+			cd source3
+		fi
 
-if  [ -f samba-4.3.0/bin/default/source3/modules/libvfs_module_greyhole.so ]; then
-    ls -1 samba-4.3.0/bin/default/source3/modules/libvfs_module_greyhole.so
-    cp samba-4.3.0/bin/default/source3/modules/libvfs_module_greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.3/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.3/greyhole-$ARCH.so
-    echo
-fi
+		if [ ! -x ${NEEDS_CONFIGURE} ]; then
+			if [ $M -eq 3 ]; then
+	            ./configure
+	            patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-$M.$m.patch
+		    else
+		        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-$M.$m.patch
+		        ./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads
+			fi
+		fi
 
-if  [ -f samba-4.4.0/bin/default/source3/modules/libvfs_module_greyhole.so ]; then
-    ls -1 samba-4.4.0/bin/default/source3/modules/libvfs_module_greyhole.so
-    mkdir -p ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.4
-    cp samba-4.4.0/bin/default/source3/modules/libvfs_module_greyhole.so ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.4/greyhole-$ARCH.so
-    echo " was copied to "
-    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/4.4/greyhole-$ARCH.so
-    echo
-fi
+	    make -j
+
+		if [ $M -eq 3 ]; then
+			cd ..
+		fi
+
+		if [ $M -eq 3 ]; then
+			COMPILED_MODULE="source3/bin/greyhole.so"
+	    else
+	        COMPILED_MODULE="`ls -1 bin/default/source3/modules/libvfs*greyhole.so`"
+		fi
+	    ls -1 ${COMPILED_MODULE}
+	    mkdir -p ${GREYHOLE_INSTALL_DIR}/samba-module/bin/$M.$m/
+	    cp ${COMPILED_MODULE} ${GREYHOLE_INSTALL_DIR}/samba-module/bin/$M.$m/greyhole-$ARCH.so
+	    echo " was copied to "
+	    ls -1 ${GREYHOLE_INSTALL_DIR}/samba-module/bin/$M.$m/greyhole-$ARCH.so
+
+	cd ..
+	echo
+done
 
 echo "****************************************"
 echo
 
 exit
 
-SSH_HOST="gb@192.168.155.208"
+SSH_HOST="gb@192.168.155.7"
 ARCH="i386"
 cd ~/git/Greyhole/samba-module/bin/
-scp $SSH_HOST:Greyhole/samba-module/bin/3.4/greyhole-$ARCH.so 3.4/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.3/greyhole-$ARCH.so 4.3/greyhole-$ARCH.so
+rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
 SSH_HOST="gb@192.168.155.88"
 ARCH="x86_64"
 cd ~/git/Greyhole/samba-module/bin/
-scp $SSH_HOST:Greyhole/samba-module/bin/3.4/greyhole-$ARCH.so 3.4/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.3/greyhole-$ARCH.so 4.3/greyhole-$ARCH.so
+rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
 SSH_HOST="gb@127.0.0.1"
 ARCH="armhf"
 cd ~/Greyhole/samba-module/bin/
-scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/3.4/greyhole-$ARCH.so 3.4/greyhole-$ARCH.so
-scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyhole-$ARCH.so
-scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
-scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
-scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
-scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
-scp -P 2223 $SSH_HOST:Greyhole/samba-module/bin/4.3/greyhole-$ARCH.so 4.3/greyhole-$ARCH.so
+rsync -av -e "ssh -p 2223" $SSH_HOST:Greyhole/samba-module/bin/ .
 
 SSH_HOST="gb@192.168.155.88"
 ARCH="armhf"
 cd ~/git/Greyhole/samba-module/bin/
-scp $SSH_HOST:Greyhole/samba-module/bin/3.4/greyhole-$ARCH.so 3.4/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/3.5/greyhole-$ARCH.so 3.5/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/3.6/greyhole-$ARCH.so 3.6/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.0/greyhole-$ARCH.so 4.0/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.1/greyhole-$ARCH.so 4.1/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.2/greyhole-$ARCH.so 4.2/greyhole-$ARCH.so
-scp $SSH_HOST:Greyhole/samba-module/bin/4.3/greyhole-$ARCH.so 4.3/greyhole-$ARCH.so
+rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
