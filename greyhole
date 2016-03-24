@@ -818,7 +818,7 @@ function should_ignore_file($share, $full_path) {
         }
     }
     foreach (Config::get(CONFIG_IGNORED_FOLDERS) as $ignored_folder_re) {
-        $p = clean_dir("$share/$path");
+        $p = clean_dir("$share/$path/");
         if (preg_match(';^' . $ignored_folder_re . '$;', $p)) {
             Log::info("Ignoring task because it matches the following '" . CONFIG_IGNORED_FOLDERS . "' pattern: $ignored_folder_re");
             return TRUE;
