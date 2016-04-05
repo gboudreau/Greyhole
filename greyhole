@@ -2677,6 +2677,20 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             $fsck_report['too_many_copies']++;
         
             $local_target_drives = array_values(order_target_drives(0, TRUE, $share, $file_path));
+
+            // The drives that are NOT returned by order_target_drives(), but have a file copy, should be removed first
+            $gone_drives = array();
+            foreach (Config::storagePoolDrives() as $sp_drive) {
+                $file = clean_dir("$sp_drive/$share/$file_path/$filename");
+                if (!array_contains($local_target_drives, $sp_drive) && file_exists($file)) {
+                    $gone_drives[] = $sp_drive;
+                    $local_target_drives[] = $sp_drive;
+                }
+            }
+            if (!empty($gone_drives)) {
+                Log::debug("Drives that shouldn't be used anymore: " . implode(' - ', $gone_drives));
+            }
+
             while (count($file_copies_inodes) > $num_copies_required && !empty($local_target_drives)) {
                 $sp_drive = array_pop($local_target_drives);
                 $key = clean_dir("$sp_drive/$share/$file_path/$filename");
