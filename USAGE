@@ -43,7 +43,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	Fedora: service smb restart
 	Ubuntu (< 10): /etc/init.d/samba restart
 	Ubuntu (10-14): restart smbd
-	Ubuntu (15+): service smb restart
+	Ubuntu (15+): service smbd restart
 	Debian: service samba restart
 
 3. Setup the database:

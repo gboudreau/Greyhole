@@ -68,12 +68,31 @@ SOURCE_LIB="${SOURCE_LIBDIR}/greyhole/${LIB_FILE}"
 rm -f ${TARGET_SYMLINK}
 ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
 
-# Bugfix for Ubuntu 14 (Trusty) that is missing libsmbd_base.so, which is used to compile the VFS
+# Bugfix for Ubuntu / Debian that are missing symlinks in ${TARGET_LIBDIR}/samba/
 MAJOR_SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1}'`"
 if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
-    if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd_base.so -a -f ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ]; then
-        ln -s ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ${TARGET_LIBDIR}/samba/libsmbd_base.so
-    fi
+	if [ -f ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ]; then
+	    if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd_base.so ]; then
+	        ln -s ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ${TARGET_LIBDIR}/samba/libsmbd_base.so
+	    fi
+	else
+	    if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so ]; then
+	        if [ -f ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ]; then
+	            ln -s ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
+	        else
+	            echo "Error: missing dependent library libsmbd-base.so.0 (libsmbd-base-samba4.so)"
+	            exit -1
+	        fi
+	    fi
+	    if [ ! -f ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ]; then
+	        if [ -f ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ]; then
+		        ln -s ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
+	        else
+	            echo "Error: missing dependent library libsamba-debug.so.0 (libsamba-debug-samba4.so)"
+	            exit -1
+	        fi
+	    fi
+	fi
 fi
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
