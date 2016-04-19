@@ -3530,9 +3530,9 @@ function how_long_ago($past_time) {
 
 function get_copy_cmd($source, $destination) {
     $copy_method = Config::get('copy_method');
-    if ($copy_method == 'rsync') {
+    if ($copy_method === 'rsync') {
         return "rsync -t " . escapeshellarg($source) . " " . escapeshellarg($destination);
-    } elseif (substr($copy_method, 0, 6 ) === "custom") {
+    } elseif (substr($copy_method, 0, 6 ) === "custom" && strpos($copy_method, ":") !== FALSE) {
         return substr($copy_method, strpos($copy_method, ":") + 1) . " " . escapeshellarg($source) . " " . escapeshellarg($destination);
     } else {
         return "cp -p " . escapeshellarg($source) . " " . escapeshellarg($destination);
