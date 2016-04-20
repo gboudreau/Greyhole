@@ -23,7 +23,7 @@ class DaemonRunner extends AbstractRunner {
 	public function run() {
 		// Prevent multiple daemons from running simultaneously
 		if (self::isRunning()) {
-			die("Found an already running Greyhole daemon with PID " . trim(file_get_contents('/var/run/greyhole.pid')) . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
+			die("Found an already running Greyhole daemon with PID " . self::getPID() . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
 		}
 
 		Log::info("Greyhole (version %VERSION%) daemon started.");
@@ -43,8 +43,12 @@ class DaemonRunner extends AbstractRunner {
 	}
 	
 	private static function isRunning() {
-        $num_daemon_processes = exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
+        $num_daemon_processes = exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v "sudo" | wc -l');
 	    return $num_daemon_processes > 1;
+	}
+
+	private static function getPID() {
+        return exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v "sudo" | grep -v ' . getmypid() . ' | awk "{print \$1}"');
 	}
     
 	private function initialize() {
