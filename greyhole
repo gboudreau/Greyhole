@@ -514,6 +514,13 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                 gh_mkdir($path, $original_path);
 
                 gh_rename("$sp_drive/$share/$full_path", "$sp_drive/$share/$target_full_path");
+
+                // Make sure all the copies of this folder have the right owner & permissions
+                $dir_infos = gh_get_file_infos("$landing_zone/$target_full_path");
+                chown("$sp_drive/$share/$target_full_path", $dir_infos->fileowner);
+                chgrp("$sp_drive/$share/$target_full_path", $dir_infos->filegroup);
+                chmod("$sp_drive/$share/$target_full_path", $dir_infos->fileperms);
+
                 Log::debug("  Directory moved: $sp_drive/$share/$full_path -> $sp_drive/$share/$target_full_path");
             }
 
