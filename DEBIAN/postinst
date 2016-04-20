@@ -87,6 +87,8 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
 	    if [ ! -f ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ]; then
 	        if [ -f ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ]; then
 		        ln -s ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
+		    elif [ -f ${TARGET_LIBDIR}/libsamba-util.so.0 ]; then
+		        ln -s ${TARGET_LIBDIR}/libsamba-util.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
 	        else
 	            echo "Error: missing dependent library libsamba-debug.so.0 (libsamba-debug-samba4.so)"
 	            exit -1
