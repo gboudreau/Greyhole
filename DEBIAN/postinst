@@ -7,7 +7,11 @@ chmod 777 /var/spool/greyhole
 mkdir -p /var/cache/greyhole-dfree
 chmod 777 /var/cache/greyhole-dfree
 
-if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]; then
+
+if [ -d /usr/lib/arm-linux-gnueabihf/samba/vfs ]; then
+    SOURCE_LIBDIR="/usr/lib"
+    TARGET_LIBDIR="/usr/lib/arm-linux-gnueabihf"
+elif [ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]; then
     SOURCE_LIBDIR="/usr/lib64" # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
     TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"
 elif [ "`uname -m`" = "x86_64" ]; then
@@ -25,7 +29,10 @@ fi
 
 if [ ! -d ${TARGET_LIBDIR}/samba/vfs/ ]; then
     # Maybe samba-vfs-modules is missing?
-    if [ -d /usr/lib/x86_64-linux-gnu ]; then
+    if [ -d /usr/lib/arm-linux-gnueabihf ]; then
+        SOURCE_LIBDIR="/usr/lib"
+        TARGET_LIBDIR="/usr/lib/arm-linux-gnueabihf"
+    elif [ -d /usr/lib/x86_64-linux-gnu ]; then
         SOURCE_LIBDIR="/usr/lib64" # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
         TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"
     else
