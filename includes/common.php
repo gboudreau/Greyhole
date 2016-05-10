@@ -361,9 +361,13 @@ class FSCKLogFile {
         if (file_exists($logfile)) {
             global $fsck_report;
             $fsck_report = unserialize(file_get_contents($logfile));
-        } else {
-            initialize_fsck_report($what);
+            if ($fsck_report !== FALSE) {
+                return;
+            }
+            rename($logfile, "$logfile.broken");
+            // $fsck_report === FALSE; let's re-initialize it!
         }
+        initialize_fsck_report($what);
     }
 
     public static function saveFSCKReport() {
