@@ -4,4 +4,3 @@ $url = "https://github.com/gboudreau/Greyhole/releases.atom";
 $rss = file_get_contents($url);
 $rss = str_replace($url, 'http://www.greyhole.net/rss/downloads/', $rss);
 echo $rss;
-?>
