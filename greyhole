@@ -3631,19 +3631,15 @@ function gh_check_md5($task) {
         // Oopsy!
         $logs = array("Mismatch in file copies checksums:");
         foreach ($md5s as $md5 => $file_copies) {
-            $files = '';
-            foreach ($file_copies as $file_copy) {
-                if ($files != '') {
-                    $files .= ', ';
-                }
-                $files .= $file_copy;
-            }
-    
+            $latest_file_copy = $file_copies[count($file_copies)-1];
+            $file_copies = array_unique($file_copies);
+            sort($file_copies);
+            $files = implode(', ', $file_copies);
+
             // Automatically fix this if:
             // - there's only 2 different MD5s for all file copies (i.e. one for all other files copies, and one for this file copy)
             // - the current MD5 is only for one file copy (we assume this copy is in error, not the others)
             // - that file copy isn't used as the share symlink target
-            $latest_file_copy = $file_copy;
             $original_file_path = clean_dir(readlink(get_share_landing_zone($task->share) . "/" . $task->full_path));
             if (count($md5s) == 2 && count($file_copies) == 1 && $latest_file_copy != $original_file_path) {
                 $original_md5 = 'Unknown';
@@ -3680,17 +3676,11 @@ function gh_check_md5($task) {
             }
 
             $logs[] = "  [$md5] => $files";
-            if (count($file_copies) == 1) {
-                $logs[] = "    The above file is unreadable.";
-                $logs[] = "    The underlying filesystem probably contains errors. You should unmount that partition, and check it using e2fsck -cfp";
-            } else {
-                $logs[] = "    The above files are unreadable.";
-                $logs[] = "    The underlying filesystems probably contains errors. You should unmount those partitions, and check them using e2fsck -cfp";
-            }
         }
-        
+        $logs[] = "Some of the above files appear to be unreadable.";
+        $logs[] = "The underlying filesystem(s) probably contains errors. You should unmount this/those partition(s), and check it/them using: fsck -cfp /dev/[...]";
         $logs[] = "You should manually check which file copy is invalid, and delete it. Re-create a valid copy with:";
-        $logs[] = "  greyhole --fsck --dir " . escapeshellarg(dirname(clean_dir($share_options[CONFIG_LANDING_ZONE] . "/$task->full_path")));
+        $logs[] = "  sudo greyhole --fsck --checksums --dir " . escapeshellarg(dirname(clean_dir($share_options[CONFIG_LANDING_ZONE] . "/$task->full_path")));
     }
     
     if (isset($logs)) {
