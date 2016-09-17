@@ -21,7 +21,7 @@ fi
 
 cd "$HOME"
 
-for version in 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
+for version in 4.5.0 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
 	echo "Working on samba-${version} ... "
 	if [ ! -d samba-${version} ]; then
 		wget http://samba.org/samba/ftp/stable/samba-${version}.tar.gz && tar zxf samba-${version}.tar.gz && rm -f samba-${version}.tar.gz
@@ -38,7 +38,7 @@ for version in 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
 		fi
 
 	    rm -f source3/modules/vfs_greyhole.c source3/bin/greyhole.so bin/default/source3/modules/libvfs*greyhole.so
-	    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-$M.$m.c source3/modules/vfs_greyhole.c
+	    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.x.c source3/modules/vfs_greyhole.c
 
 		if [ $M -eq 3 ]; then
 			cd source3

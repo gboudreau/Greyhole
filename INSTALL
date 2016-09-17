@@ -71,8 +71,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	# For Samba 4.4: #
 		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.4/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.4/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.4/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	# For Samba 4.5: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.5/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; 
-then ln -s samba-module/bin/4.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.5/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
 	Ubuntu (10-14): install the Upstart script:
 		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
