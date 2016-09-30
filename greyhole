@@ -979,7 +979,7 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
         // Check if another process locked this file before we work on it.
         global $locked_files, $locked_shares;
         if (isset($locked_files[clean_dir("$share/$full_path")]) || ($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
-            Log::debug("  File $landing_zone/$full_path is locked by another process (" . $locked_files[clean_dir("$share/$full_path")] . "). Will wait until it's unlocked to work on any file in this share.");
+            Log::debug("  File $landing_zone/$full_path is locked by another process (" . ( isset($locked_files[clean_dir("$share/$full_path")]) ? $locked_files[clean_dir("$share/$full_path")] : $locked_by ) . "). Will wait until it's unlocked to work on any file in this share.");
             $locked_files[clean_dir("$share/$full_path")] = isset($locked_by) ? $locked_by : TRUE;
             $locked_shares[$share] = TRUE;
             return FALSE;
