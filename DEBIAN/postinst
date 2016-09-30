@@ -14,6 +14,9 @@ if [ -d /usr/lib/arm-linux-gnueabihf/samba/vfs ]; then
 elif [ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]; then
     SOURCE_LIBDIR="/usr/lib64" # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
     TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"
+elif [ -d /usr/lib/i386-linux-gnu/samba/vfs ]; then
+    SOURCE_LIBDIR="/usr/lib"
+    TARGET_LIBDIR="/usr/lib/i386-linux-gnu"
 elif [ "`uname -m`" = "x86_64" ]; then
     SOURCE_LIBDIR="/usr/lib64"
     TARGET_LIBDIR="/usr/lib64"
@@ -35,6 +38,9 @@ if [ ! -d ${TARGET_LIBDIR}/samba/vfs/ ]; then
     elif [ -d /usr/lib/x86_64-linux-gnu ]; then
         SOURCE_LIBDIR="/usr/lib64" # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
         TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"
+    elif [ -d /usr/lib/i386-linux-gnu ]; then
+        SOURCE_LIBDIR="/usr/lib"
+        TARGET_LIBDIR="/usr/lib/i386-linux-gnu"
     else
         SOURCE_LIBDIR="/usr/lib"
         TARGET_LIBDIR="/usr/lib"
