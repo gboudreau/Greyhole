@@ -138,13 +138,15 @@ if [ -f /sbin/start -a $uses_systemd -eq 0 ]; then
 else
 	# (SYSV) Service install & start
 	rm -f /etc/init/greyhole.conf
-	if [ -f /etc/init.d/mysql ]; then
-	    sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
-    fi
-    if [ -f /etc/init.d/smbd ]; then
-        sed -i 's/smb$/smbd/' /etc/init.d/greyhole
-    elif [ -f /etc/init.d/samba ]; then
-        sed -i 's/smb/samba/' /etc/init.d/greyhole
+	if [ -f /etc/init.d/greyhole ]; then
+		if [ -f /etc/init.d/mysql ]; then
+		    sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
+        fi
+        if [ -f /etc/init.d/smbd ]; then
+            sed -i 's/smb$/smbd/' /etc/init.d/greyhole
+        elif [ -f /etc/init.d/samba ]; then
+            sed -i 's/smb/samba/' /etc/init.d/greyhole
+        fi
     fi
 	if [ -f /sbin/chkconfig ]; then
 		/sbin/chkconfig --add greyhole
