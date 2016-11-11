@@ -1678,7 +1678,7 @@ function parse_samba_spool() {
             $act = array_shift($line);
             $share = array_shift($line);
             if ($act == 'mkdir') {
-                // Just create the same folder on the 2 backup drives, to be able to get back empty folders, if we ever loose the LZ
+                // Just create the same folder on the 2 backup drives, to be able to get back empty folders, if we ever lose the LZ
                 $dir_fullpath = get_share_landing_zone($share) . "/$line[0]";
                 Log::debug("Directory created: $share/$line[0]");
                 foreach (Config::get(CONFIG_METASTORE_BACKUPS) as $metastore_backup_drive) {
