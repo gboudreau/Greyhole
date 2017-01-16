@@ -1904,7 +1904,7 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
                 }
             } else if (!file_exists("$sp_drive/.greyhole_used_this") && StoragePool::is_pool_drive($sp_drive)) {
                 Log::error("Can't find how much free space is left on $sp_drive. This partition will never be used!");
-                Log::error("Please report this using the 'Bugs Tracker' link found on http://greyhole.net. You should include the following information in your ticket:");
+                Log::error("Please report this using the 'Issues' tab found on https://github.com/gboudreau/Greyhole. You should include the following information in your ticket:");
                 Log::error("===== Error report starts here =====");
                 Log::error("Unknown free space for partition: $sp_drive");
                 Log::error("df_command: " . ConfigHelper::$df_command);
