@@ -23,7 +23,7 @@ abstract class Hook
     protected $event_type;
     protected $script;
 
-    private static $hooks = array();
+    protected static $hooks = array();
 
     /**
      * @param string $event_type
@@ -59,11 +59,13 @@ abstract class Hook
         }
         foreach ($hooks as $hook) {
             Log::debug("Calling external hook $hook->script for event $hook->event_type ...");
-            exec($hook->script . " " . implode(' ', $hook->getArgs($context)) . " 2>&1", $output, $result_code);
-            foreach($output as $line) {
-                Log::debug("  $line");
+            exec(escapeshellarg($hook->script) . " " . implode(' ', $hook->getArgs($context)) . " 2>&1", $output, $result_code);
+            if (!empty($output)) {
+                foreach($output as $line) {
+                    Log::debug("  $line");
+                }
             }
-            if ($result_code == 0) {
+            if ($result_code === 0) {
                 Log::debug("External hook exited with status code $result_code.");
             } else {
                 Log::warn("External hook $hook->script exited with status code $result_code.");
@@ -92,12 +94,12 @@ class FileHookContext implements HookContext
 class FileHook extends Hook
 {
     public static function trigger($event_type, $share, $path_on_share) {
-        parent::_trigger($event_type, new FileHookContext($share, $path_on_share));
+        Hook::_trigger($event_type, new FileHookContext($share, $path_on_share));
     }
 
     /**
      * @param FileHookContext $context
-     * @return string
+     * @return array
      */
     protected function getArgs($context) {
         return array(
@@ -121,12 +123,12 @@ class LogHookContext implements HookContext
 class LogHook extends Hook
 {
     public static function trigger($event_type, $event_code, $log) {
-        parent::_trigger($event_type, new LogHookContext($event_code, $log));
+        Hook::_trigger($event_type, new LogHookContext($event_code, $log));
     }
 
     /**
      * @param LogHookContext $context
-     * @return string
+     * @return array
      */
     protected function getArgs($context) {
         return array(
