@@ -417,6 +417,8 @@ function gh_rmdir($share, $full_path) {
             Log::debug("  Removed metadata files directory $metastore/$share/$full_path");
         }
     }
+
+    FileHook::trigger(FileHook::EVENT_TYPE_RMDIR, $share, $full_path);
 }
 
 function gh_unlink($share, $full_path, $task_id) {
@@ -477,6 +479,8 @@ function gh_unlink($share, $full_path, $task_id) {
         }
     }
     remove_metafiles($share, $path, $filename);
+
+    FileHook::trigger(FileHook::EVENT_TYPE_DELETE, $share, $full_path);
 }
 
 function is_a_metastore_dir($share, $full_path) {
@@ -671,6 +675,9 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
         }
     }
     $sleep_before_task = array();
+
+    FileHook::trigger(FileHook::EVENT_TYPE_RENAME, $share, $target_full_path, $full_path);
+
     return TRUE;
 }
 
@@ -942,6 +949,7 @@ function gh_write($share, $full_path, $task_id) {
                 }
             }
         }
+        FileHook::trigger(FileHook::EVENT_TYPE_EDIT, $share, $full_path);
     } else {
         if (!isset($source_file)) {
             $source_file = clean_dir("$landing_zone/$full_path");
@@ -981,6 +989,7 @@ function gh_write($share, $full_path, $task_id) {
                 return FALSE;
             }
         }
+        FileHook::trigger(FileHook::EVENT_TYPE_CREATE, $share, $full_path);
     }
     return TRUE;
 }
@@ -1698,6 +1707,7 @@ function parse_samba_spool() {
                         gh_mkdir("$backup_drive/$share/$line[0]", $dir_fullpath);
                     }
                 }
+                FileHook::trigger(FileHook::EVENT_TYPE_MKDIR, $share, $line[0]);
                 continue;
             }
             $result = array_pop($line);

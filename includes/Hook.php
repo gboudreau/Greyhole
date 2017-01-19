@@ -39,8 +39,10 @@ abstract class Hook
      * @param string $script
      */
     public static function add($event_type, $script) {
-        if (array_contains(array('create', 'edit', 'rename', 'delete', 'mkdir', 'rmdir'), $event_type)) {
+        if (array_contains(FileHook::getEventTypes(), $event_type)) {
             $hook = new FileHook($event_type, $script);
+        } elseif (array_contains(LogHook::getEventTypes(), $event_type)) {
+            $hook = new LogHook($event_type, $script);
         } else {
             Log::warn("Unknown hook event type '$event_type'; ignoring.");
             return;
@@ -85,16 +87,25 @@ class FileHookContext implements HookContext
 {
     public $share;
     public $path_on_share;
-    public function __construct($share, $path_on_share) {
+    public $from_path_on_share;
+    public function __construct($share, $path_on_share, $from_path_on_share = NULL) {
         $this->share = $share;
         $this->path_on_share = $path_on_share;
+        $this->from_path_on_share = $from_path_on_share;
     }
 }
 
 class FileHook extends Hook
 {
-    public static function trigger($event_type, $share, $path_on_share) {
-        Hook::_trigger($event_type, new FileHookContext($share, $path_on_share));
+    const EVENT_TYPE_CREATE = 'create';
+    const EVENT_TYPE_EDIT   = 'edit';
+    const EVENT_TYPE_RENAME = 'rename';
+    const EVENT_TYPE_DELETE = 'delete';
+    const EVENT_TYPE_MKDIR  = 'mkdir';
+    const EVENT_TYPE_RMDIR  = 'rmdir';
+
+    public static function trigger($event_type, $share, $path_on_share, $from_path_on_share = NULL) {
+        Hook::_trigger($event_type, new FileHookContext($share, $path_on_share, $from_path_on_share));
     }
 
     /**
@@ -102,10 +113,25 @@ class FileHook extends Hook
      * @return array
      */
     protected function getArgs($context) {
-        return array(
+        $args = array(
             escapeshellarg($this->event_type),
             escapeshellarg($context->share),
             escapeshellarg($context->path_on_share)
+        );
+        if (!empty($context->from_path_on_share)) {
+            $args[] = escapeshellarg($context->from_path_on_share);
+        }
+        return $args;
+    }
+
+    public static function getEventTypes() {
+        return array(
+            static::EVENT_TYPE_CREATE,
+            static::EVENT_TYPE_EDIT,
+            static::EVENT_TYPE_RENAME,
+            static::EVENT_TYPE_DELETE,
+            static::EVENT_TYPE_MKDIR,
+            static::EVENT_TYPE_RMDIR
         );
     }
 }
@@ -122,6 +148,13 @@ class LogHookContext implements HookContext
 
 class LogHook extends Hook
 {
+    const EVENT_TYPE_WARNING  = 'warning';
+    const EVENT_TYPE_ERROR    = 'error';
+    const EVENT_TYPE_CRITICAL = 'critical';
+    const EVENT_TYPE_IDLE     = 'idle';
+    const EVENT_TYPE_NOT_IDLE = 'not_idle';
+    const EVENT_TYPE_FSCK     = 'fsck';
+
     public static function trigger($event_type, $event_code, $log) {
         Hook::_trigger($event_type, new LogHookContext($event_code, $log));
     }
@@ -135,6 +168,17 @@ class LogHook extends Hook
             escapeshellarg($this->event_type),
             escapeshellarg($context->event_code),
             escapeshellarg($context->log)
+        );
+    }
+
+    public static function getEventTypes() {
+        return array(
+            static::EVENT_TYPE_WARNING,
+            static::EVENT_TYPE_ERROR,
+            static::EVENT_TYPE_CRITICAL,
+            static::EVENT_TYPE_IDLE,
+            static::EVENT_TYPE_NOT_IDLE,
+            static::EVENT_TYPE_FSCK
         );
     }
 }
