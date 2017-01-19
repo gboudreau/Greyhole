@@ -148,7 +148,7 @@ function execute_next_task() {
 
         if (!empty($written_files[clean_dir("$task->share/$task->full_path")])) {
             Log::debug("  File is still being written to (" . bytes_to_human($filesize, FALSE) . "). Postponing.");
-            $locked_files[clean_dir("$task->share/$task->full_path")] = TRUE;
+            $locked_files[clean_dir("$task->share/$task->full_path")] = 'samba-bytes-writer';
             $locked_shares[$task->share] = TRUE;
             return;
         }
@@ -588,11 +588,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
         Log::info("File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
         
         // Check if another process locked this file before we work on it.
-        global $locked_files, $locked_shares;
-        if (isset($locked_files[clean_dir("$share/$target_full_path")]) || ($locked_by = file_is_locked($share, $target_full_path)) !== FALSE) {
-            Log::debug("  File $landing_zone/$target_full_path is locked by another process (" . $locked_files[clean_dir("$share/$target_full_path")] . "). Will wait until it's unlocked to work on any file in this share.");
-            $locked_files[clean_dir("$share/$target_full_path")] = isset($locked_by) ? $locked_by : TRUE;
-            $locked_shares[$share] = TRUE;
+        if (gh_check_file_locked($share, $target_full_path)) {
             return FALSE;
         }
 
@@ -676,6 +672,25 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
     }
     $sleep_before_task = array();
     return TRUE;
+}
+
+function gh_check_file_locked($share, $target_full_path) {
+    global $locked_files, $locked_shares;
+    $idx = clean_dir("$share/$target_full_path");
+    if (isset($locked_files[$idx])) {
+        $locked_by = $locked_files[$idx];
+    } else {
+        $locked_by = file_is_locked($share, $target_full_path);
+        if ($locked_by !== FALSE) {
+            $locked_files[$idx] = $locked_by;
+        }
+    }
+    if ($locked_by !== FALSE) {
+        Log::debug("  File $share/$target_full_path is locked by another process ($locked_by). Will wait until it's unlocked to work on any file in this share.");
+        $locked_shares[$share] = TRUE;
+        return TRUE;
+    }
+    return FALSE;
 }
 
 function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
@@ -773,7 +788,7 @@ function file_is_locked($share, $full_path) {
         return FALSE;
     }
 
-    return TRUE;
+    return 'samba-vfs-writer';
 }
 
 function real_file_is_locked($real_fullpath) {
@@ -977,11 +992,7 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
     // Only need to check for locking if we have something to do!
     if ($num_copies_required > 1 || count($existing_metafiles) == 0) {
         // Check if another process locked this file before we work on it.
-        global $locked_files, $locked_shares;
-        if (isset($locked_files[clean_dir("$share/$full_path")]) || ($locked_by = file_is_locked($share, $full_path)) !== FALSE) {
-            Log::debug("  File $landing_zone/$full_path is locked by another process (" . ( isset($locked_files[clean_dir("$share/$full_path")]) ? $locked_files[clean_dir("$share/$full_path")] : $locked_by ) . "). Will wait until it's unlocked to work on any file in this share.");
-            $locked_files[clean_dir("$share/$full_path")] = isset($locked_by) ? $locked_by : TRUE;
-            $locked_shares[$share] = TRUE;
+        if (gh_check_file_locked($share, $full_path)) {
             return FALSE;
         }
         global $sleep_before_task;
