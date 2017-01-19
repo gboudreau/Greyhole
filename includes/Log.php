@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2014 Guillaume Boudreau
+Copyright 2014-2017 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -71,7 +71,7 @@ final class Log {
 
     private static $action = ACTION_INITIALIZE;
     private static $old_action;
-    private static $level;
+    private static $level = Log::INFO; // Default, until we are able to read the config file
 
     public static function setLevel($level) {
         self::$level = $level;
