@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2014 Guillaume Boudreau
+Copyright 2014-2017 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -49,6 +49,7 @@ define('CONFIG_DB_PASS', 'db_pass');
 define('CONFIG_DB_NAME', 'db_name');
 define('CONFIG_METASTORE_BACKUPS', 'metastore_backups');
 define('CONFIG_TRASH_SHARE', '===trash_share===');
+define('CONFIG_HOOK', 'hook');
 
 function recursive_include_parser($file) {
     $regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
@@ -214,6 +215,9 @@ final class ConfigHelper {
 
         // Share options
         if (self::parse_line_share_option($name, $value)) return;
+
+        // Hooks
+        if (self::parse_line_hook($name, $value)) return;
 
         // Unknown
         if (is_numeric($value)) {
@@ -383,6 +387,25 @@ final class ConfigHelper {
             return FALSE;
         }
         return TRUE;
+    }
+
+    private static function parse_line_hook($name, $value) {
+        if (string_starts_with($name, CONFIG_HOOK)) {
+            if (!preg_match('/hook\[([^\]]+)\]/', $name, $re)) {
+                Log::warn("Can't parse the following config line: $name; ignoring.");
+                return TRUE;
+            }
+            if (!is_executable($value)) {
+                Log::warn("Hook script $value is not executable; ignoring.");
+                return TRUE;
+            }
+            $events = explode('|', $re[1]);
+            foreach ($events as $event) {
+                Hook::add($event, $value);
+            }
+            return TRUE;
+        }
+        return FALSE;
     }
 
     private static function init() {

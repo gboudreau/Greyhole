@@ -21,6 +21,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 // Other helpers
 require_once('includes/ConfigHelper.php');
 require_once('includes/DB.php');
+require_once('includes/Hook.php');
 require_once('includes/Log.php');
 require_once('includes/MigrationHelper.php');
 require_once('includes/PoolDriveSelector.php');
