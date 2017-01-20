@@ -47,7 +47,7 @@ final class SystemHelper {
                             }
                         }
                         if (empty($dev)) {
-                            Log::warn("Warning! Couldn't find the device used by your ZFS pool name $pool. That pool will never be used.");
+                            Log::warn("Warning! Couldn't find the device used by your ZFS pool name $pool. That pool will never be used.", Log::EVENT_CODE_ZFS_UNKNOWN_DEVICE);
                             return FALSE;
                         }
                     }

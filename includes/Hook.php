@@ -44,10 +44,14 @@ abstract class Hook
         } elseif (array_contains(LogHook::getEventTypes(), $event_type)) {
             $hook = new LogHook($event_type, $script);
         } else {
-            Log::warn("Unknown hook event type '$event_type'; ignoring.");
+            Log::warn("Unknown hook event type '$event_type'; ignoring.", Log::EVENT_CODE_HOOK_NOT_EXECUTABLE);
             return;
         }
         static::$hooks[$event_type][] = $hook;
+    }
+
+    public static function hasHookForEvent($event_type) {
+        return !empty(static::$hooks[$event_type]);
     }
 
     /**
@@ -70,7 +74,11 @@ abstract class Hook
             if ($result_code === 0) {
                 Log::debug("External hook exited with status code $result_code.");
             } else {
-                Log::warn("External hook $hook->script exited with status code $result_code.");
+                if ($hook->event_type == LogHook::EVENT_TYPE_WARNING) {
+                    // Don't start an infinite loop!
+                } else {
+                    Log::warn("External hook $hook->script exited with status code $result_code.", LogHook::EVENT_CODE_HOOK_NON_ZERO_EXIT_CODE_IN_WARN);
+                }
             }
         }
     }
@@ -154,6 +162,8 @@ class LogHook extends Hook
     const EVENT_TYPE_IDLE     = 'idle';
     const EVENT_TYPE_NOT_IDLE = 'not_idle';
     const EVENT_TYPE_FSCK     = 'fsck';
+
+    const EVENT_CODE_HOOK_NON_ZERO_EXIT_CODE_IN_WARN = 1; // Used to prevent infinite loop, when logging a WARNING from a LogHook!
 
     public static function trigger($event_type, $event_code, $log) {
         Hook::_trigger($event_type, new LogHookContext($event_code, $log));

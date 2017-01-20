@@ -70,7 +70,7 @@ final class StoragePool {
                 }
                 self::mark_gone_drive_fscked($sp_drive);
                 $missing_drives[] = $sp_drive;
-                Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+                Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.", Log::EVENT_CODE_STORAGE_POOL_DRIVE_UUID_CHANGED);
                 Log::debug("Email sent for gone drive: $sp_drive");
                 self::$gone_ok_drives[$sp_drive] = TRUE; // The upcoming fsck should not recreate missing copies just yet
             } else if ((self::gone_ok($sp_drive, $j++ == 0) || self::gone_fscked($sp_drive, $i++ == 0)) && self::is_pool_drive($sp_drive) && !empty($drives_definitions[$sp_drive])) {

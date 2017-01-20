@@ -1,7 +1,7 @@
 #!/usr/bin/php -d open_basedir=/
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau, Andrew Hopkinson
+Copyright 2009-2017 Guillaume Boudreau, Andrew Hopkinson
 
 This file is part of Greyhole.
 
@@ -57,7 +57,7 @@ function get_next_tasks($incl_md5=FALSE, $update_idle=TRUE) {
 }
 
 function execute_next_task() {
-    global $sleep_before_task, $next_task, $next_tasks, $current_task_id, $locked_files, $locked_shares, $written_files, $fix_symlinks_scanned_dirs;
+    global $sleep_before_task, $next_task, $next_tasks, $current_task_id, $locked_files, $locked_shares, $written_files, $fix_symlinks_scanned_dirs, $was_idle;
 
     if (isset($next_task)) {
         $task = $next_task;
@@ -73,8 +73,6 @@ function execute_next_task() {
                 $task = array_shift($next_tasks);
             } else {
                 Log::setAction(ACTION_SLEEP);
-                Log::debug("Nothing to do... Sleeping.");
-
                 DB::repairTables();
 
                 check_md5_workers();
@@ -83,6 +81,13 @@ function execute_next_task() {
                 foreach (array('fsck_checksums.log', 'fsck_files.log') as $log_file) {
                     $log = new FSCKLogFile($log_file);
                     $log->emailAsRequired();
+                }
+
+                $log = "Nothing to do... Sleeping.";
+                Log::debug($log);
+                if (!$was_idle) {
+                    LogHook::trigger(LogHook::EVENT_TYPE_IDLE, Log::EVENT_CODE_IDLE, $log);
+                    $was_idle = TRUE;
                 }
 
                 $log_level = Log::getLevel();
@@ -113,7 +118,12 @@ function execute_next_task() {
     
     if (array_contains($sleep_before_task, $task->id)) {
         Log::setAction(ACTION_SLEEP);
-        Log::debug("Only locked files operations pending... Sleeping.");
+        $log = "Only locked files operations pending... Sleeping.";
+        Log::debug($log);
+        if (!$was_idle) {
+            LogHook::trigger(LogHook::EVENT_TYPE_IDLE, Log::EVENT_CODE_IDLE, $log);
+            $was_idle = TRUE;
+        }
         $log_level = Log::getLevel();
         sleep($log_level == Log::DEBUG ? 10 : ($log_level == Log::TEST ? 1 : 600));
         $sleep_before_task = array();
@@ -121,7 +131,12 @@ function execute_next_task() {
     }
 
     Log::setAction($task->action);
-    Log::info("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
+    $log = "Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : '');
+    Log::info($log);
+    if ($was_idle) {
+        LogHook::trigger(LogHook::EVENT_TYPE_NOT_IDLE, Log::EVENT_CODE_IDLE_NOT, $log);
+        $was_idle = FALSE;
+    }
 
     if ($task->complete == 'written') {
         if (should_ignore_file($task->share, $task->full_path)) {
@@ -172,9 +187,10 @@ function execute_next_task() {
             list($path, $filename) = explode_full_path($task->full_path);
             FSCKLogFile::loadFSCKReport('Missing files'); // Create or load the fsck_report from disk
             gh_fsck_file($path, $filename, $file_type, 'metastore', $task->share);
-            if (task_has_option($task, OPTION_EMAIL)) {
+            $send_email = task_has_option($task, OPTION_EMAIL);
+            if ($send_email || Hook::hasHookForEvent(LogHook::EVENT_TYPE_FSCK)) {
                 // Save the report to disk to be able to email it when we're done with all fsck_file tasks
-                FSCKLogFile::saveFSCKReport();
+                FSCKLogFile::saveFSCKReport($send_email);
             }
             break;
         case 'md5':
@@ -281,7 +297,7 @@ function execute_next_task() {
                             gh_fsck("$storage_volume/$share_name", $share_name, $storage_volume);
                         }
                     } else {
-                        Log::error("Unknown folder to fsck. You should specify a storage pool folder, a metadata store folder, a shared folder, or a subdirectory of any of those.");
+                        Log::error("Unknown folder to fsck. You should specify a storage pool folder, a metadata store folder, a shared folder, or a subdirectory of any of those.", Log::EVENT_CODE_FSCK_UNKNOWN_FOLDER);
                     }
                 } else {
                     $share = $share_options['name'];
@@ -341,12 +357,16 @@ function execute_next_task() {
             
             Settings::set('last_fsck_conf_md5', $new_conf_md5);
             
-            if (task_has_option($task, OPTION_EMAIL)) {
+            if (task_has_option($task, OPTION_EMAIL) || Hook::hasHookForEvent(LogHook::EVENT_TYPE_FSCK)) {
                 // Email report for fsck
+                $subject = 'fsck of Greyhole shares on ' . exec('hostname');
                 $fsck_report_mail = get_fsck_report();
-                $email_to = Config::get(CONFIG_EMAIL_TO);
-                Log::debug("Sending fsck report to $email_to");
-                mail($email_to, 'fsck of Greyhole shares on ' . exec('hostname'), $fsck_report_mail);
+                if (task_has_option($task, OPTION_EMAIL)) {
+                    $email_to = Config::get(CONFIG_EMAIL_TO);
+                    Log::debug("Sending fsck report to $email_to");
+                    mail($email_to, $subject, $fsck_report_mail);
+                }
+                LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $subject . "\n" . $fsck_report_mail);
             }
             break;
         case 'mkdir':
@@ -643,7 +663,7 @@ function gh_mv($share, $full_path, $target_full_path, $task_id) {
                             $symlink_target = $metafile->path;
                         }
                     } else {
-                        Log::warn("    Warning! An error occured while renaming file copy $old_path to $metafile->path.");
+                        Log::warn("    Warning! An error occurred while renaming file copy $old_path to $metafile->path.", Log::EVENT_CODE_RENAME_FILE_COPY_FAILED);
                     }
                     $existing_metafiles[$key] = $metafile;
                 }
@@ -742,7 +762,7 @@ function gh_file_exists($real_path, $log_message=null) {
 function get_num_copies($share) {
     $num_copies = SharesConfig::get($share, CONFIG_NUM_COPIES);
     if (!$num_copies) {
-        Log::warn("Found a task on a share ($share) that disappeared from " . ConfigHelper::$config_file . ". Skipping.");
+        Log::warn("Found a task on a share ($share) that disappeared from " . ConfigHelper::$config_file . ". Skipping.", Log::EVENT_CODE_TASK_FOR_UNKNOWN_SHARE);
         return -1;
     }
     if ($num_copies < 1) {
@@ -1021,7 +1041,7 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
     $metafiles = create_metafiles($share, $full_path, $num_copies_required, $filesize, $existing_metafiles);
 
     if (count($metafiles) == 0) {
-        Log::warn("  No metadata files could be created. Will wait until metadata files can be created to work on this file.");
+        Log::error("  No metadata files could be created. Will wait until metadata files can be created to work on this file.", Log::EVENT_CODE_NO_METADATA_SAVED);
         postpone_task($task_id);
         return array();
     }
@@ -1065,7 +1085,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 
         $root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
         if (!StoragePool::is_pool_drive($root_path)) {
-            Log::warn("  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+            Log::warn("  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.", Log::EVENT_CODE_STORAGE_POOL_DRIVE_UUID_CHANGED);
             $metafile->state = 'Gone';
             $metafiles[$key] = $metafile;
             continue;
@@ -1093,10 +1113,10 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
             if (file_exists("$landing_zone/$full_path")) {
                 global $current_task_id;
                 if ($current_task_id === 0) {
-                    Log::error("    Failed file copy (cont). We already retried this task. Aborting.");
+                    Log::error("    Failed file copy (cont). We already retried this task. Aborting.", Log::EVENT_CODE_FILE_COPY_FAILED);
                     return;
                 }
-                Log::warn("    Failed file copy (cont). Will try to re-process this write task, since the source file seems intact.");
+                Log::warn("    Failed file copy (cont). Will try to re-process this write task, since the source file seems intact.", Log::EVENT_CODE_FILE_COPY_FAILED);
                 // Queue a new write task, to replace the now gone copy.
                 global $next_task;
                 $next_task = (object) array(
@@ -1189,7 +1209,7 @@ function gh_copy_file($source_file, &$destination_file) {
         gh_rename($temp_path, $destination_file);
         gh_chperm($destination_file, $original_file_infos);
     } else {
-        Log::warn("    Failed file copy. Will mark this metadata file 'Gone'.");
+        Log::warn("    Failed file copy. Will mark this metadata file 'Gone'.", Log::EVENT_CODE_FILE_COPY_FAILED);
         if ($renamed) {
             // Do NOT delete $temp_path if the file was renamed... Just move it back!
             gh_rename($temp_path, $source_file);
@@ -1216,13 +1236,13 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
     }
     if (is_dir($directory)) {
         if (!chown($directory, $dir_infos->fileowner)) {
-            Log::warn("  Failed to chown directory '$directory'");
+            Log::warn("  Failed to chown directory '$directory'", Log::EVENT_CODE_MKDIR_CHOWN_FAILED);
         }
         if (!chgrp($directory, $dir_infos->filegroup)) {
-            Log::warn("  Failed to chgrp directory '$directory'");
+            Log::warn("  Failed to chgrp directory '$directory'", Log::EVENT_CODE_MKDIR_CHGRP_FAILED);
         }
         if (!chmod($directory, $dir_infos->fileperms)) {
-            Log::warn("  Failed to chmod directory '$directory'");
+            Log::warn("  Failed to chmod directory '$directory'", Log::EVENT_CODE_MKDIR_CHMOD_FAILED);
         }
     } else {
         // Need to mkdir & chown/chgrp all dirs that don't exists, up to the full path ($directory)
@@ -1246,17 +1266,17 @@ function gh_mkdir($directory, $original_directory_or_dir_infos) {
                             // Bingo!
                             $parent_directory = normalize_utf8_characters($parent_directory);
                         } else {
-                            Log::warn("  Failed to create directory $parent_directory");
+                            Log::warn("  Failed to create directory $parent_directory", Log::EVENT_CODE_MKDIR_FAILED);
                             return FALSE;
                         }
                     }
                 }
             }
             if (!chown($parent_directory, $dir_infos->fileowner)) {
-                Log::warn("  Failed to chown directory '$parent_directory'");
+                Log::warn("  Failed to chown directory '$parent_directory'", Log::EVENT_CODE_MKDIR_CHOWN_FAILED);
             }
             if (!chgrp($parent_directory, $dir_infos->filegroup)) {
-                Log::warn("  Failed to chgrp directory '$parent_directory'");
+                Log::warn("  Failed to chgrp directory '$parent_directory'", Log::EVENT_CODE_MKDIR_CHGRP_FAILED);
             }
             if (!isset($dir_parts[$i])) {
                 break;
@@ -1443,7 +1463,7 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
             $ok_metafiles[$key] = $metafile;
         } else {
             if (!$valid_path) {
-                Log::warn("Found a metadata file pointing to a drive not defined in your storage pool: '$metafile->path'. Will mark it as Gone.");
+                Log::warn("Found a metadata file pointing to a drive not defined in your storage pool: '$metafile->path'. Will mark it as Gone.", Log::EVENT_CODE_METADATA_POINTS_TO_GONE_DRIVE);
                 $metafile->state = 'Gone';
                 $metafiles[$key] = $metafile;
                 save_metafiles($share, $path, $filename, $metafiles);
@@ -1550,7 +1570,7 @@ function samba_restart() {
       } else if (is_file('/etc/systemd/system/multi-user.target.wants/smb.service')) {
           exec("systemctl restart smb.service");
       } else {
-          Log::critical("Couldn't find how to restart Samba. Please restart the Samba daemon manually.");
+          Log::critical("Couldn't find how to restart Samba. Please restart the Samba daemon manually.", Log::EVENT_CODE_SAMBA_RESTART_FAILED);
       }
 }
 
@@ -1593,7 +1613,7 @@ function samba_check_vfs() {
     }
     if (!$vfs_is_ok) {
         $vfs_target = "$source_libdir/greyhole/greyhole-samba$version.so";
-        Log::warn("  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target");
+        Log::warn("  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target", Log::EVENT_CODE_VFS_MODULE_WRONG);
         if (is_file($vfs_file)) {
             unlink($vfs_file);
         }
@@ -1617,7 +1637,7 @@ function create_mem_spool() {
         }
         exec('mount -o size=4M -t tmpfs none /var/spool/greyhole/mem 2> /dev/null', $mount_result);
         if (!empty($mount_result)) {
-            Log::error("Error mounting tmpfs in /var/spool/greyhole/mem: $mount_result");
+            Log::error("Error mounting tmpfs in /var/spool/greyhole/mem: $mount_result", Log::EVENT_CODE_SPOOL_MOUNT_FAILED);
         }
         return TRUE;
     }
@@ -1917,25 +1937,25 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
     foreach (Config::storagePoolDrives() as $sp_drive) {
         if (!isset($dfs[$sp_drive])) {
             if (!is_dir($sp_drive)) {
-                Log::error("The directory at $sp_drive doesn't exist. This drive will never be used!");
                 if (SystemHelper::is_amahi()) {
-                    Log::error("You should de-select, then re-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page, to fix this problem.");
+                    $details = "You should de-select, then re-select this partition in your Amahi dashboard (http://hda), in the Shares > Storage Pool page, to fix this problem.";
                 } else {
-                    Log::error("See the INSTALL file for instructions on how to prepare partitions to include in your storage pool.");
+                    $details = "See the INSTALL file for instructions on how to prepare partitions to include in your storage pool.";
                 }
+                Log::error("The directory at $sp_drive doesn't exist. This drive will never be used! $details", Log::EVENT_CODE_STORAGE_POOL_FOLDER_NOT_FOUND);
             } else if (!file_exists("$sp_drive/.greyhole_used_this") && StoragePool::is_pool_drive($sp_drive)) {
-                Log::error("Can't find how much free space is left on $sp_drive. This partition will never be used!");
-                Log::error("Please report this using the 'Issues' tab found on https://github.com/gboudreau/Greyhole. You should include the following information in your ticket:");
-                Log::error("===== Error report starts here =====");
-                Log::error("Unknown free space for partition: $sp_drive");
-                Log::error("df_command: " . ConfigHelper::$df_command);
-                unset($responses);
-                exec(ConfigHelper::$df_command, $responses);
-                Log::error("Result of df_command: " . var_export($responses, TRUE));
-                unset($responses);
-                exec('df -k 2>&1', $responses);
-                Log::error("Result of df -k: " . var_export($responses, TRUE));
-                Log::error("===== Error report ends here =====");
+                unset($df_command_responses);
+                exec(ConfigHelper::$df_command, $df_command_responses);
+                unset($df_k_responses);
+                exec('df -k 2>&1', $df_k_responses);
+                $details = "Please report this using the 'Issues' tab found on https://github.com/gboudreau/Greyhole. You should include the following information in your ticket:\n"
+                    . "===== Error report starts here =====\n"
+                    . "Unknown free space for partition: $sp_drive\n"
+                    . "df_command: " . ConfigHelper::$df_command . "\n"
+                    . "Result of df_command: " . var_export($df_command_responses, TRUE) . "\n"
+                    . "Result of df -k: " . var_export($df_k_responses, TRUE) . "\n"
+                    . "===== Error report ends here =====";
+                Log::error("Can't find how much free space is left on $sp_drive. This partition will never be used! Details will follow.\n$details", Log::EVENT_CODE_STORAGE_POOL_DRIVE_DF_FAILED);
             }
             continue;
         }
@@ -1993,11 +2013,11 @@ function order_target_drives($filesize_kb, $include_full_drives, $share, $path, 
     
     // Email notification when all drives are over-capacity
     if (count($sorted_target_drives) == 0) {
-        Log::warn("  Warning! All storage pool drives are over-capacity!");
+        Log::error("  Warning! All storage pool drives are over-capacity!", Log::EVENT_CODE_ALL_DRIVES_FULL);
         if (!isset($last_OOS_notification)) {
             $setting = Settings::get('last_OOS_notification');
             if ($setting === FALSE) {
-                Log::warn("Received no rows when querying settings for 'last_OOS_notification'; expected one.");
+                Log::warn("Received no rows when querying settings for 'last_OOS_notification'; expected one.", Log::EVENT_CODE_SETTINGS_READ_ERROR);
                 $setting = Settings::set('last_OOS_notification', 0);
             }
             $last_OOS_notification = $setting;
@@ -2180,10 +2200,9 @@ function gh_fsck($path, $share, $storage_path = FALSE) {
     }
 
 
-    $list = array();
     $handle = @opendir($path);
     if ($handle === FALSE) {
-        Log::error("  Couldn't open $path to list content. Skipping...");
+        Log::error("  Couldn't open $path to list content. Skipping...", Log::EVENT_CODE_LIST_DIR_FAILED);
         return;
     }
     while (($filename = readdir($handle)) !== FALSE) {
@@ -2378,7 +2397,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                 // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
                 $root_path = str_replace(normalize_utf8_characters(clean_dir("/$share/$file_path/$filename")), '', normalize_utf8_characters($metafile->path));
                 if ($root_path == $metafile->path) {
-                    Log::warn("Couldn't find root path for $metafile->path");
+                    Log::warn("Couldn't find root path for $metafile->path", Log::EVENT_CODE_FSCK_METAFILE_ROOT_PATH_NOT_FOUND);
                 }
                 if ($inode_number !== FALSE && $metafile->state == 'OK') {
                     Log::debug("Found $metafile->path");
@@ -2401,7 +2420,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
                 $link_target = readlink($metafile->path);
                 if (array_contains($file_copies_inodes, $link_target)) {
                     // This link points to another file copy. Bad, bad!
-                    Log::warn("Warning! Found a symlink in your storage pool: $metafile->path -> $link_target. Deleting.");
+                    Log::warn("Warning! Found a symlink in your storage pool: $metafile->path -> $link_target. Deleting.", Log::EVENT_CODE_FSCK_SYMLINK_FOUND_IN_STORAGE_POOL);
                     gh_recycle($metafile->path);
                 }
                 $inode_number = FALSE;
@@ -2434,7 +2453,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
     $num_copies_required = get_num_copies($share);
     if ($num_copies_required == -1) {
-        Log::warn("Tried to fsck a share that is missing from greyhole.conf. Skipping.");
+        Log::warn("Tried to fsck a share that is missing from greyhole.conf. Skipping.", Log::EVENT_CODE_FSCK_UNKNOWN_SHARE);
         return;
     }
     
@@ -2532,10 +2551,10 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
 
                 if ($file_size === FALSE) {
                     // Empty file; just delete it.
-                    Log::warn("  An empty file copy was found: $real_full_path is 0 bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.");
+                    Log::warn("  An empty file copy was found: $real_full_path is 0 bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes. This empty copy will be deleted.", Log::EVENT_CODE_FSCK_EMPTY_FILE_COPY_FOUND);
                     unlink($real_full_path);
                 } else {
-                    Log::warn("  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.");
+                    Log::warn("  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.", Log::EVENT_CODE_FSCK_SIZE_MISMATCH_FILE_COPY_FOUND);
                     gh_recycle($real_full_path);
                     $fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
                 }
@@ -2567,7 +2586,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             save_metafiles($share, $file_path, $filename, $file_metafiles);
         }
     } else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
-        Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')));
+        Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')), Log::EVENT_CODE_FSCK_NO_FILE_COPIES);
         if ($source == 'metastore' || get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
             $fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
         }
@@ -2968,7 +2987,7 @@ function gh_recycle($real_path, $file_was_modified=FALSE) {
     if ($should_move_to_trash) {
         // Move to trash
         if (!isset($trash_path)) {
-            Log::warn("  Warning! Can't find trash for $real_path. Won't delete this file!");
+            Log::warn("  Warning! Can't find trash for $real_path. Won't delete this file!", Log::EVENT_CODE_TRASH_NOT_FOUND);
             return FALSE;
         }
         
@@ -3264,7 +3283,7 @@ function gh_balance() {
                     $pool_drives_avail_space[$sp_drive] -= $filesize;
                     $pool_drives_avail_space[$source_drive] += $filesize;
                 } else {
-                    Log::warn("    Failed file copy. Skipping.");
+                    Log::warn("    Failed file copy. Skipping.", Log::EVENT_CODE_FILE_COPY_FAILED);
                     @unlink($temp_path);
                     continue;
                 }
@@ -3308,7 +3327,7 @@ function gh_balance() {
             Log::debug("Some shares with sticky files were skipped. Balancing will now re-start to continue moving those sticky files as needed, and further balance. Recursion level = " . count($arr));
             gh_balance();
         } else {
-            Log::warn("Maximum number of consecutive balance reached. You'll need to re-execute --balance if you want to balance further.");
+            Log::info("Maximum number of consecutive balance reached. You'll need to re-execute --balance if you want to balance further.");
         }
     }
 }
@@ -3379,7 +3398,7 @@ function process_config() {
             sleep(600); // 10 minutes
         } else {
             // Otherwise, die.
-            Log::critical("Config file parsing failed. Exiting.");
+            Log::critical("Config file parsing failed. Exiting.", Log::EVENT_CODE_CONFIG_FILE_PARSING_FAILED);
         }
     }
     // Config is OK; go on!
@@ -3525,7 +3544,7 @@ function create_trash_share_symlink($filepath_in_trash, $trash_path) {
         if (@gh_symlink($filepath_in_trash, $filepath_in_trash_share)) {
             Log::debug("  Created symlink to deleted file in {$trash_share['name']} share ($filename).");
         } else {
-            Log::warn("  Warning! Couldn't create symlink to deleted file in {$trash_share['name']} share ($filename).");
+            Log::warn("  Warning! Couldn't create symlink to deleted file in {$trash_share['name']} share ($filename).", Log::EVENT_CODE_TRASH_SYMLINK_FAILED);
         }
     }
 }
@@ -3673,8 +3692,7 @@ function gh_check_md5($task) {
                     }
                 }
 
-                Log::warn("  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5");
-                Log::warn("  This copy will be deleted, and replaced with a new copy from $original_file_path");
+                Log::warn("  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5. This copy will be deleted, and replaced with a new copy from $original_file_path", Log::EVENT_CODE_FSCK_MD5_MISMATCH);
                 gh_recycle($latest_file_copy);
 
                 $metafiles = array();
@@ -3707,13 +3725,13 @@ function gh_check_md5($task) {
     if (isset($logs)) {
         // Write to greyhole.log
         foreach ($logs as $log) {
-            Log::error($log);
+            Log::error($log, Log::EVENT_CODE_FSCK_MD5_MISMATCH);
         }
 
         // Write in fsck_checksums.log too
         $flog = fopen(FSCKLogFile::PATH . '/fsck_checksums.log', 'a');
         if (!$flog) {
-            Log::critical("Couldn't open log file: " . FSCKLogFile::PATH . "/fsck_checksums.log");
+            Log::critical("Couldn't open log file: " . FSCKLogFile::PATH . "/fsck_checksums.log", Log::EVENT_CODE_FSCK_MD5_LOG_FAILURE);
         }
         fwrite($flog, $date = date("M d H:i:s") . ' ' . implode("\n", $logs) . "\n\n");
         fclose($flog);
@@ -3776,7 +3794,7 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
         $inode_number = @gh_fileinode($clean_full_path);
         if ($inode_number !== FALSE) {
             if (is_dir($clean_full_path)) {
-                Log::warn("Warning! Found a directory that should be a file! Will try to remove it, if it's empty.");
+                Log::info("Found a directory that should be a file! Will try to remove it, if it's empty.");
                 @rmdir($clean_full_path);
                 continue;
             }
@@ -3796,7 +3814,7 @@ function get_file_inodes($share, $file_path, $filename, &$file_metafiles, $one_i
                 }
             }
             if (is_string($file_metafiles)) {
-                Log::critical("Fatal error! \$file_metafiles is now a string: '$file_metafiles'.");
+                Log::critical("Fatal error! \$file_metafiles is now a string: '$file_metafiles'.", Log::EVENT_CODE_UNEXPECTED_VAR);
             }
             $file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => $state);
             

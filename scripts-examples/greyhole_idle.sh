@@ -24,16 +24,10 @@ LOG="$3"
 
 echo "Received hook with event_type = ${EVENT_TYPE}, event_code = ${EVENT_CODE}" >> /tmp/gh_log.txt
 
-if [ "${EVENT_TYPE}" = "warning" -o "${EVENT_TYPE}" = "error" -o "${EVENT_TYPE}" = "critical" ]; then
-	# Expected log format: Jan 20 07:52:56 WARN initialize: ...
-	IFS=' '
-	arrLOG=(${LOG})
-	EVENT_DATE="${arrLOG[0]} ${arrLOG[1]} ${arrLOG[2]}"
-	LOG_LEVEL=${arrLOG[3]}
-	ACTION=${arrLOG[4]%?} # See ACTION_* defines in the includes/Log.php file: https://github.com/gboudreau/Greyhole/blob/master/includes/Log.php#L21
-	MESSAGE=(${arrLOG[@]:5})
-	MESSAGE="${MESSAGE[@]}"
-	echo "  Tokenize'd log: EVENT_DATE=${EVENT_DATE} ; LOG_LEVEL=${LOG_LEVEL} ; ACTION=${ACTION} ; MESSAGE=${MESSAGE}" >> /tmp/gh_log.txt
+if [ "${EVENT_TYPE}" = "idle" ]; then
+	echo "  Greyhole is idle: ${LOG}" >> /tmp/gh_log.txt
+elif [ "${EVENT_TYPE}" = "not_idle" ]; then
+	echo "  Greyhole is busy: ${LOG}" >> /tmp/gh_log.txt
 else
 	echo "Warning: Unknown event received: ${EVENT_TYPE}" >> /tmp/gh_log.txt
 	exit 1

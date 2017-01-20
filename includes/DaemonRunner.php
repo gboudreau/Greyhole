@@ -26,8 +26,13 @@ class DaemonRunner extends AbstractRunner {
 			die("Found an already running Greyhole daemon with PID " . self::getPID() . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
 		}
 
-		Log::info("Greyhole (version %VERSION%) daemon started.");
+		$log = "Greyhole (version %VERSION%) daemon started.";
+		Log::info($log);
 		$this->initialize();
+
+		global $was_idle;
+        $was_idle = TRUE;
+        LogHook::trigger(LogHook::EVENT_TYPE_IDLE, Log::EVENT_CODE_IDLE, $log);
 
         // The daemon runs indefinitely, this the infinite loop here.
 		while (TRUE) {

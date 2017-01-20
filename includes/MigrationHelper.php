@@ -74,7 +74,7 @@ final class MigrationHelper {
                 unlink("$sp_drive/.greyhole_uses_this");
             }
             if ($drives_definitions[$sp_drive] != $drive_uuid) {
-                Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.");
+                Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.", Log::EVENT_CODE_STORAGE_POOL_DRIVE_UUID_CHANGED);
             }
         }
         foreach ($drives_definitions as $sp_drive => $uuid) {
@@ -93,7 +93,7 @@ final class MigrationHelper {
                 if (Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
                     Log::info("The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ", but per greyhole.conf '" . CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE . "' options, you chose to ignore this normally critical error.");
                 } else {
-                    Log::critical("ERROR: The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ". The Greyhole daemon will now stop.");
+                    Log::critical("ERROR: The following storage pool drives are on the same partition: " . implode(", ", $sp_drives) . ". The Greyhole daemon will now stop.", Log::EVENT_CODE_CONFIG_STORAGE_POOL_DRIVES_SAME_PARTITION);
                 }
             }
         }
