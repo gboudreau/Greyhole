@@ -9,7 +9,6 @@ Links
 -----
 * [Official website](https://www.greyhole.net/)
 * [Support](http://support.greyhole.net)
-* [Live chat (IRC)](https://www.greyhole.net/chat/)
 
 Features
 --------
