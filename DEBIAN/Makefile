@@ -22,7 +22,7 @@ deb: build
 	rm COPYING
 	rm INSTALL
 	rm USAGE
-	rm -rf samba-module/ docs/ includes/ web-app/
+	rm -rf samba-module/ docs/ includes/ web-app/ scripts-examples/
 
 build:
 	mkdir -p $(DESTDIR)etc/init.d/
@@ -31,6 +31,7 @@ build:
 	mkdir -p $(DESTDIR)usr/share/greyhole/
 	mkdir -p $(DESTDIR)etc/logrotate.d/
 	mkdir -p $(DESTDIR)usr/share/greyhole/web-app/
+	mkdir -p $(DESTDIR)usr/share/greyhole/scripts-examples/
 	mkdir -p $(DESTDIR)etc/cron.d/
 	mkdir -p $(DESTDIR)etc/cron.daily/
 	mkdir -p $(DESTDIR)etc/cron.weekly/
@@ -57,6 +58,11 @@ build:
 
 	install -m 0644 -D -p web-app/index.php $(DESTDIR)usr/share/greyhole/web-app/index.php
 	install -m 0644 -D -p web-app/README $(DESTDIR)usr/share/greyhole/web-app/README
+
+	install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
+	install -m 0755 -D -p scripts-examples/greyhole_idle.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
+	install -m 0755 -D -p scripts-examples/greyhole_notify_error.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
+	install -m 0755 -D -p scripts-examples/greyhole_send_fsck_report.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
 	
 	install -m 0644 -D -p USAGE $(DESTDIR)usr/share/greyhole/
 	

@@ -109,7 +109,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
     protected static function check_going_dir($path, $share, $going_drive) {
         $handle = @opendir($path);
         if ($handle === FALSE) {
-            Log::error("Couldn't open $path to list content. Skipping...");
+            Log::error("Couldn't open $path to list content. Skipping...", Log::EVENT_CODE_LIST_DIR_FAILED);
             return;
         }
         Log::debug("Entering $path");
@@ -135,7 +135,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
                 $file_metafiles = array();
                 $file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
                 if (count($file_copies_inodes) == 0) {
-                    Log::warn("Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
+                    Log::debug("Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
                     echo ".";
                     gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
                 }

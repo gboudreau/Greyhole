@@ -21,6 +21,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 // Other helpers
 require_once('includes/ConfigHelper.php');
 require_once('includes/DB.php');
+require_once('includes/Hook.php');
 require_once('includes/Log.php');
 require_once('includes/MigrationHelper.php');
 require_once('includes/PoolDriveSelector.php');
@@ -76,7 +77,7 @@ function explode_full_path($full_path) {
 
 function gh_shutdown() {
     if ($err = error_get_last()) {
-        Log::error("PHP Fatal Error: " . $err['message'] . "; BT: " . basename($err['file']) . '[L' . $err['line'] . '] ');
+        Log::error("PHP Fatal Error: " . $err['message'] . "; BT: " . basename($err['file']) . '[L' . $err['line'] . '] ', Log::EVENT_CODE_PHP_CRITICAL);
     }
 }
 
@@ -91,7 +92,7 @@ function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
     case E_PARSE:
     case E_CORE_ERROR:
     case E_COMPILE_ERROR:
-        Log::critical("PHP Error [$errno]: $errstr in $errfile on line $errline");
+        Log::critical("PHP Error [$errno]: $errstr in $errfile on line $errline", Log::EVENT_CODE_PHP_CRITICAL);
         break;
 
     case E_WARNING:
@@ -104,11 +105,11 @@ function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
             // What would have been logged will be echoed instead.
             return TRUE;
         }
-        Log::warn("PHP Warning [$errno]: $errstr in $errfile on line $errline; BT: " . get_debug_bt());
+        Log::warn("PHP Warning [$errno]: $errstr in $errfile on line $errline; BT: " . get_debug_bt(), Log::EVENT_CODE_PHP_WARNING);
         break;
 
     default:
-        Log::warn("PHP Unknown Error [$errno]: $errstr in $errfile on line $errline");
+        Log::error("PHP Unknown Error [$errno]: $errstr in $errfile on line $errline", Log::EVENT_CODE_PHP_ERROR);
         break;
     }
 
@@ -192,7 +193,7 @@ function get_share_landing_zone($share) {
     } else if (array_contains(ConfigHelper::$trash_share_names, $share)) {
         return SharesConfig::get(CONFIG_TRASH_SHARE, CONFIG_LANDING_ZONE);
     } else {
-        Log::warn("  Found a share ($share) with no path in " . ConfigHelper::$smb_config_file . ", or missing it's num_copies[$share] config in " . ConfigHelper::$config_file . ". Skipping.");
+        Log::warn("  Found a share ($share) with no path in " . ConfigHelper::$smb_config_file . ", or missing it's num_copies[$share] config in " . ConfigHelper::$config_file . ". Skipping.", Log::EVENT_CODE_SHARE_MISSING_FROM_GREYHOLE_CONF);
         return FALSE;
     }
 }
@@ -202,7 +203,7 @@ function memory_check() {
     $used = $usage / Config::get(CONFIG_MEMORY_LIMIT);
     $used = $used * 100;
     if ($used > 95) {
-        Log::critical("$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in /etc/greyhole.conf");
+        Log::critical("$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in /etc/greyhole.conf", Log::EVENT_CODE_MEMORY_LIMIT_REACHED);
     }
 }
 
@@ -313,13 +314,23 @@ class FSCKLogFile {
 
         $last_mod_date = filemtime($logfile);
         if ($last_mod_date > $this->getLastEmailSentTime()) {
-            $email_to = Config::get(CONFIG_EMAIL_TO);
-            Log::warn("Sending $logfile by email to $email_to");
-            mail($email_to, $this->getSubject(), $this->getBody());
+            if ($this->shouldSendViaEmail()) {
+                $email_to = Config::get(CONFIG_EMAIL_TO);
+                Log::info("Sending $logfile by email to $email_to");
+                mail($email_to, $this->getSubject(), $this->getBody());
+            }
+
+            LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $this->getSubject() . "\n" . $this->getBody());
 
             $this->lastEmailSentTime = $last_mod_date;
             Settings::set("last_email_$this->filename", $this->lastEmailSentTime);
         }
+    }
+
+    private function shouldSendViaEmail() {
+        $this->getBody();
+        global $fsck_report;
+        return (@$fsck_report['send_via_email'] === TRUE);
     }
 
     private function getBody() {
@@ -370,8 +381,9 @@ class FSCKLogFile {
         initialize_fsck_report($what);
     }
 
-    public static function saveFSCKReport() {
+    public static function saveFSCKReport($send_via_email) {
         global $fsck_report;
+        $fsck_report['send_via_email'] = $send_via_email;
         $logfile = self::PATH . '/fsck_files.log';
         file_put_contents($logfile, serialize($fsck_report));
     }

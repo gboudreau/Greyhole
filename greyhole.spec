@@ -26,6 +26,7 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/web-app/
+mkdir -p $RPM_BUILD_ROOT/usr/share/greyhole/scripts-examples/
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1/
 mkdir -p $RPM_BUILD_ROOT/usr/share/man/man5/
 
@@ -48,6 +49,11 @@ install -m 0755 -D -p greyhole.cron.daily ${RPM_BUILD_ROOT}%{_sysconfdir}/cron.d
 
 install -m 0644 -D -p web-app/index.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/
 install -m 0644 -D -p web-app/README ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/
+
+install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
+install -m 0755 -D -p scripts-examples/greyhole_idle.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
+install -m 0755 -D -p scripts-examples/greyhole_notify_error.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
+install -m 0755 -D -p scripts-examples/greyhole_send_fsck_report.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
 
 install -m 0644 -D -p USAGE ${RPM_BUILD_ROOT}/usr/share/greyhole/
 

@@ -51,7 +51,7 @@ class PoolDriveSelector {
             arsort($sorted_target_drives);
             arsort($last_resort_sorted_target_drives);
         } else {
-            Log::critical("Unknown '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' found: " . $this->selection_algorithm);
+            Log::critical("Unknown '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' found: " . $this->selection_algorithm, Log::EVENT_CODE_CONFIG_INVALID_VALUE);
         }
         // Only keep drives that are in $this->drives
         $this->sorted_target_drives = array();
@@ -101,7 +101,7 @@ class PoolDriveSelector {
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(least_used_space|most_available_space)/i', $config_string, $regs)) {
-            Log::critical("Can't understand the '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' value: $config_string");
+            Log::critical("Can't understand the '" . CONFIG_DRIVE_SELECTION_ALGORITHM . "' value: $config_string", Log::EVENT_CODE_CONFIG_INVALID_VALUE);
         }
         $selection_algorithm = $regs[2];
         $groups = array_map('trim', explode(',', $regs[1]));

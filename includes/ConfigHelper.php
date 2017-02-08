@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2014 Guillaume Boudreau
+Copyright 2014-2017 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -49,6 +49,7 @@ define('CONFIG_DB_PASS', 'db_pass');
 define('CONFIG_DB_NAME', 'db_name');
 define('CONFIG_METASTORE_BACKUPS', 'metastore_backups');
 define('CONFIG_TRASH_SHARE', '===trash_share===');
+define('CONFIG_HOOK', 'hook');
 
 function recursive_include_parser($file) {
     $regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
@@ -74,7 +75,7 @@ function recursive_include_parser($file) {
             $ok_to_execute &= !($perms & 0x0002);
 
             if (!$ok_to_execute) {
-                Log::warn("Config file '{$file}' is executable but file permissions are insecure, only the file's contents will be included.");
+                Log::warn("Config file '{$file}' is executable but file permissions are insecure, only the file's contents will be included.", Log::EVENT_CODE_CONFIG_INCLUDE_INSECURE_PERMISSIONS);
             }
         }
 
@@ -215,6 +216,9 @@ final class ConfigHelper {
         // Share options
         if (self::parse_line_share_option($name, $value)) return;
 
+        // Hooks
+        if (self::parse_line_hook($name, $value)) return;
+
         // Unknown
         if (is_numeric($value)) {
             $value = (int) $value;
@@ -226,7 +230,7 @@ final class ConfigHelper {
         foreach (self::$deprecated_options as $old_name => $new_name) {
             if (string_contains($name, $old_name)) {
                 $fixed_name = str_replace($old_name, $new_name, $name);
-                Log::warn("Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name");
+                Log::warn("Deprecated option found in greyhole.conf: $name. You should change that to: $fixed_name", Log::EVENT_CODE_CONFIG_DEPRECATED_OPTION);
                 $name = $fixed_name;
             }
         }
@@ -262,7 +266,7 @@ final class ConfigHelper {
 
     private static function parse_line_log($name, $value) {
         if ($name == CONFIG_LOG_LEVEL) {
-            self::assert(defined("Log::$value"), "Invalid value for log_level: '$value'");
+            self::assert(defined("Log::$value"), "Invalid value for log_level: '$value'", Log::EVENT_CODE_CONFIG_INVALID_VALUE);
             Config::set(CONFIG_LOG_LEVEL, constant("Log::$value"));
             return TRUE;
         }
@@ -285,7 +289,7 @@ final class ConfigHelper {
                 }
                 Config::add(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $value, $sp_drive);
             } else {
-                Log::warn("Warning! Unable to parse " . CONFIG_STORAGE_POOL_DRIVE . " line from config file. Value = $value");
+                Log::warn("Warning! Unable to parse " . CONFIG_STORAGE_POOL_DRIVE . " line from config file. Value = $value", Log::EVENT_CODE_CONFIG_UNPARSEABLE_LINE);
             }
             return TRUE;
         }
@@ -385,11 +389,30 @@ final class ConfigHelper {
         return TRUE;
     }
 
+    private static function parse_line_hook($name, $value) {
+        if (string_starts_with($name, CONFIG_HOOK)) {
+            if (!preg_match('/hook\[([^\]]+)\]/', $name, $re)) {
+                Log::warn("Can't parse the following config line: $name; ignoring.", Log::EVENT_CODE_CONFIG_UNPARSEABLE_LINE);
+                return TRUE;
+            }
+            if (!is_executable($value)) {
+                Log::warn("Hook script $value is not executable; ignoring.", Log::EVENT_CODE_CONFIG_HOOK_SCRIPT_NOT_EXECUTABLE);
+                return TRUE;
+            }
+            $events = explode('|', $re[1]);
+            foreach ($events as $event) {
+                Hook::add($event, $value);
+            }
+            return TRUE;
+        }
+        return FALSE;
+    }
+
     private static function init() {
         Log::setLevel(Config::get(CONFIG_LOG_LEVEL));
 
         if (count(Config::storagePoolDrives()) == 0) {
-            Log::error("You have no '" . CONFIG_STORAGE_POOL_DRIVE . "' defined. Greyhole can't run.");
+            Log::error("You have no '" . CONFIG_STORAGE_POOL_DRIVE . "' defined. Greyhole can't run.", Log::EVENT_CODE_CONFIG_NO_STORAGE_POOL);
             return FALSE;
         }
 
@@ -441,7 +464,7 @@ final class ConfigHelper {
                 SharesConfig::set($share_name, CONFIG_NUM_COPIES, count(Config::storagePoolDrives()));
             }
             if (!isset($share_options[CONFIG_LANDING_ZONE])) {
-                Log::warn("Found a share ($share_name) defined in " . self::$config_file . " with no path in " . self::$smb_config_file . ". Either add this share in " . self::$smb_config_file . ", or remove it from " . self::$config_file . ", then restart Greyhole.");
+                Log::warn("Found a share ($share_name) defined in " . self::$config_file . " with no path in " . self::$smb_config_file . ". Either add this share in " . self::$smb_config_file . ", or remove it from " . self::$config_file . ", then restart Greyhole.", Log::EVENT_CODE_CONFIG_SHARE_MISSING_FROM_SMB_CONF);
                 return FALSE;
             }
             if (!isset($share_options[CONFIG_DELETE_MOVES_TO_TRASH])) {
@@ -464,10 +487,10 @@ final class ConfigHelper {
             // Validate that the landing zone is NOT a subdirectory of a storage pool drive, and that storage pool drives are not subdirectories of the landing zone!
             foreach (Config::storagePoolDrives() as $sp_drive) {
                 if (string_starts_with($share_options[CONFIG_LANDING_ZONE], $sp_drive)) {
-                    Log::critical("Found a share ($share_name), with path " . $share_options[CONFIG_LANDING_ZONE] . ", which is INSIDE a storage pool drive ($sp_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+                    Log::critical("Found a share ($share_name), with path " . $share_options[CONFIG_LANDING_ZONE] . ", which is INSIDE a storage pool drive ($sp_drive). Share directories should never be inside a directory that you have in your storage pool.\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.", Log::EVENT_CODE_CONFIG_LZ_INSIDE_STORAGE_POOL);
                 }
                 if (string_starts_with($sp_drive, $share_options[CONFIG_LANDING_ZONE])) {
-                    Log::critical("Found a storage pool drive ($sp_drive), which is INSIDE a share landing zone (" . $share_options[CONFIG_LANDING_ZONE] . "), for share $share_name. Storage pool drives should never be inside a directory that you use as a share landing zone ('path' in smb.conf).\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.");
+                    Log::critical("Found a storage pool drive ($sp_drive), which is INSIDE a share landing zone (" . $share_options[CONFIG_LANDING_ZONE] . "), for share $share_name. Storage pool drives should never be inside a directory that you use as a share landing zone ('path' in smb.conf).\nFor your shares to use your storage pool, you just need them to have 'vfs objects = greyhole' in their (smb.conf) config; their location on your file system is irrelevant.", Log::EVENT_CODE_CONFIG_STORAGE_POOL_INSIDE_LZ);
                 }
             }
         }
@@ -483,7 +506,7 @@ final class ConfigHelper {
                 }
             }
             if (!$found) {
-                Log::warn("The storage pool drive '$sp_drive' is not part of any drive_selection_algorithm definition, and will thus never be used to receive any files.");
+                Log::warn("The storage pool drive '$sp_drive' is not part of any drive_selection_algorithm definition, and will thus never be used to receive any files.", Log::EVENT_CODE_CONFIG_STORAGE_POOL_DRIVE_NOT_IN_DRIVE_SELECTION_ALGO);
             }
         }
 
@@ -525,9 +548,9 @@ final class ConfigHelper {
         return TRUE;
     }
 
-    private static function assert($check, $error_message) {
+    private static function assert($check, $error_message, $event_code) {
         if ($check === FALSE) {
-            Log::critical($error_message);
+            Log::critical($error_message, $event_code);
         }
     }
 }

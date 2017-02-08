@@ -424,6 +424,106 @@ Examples: \fIinclude = /etc/greyhole.d/storage_drives\fR
 \fIinclude = /etc/greyhole.d/greyhole_shares.sh\fR
 .RE
 .RE
+.RE
+
+executed_tasks_retention
+.PP
+.RS 4
+How long should executed tasks be kept in the database, after having been executed.
+.RS 0
+Those are strictly for debugging purposes; they serve no other purposes.
+.RE
+.RS 0
+Enter a number of days, or \fBforever\fR
+.RE
+.RS 0
+Default is \fB60\fR days.
+.RE
+.RE
+
+
+ignored_files
+.RS 0
+ignored_folders
+.PP
+.RS 4
+Files that match the patterns below will be ignored by Greyhole.
+.RS 0
+They will stay in the landing zone indefinitely, so be careful on what you
+define here. List here all files and folders that are temporary, to prevent
+Greyhole from working for nothing.
+.PP
+Format is Regular Expressions (PCRE syntax)
+.PP
+\fBignored_files\fR is matched against the file name only.
+.RE
+.RS 0
+\fBignored_folders\fR is matched against the concatenation of the share name and
+the full path to the file (without the filename), eg: \fBVideos/Movies/HD/\fR
+.RE
+.RE
+
+hook
+.PP
+.RS 4
+Call custom scripts on events.
+.PP
+.RS 0
+Available events type: \fBcreate\fR, \fBedit\fR, \fBrename\fR, \fBdelete\fR, \fBmkdir\fR, \fBrmdir\fR, \fBwarning\fR, \fBerror\fR, \fBcritical\fR, \fBfsck\fR, \fBidle\fR and \fBnot_idle\fR
+.RE
+.RS 2
+- For \fBcreate\fR, \fBedit\fR, \fBrename\fR, \fBdelete\fR, \fBmkdir\fR and \fBrmdir\fR: the hooks are called after Greyhole finished processing the operation;
+.RE
+.RS 2
+- for \fBwarning\fR, \fBerror\fR, \fBcritical\fR and \fBfsck\fR: the hooks are called after Greyhole created a log;
+.RE
+.RS 2
+- for \fBidle\fR and \fBnot_idle\fR: the hooks are called just before the daemon will sleep, or when it's about to start working again.
+.RE
+.PP
+.RS 0
+The parameters sent to the custom scripts are:
+.RE
+.RS 2
+- \fBevent_type\fR (one of the above)
+.RE
+.RS 2
+If event is related to a file/folder on a share (\fBcreate\fR, \fBedit\fR, \fBrename\fR, \fBdelete\fR, \fBmkdir\fR and \fBrmdir\fR), other params will be:
+.RE
+.RS 4
+- \fBshare_name\fR
+.RE
+.RS 4
+- \fBpath_on_share\fR
+.RE
+.RS 4
+- \fBoriginal_path_on_share\fR (only for \fBrename\fR)
+.RE
+.RS 2
+If event is related to a log (\fBwarning\fR, \fBerror\fR, \fBcritical\fR, \fBfsck\fR, \fBidle\fR and \fBnot_idle\fR), other params will be:
+.RE
+.RS 4
+- \fBevent_code\fR: one of the predefined values that define the actual error/event.
+.RE
+.RS 6
+Look here for the list of possible codes: \fIhttps://github.com/gboudreau/Greyhole/blob/master/includes/Log.php#L62\fR
+.RE
+.RS 4
+- \fBlog\fR: user-readable log (might contain LF characters)
+.RE
+.PP
+Examples: \fIhook[create|edit|rename|delete|mkdir|rmdir] = /usr/share/greyhole/scripts-examples/greyhole_file_changed.sh\fR
+.RS 10
+\fIhook[warning|error|critical]                = /usr/share/greyhole/scripts-examples/greyhole_notify_error.sh\fR
+.RE
+.RS 10
+\fIhook[fsck]                                  = /usr/share/greyhole/scripts-examples/greyhole_send_fsck_report.sh\fR
+.RE
+.RS 10
+\fIhook[idle|not_idle]                         = /usr/share/greyhole/scripts-examples/greyhole_idle.sh\fR
+.RE
+.RE
+
 
 .SH AUTHORS
 Guillaume Boudreau	<guillaume (at) greyhole.net>

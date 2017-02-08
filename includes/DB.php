@@ -43,7 +43,7 @@ final class DB {
                 return DB::connect(TRUE);
             }
             echo "ERROR: Can't connect to database: " . $ex->getMessage() . "\n";
-            Log::critical("Can't connect to database: " . $ex->getMessage());
+            Log::critical("Can't connect to database: " . $ex->getMessage(), Log::EVENT_CODE_DB_CONNECT_FAILED);
         }
 
         if (self::$handle) {
@@ -375,7 +375,7 @@ final class DB {
                     try {
                         DB::execute("ALTER TABLE `$table_name` CHARACTER SET utf8 COLLATE utf8_general_ci");
                     } catch (Exception $ex) {
-                        Log::warn("  ALTER TABLE failed.");
+                        Log::warn("  ALTER TABLE failed.", Log::EVENT_CODE_DB_MIGRATION_FAILED);
                     }
                 }
             }
@@ -413,7 +413,7 @@ final class DB {
             return;
         }
         if (!is_int($executed_tasks_retention)) {
-            Log::critical("Error: Invalid value for 'executed_tasks_retention' in greyhole.conf: '$executed_tasks_retention'. You need to use either 'forever' (no quotes), or a number of days.");
+            Log::critical("Error: Invalid value for 'executed_tasks_retention' in greyhole.conf: '$executed_tasks_retention'. You need to use either 'forever' (no quotes), or a number of days.", Log::EVENT_CODE_CONFIG_INVALID_VALUE);
         }
         Log::info("Cleaning executed tasks: keeping the last $executed_tasks_retention days of logs.");
         $query = sprintf("DELETE FROM tasks_completed WHERE event_date < NOW() - INTERVAL %d DAY", (int) $executed_tasks_retention);
