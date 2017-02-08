@@ -1056,7 +1056,9 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
 
     save_metafiles($share, $path, $filename, $metafiles);
 
-    create_copies_from_metafiles($metafiles, $share, $full_path, $source_file);
+    if (!create_copies_from_metafiles($metafiles, $share, $full_path, $source_file)) {
+        return FALSE;
+    }
 
     return $metafiles;
 }
@@ -1071,7 +1073,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
     $link_next = FALSE;
     $file_infos = gh_get_file_infos("$landing_zone/$full_path");
     foreach ($metafiles as $key => $metafile) {
-        if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return; }
+        if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return FALSE; }
         
         if ($metafile->path == $source_file && $metafile->state == 'OK' && gh_filesize($metafile->path) == gh_filesize($source_file)) {
             Log::debug("  File copy at $metafile->path is already up to date.");
@@ -1114,7 +1116,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
                 global $current_task_id;
                 if ($current_task_id === 0) {
                     Log::error("    Failed file copy (cont). We already retried this task. Aborting.", Log::EVENT_CODE_FILE_COPY_FAILED);
-                    return;
+                    return FALSE;
                 }
                 Log::warn("    Failed file copy (cont). Will try to re-process this write task, since the source file seems intact.", Log::EVENT_CODE_FILE_COPY_FAILED);
                 // Queue a new write task, to replace the now gone copy.
@@ -1126,7 +1128,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
                     'full_path' => clean_dir($full_path),
                     'complete' => 'yes'
                 );
-                return;
+                return FALSE;
             }
             continue;
         }
@@ -1152,6 +1154,7 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
         }
         save_metafiles($share, $path, $filename, $metafiles);
     }
+    return TRUE;
 }
 
 function gh_copy_file($source_file, &$destination_file) {
