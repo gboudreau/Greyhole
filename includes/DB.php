@@ -148,16 +148,21 @@ final class DB {
     }
 
     private static function migrate() {
-        DB::migrate_1_frozen_thaw();
-        DB::migrate_2_idle();
-        DB::migrate_3_larger_settings();
-        DB::migrate_4_find_next_task_index();
-        DB::migrate_5_find_next_task_index();
-        DB::migrate_6_md5_worker_indexes();
-        DB::migrate_7_larger_full_path();
-        DB::migrate_8_du_stats();
-        DB::migrate_9_complete_writen();
-        DB::migrate_10_utf8();
+        $db_version = (int) Settings::get('db_version');
+        if ($db_version < 11) {
+            DB::migrate_1_frozen_thaw();
+            DB::migrate_2_idle();
+            DB::migrate_3_larger_settings();
+            DB::migrate_4_find_next_task_index();
+            DB::migrate_5_find_next_task_index();
+            DB::migrate_6_md5_worker_indexes();
+            DB::migrate_7_larger_full_path();
+            DB::migrate_8_du_stats();
+            DB::migrate_9_complete_writen();
+            DB::migrate_10_utf8();
+            DB::migrate_11_varchar();
+            Settings::set('db_version', 11);
+        }
     }
 
     // Migration #1 (complete = frozen|thawed)
@@ -390,6 +395,26 @@ final class DB {
                 DB::execute("ALTER TABLE `$table_name` CHANGE `$column_name` `$column_name` $definition");
             }
         }
+    }
+
+    # Migration #11: TINYTEXT > VARCHAR(255)
+    private static function migrate_11_varchar() {
+        $q = "ALTER TABLE `settings` CHANGE `name` `name` VARCHAR(255) NOT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` DROP INDEX `md5_checker`";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` CHANGE `share` `share` VARCHAR(255) NOT NULL, CHANGE `full_path` `full_path` VARCHAR(255) NULL, CHANGE `additional_info` `additional_info` VARCHAR(255) NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` ADD INDEX `md5_checker` (`action`, `share`(64), `full_path`, `complete`)";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks_completed` CHANGE `share` `share` VARCHAR(255) NOT NULL, CHANGE `full_path` `full_path` VARCHAR(255) NULL, CHANGE `additional_info` `additional_info` VARCHAR(255) NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` DROP INDEX `uniqness`";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` CHANGE `share` `share` VARCHAR(255) NOT NULL, CHANGE `full_path` `full_path` VARCHAR(255) NOT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`)";
+        DB::execute($q);
     }
 
     public static function repairTables() {
