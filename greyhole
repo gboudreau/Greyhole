@@ -2589,7 +2589,7 @@ function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_pa
             save_metafiles($share, $file_path, $filename, $file_metafiles);
         }
     } else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
-        Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool. ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')), Log::EVENT_CODE_FSCK_NO_FILE_COPIES);
+        Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool: "' . clean_dir("$share/$file_path/$filename") . '". ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')), Log::EVENT_CODE_FSCK_NO_FILE_COPIES);
         if ($source == 'metastore' || get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
             $fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
         }
