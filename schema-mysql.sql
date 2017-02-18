@@ -14,7 +14,7 @@ CREATE TABLE `tasks` (
 `share` VARCHAR(255) NOT NULL,
 `full_path` VARCHAR(255) NULL,
 `additional_info` VARCHAR(255) NULL,
-`complete` ENUM( 'yes',  'no', 'frozen', 'thawed', 'idle') CHARACTER SET ascii NOT NULL,
+`complete` ENUM('yes', 'no', 'frozen', 'thawed', 'idle', 'written') CHARACTER SET ascii NOT NULL,
 `event_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 PRIMARY KEY (`id`),
 KEY `md5_worker` (`action`,`complete`,`additional_info`(100),`id`),
@@ -28,7 +28,7 @@ CREATE TABLE `tasks_completed` (
 `share` VARCHAR(255) NOT NULL,
 `full_path` VARCHAR(255) NULL,
 `additional_info` VARCHAR(255) NULL,
-`complete` ENUM( 'yes',  'no', 'frozen', 'thawed', 'idle' ) CHARACTER SET ascii NOT NULL,
+`complete` ENUM('yes', 'no', 'frozen', 'thawed', 'idle', 'written') CHARACTER SET ascii NOT NULL,
 `event_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE = MYISAM DEFAULT CHARSET=utf8;
 
