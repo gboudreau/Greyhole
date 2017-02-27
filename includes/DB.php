@@ -70,6 +70,11 @@ final class DB {
                 DB::repairTables();
                 return DB::execute($q, $args, FALSE); // $attempt_repair = FALSE, to not go into an infinite loop, if the repair doesn't work.
             }
+            if ($error[1] == 1406 && $attempt_repair) {
+                Log::info("Error during MySQL query: " . $e->getMessage() . '. Will now try to use larger full_path columns.');
+                DB::migrate_large_fullpath();
+                return DB::execute($q, $args, FALSE); // $attempt_repair = FALSE, to not go into an infinite loop, if the fix doesn't work.
+            }
             throw new Exception($e->getMessage(), $error[1]);
         }
     }
@@ -414,6 +419,30 @@ final class DB {
         $q = "ALTER TABLE `du_stats` CHANGE `share` `share` VARCHAR(255) NOT NULL, CHANGE `full_path` `full_path` VARCHAR(255) NOT NULL";
         DB::execute($q);
         $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`)";
+        DB::execute($q);
+    }
+
+    # For users who deal with full_path > 255 characters, migrate to large TEXT fields
+    private static function migrate_large_fullpath() {
+        $q = "ALTER TABLE `settings` DROP PRIMARY KEY";
+        DB::execute($q);
+        $q = "ALTER TABLE `settings` CHANGE `name` `name` TEXT NOT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `settings` ADD PRIMARY KEY (`name`(255))";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` DROP INDEX `md5_checker`";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` CHANGE `full_path` `full_path` TEXT NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` ADD INDEX `md5_checker` (`action`, `share`(64), `full_path`(255), `complete`)";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks_completed` CHANGE `full_path` `full_path` TEXT NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` DROP INDEX `uniqness`";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` CHANGE `full_path` `full_path` TEXT NOT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`(255))";
         DB::execute($q);
     }
 
