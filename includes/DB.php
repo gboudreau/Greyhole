@@ -64,7 +64,7 @@ final class DB {
             $stmt->execute();
             return $stmt;
         } catch (PDOException $e) {
-            $error = self::$handle->errorInfo();
+            $error = $e->errorInfo;
             if (($error[1] == 144 || $error[1] == 145) && $attempt_repair) {
                 Log::info("Error during MySQL query: " . $e->getMessage() . '. Will now try to repair the MySQL tables.');
                 DB::repairTables();
