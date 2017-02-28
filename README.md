@@ -32,5 +32,5 @@ The [GitHub Wiki](https://github.com/gboudreau/Greyhole/wiki) contains the Greyh
 Acks
 ----
 Greyhole is developed mainly using a free open-source license of  
-![PHPStorm](http://www.jetbrains.com/phpstorm/documentation/docs/logo_phpstorm.png)  
+![PHPStorm](https://d3uepj124s5rcx.cloudfront.net/items/0V0z2p0e0K1D0F3t2r1P/logo_PhpStorm.png)  
 kindly provided by [JetBrains](http://www.jetbrains.com/). Thanks guys!
