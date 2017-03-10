@@ -36,8 +36,6 @@ install -m 0755 -D -p greyhole-dfree.php ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0755 -D -p greyhole-custom-cp.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/
 
 install -m 0644 -D -p schema-mysql.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
-install -m 0644 -D -p schema-sqlite.sql ${RPM_BUILD_ROOT}/usr/share/greyhole/
-install -m 0755 -D -p db_migration-sqlite2mysql.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}/usr/share/greyhole/
 
 install -m 0644 -D -p greyhole.example.conf ${RPM_BUILD_ROOT}%{_sysconfdir}/greyhole.conf

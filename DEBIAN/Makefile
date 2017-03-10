@@ -10,8 +10,6 @@ deb: build
 	rm -f greyhole-mv
 	rm logrotate.greyhole
 	rm schema-mysql.sql
-	rm schema-sqlite.sql
-	rm db_migration-sqlite2mysql.sh
 	rm greyhole.example.conf
 	rm greyhole.cron.d
 	rm greyhole.cron.weekly
@@ -44,8 +42,6 @@ build:
 	install -m 0755 -D -p greyhole-custom-cp.sh $(DESTDIR)usr/share/greyhole/
 
 	install -m 0644 -D -p schema-mysql.sql $(DESTDIR)usr/share/greyhole/
-	install -m 0644 -D -p schema-sqlite.sql $(DESTDIR)usr/share/greyhole/
-	install -m 0755 -D -p db_migration-sqlite2mysql.sh $(DESTDIR)usr/share/greyhole/
 	install -m 0644 -D -p greyhole.example.conf $(DESTDIR)usr/share/greyhole/
 
 	install -m 0644 -D -p greyhole.example.conf $(DESTDIR)etc/greyhole.conf

@@ -39,14 +39,12 @@ db_path
 .RE
 .PP
 .RS 4
-The database to use for the Greyhole tasks queue & settings. Available engines: \fBmysql\fR (recommended), \fBsqlite\fR
+The database to use for the Greyhole tasks queue & settings. Available engines: \fBmysql\fR
 .RS 0
 \fINo defaults\fR.
 .RE
 .PP
 When using \fBmysql\fR, you will need to specify a \fBdb_host\fR (normally localhost), \fBdb_user\fR, \fBdb_pass\fR and \fBdb_name\fR. The user and database should already exist, per the USAGE instructions.
-.PP
-When using \fBsqlite\fR, only \fBdb_path\fR is used, and it should be the full path to a sqlite file that will be created by Greyhole.
 .PP
 Example: \fIdb_engine = mysql\fR
 .RS 9
@@ -359,11 +357,11 @@ Examples: \fIfrozen_directory = Data/mysql\fR
 max_queued_tasks
 .PP
 .RS 4
-(Numeric) Maximum number of queued tasks to store in MySQL/SQLite, when parsing the 
+(Numeric) Maximum number of queued tasks to store in MySQL, when parsing the
 spool directory. Use a lower number if you experience slowness while parsing 
 spooled operations.
 .RS 0
-Default is \fB10000000\fR when using Mysql (\fBdb_engine\fR), and \fI1000\fR when using SQLite.
+Default is \fB10000000\fR.
 .RE
 .RE
 
