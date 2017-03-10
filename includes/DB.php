@@ -166,40 +166,23 @@ final class DB {
             DB::migrate_9_complete_writen();
             DB::migrate_10_utf8();
             DB::migrate_11_varchar();
-            Settings::set('db_version', 11);
+            DB::migrate_12_force_update_complete();
+            Settings::set('db_version', 12);
         }
     }
 
     // Migration #1 (complete = frozen|thawed)
     private static function migrate_1_frozen_thaw() {
-        $query = "DESCRIBE tasks";
-        $rows = DB::getAll($query);
-        foreach ($rows as $row) {
-            if ($row->Field == 'complete') {
-                if ($row->Type == "enum('yes','no')") {
-                    // migrate
-                    DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
-                    DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
-                }
-                break;
-            }
-        }
+	    // Deprecated by migration #9
+        // DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
+        // DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed') NOT NULL");
     }
 
     // Migration #2 (complete = idle)
     private static function migrate_2_idle() {
-        $query = "DESCRIBE tasks";
-        $rows = DB::getAll($query);
-        foreach ($rows as $row) {
-            if ($row->Field == 'complete') {
-                if ($row->Type == "enum('yes','no','frozen','thawed')") {
-                    // migrate
-                    DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
-                    DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
-                }
-                break;
-            }
-        }
+        // Deprecated by migration #9
+        // DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
+        // DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle') NOT NULL");
     }
 
     // Migration #3 (larger settings.value: tinytext > text)
@@ -290,18 +273,9 @@ final class DB {
 
     // Migration #7 (full_path new size: 4096)
     private static function migrate_7_larger_full_path() {
-        $query = "DESCRIBE tasks";
-        $rows = DB::getAll($query);
-        foreach ($rows as $row) {
-            if ($row->Field == 'full_path') {
-                if ($row->Type == "tinytext") {
-                    // migrate
-                    DB::execute("ALTER TABLE tasks CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
-                    DB::execute("ALTER TABLE tasks_completed CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
-                }
-                break;
-            }
-        }
+	    // Deprecated by migration #11
+        // DB::execute("ALTER TABLE tasks CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
+        // DB::execute("ALTER TABLE tasks_completed CHANGE full_path full_path TEXT CHARACTER SET utf8 NULL");
     }
 
     // Migration #8 (new du_stats table)
@@ -420,6 +394,12 @@ final class DB {
         DB::execute($q);
         $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`)";
         DB::execute($q);
+    }
+
+    // Migration #12 (unconditional change of complete columns)
+    private static function migrate_12_force_update_complete() {
+        DB::execute("ALTER TABLE tasks CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') CHARACTER SET ascii NOT NULL");
+        DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') CHARACTER SET ascii NOT NULL");
     }
 
     # For users who deal with full_path > 255 characters, migrate to large TEXT fields
