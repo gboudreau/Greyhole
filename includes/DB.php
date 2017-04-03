@@ -166,6 +166,8 @@ final class DB {
             DB::migrate_9_complete_writen();
             DB::migrate_10_utf8();
             DB::migrate_11_varchar();
+        }
+        if ($db_version < 12) {
             DB::migrate_12_force_update_complete();
             Settings::set('db_version', 12);
         }
