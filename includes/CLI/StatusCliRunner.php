@@ -22,7 +22,7 @@ require_once('includes/CLI/AbstractAnonymousCliRunner.php');
 
 class StatusCliRunner extends AbstractAnonymousCliRunner {
     public function run() {
-        $num_dproc = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | wc -l');
+        $num_dproc = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v bash | wc -l');
         if ($num_dproc == 0) {
             $this->log();
             $this->log("Greyhole daemon is currently stopped.");

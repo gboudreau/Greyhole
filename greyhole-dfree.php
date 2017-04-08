@@ -1,4 +1,4 @@
-#!/usr/bin/php -d open_basedir=/
+#!/usr/bin/greyhole-php
 <?php
 /*
 Copyright 2009-2014 Guillaume Boudreau

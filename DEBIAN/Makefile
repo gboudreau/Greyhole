@@ -5,6 +5,7 @@ deb: build
 	rm initd_script.sh
 	rm greyhole
 	rm greyhole-dfree
+	rm greyhole-php
 	rm greyhole-dfree.php
 	rm greyhole-custom-cp.sh
 	rm -f greyhole-mv
@@ -38,6 +39,7 @@ build:
 
 	install -m 0755 -D -p greyhole $(DESTDIR)usr/bin
 	install -m 0755 -D -p greyhole-dfree $(DESTDIR)usr/bin
+	install -m 0755 -D -p greyhole-php $(DESTDIR)usr/bin
 	install -m 0755 -D -p greyhole-dfree.php $(DESTDIR)usr/share/greyhole/
 	install -m 0755 -D -p greyhole-custom-cp.sh $(DESTDIR)usr/share/greyhole/
 

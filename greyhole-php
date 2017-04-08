@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# If you need to override a php.ini directive (like open_basedir), do it in this file.
+export PHPRC=/usr/share/greyhole/php.ini
+
+/usr/bin/php "$@"

@@ -22,7 +22,7 @@ require_once('includes/CLI/AbstractCliRunner.php');
 
 class PauseCliRunner extends AbstractCliRunner {
     public function run() {
-        $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | awk \'{print $1}\'');
+        $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v bash | awk \'{print $1}\'');
         if ($pid) {
             if ($this instanceof ResumeCliRunner) {
                 exec('kill -CONT ' . $pid);

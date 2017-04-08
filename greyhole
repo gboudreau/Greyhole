@@ -1,4 +1,4 @@
-#!/usr/bin/php -d open_basedir=/
+#!/usr/bin/greyhole-php
 <?php
 /*
 Copyright 2009-2017 Guillaume Boudreau, Andrew Hopkinson
@@ -3595,7 +3595,7 @@ function task_has_option($task, $option) {
 
 function spawn_thread($action, $arguments) {
     // Don't spawn duplicate threads
-    $num_worker_thread = (int) exec('ps ax | grep "/usr/bin/greyhole --' . $action . '" | grep "drive='. implode('" | grep "drive=', $arguments) . '" | grep -v grep | wc -l');
+    $num_worker_thread = (int) exec('ps ax | grep "/usr/bin/greyhole --' . $action . '" | grep "drive='. implode('" | grep "drive=', $arguments) . '" | grep -v grep | grep -v bash | wc -l');
     if ($num_worker_thread > 0) {
         Log::debug("Won't span a duplicate thread; 'greyhole --$action --drive=$arguments[0]' is already running");
         return 1;
@@ -3631,7 +3631,7 @@ function gh_check_md5($task) {
         DB::insert($query, array('task_id' => $task->id));
 
         // If there's no worker thread alive, spawn all of them. The idle ones will just die.
-        $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
+        $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | grep -v bash | wc -l"));
         if ($num_worker_threads == 0) {
             Log::debug("  Will spawn new worker threads to work on this.");
             foreach (Config::storagePoolDrives() as $sp_drive) {
@@ -3753,7 +3753,7 @@ function check_md5_workers() {
     $query = "SELECT * from tasks WHERE action = 'md5' AND complete = 'no' LIMIT 1";
     $row = DB::getFirst($query);
     if ($row) {
-        $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | wc -l"));
+        $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | grep -v bash | wc -l"));
         if ($num_worker_threads == 0) {
             Log::debug("Will spawn new worker threads to work on incomplete checksums calculations.");
             foreach (Config::storagePoolDrives() as $sp_drive) {

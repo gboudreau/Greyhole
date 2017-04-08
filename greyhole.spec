@@ -32,6 +32,7 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/man/man5/
 
 install -m 0755 -D -p greyhole ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree ${RPM_BUILD_ROOT}%{_bindir}
+install -m 0755 -D -p greyhole-php ${RPM_BUILD_ROOT}%{_bindir}
 install -m 0755 -D -p greyhole-dfree.php ${RPM_BUILD_ROOT}/usr/share/greyhole/
 install -m 0755 -D -p greyhole-custom-cp.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/
 

@@ -48,12 +48,12 @@ class DaemonRunner extends AbstractRunner {
 	}
 	
 	private static function isRunning() {
-        $num_daemon_processes = exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v "sudo" | wc -l');
+        $num_daemon_processes = exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v bash | grep -v "sudo" | wc -l');
 	    return $num_daemon_processes > 1;
 	}
 
 	private static function getPID() {
-        return exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v "sudo" | grep -v ' . getmypid() . ' | awk "{print \$1}"');
+        return exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v bash | grep -v "sudo" | grep -v ' . getmypid() . ' | awk "{print \$1}"');
 	}
     
 	private function initialize() {

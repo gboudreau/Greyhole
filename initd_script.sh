@@ -44,7 +44,7 @@ COMMAND="$1"
 
 status () {
 	PID=`cat $PIDFILE 2> /dev/null`
-    DAEMON_RUNNING=`ps ax | grep "^ *$PID.*greyhole --daemon\|^ *$PID.*greyhole -D" | grep -v grep | wc -l`
+    DAEMON_RUNNING=`ps ax | grep "^ *$PID.*greyhole --daemon\|^ *$PID.*greyhole -D" | grep -v grep | grep -v bash | wc -l`
 	if [ -f $PIDFILE -a "$DAEMON_RUNNING" -eq "1" ]; then
 		[ "$COMMAND" = "status" -o "$COMMAND" = "stat" ] && echo "Greyhole is running."
 		return 0
@@ -61,7 +61,7 @@ daemon_start () {
 	fi
 	nice -n $n /usr/bin/greyhole --daemon > /dev/null &
 	RETVAL=$?
-	[ $RETVAL -eq 0 ] && ps ax | grep "greyhole --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
+	[ $RETVAL -eq 0 ] && ps ax | grep "greyhole --daemon" | grep -v grep | grep -v bash | tail -1 | awk '{print $1}' > $PIDFILE
 	return $RETVAL
 }
 
@@ -79,7 +79,7 @@ start () {
     	    echo "FAILED"
             RETVAL=$TESTRESULT
     	else
-            start-stop-daemon --start --pidfile $PIDFILE --exec /usr/bin/php --nicelevel $n --background -- -d open_basedir=/ /usr/bin/greyhole --daemon
+            start-stop-daemon --start --pidfile $PIDFILE --exec /usr/bin/greyhole-php --nicelevel $n --background -- /usr/bin/greyhole --daemon
             RETVAL=$?
             if [ $RETVAL -eq 0 ]; then
                 echo "OK"
@@ -103,7 +103,7 @@ start () {
 		echo
 	fi
 	sleep 1 # Allow some time for the daemon to appear in the processes list
-	[ $RETVAL -eq 0 ] && ps ax | grep "greyhole --daemon" | grep -v grep | tail -1 | awk '{print $1}' > $PIDFILE
+	[ $RETVAL -eq 0 ] && ps ax | grep "greyhole --daemon" | grep -v grep | grep -v bash | tail -1 | awk '{print $1}' > $PIDFILE
 	return $RETVAL
 }
 

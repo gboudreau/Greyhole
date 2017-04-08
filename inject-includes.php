@@ -1,4 +1,4 @@
-#!/usr/bin/php -d open_basedir=/
+#!/usr/bin/php
 <?php
 /*
 Copyright 2013-2014 Guillaume Boudreau
@@ -23,7 +23,7 @@ if ($argc != 2) {
     die("Usage: $argv[0] [php_file]\n");
 }
 
-file_put_contents($argv[1], "#!/usr/bin/php -d open_basedir=/\n" . inject_in_file($argv[1]));
+file_put_contents($argv[1], "#!/usr/bin/greyhole-php\n" . inject_in_file($argv[1]));
 
 $require_once_already_included = array();
 

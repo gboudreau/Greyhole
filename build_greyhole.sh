@@ -138,18 +138,20 @@ ssh ${HOST}
 
 if [ -x /usr/bin/yum ]; then
 	sudo yum update greyhole
-	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree
+	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree /usr/bin/greyhole-php
 	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
+	sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
 	sudo service greyhole condrestart
 elif [ -x /usr/bin/apt-get ]; then
 	sudo apt-get update && sudo apt-get install greyhole
-	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree
+	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree /usr/bin/greyhole-php
 	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
+	sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
 	sudo restart greyhole
 fi
-chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree
+chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
 
 
 ####################

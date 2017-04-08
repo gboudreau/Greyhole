@@ -39,6 +39,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
 	install -m 0755 -D -p greyhole /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
+	install -m 0755 -D -p greyhole-php /usr/bin
 	install -m 0755 -D -p greyhole-dfree.php /usr/share/greyhole
 	install -m 0755 -D -p greyhole-custom-cp.sh /usr/share/greyhole
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
