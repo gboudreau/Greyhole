@@ -64,7 +64,7 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
             $dfs[$sp_drive]['free'] -= (float) Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive);
 
             $percent_free = $dfs[$sp_drive]['free'] / ($dfs[$sp_drive]['free'] + $dfs[$sp_drive]['used']);
-            $cols_free = round($cols * $percent_free);
+            $cols_free = ceil($cols * $percent_free);
             $cols_used = $cols - $cols_free;
 
             $prefix = ''; $suffix = "\033[0m";
@@ -85,6 +85,9 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
             }
             $how_much = round($diff / 1024 / 1024) . 'GB';
 
+            $cols_used = max($cols_used, 0);
+            $cols_diff = max($cols_diff, 0);
+            $cols_free = max($cols_free, 0);
             printf("%$max_storage_pool_strlen"."s  [%s%s%s%s%s]  %s %5s\n", $sp_drive, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_used), $prefix, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_diff), $suffix, str_repeat(' ', $cols_free), $sign, $how_much);
             $num_lines++;
         }
