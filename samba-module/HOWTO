@@ -1,0 +1,60 @@
+Samba VFS HOWTO
+===============
+
+How to build the VFS module binaries for a new Samba version.  
+(Mostly, notes to self...)
+
+1. Create a new .patch file in `samba-module/`  
+   For example, `samba-module/wscript-samba-4.6.patch`
+
+2. If needed, create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
+
+3. Add the new Samba version number in `build_vfs.sh @L16`
+
+4. Run the build_vfs.sh script
+
+        cd ~/git/Greyhole/
+        
+        # i386
+        SSH_HOST="gb@192.168.155.45"
+        rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
+        ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'
+        
+        # x86_64
+        SSH_HOST="gb@192.168.155.88"
+        rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
+        ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'
+        
+        # ARMHF
+        SSH_HOST="gb@192.168.155.88"
+        rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
+        ssh -t $SSH_HOST 'cd qemu-arm ; ./boot.sh ; sleep 300 ; rsync -av --exclude .git --exclude release -e "ssh -p 2223" ./ gb@127.0.0.1:Greyhole'
+        ssh -t $SSH_HOST 'ssh -t gb@127.0.0.1 \'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"\''
+
+5. Copy the resulting binaries back into your workstation:
+
+        cd ~/git/Greyhole/samba-module/bin/
+
+        SSH_HOST="gb@192.168.155.45"
+        rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
+       
+        SSH_HOST="gb@192.168.155.88"
+        rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
+       
+        SSH_HOST="gb@192.168.155.88"
+        ssh $SSH_HOST 'cd ~/Greyhole/samba-module/bin/ ; rsync -av -e "ssh -p 2223" gb@127.0.0.1:Greyhole/samba-module/bin/ .'
+        rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
+
+6. Edit `greyhole.spec`
+    - Add lines near L74, L86, L96
+    - Add an `if` block near L147, and change the `else` block to use the latest version
+
+7. Edit `INSTALL`
+    - Add an `if` block near L78
+    - Change the example near L96 & L101: `SAMBA_VERSION=4.6.0 # Or whatever is the latest version of Samba4.`
+
+8. Edit DEBIAN/Makefile
+    - Add lines near L83, L96, L108
+
+8. Edit DEBIAN/postinst
+    - Add an `elif` block near L77, and change the `else` block to use the latest version

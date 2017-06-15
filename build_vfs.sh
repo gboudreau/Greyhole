@@ -1,19 +1,12 @@
 #!/bin/bash
 
-## Note to self:
-# Run this script on:
-#   - x86_64: gb@fileserver2:~
-#   - i386:   bougu@macbook:~/VirtualBox VMs/Ubuntu (32-bit)
-#   - ARM:    gb@fileserver2:~/qemu-arm ; ./boot.sh ; sleep xx ; ssh -p 2223 gb@127.0.0.1
+# See samba-modules/HOWTO for details on usage
 
-# rsync -av --exclude .git --exclude release gb@192.168.155.88:Greyhole/ ~/Greyhole
-# screen
-# ~/Greyhole/build_vfs.sh
-
-export GREYHOLE_INSTALL_DIR="/home/gb/Greyhole"
-export HOME="/home/gb"
+export GREYHOLE_INSTALL_DIR="$HOME/Greyhole"
 
 ###
+
+alias python='/usr/bin/python2'
 
 ARCH="`uname -i`"
 if [ "$ARCH" = "unknown" ]; then
@@ -35,6 +28,10 @@ for version in 4.6.0 4.5.0 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
 	cd samba-${version}
 		NEEDS_CONFIGURE=
 		if  [ ! -f source3/modules/vfs_greyhole.c ]; then
+			NEEDS_CONFIGURE=1
+		fi
+        grep -i vfs_greyhole source3/wscript >/dev/null
+		if  [ $? -ne 0 ]; then
 			NEEDS_CONFIGURE=1
 		fi
 
@@ -78,25 +75,3 @@ done
 
 echo "****************************************"
 echo
-
-exit
-
-SSH_HOST="gb@192.168.155.7"
-ARCH="i386"
-cd ~/git/Greyhole/samba-module/bin/
-rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
-
-SSH_HOST="gb@192.168.155.88"
-ARCH="x86_64"
-cd ~/git/Greyhole/samba-module/bin/
-rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
-
-SSH_HOST="gb@127.0.0.1"
-ARCH="armhf"
-cd ~/Greyhole/samba-module/bin/
-rsync -av -e "ssh -p 2223" $SSH_HOST:Greyhole/samba-module/bin/ .
-
-SSH_HOST="gb@192.168.155.88"
-ARCH="armhf"
-cd ~/git/Greyhole/samba-module/bin/
-rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
