@@ -5,7 +5,7 @@ How to build the VFS module binaries for a new Samba version.
 (Mostly, notes to self...)
 
 1. Create a new .patch file in `samba-module/`  
-   For example, `samba-module/wscript-samba-4.6.patch`
+   For example, `samba-module/wscript-samba-$VERSION.patch`
 
 2. If needed, create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
 
@@ -15,30 +15,27 @@ How to build the VFS module binaries for a new Samba version.
 
         cd ~/git/Greyhole/
         
-        # i386
-        SSH_HOST="gb@192.168.155.45"
+        SSH_HOST="gh-builder-i386"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
         ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'
         
-        # x86_64
-        SSH_HOST="gb@192.168.155.88"
+        SSH_HOST="gh-builder-x86_64"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
         ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'
         
         # ARMHF
-        SSH_HOST="gb@192.168.155.88"
+        SSH_HOST="gh-builder-rpi"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'cd qemu-arm ; ./boot.sh ; sleep 300 ; rsync -av --exclude .git --exclude release -e "ssh -p 2223" ./ gb@127.0.0.1:Greyhole'
-        ssh -t $SSH_HOST 'ssh -t gb@127.0.0.1 \'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"\''
+        ssh -t $SSH_HOST 'cd qemu-arm ; ./boot.sh ; sleep 300 ; cd ; cd Greyhole ; rsync -av --exclude .git --exclude release -e "ssh -p 2223" ./ 127.0.0.1:Greyhole ; ssh -t 127.0.0.1 ''screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'''
 
 5. Copy the resulting binaries back into your workstation:
 
         cd ~/git/Greyhole/samba-module/bin/
-
-        SSH_HOST="gb@192.168.155.45"
+        
+        SSH_HOST="gh-builder-i386"
         rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
        
-        SSH_HOST="gb@192.168.155.88"
+        SSH_HOST="gh-builder-x86_64"
         rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
        
         SSH_HOST="gb@192.168.155.88"
@@ -58,3 +55,6 @@ How to build the VFS module binaries for a new Samba version.
 
 8. Edit DEBIAN/postinst
     - Add an `elif` block near L77, and change the `else` block to use the latest version
+
+9. Commit all changes & new binaries  
+   See [this commit](https://github.com/gboudreau/Greyhole/commit/7d5a46aa35392e524ac8ef8a360a9544219a446a) for an example of what your commit should contain.
