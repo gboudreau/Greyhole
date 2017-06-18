@@ -42,19 +42,16 @@ How to build the VFS module binaries for a new Samba version.
         ssh $SSH_HOST 'cd ~/Greyhole/samba-module/bin/ ; rsync -av -e "ssh -p 2223" gb@127.0.0.1:Greyhole/samba-module/bin/ .'
         rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
-6. Edit `greyhole.spec`
-    - Add lines near L74, L86, L96
-    - Add an `if` block near L147, and change the `else` block to use the latest version
-
-7. Edit `INSTALL`
+6. Edit `INSTALL`
+    - Change latest version of Samba supported in point 3 (near L76).
     - Add an `if` block near L78
     - Change the example near L96 & L101: `SAMBA_VERSION=4.6.0 # Or whatever is the latest version of Samba4.`
 
-8. Edit DEBIAN/Makefile
+7. Edit DEBIAN/Makefile
     - Add lines near L83, L96, L108
 
 8. Edit DEBIAN/postinst
     - Add an `elif` block near L77, and change the `else` block to use the latest version
 
-9. Commit all changes & new binaries  
+9. Commit all changes & new binaries
    See [this commit](https://github.com/gboudreau/Greyhole/commit/7d5a46aa35392e524ac8ef8a360a9544219a446a) for an example of what your commit should contain.

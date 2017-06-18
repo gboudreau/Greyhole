@@ -9,18 +9,6 @@ If you can't install a pre-packaged version, follow the steps below to install f
 The following instructions have been tested on Fedora 12, and Ubuntu 9 & 10.
 If you know what you're doing, you should have no problem installing on any other Linux variant.
 
-Amahi (http://www.amahi.org) comes with Greyhole pre-installed.
-If you're looking for an easy way to try Greyhole, in a virtual machine or a spare computer, installing Amahi might be the easiest way to get a working Greyhole install.
-More info about Greyhole on Amahi: http://wiki.amahi.org/index.php/Greyhole
-
-Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
-      See http://www.samba.org/samba/history/samba-3.4.3.html - BUG 6769: Fix symlink unlink. - https://bugzilla.samba.org/show_bug.cgi?id=6769
-      With this bug present, trying to delete files on Greyhole shares will not work!
-      Make sure the Samba version you use includes this fix, or isn't affected by this bug.
-      Also, there have been reports that the Debian-bundled version of Samba would sometime show symlinks as 0-bytes files, to clients.
-      If you have such issues, you should upgrade to Samba 3.5+ from the Sernet repo, using instructions such as http://www.faqforge.com/linux/distributions/centos/updating-samba-on-centos-5/
-      or compile the latest Samba stable manually and use that.
-
 1. Install the required applications: PHP 5+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
 	Fedora: yum -y install mysql-server php php-mysql php-mbstring php-intl samba samba-common php-pear rsync lsof
@@ -85,7 +73,7 @@ Note: Samba 3.4.3 (and 3.3.9) fix a bug that affects Greyhole functionnality.
 	Ubuntu (15+): /etc/init.d/smbd restart
 	Debian: service samba restart
 
-3. For Samba >4.4: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba >4.6: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
   The following is for Samba 4.x. For Samba 3, see a previous version of this file: https://github.com/gboudreau/Greyhole/blob/0.9.35/INSTALL
