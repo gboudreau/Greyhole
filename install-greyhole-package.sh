@@ -82,6 +82,40 @@ install_mysql_server() {
     exit 2
 }
 
+php_mysql_installed() {
+    rpm -q php-mysql >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        return 0
+    fi
+    
+    rpm -q php-mysqlnd >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        return 0
+    fi
+    
+    return 1
+}
+
+install_php_mysql() {
+    yum info php-mysql >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        sudo yum install php-mysql
+        return
+    fi
+    
+    yum info php-mysqlnd >/dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        sudo yum install php-mysqlnd
+        return
+    fi
+    
+    echo
+    echo "Can't find any packages in your configured yum repos that provide php-mysql functionality."
+    echo "Searched for: php-mysql, php-mysqlnd"
+    echo
+    exit 2
+}
+
 _OSTYPE_detect
 
 if [ "$_OSTYPE" = "yum" ]; then
@@ -93,6 +127,14 @@ if [ "$_OSTYPE" = "yum" ]; then
         echo "Can't find mysql-server or mariadb-server installed."
         echo "Will install either one (whichever is available for your distribution)."
         install_mysql_server
+    fi
+    
+    # Can't hard-code php-mysql dependency into the RPM, because some distributions (FC25) don't offer it, and include php-mysqlnd instead.
+    php_mysql_installed
+    if [ $? -ne 0 ]; then
+        echo "Can't find php-mysql or php-mysqlnd installed."
+        echo "Will install either one (whichever is available for your distribution)."
+        install_php_mysql
     fi
     
     sudo yum install greyhole
