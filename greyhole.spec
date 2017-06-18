@@ -72,14 +72,14 @@ SUPPORTED_SAMBA_VERSIONS=`ls -1 samba-module/bin/`
 	%ifarch %{arm}
 		for v in ${SUPPORTED_SAMBA_VERSIONS}; do
 			dotlessv=`echo $v | tr -d '.'`
-			if [ -f samba-module/bin/${v}/greyhole-x86_64.so ]; then
+			if [ -f samba-module/bin/${v}/greyhole-armv5tel.so ]; then
 				install -m 0644 -D -p samba-module/bin/${v}/greyhole-armv5tel.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba${dotlessv}.so
 			fi
 		done
 	%else
 		for v in ${SUPPORTED_SAMBA_VERSIONS}; do
 			dotlessv=`echo $v | tr -d '.'`
-			if [ -f samba-module/bin/${v}/greyhole-x86_64.so ]; then
+			if [ -f samba-module/bin/${v}/greyhole-i386.so ]; then
 				install -m 0644 -D -p samba-module/bin/${v}/greyhole-i386.so ${RPM_BUILD_ROOT}/usr/lib/greyhole/greyhole-samba${dotlessv}.so
 			fi
 		done
