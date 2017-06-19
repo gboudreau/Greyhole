@@ -53,25 +53,25 @@ mysql_server_installed() {
 install_mysql_server() {
     yum info mysql-server >/dev/null 2>&1
     if [ $? -eq 0 ]; then
-        sudo yum install mysql-server
+        sudo yum install -y mysql-server
         return
     fi
     
     yum info mysql-community-server >/dev/null 2>&1
     if [ $? -eq 0 ]; then
-        sudo yum install mysql-community-server
+        sudo yum install -y mysql-community-server
         return
     fi
     
     yum info mariadb-server >/dev/null 2>&1
     if [ $? -eq 0 ]; then
-        sudo yum install mariadb-server
+        sudo yum install -y mariadb-server
         return
     fi
     
     yum info mariadb-galera-server >/dev/null 2>&1
     if [ $? -eq 0 ]; then
-        sudo yum install mariadb-galera-server
+        sudo yum install -y mariadb-galera-server
         return
     fi
     
@@ -99,13 +99,13 @@ php_mysql_installed() {
 install_php_mysql() {
     yum info php-mysql >/dev/null 2>&1
     if [ $? -eq 0 ]; then
-        sudo yum install php-mysql
+        sudo yum install -y php-mysql
         return
     fi
     
     yum info php-mysqlnd >/dev/null 2>&1
     if [ $? -eq 0 ]; then
-        sudo yum install php-mysqlnd
+        sudo yum install -y php-mysqlnd
         return
     fi
     
@@ -137,7 +137,7 @@ if [ "$_OSTYPE" = "yum" ]; then
         install_php_mysql
     fi
     
-    sudo yum install greyhole
+    sudo yum install -y greyhole
     if [ $? -ne 0 ]; then
         exit -2;
     fi
