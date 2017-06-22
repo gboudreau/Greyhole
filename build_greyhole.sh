@@ -197,7 +197,7 @@ file_to_upload="release/greyhole-$VERSION.tar.gz"
 json=`echo -n $VERSION | php -r '$version=file_get_contents("php://stdin");$changelog=trim(file_get_contents("/tmp/gh_changelog"));echo json_encode(array("tag_name"=>$version,"name"=>$version,"body"=>$changelog));'`
 curl -s -H "Authorization: token `cat .github_token`" -H "Accept: application/vnd.github.manifold-preview" -X POST -d "$json" https://api.github.com/repos/gboudreau/greyhole/releases > /tmp/response.json
 filename=`basename "$file_to_upload"`
-upload_url=`echo $filename | php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo str_replace("{?name}", "?name=".file_get_contents("php://stdin"), $o->upload_url);'`
+upload_url=`echo $filename | php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo str_replace("{?name,label}", "?name=".file_get_contents("php://stdin"), $o->upload_url);'`
 curl -s -H "Authorization: token `cat .github_token`" -H "Accept: application/vnd.github.manifold-preview" -X POST -H "Content-Type: application/x-gzip" --data-binary @"$file_to_upload" "$upload_url"
 release_url=`php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_url."\n";'`
 
