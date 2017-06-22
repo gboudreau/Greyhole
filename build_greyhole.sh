@@ -149,7 +149,7 @@ elif [ -x /usr/bin/apt-get ]; then
 	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
 	sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
-	sudo restart greyhole
+	sudo service greyhole restart
 fi
 chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
 
