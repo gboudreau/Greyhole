@@ -56,7 +56,7 @@ final class StoragePool {
         return $is_greyhole_owned_drive;
     }
 
-    public static function check_drives($skip_fsck=FALSE) {
+    public static function check_drives() {
         Log::setAction(ACTION_CHECK_POOL);
         $needs_fsck = FALSE;
         $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
@@ -89,9 +89,7 @@ final class StoragePool {
             foreach ($returned_drives as $sp_drive) {
                 $body .= "$sp_drive was missing; it's now available again.\n";
             }
-            if (!$skip_fsck) {
-                $body .= "\nA fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
-            }
+            $body .= "\nA fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
             $drive_string = join(", ", $returned_drives);
             $subject = "Storage pool drive now online on " . exec ('hostname') . ": ";
             $subject = $subject . $drive_string;
@@ -120,9 +118,7 @@ final class StoragePool {
             $body .= "- If you forgot to use 'greyhole --replace', you should do so now. Until you do, this drive will not be part of your storage pool.\n\n";
             $body .= "- If the drive is gone, you should either re-mount it manually (if possible), or remove it from your storage pool. To do so, use the following command:\n  greyhole --gone=" . escapeshellarg($sp_drive) . "\n  Note that the above command is REQUIRED for Greyhole to re-create missing file copies before the next fsck runs. Until either happens, missing file copies WILL NOT be re-created on other drives.\n\n";
             $body .= "- If you know this drive will come back soon, and do NOT want Greyhole to re-create missing file copies for this drive until it reappears, you should execute this command:\n  greyhole --wait-for=" . escapeshellarg($sp_drive) . "\n\n";
-            if (!$skip_fsck) {
-                $body .= "A fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
-            }
+            $body .= "A fsck will now start, to fix the symlinks found in your shares, when possible.\nYou'll receive a report email once that fsck run completes.\n";
             $subject = "Missing storage pool drives on " . exec('hostname') . ": ";
             $drive_string = join(",",$missing_drives);
             $subject = $subject . $drive_string;
@@ -136,27 +132,25 @@ final class StoragePool {
             get_metastores(FALSE); // FALSE => Resets the metastores cache
             clearstatcache();
 
-            if (!$skip_fsck) {
-                initialize_fsck_report('All shares');
-                if ($needs_fsck === 2) {
-                    foreach ($returned_drives as $drive) {
-                        $metastores = get_metastores_from_storage_volume($drive);
-                        Log::info("Starting fsck for metadata store on $drive which came back online.");
-                        foreach ($metastores as $metastore) {
-                            foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                                gh_fsck_metastore($metastore,"/$share_name", $share_name);
-                            }
+            initialize_fsck_report('All shares');
+            if ($needs_fsck === 2) {
+                foreach ($returned_drives as $drive) {
+                    $metastores = get_metastores_from_storage_volume($drive);
+                    Log::info("Starting fsck for metadata store on $drive which came back online.");
+                    foreach ($metastores as $metastore) {
+                        foreach (SharesConfig::getShares() as $share_name => $share_options) {
+                            gh_fsck_metastore($metastore,"/$share_name", $share_name);
                         }
-                        Log::info("fsck for returning drive $drive's metadata store completed.");
                     }
-                    Log::info("Starting fsck for all shares - caused by missing drive that came back online.");
-                } else {
-                    Log::info("Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
-                    fix_all_symlinks();
+                    Log::info("fsck for returning drive $drive's metadata store completed.");
                 }
-                schedule_fsck_all_shares(array('email'));
-                Log::info("  fsck for all shares scheduled.");
+                Log::info("Starting fsck for all shares - caused by missing drive that came back online.");
+            } else {
+                Log::info("Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
+                fix_all_symlinks();
             }
+            schedule_fsck_all_shares(array('email'));
+            Log::info("  fsck for all shares scheduled.");
 
             self::reload_gone_ok_drives();
         }
