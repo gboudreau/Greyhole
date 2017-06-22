@@ -50,6 +50,7 @@ define('CONFIG_DB_NAME', 'db_name');
 define('CONFIG_METASTORE_BACKUPS', 'metastore_backups');
 define('CONFIG_TRASH_SHARE', '===trash_share===');
 define('CONFIG_HOOK', 'hook');
+define('CONFIG_CHECK_SP_SCHEDULE', 'check_storage_pool_schedule');
 
 function recursive_include_parser($file) {
     $regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
@@ -121,6 +122,7 @@ final class ConfigHelper {
             CONFIG_GREYHOLE_ERROR_LOG_FILE,
             CONFIG_TIMEZONE,
             CONFIG_MEMORY_LIMIT,
+            CONFIG_CHECK_SP_SCHEDULE
         ),
     );
 
@@ -578,6 +580,7 @@ final class Config {
         CONFIG_GREYHOLE_ERROR_LOG_FILE     => FALSE,
         CONFIG_EMAIL_TO                    => 'root',
         CONFIG_DF_CACHE_TIME               => 15,
+        CONFIG_CHECK_SP_SCHEDULE           => NULL
     );
 
     /**

@@ -58,6 +58,33 @@ final class StoragePool {
 
     public static function check_drives() {
         Log::setAction(ACTION_CHECK_POOL);
+
+        // If last 'df' ran less than 10s ago, all the drives are already awake; no harm checking them at this time.
+        global $last_df_time;
+        $force_run = ( time()-$last_df_time < 10);
+
+        $schedule = Config::get(CONFIG_CHECK_SP_SCHEDULE);
+        if (!empty($schedule) && !$force_run) {
+            if (string_starts_with($schedule, '*:')) {
+                if (strlen($schedule) == 4) {
+                    $should_run = substr($schedule, 2) === date('i');
+                } else {
+                    Log::warn("Invalid format for " . CONFIG_CHECK_SP_SCHEDULE . " config option. Supported values are: *:mi or hh:mi", Log::EVENT_CODE_CONFIG_UNPARSEABLE_LINE);
+                    $should_run = TRUE;
+                }
+            } else {
+                if (strlen($schedule) == 5 && $schedule[2] == ':') {
+                    $should_run = ( $schedule === date('H:i') );
+                } else {
+                    Log::warn("Invalid format for " . CONFIG_CHECK_SP_SCHEDULE . " config option. Supported values are: *:mi or hh:mi", Log::EVENT_CODE_CONFIG_UNPARSEABLE_LINE);
+                    $should_run = TRUE;
+                }
+            }
+            if (!$should_run) {
+                return;
+            }
+        }
+
         $needs_fsck = FALSE;
         $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
         $returned_drives = array();
