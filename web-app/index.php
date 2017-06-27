@@ -50,7 +50,7 @@ if ($level_min > 1) {
 		'share' => $share,
 		'full_path' => $full_path
 	);
-    $total_bytes = (float) DB::getFirstValue($query, $params) or die("SQL error: " . DB::error());
+    $total_bytes = (float) DB::getFirstValue($query, $params);
 }
 
 if ($level_min > 1) {
@@ -66,7 +66,7 @@ if ($level_min > 1) {
 		'depth' => $level_min
 	);
 }
-$rows = DB::getAll($query, $params) or die("SQL error: " . DB::error());
+$rows = DB::getAll($query, $params);
 
 $total_bytes_subfolders = 0;
 $results_rows = array();
