@@ -59,7 +59,10 @@ abstract class Hook
      * @param HookContext $context
      */
     protected static function _trigger($event_type, $context) {
-        $hooks = @static::$hooks[$event_type];
+        if (!isset(static::$hooks[$event_type])) {
+            return;
+        }
+        $hooks = static::$hooks[$event_type];
         if (!is_array($hooks)) {
             return;
         }
