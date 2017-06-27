@@ -23,7 +23,11 @@ if ($argc != 2) {
     die("Usage: $argv[0] [php_file]\n");
 }
 
-file_put_contents($argv[1], "#!/usr/bin/greyhole-php\n" . inject_in_file($argv[1]));
+$prefix = "#!/usr/bin/greyhole-php\n";
+if ($argv[1] == 'web-app/index.php') {
+    $prefix = '';
+}
+file_put_contents($argv[1], $prefix . inject_in_file($argv[1]));
 
 $require_once_already_included = array();
 
