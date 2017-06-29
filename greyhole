@@ -947,8 +947,8 @@ function gh_write($share, $full_path, $task_id) {
                 Log::debug("  Change of mind... Will use source file: $source_file");
             }
             $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove);
-            if ($new_metafiles === FALSE) {
-                return FALSE;
+            if ($new_metafiles === FALSE || $new_metafiles === TRUE) {
+                return $new_metafiles;
             }
             if (!empty($new_metafiles) && !isset($new_metafiles[$source_file])) {
                 // Delete source file; we copied it somewhere else
@@ -1005,8 +1005,8 @@ function gh_write($share, $full_path, $task_id) {
                 }
             }
             $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
-            if ($new_metafiles === FALSE) {
-                return FALSE;
+            if ($new_metafiles === FALSE || $new_metafiles === TRUE) {
+                return $new_metafiles;
             }
         }
         FileHook::trigger(FileHook::EVENT_TYPE_CREATE, $share, $full_path);
@@ -1014,6 +1014,9 @@ function gh_write($share, $full_path, $task_id) {
     return TRUE;
 }
 
+/**
+ * @return array|bool FALSE if the operation failed, and should be retried, TRUE if it failed, but should not be retried, or an array of metafiles if it succeeded.
+ */
 function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove=NULL) {
     $landing_zone = get_share_landing_zone($share);
     list($path, $filename) = explode_full_path($full_path);
@@ -1057,7 +1060,8 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
     save_metafiles($share, $path, $filename, $metafiles);
 
     if (!create_copies_from_metafiles($metafiles, $share, $full_path, $source_file)) {
-        return FALSE;
+        // If create_copies_from_metafiles returns FALSE, we want to abort this op, thus why we return TRUE here
+        return TRUE;
     }
 
     return $metafiles;
