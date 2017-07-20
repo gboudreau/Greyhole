@@ -114,6 +114,12 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
 	fi
 fi
 
+if [ -d /etc/ld.so.conf.d ]; then
+	# Make sure "TARGET_LIBDIR/samba" is available for greyhole.so to find the required libs in
+	echo "${TARGET_LIBDIR}/samba" > /etc/ld.so.conf.d/greyhole.conf
+	ldconfig
+fi
+
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
 	# cifs client workaround
 	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
