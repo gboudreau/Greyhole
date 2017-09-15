@@ -36,7 +36,11 @@ for version in 4.6.0 4.5.0 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
 		fi
 
 	    rm -f source3/modules/vfs_greyhole.c source3/bin/greyhole.so bin/default/source3/modules/libvfs*greyhole.so
-	    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.x.c source3/modules/vfs_greyhole.c
+        if [ -f ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.${m}.c ]; then
+	        ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.${m}.c source3/modules/vfs_greyhole.c
+        else
+            ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.x.c source3/modules/vfs_greyhole.c
+        fi
 
 		if [ ${M} -eq 3 ]; then
 			cd source3

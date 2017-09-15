@@ -26,7 +26,7 @@ How to build the VFS module binaries for a new Samba version.
         # ARMHF
         SSH_HOST="gh-builder-rpi"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'cd qemu-arm ; ./boot.sh ; sleep 300 ; cd ; cd Greyhole ; rsync -av --exclude .git --exclude release -e "ssh -p 2223" ./ 127.0.0.1:Greyhole ; ssh -t 127.0.0.1 ''screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'''
+        ssh -t $SSH_HOST 'cd qemu-arm ; ./boot.sh ; sleep 300 ; cd ; cd Greyhole ; rsync -av --exclude .git --exclude release -e "ssh -p 2223" ./ 127.0.0.1:Greyhole ; ssh -p 2223 -t 127.0.0.1 ''screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'''
 
 5. Copy the resulting binaries back into your workstation:
 
