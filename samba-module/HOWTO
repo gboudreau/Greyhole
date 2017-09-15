@@ -1,10 +1,10 @@
 Samba VFS HOWTO
 ===============
 
-How to build the VFS module binaries for a new Samba version.  
+How to build the VFS module binaries for a new Samba version.
 (Mostly, notes to self...)
 
-1. Create a new .patch file in `samba-module/`  
+1. Create a new .patch file in `samba-module/`
    For example, `samba-module/wscript-samba-$VERSION.patch`
 
 2. If needed, create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
@@ -14,15 +14,15 @@ How to build the VFS module binaries for a new Samba version.
 4. Run the build_vfs.sh script
 
         cd ~/git/Greyhole/
-        
+
         SSH_HOST="gh-builder-i386"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
         ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'
-        
+
         SSH_HOST="gh-builder-x86_64"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
         ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'
-        
+
         # ARMHF
         SSH_HOST="gh-builder-rpi"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
@@ -31,14 +31,14 @@ How to build the VFS module binaries for a new Samba version.
 5. Copy the resulting binaries back into your workstation:
 
         cd ~/git/Greyhole/samba-module/bin/
-        
+
         SSH_HOST="gh-builder-i386"
         rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
-       
+
         SSH_HOST="gh-builder-x86_64"
         rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
-       
-        SSH_HOST="gb@192.168.155.88"
+
+        SSH_HOST="gh-builder-rpi"
         ssh $SSH_HOST 'cd ~/Greyhole/samba-module/bin/ ; rsync -av -e "ssh -p 2223" gb@127.0.0.1:Greyhole/samba-module/bin/ .'
         rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
