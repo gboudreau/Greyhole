@@ -15,7 +15,7 @@ fi
 
 cd "$HOME"
 
-for version in 4.6.0 4.5.0 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
+for version in 4.7.0 4.6.0 4.5.0 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
 	echo "Working on samba-${version} ... "
 	if [ ! -d samba-${version} ]; then
 		wget http://samba.org/samba/ftp/stable/samba-${version}.tar.gz && tar zxf samba-${version}.tar.gz && rm -f samba-${version}.tar.gz
