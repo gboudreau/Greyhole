@@ -3,7 +3,7 @@ Greyhole Installation Instructions
 
 Greyhole comes as RPM or DEB packages. If your distribution supports those, you should definitely install one of them.
 They are available from https://www.greyhole.net/download/
-Once you did, look in /usr/share/greyhole/USAGE (or online https://raw.github.com/gboudreau/Greyhole/master/USAGE) for configuration instructions.
+After installing, look in /usr/share/greyhole/USAGE (or online https://raw.github.com/gboudreau/Greyhole/master/USAGE) for configuration instructions.
 If you can't install a pre-packaged version, follow the steps below to install from source.
 
 The following instructions have been tested on Fedora 12, and Ubuntu 9 & 10.
@@ -24,24 +24,32 @@ If you know what you're doing, you should have no problem installing on any othe
 	mkdir -p /var/spool/greyhole
 	chmod 777 /var/spool/greyhole
 	mkdir -p /usr/share/greyhole
-	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
 	install -m 0755 -D -p greyhole /usr/bin
 	install -m 0755 -D -p greyhole-dfree /usr/bin
 	install -m 0755 -D -p greyhole-php /usr/bin
 	install -m 0755 -D -p greyhole-dfree.php /usr/share/greyhole
 	install -m 0755 -D -p greyhole-custom-cp.sh /usr/share/greyhole
+	install -m 0644 -D -p schema-mysql.sql /usr/share/greyhole
+	install -m 0644 -D -p greyhole.example.conf /usr/share/greyhole
+	install -m 0644 -D -p greyhole.example.conf /etc/greyhole.conf
 	install -m 0644 -D -p logrotate.greyhole /etc/logrotate.d/greyhole
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
-	install -m 0644 -D -p greyhole.example.conf /etc/greyhole.conf
 	install -m 0755 -D -p greyhole.cron.weekly /etc/cron.weekly/greyhole
 	install -m 0755 -D -p greyhole.cron.daily /etc/cron.daily/greyhole
+	install -m 0644 -D -p web-app/index.php /usr/share/greyhole/web-app
+	install -m 0644 -D -p web-app/README /usr/share/greyhole/web-app
+	install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh /usr/share/greyhole/scripts-examples
+	install -m 0755 -D -p scripts-examples/greyhole_idle.sh /usr/share/greyhole/scripts-examples
+	install -m 0755 -D -p scripts-examples/greyhole_notify_error.sh /usr/share/greyhole/scripts-examples
+	install -m 0755 -D -p scripts-examples/greyhole_send_fsck_report.sh /usr/share/greyhole/scripts-examples
+	install -m 0644 -D -p USAGE /usr/share/greyhole
 	install -m 0644 -D -p docs/greyhole.1.gz /usr/share/man/man1/
 	install -m 0644 -D -p docs/greyhole-dfree.1.gz /usr/share/man/man1/
 	install -m 0644 -D -p docs/greyhole.conf.5.gz /usr/share/man/man5/
 
 	# What version of Samba are you running ?
-    SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
-    echo "You appear to be running Samba $SMB_VERSION"
+	SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
+	echo "You appear to be running Samba $SMB_VERSION"
 
 	# For Samba 3.4: #
 		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.4/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.4/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
@@ -64,9 +72,15 @@ If you know what you're doing, you should have no problem installing on any othe
 	# For Samba 4.6: #
 		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.6/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.6/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.6/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
-	Ubuntu (10-14): install the Upstart script:
-		install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
-		rm /etc/init.d/greyhole
+	# Install the start script
+	# For SysVinit systems: install the initd script:
+	install -m 0755 -D -p initd_script.sh /etc/init.d/greyhole
+
+	# For Upstart systems: install the Upstart script:
+	install -m 0644 -D -p upstart.conf /etc/init/greyhole.conf
+
+	# For Systemd systems: install the service
+	install -m 0644 -D -p greyhole.systemd /usr/lib/systemd/system/greyhole.service
 
 	Fedora: service smb restart
 	Ubuntu (14-): /etc/init.d/samba restart, or restart smbd
@@ -76,7 +90,7 @@ If you know what you're doing, you should have no problem installing on any othe
 3. For Samba >4.6: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
-  The following is for Samba 4.x. For Samba 3, see a previous version of this file: https://github.com/gboudreau/Greyhole/blob/0.9.35/INSTALL
+   The following is for Samba 4.x. For Samba 3, see a previous version of this file: https://github.com/gboudreau/Greyhole/blob/0.9.35/INSTALL
 
 	Fedora: yum -y install patch gcc python-devel gnutls-devel
 	Ubuntu: apt-get -y install build-essential python-dev libgnutls-dev
@@ -102,6 +116,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	Ubuntu (10-14): [nothing to do]
 	Ubuntu (15): update-rc.d greyhole defaults
 	Debian: update-rc.d greyhole defaults
+	Systemd: systemctl enable greyhole
 
 5. Work around problems with the CIFS client (as root):
     Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
@@ -115,7 +130,6 @@ If you know what you're doing, you should have no problem installing on any othe
 		modprobe cifs enable_oplocks=0
 		echo 0 > /sys/module/cifs/parameters/enable_oplocks
 	fi
-
 
 You are now ready to configure and use Greyhole.
 See the USAGE file for details:
