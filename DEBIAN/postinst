@@ -103,6 +103,9 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
 	            exit -1
 	        fi
 	    fi
+        if [ ! -f ${TARGET_LIBDIR}/libsmbd-base-samba4.so ]; then
+            ln -s ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so ${TARGET_LIBDIR}/libsmbd-base-samba4.so
+        fi
 	    if [ ! -f ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ]; then
 	        if [ -f ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ]; then
 		        ln -s ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
@@ -113,6 +116,9 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
 	            exit -1
 	        fi
 	    fi
+        if [ ! -f ${TARGET_LIBDIR}/libsamba-debug-samba4.so ]; then
+            ln -s ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ${TARGET_LIBDIR}/libsamba-debug-samba4.so
+        fi
 	fi
 fi
 
