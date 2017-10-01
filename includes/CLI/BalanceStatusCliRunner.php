@@ -43,7 +43,7 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
         $num_lines++;
 
         $max_storage_pool_strlen = max(array_map('mb_strlen', Config::storagePoolDrives()));
-        $cols -= $max_storage_pool_strlen + 13;
+        $cols -= $max_storage_pool_strlen + 14;
 
         $sorted_pool_drives = sort_storage_drives_available_space();
         $pool_drives_avail_space = array();
@@ -88,7 +88,7 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
             $cols_used = max($cols_used, 0);
             $cols_diff = max($cols_diff, 0);
             $cols_free = max($cols_free, 0);
-            printf("%$max_storage_pool_strlen"."s  [%s%s%s%s%s]  %s %5s\n", $sp_drive, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_used), $prefix, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_diff), $suffix, str_repeat(' ', $cols_free), $sign, $how_much);
+            printf("%$max_storage_pool_strlen"."s  [%s%s%s%s%s]  %s %6s\n", $sp_drive, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_used), $prefix, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_diff), $suffix, str_repeat(' ', $cols_free), $sign, $how_much);
             $num_lines++;
         }
 
