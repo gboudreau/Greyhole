@@ -101,7 +101,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
 	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm -f samba-${SAMBA_VERSION}.tar.gz
 	cd samba-${SAMBA_VERSION}
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.7+.c source3/modules/vfs_greyhole.c
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.7.c source3/modules/vfs_greyhole.c
 	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.7.patch
 	./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads && make
 
