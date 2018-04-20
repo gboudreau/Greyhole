@@ -29,19 +29,6 @@ static int vfs_greyhole_debug_level = DBGC_VFS;
 #undef DBGC_CLASS
 #define DBGC_CLASS vfs_greyhole_debug_level
 
-/* Function prototypes */
-
-static int greyhole_connect(vfs_handle_struct *handle, const char *svc, const char *user);
-static int greyhole_mkdir(vfs_handle_struct *handle, const struct smb_filename *smb_fname, mode_t mode);
-static int greyhole_rmdir(vfs_handle_struct *handle, const struct smb_filename *smb_fname);
-static int greyhole_open(vfs_handle_struct *handle, struct smb_filename *fname, files_struct *fsp, int flags, mode_t mode);
-static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count);
-static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count, off_t offset);
-static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_struct *tofsp, off_t offset, size_t n);
-static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
-static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
-static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
-
 /* Save formated string to Greyhole spool */
 
 static void gh_spoolf(const char* format, ...)
@@ -61,30 +48,6 @@ static void gh_spoolf(const char* format, ...)
 
 	fclose(spoolf);
 }
-
-/* VFS operations */
-
-static struct vfs_fn_pointers vfs_greyhole_fns = {
-
-	/* Disk operations */
-
-	.connect_fn = greyhole_connect,
-
-	/* Directory operations */
-
-	.mkdir_fn = greyhole_mkdir,
-	.rmdir_fn = greyhole_rmdir,
-
-	/* File operations */
-
-	.open_fn = greyhole_open,
-	.write_fn = greyhole_write,
-	.pwrite_fn = greyhole_pwrite,
-	.recvfile_fn = greyhole_recvfile,
-	.close_fn = greyhole_close,
-	.rename_fn = greyhole_rename,
-	.unlink_fn = greyhole_unlink
-};
 
 #define PO10_LIMIT (INT_MAX/10)
 
@@ -284,7 +247,30 @@ static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename 
 	return result;
 }
 
-NTSTATUS vfs_greyhole_init(TALLOC_CTX *ctx);
+/* VFS operations */
+
+static struct vfs_fn_pointers vfs_greyhole_fns = {
+
+        /* Disk operations */
+
+        .connect_fn = greyhole_connect,
+
+        /* Directory operations */
+
+        .mkdir_fn = greyhole_mkdir,
+        .rmdir_fn = greyhole_rmdir,
+
+        /* File operations */
+
+        .open_fn = greyhole_open,
+        .write_fn = greyhole_write,
+        .pwrite_fn = greyhole_pwrite,
+        .recvfile_fn = greyhole_recvfile,
+        .close_fn = greyhole_close,
+        .rename_fn = greyhole_rename,
+        .unlink_fn = greyhole_unlink
+};
+
 NTSTATUS vfs_greyhole_init(TALLOC_CTX *ctx)
 {
 	NTSTATUS ret = smb_register_vfs(SMB_VFS_INTERFACE_VERSION, "greyhole", &vfs_greyhole_fns);
