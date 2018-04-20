@@ -138,12 +138,12 @@ static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, cons
 	FILE *spoolf;
 	char filename[255];
 	struct timeval tp;
+	char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 
 	result = SMB_VFS_NEXT_WRITE(handle, fsp, data, count);
 
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
-		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
 		spoolf = fopen(filename, "wt");
 		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
@@ -161,12 +161,12 @@ static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, con
 	FILE *spoolf;
 	char filename[255];
 	struct timeval tp;
+	char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 
 	result = SMB_VFS_NEXT_PWRITE(handle, fsp, data, count, offset);
 
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
-		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
 		spoolf = fopen(filename, "wt");
 		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
@@ -184,12 +184,12 @@ static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_st
 	FILE *spoolf;
 	char filename[255];
 	struct timeval tp;
+	char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 
 	result = SMB_VFS_NEXT_RECVFILE(handle, fromfd, tofsp, offset, n);
 
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
-		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 		snprintf(filename, 43 + strlen(share) + nDigits(tofsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, tofsp->fh->fd);
 		spoolf = fopen(filename, "wt");
 		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
