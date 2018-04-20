@@ -72,19 +72,6 @@ static int nDigits(int i)
 /* Implementation of vfs_ops.  Pass everything on to the default
 operation but log event first. */
 
-static int greyhole_connect(vfs_handle_struct *handle, const char *svc, const char *user)
-{
-	int result;
-
-	if (!handle) {
-		return -1;
-	}
-
-	result = SMB_VFS_NEXT_CONNECT(handle, svc, user);
-
-	return result;
-}
-
 static int greyhole_mkdir(vfs_handle_struct *handle, const struct smb_filename *smb_fname, mode_t mode)
 {
 	int result;
@@ -252,10 +239,6 @@ static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename 
 /* VFS operations */
 
 static struct vfs_fn_pointers vfs_greyhole_fns = {
-
-        /* Disk operations */
-
-        .connect_fn = greyhole_connect,
 
         /* Directory operations */
 
