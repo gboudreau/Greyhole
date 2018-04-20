@@ -53,18 +53,20 @@ static void gh_spoolf(const char* format, ...)
 
 static int nDigits(int i)
 {
-  int n,po10;
+	int n, po10;
 
-  if (i < 0) i = -i;
-  n=1;
-  po10=10;
-  while(i>=po10)
-  {
-    n++;
-    if (po10 > PO10_LIMIT) break;
-    po10*=10;
-  }
-  return n;
+	if (i < 0) i = -i;
+
+	n = 1;
+	po10 = 10;
+
+	while(i >= po10) {
+		n++;
+		if (po10 > PO10_LIMIT) break;
+		po10 *= 10;
+	}
+
+	return n;
 }
 
 /* Implementation of vfs_ops.  Pass everything on to the default
