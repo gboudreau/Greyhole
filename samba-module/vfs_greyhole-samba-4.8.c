@@ -271,6 +271,7 @@ static struct vfs_fn_pointers vfs_greyhole_fns = {
         .unlink_fn = greyhole_unlink
 };
 
+static_decl_vfs;
 NTSTATUS vfs_greyhole_init(TALLOC_CTX *ctx)
 {
 	NTSTATUS ret = smb_register_vfs(SMB_VFS_INTERFACE_VERSION, "greyhole", &vfs_greyhole_fns);
