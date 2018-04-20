@@ -73,6 +73,8 @@ If you know what you're doing, you should have no problem installing on any othe
 		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.6/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.6/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.6/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 	# For Samba 4.7: #
 		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.7/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.7/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.7/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	# For Samba 4.8: #
+		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.8/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.8/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.8/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
 
 	# Install the start script
 	# For SysVinit systems: install the initd script:
@@ -89,7 +91,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	Ubuntu (15+): /etc/init.d/smbd restart
 	Debian: service samba restart
 
-3. For Samba >4.7: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba >4.8: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
    The following is for Samba 4.x. For Samba 3, see a previous version of this file: https://github.com/gboudreau/Greyhole/blob/0.9.35/INSTALL
@@ -97,13 +99,13 @@ If you know what you're doing, you should have no problem installing on any othe
 	Fedora: yum -y install patch gcc python-devel gnutls-devel
 	Ubuntu: apt-get -y install build-essential python-dev libgnutls-dev
 
-	SAMBA_VERSION=4.7.0 # Or whatever is the latest version of Samba4.
+	SAMBA_VERSION=4.8.0 # Or whatever is the latest version of Samba4.
 	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
 	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm -f samba-${SAMBA_VERSION}.tar.gz
 	cd samba-${SAMBA_VERSION}
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.7+.c source3/modules/vfs_greyhole.c
-	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.7.patch
-	./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads && make
+	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.8.c source3/modules/vfs_greyhole.c
+	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.8.patch
+	./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam && make
 
     # Create a symlink in the Samba VFS modules dir pointing to the compiled VFS
     if [ -d /usr/lib/x86_64-linux-gnu ]; then LIBDIR=/usr/lib/x86_64-linux-gnu; elif [ "`uname -m`" = "x86_64" ]; then LIBDIR=/usr/lib64; else LIBDIR=/usr/lib; fi
