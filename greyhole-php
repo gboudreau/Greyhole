@@ -3,4 +3,16 @@
 # If you need to override a php.ini directive (like open_basedir), do it in this file.
 export PHPRC=/usr/share/greyhole/php.ini
 
+# Check that the required PHP extensions are loaded
+mods_required="mbstring mysql intl"
+function missing_mod
+{
+	echo "Error: PHP '$1' module missing; please enable it in your PHP configuration."
+	exit 1
+}
+/usr/bin/php -m > /tmp/greyhole-php.loaded.mods
+for mod in ${mods_required[@]} ; do
+	grep "${mod}" /tmp/greyhole-php.loaded.mods >/dev/null || missing_mod "${mod}"
+done
+
 /usr/bin/php "$@"
