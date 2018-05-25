@@ -11,6 +11,7 @@ function missing_mod
 	exit 1
 }
 /usr/bin/php -m > /tmp/greyhole-php.loaded.mods
+chmod 666 /tmp/greyhole-php.loaded.mods 2>/dev/null
 for mod in ${mods_required[@]} ; do
 	grep "${mod}" /tmp/greyhole-php.loaded.mods >/dev/null || missing_mod "${mod}"
 done
