@@ -42,7 +42,7 @@ static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
 static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
 static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
 
-/* Save formated string to Greyhole spool */
+/* Save formatted string to Greyhole spool */
 
 static void gh_spoolf(const char* format, ...)
 {

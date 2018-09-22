@@ -1,5 +1,5 @@
 /* 
-Copyright 2009-2014 Guillaume Boudreau, Edgars Binans
+Copyright 2009-2018 Guillaume Boudreau, Edgars Binans
 
 This file is part of Greyhole.
 
@@ -38,11 +38,12 @@ static int greyhole_open(vfs_handle_struct *handle, struct smb_filename *fname, 
 static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count);
 static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count, off_t offset);
 static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_struct *tofsp, off_t offset, size_t n);
+static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle, TALLOC_CTX *mem_ctx, struct tevent_context *ev, struct files_struct *fsp, const void *data, size_t n, off_t offset);
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
 static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
 static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
 
-/* Save formated string to Greyhole spool */
+/* Save formatted string to Greyhole spool */
 
 static void gh_spoolf(const char* format, ...)
 {
@@ -81,6 +82,7 @@ static struct vfs_fn_pointers vfs_greyhole_fns = {
 	.write_fn = greyhole_write,
 	.pwrite_fn = greyhole_pwrite,
 	.recvfile_fn = greyhole_recvfile,
+	.pwrite_send_fn = greyhole_pwrite_send,
 	.close_fn = greyhole_close,
 	.rename_fn = greyhole_rename,
 	.unlink_fn = greyhole_unlink
@@ -236,6 +238,56 @@ static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_st
 	}
 
 	return result;
+}
+
+struct greyhole_pwrite_state {
+	vfs_handle_struct *handle;
+	files_struct *fsp;
+	ssize_t ret;
+	struct vfs_aio_state vfs_aio_state;
+};
+
+static void greyhole_pwrite_done(struct tevent_req *subreq)
+{
+	struct tevent_req *req = tevent_req_callback_data(subreq, struct tevent_req);
+	struct greyhole_pwrite_state *state = tevent_req_data(req, struct greyhole_pwrite_state);
+	state->ret = SMB_VFS_PWRITE_RECV(subreq, &state->vfs_aio_state);
+	TALLOC_FREE(subreq);
+	tevent_req_done(req);
+}
+
+static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle, TALLOC_CTX *mem_ctx, struct tevent_context *ev, struct files_struct *fsp, const void *data, size_t n, off_t offset)
+{
+	struct tevent_req *req, *subreq;
+	struct greyhole_pwrite_state *state;
+	ssize_t result;
+	FILE *spoolf;
+	char filename[255];
+	struct timeval tp;
+
+	req = tevent_req_create(mem_ctx, &state, struct greyhole_pwrite_state);
+	if (req == NULL) {
+		return NULL;
+	}
+	state->handle = handle;
+	state->fsp = fsp;
+
+	subreq = SMB_VFS_NEXT_PWRITE_SEND(state, ev, handle, fsp, data, n, offset);
+	if (tevent_req_nomem(subreq, req)) {
+		return tevent_req_post(req, ev);
+	}
+	tevent_req_set_callback(subreq, greyhole_pwrite_done, req);
+
+	gettimeofday(&tp, (struct timezone *) NULL);
+	char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
+	snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
+	spoolf = fopen(filename, "wt");
+	fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+		share,
+		fsp->fh->fd);
+	fclose(spoolf);
+
+	return req;
 }
 
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)
