@@ -10,12 +10,15 @@ alias python='/usr/bin/python2'
 
 ARCH="`uname -i`"
 if [ "$ARCH" = "unknown" ]; then
+    ARCH="`uname -m`"
+fi
+if [ "$ARCH" = "armv6l" ]; then
     ARCH="armhf"
 fi
 
 cd "$HOME"
 
-for version in 4.7.0 4.6.0 4.5.0 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.9; do
+for version in 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
 	echo "Working on samba-${version} ... "
 	if [ ! -d samba-${version} ]; then
 		curl -LO http://samba.org/samba/ftp/stable/samba-${version}.tar.gz && tar zxf samba-${version}.tar.gz && rm -f samba-${version}.tar.gz
@@ -52,7 +55,11 @@ for version in 4.7.0 4.6.0 4.5.0 4.4.0 4.3.0 4.2.0 4.1.4 4.0.14 3.6.9 3.5.4 3.4.
 	            patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-${M}.${m}.patch
 		    else
 		        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.${m}.patch
-		        ./configure --enable-debug --enable-selftest --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam
+		        if [ ${m} -gt 8 ]; then
+			        ./configure --enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --disable-python --without-ad-dc --without-json-audit --without-libarchive
+			    else
+			        ./configure --enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --disable-python --without-ad-dc
+			    fi
 			fi
 		fi
 
