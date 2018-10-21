@@ -19,7 +19,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 2. Setup Samba:
 
 	Edit /etc/samba/smb.conf
-	Change or add the following values in the [global] section:
+	Change or add the following values in the [global] section (making sure this section is above all shares definition):
 
 		unix extensions = no
 		wide links = yes
