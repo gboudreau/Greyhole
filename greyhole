@@ -1624,6 +1624,9 @@ function samba_check_vfs() {
         if (is_file($vfs_file)) {
             unlink($vfs_file);
         }
+        if (!is_dir(dirname($vfs_file))) {
+            mkdir(dirname($vfs_file));
+        }
         gh_symlink($vfs_target, $vfs_file);
         samba_restart();
     }
