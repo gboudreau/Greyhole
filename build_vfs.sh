@@ -55,11 +55,14 @@ for version in 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
 	            patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-${M}.${m}.patch
 		    else
 		        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.${m}.patch
+	            CONF_OPTIONS="--enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --without-ad-dc"
+		        if [ ${m} -gt 6 ]; then
+		            CONF_OPTIONS="${CONF_OPTIONS} --disable-python"
+		        fi
 		        if [ ${m} -gt 8 ]; then
-			        ./configure --enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --disable-python --without-ad-dc --without-json-audit --without-libarchive
-			    else
-			        ./configure --enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --disable-python --without-ad-dc
+		            CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
 			    fi
+		        ./configure ${CONF_OPTIONS}
 			fi
 		fi
 

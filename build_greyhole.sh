@@ -207,11 +207,11 @@ release_url=`php -r '$o=json_decode(file_get_contents("/tmp/response.json"));ech
 if [ "$BUILD_NUMBER" = "1" ]; then
 	/usr/local/bin/twitter set "New version available: $VERSION - ChangeLog: http://t.co/hZheYwg"
 	/usr/local/bin/fbcmd PPOST Greyhole "New version available: $VERSION - Downloads: https://www.greyhole.net/ or just use your package manager to update." 'ChangeLog' "${CHANGELOG_URL}"
-	./irc_notif.sh "New version available $VERSION - Changelog: https://www.greyhole.net/releases/CHANGELOG" $VERSION
+	#./irc_notif.sh "New version available $VERSION - Changelog: https://www.greyhole.net/releases/CHANGELOG" $VERSION
 else
 	/usr/local/bin/twitter set "New packages available: $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one."
 	/usr/local/bin/fbcmd PPOST Greyhole "New packages available: $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one." 'ChangeLog' "${CHANGELOG_URL}"
-	./irc_notif.sh "New packages available $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one." $VERSION
+	#./irc_notif.sh "New packages available $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one." $VERSION
 fi
 
 ###
