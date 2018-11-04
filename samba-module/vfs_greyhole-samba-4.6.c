@@ -39,6 +39,7 @@ static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, cons
 static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count, off_t offset);
 static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_struct *tofsp, off_t offset, size_t n);
 static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle, TALLOC_CTX *mem_ctx, struct tevent_context *ev, struct files_struct *fsp, const void *data, size_t n, off_t offset);
+static ssize_t greyhole_pwrite_recv(struct tevent_req *req, struct vfs_aio_state *vfs_aio_state);
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
 static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
 static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
@@ -83,6 +84,7 @@ static struct vfs_fn_pointers vfs_greyhole_fns = {
 	.pwrite_fn = greyhole_pwrite,
 	.recvfile_fn = greyhole_recvfile,
 	.pwrite_send_fn = greyhole_pwrite_send,
+	.pwrite_recv_fn = greyhole_pwrite_recv,
 	.close_fn = greyhole_close,
 	.rename_fn = greyhole_rename,
 	.unlink_fn = greyhole_unlink
@@ -288,6 +290,18 @@ static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle,
 	fclose(spoolf);
 
 	return req;
+}
+
+static ssize_t greyhole_pwrite_recv(struct tevent_req *req, struct vfs_aio_state *vfs_aio_state)
+{
+	struct greyhole_pwrite_state *state = tevent_req_data(req, struct greyhole_pwrite_state);
+
+	if (tevent_req_is_unix_error(req, &vfs_aio_state->error)) {
+		return -1;
+	}
+
+	*vfs_aio_state = state->vfs_aio_state;
+	return state->ret;
 }
 
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)

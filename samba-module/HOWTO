@@ -27,7 +27,7 @@ How to build the VFS module binaries for a new Samba version.
         cd ~/Temp/qemu-arm
         ./boot.sh
         sleep 180
-        rsync -av --exclude .git --exclude release -e "ssh -p 2223" ./ 127.0.0.1:Greyhole
+        rsync -av --exclude .git --exclude release -e "ssh -p 2223" ~/git/Greyhole/ 127.0.0.1:Greyhole
         ssh -p 2223 -t 127.0.0.1 'screen sh -c "~/Greyhole/build_vfs.sh ; exec bash"'
 
 5. Copy the resulting binaries back into your workstation:

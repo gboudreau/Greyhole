@@ -15,6 +15,9 @@ fi
 if [ "$ARCH" = "armv6l" ]; then
     ARCH="armhf"
 fi
+if [ "$ARCH" = "i686" ]; then
+    ARCH="i386"
+fi
 
 cd "$HOME"
 
