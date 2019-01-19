@@ -430,14 +430,14 @@ final class DB {
 
     public static function repairTables() {
         if (Log::actionIs(ACTION_DAEMON)) {
-            Log::info("Optimizing MySQL tables...");
+            Log::info("Checking MySQL tables...");
         }
-        // Let's repair tables only if they need to!
+        // Let's repair/optimize tables only if they need to!
         foreach (array('tasks', 'settings', 'du_stats', 'tasks_completed') as $table_name) {
             try {
-                DB::getFirst("SELECT * FROM $table_name LIMIT 1");
+                DB::execute("SELECT * FROM $table_name LIMIT 1", array(), FALSE);
             } catch (Exception $e) {
-                Log::info("Repairing $table_name MySQL table...");
+                Log::warn("Test failed for $table_name MySQL table: " . $e->getMessage() . " - Will try to repair it using: REPAIR TABLE $table_name ...", Log::EVENT_CODE_DB_TABLE_CRASHED);
                 DB::execute("REPAIR TABLE $table_name", array(), FALSE);
             }
         }

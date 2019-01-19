@@ -74,6 +74,7 @@ final class Log {
     const EVENT_CODE_CONFIG_UNPARSEABLE_LINE = 'config_unparseable_line';
     const EVENT_CODE_DB_CONNECT_FAILED = 'db_connect_failed';
     const EVENT_CODE_DB_MIGRATION_FAILED = 'db_migration_failed';
+    const EVENT_CODE_DB_TABLE_CRASHED = 'db_table_crashed';
     const EVENT_CODE_FILE_COPY_FAILED = 'file_copy_failed';
     const EVENT_CODE_FSCK_REPORT = 'fsck_report';
     const EVENT_CODE_FSCK_EMPTY_FILE_COPY_FOUND = 'fsck_empty_file_copy_found';
