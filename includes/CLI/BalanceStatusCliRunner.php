@@ -65,10 +65,10 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
 
             $percent_free = $dfs[$sp_drive]['free'] / ($dfs[$sp_drive]['free'] + $dfs[$sp_drive]['used']);
             $cols_free = ceil($cols * $percent_free);
-            $cols_used = $cols - $cols_free;
+            $cols_used = $cols - abs($cols_free);
 
             $prefix = ''; $suffix = "\033[0m";
-            if ($target_avail_space > $dfs[$sp_drive]['free']) {
+            if ($dfs[$sp_drive]['free'] < $target_avail_space) {
                 $diff = $target_avail_space - $dfs[$sp_drive]['free'];
                 $percent_diff = $diff / ($dfs[$sp_drive]['free'] + $dfs[$sp_drive]['used']);
                 $cols_diff = round($cols * $percent_diff);
