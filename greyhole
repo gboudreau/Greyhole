@@ -3334,13 +3334,12 @@ function gh_balance() {
                             if ($metafile->is_linked) {
                                 // Re-create correct symlink
                                 $landing_zone = $share_options[CONFIG_LANDING_ZONE];
+                                Log::debug("││││ Updating symlink at $landing_zone/$full_path to point to $metafile->path");
                                 if (is_link("$landing_zone/$full_path")) {
-                                    Log::debug("││││ Updating symlink at $landing_zone/$full_path to point to $metafile->path");
-                                    if (gh_recycle("$landing_zone/$full_path")) {
-                                        @gh_symlink($metafile->path, "$landing_zone/$full_path");
-                                        // Creating this symlink can fail if the parent dir was removed
-                                    }
+                                    gh_recycle("$landing_zone/$full_path");
                                 }
+                                // Creating this symlink can fail if the parent dir was removed
+                                @gh_symlink($metafile->path, "$landing_zone/$full_path");
                             }
                             $existing_metafiles[$metafile->path] = $metafile;
                             save_metafiles($share_name, $path, $filename, $existing_metafiles);
