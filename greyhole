@@ -3325,7 +3325,7 @@ function gh_balance() {
                 }
 
                 // Update metafiles
-                foreach (get_metafiles($share_name, $path, $filename, FALSE, TRUE, FALSE) as $existing_metafiles) {
+                foreach (get_metafiles($share_name, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
                     foreach ($existing_metafiles as $key => $metafile) {
                         if ($metafile->path == $file) {
                             $metafile->path = "$sp_drive/$share_name/$full_path";
