@@ -1418,33 +1418,34 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
         $t = file_get_contents($metafiles_data_file);
         $metafiles = unserialize($t);
     }
+    if (!is_array($metafiles)) {
+        $metafiles = array();
+    }
 
     if ($check_symlink) {
         // Fix wrong 'is_linked' flags
         $share_file = get_share_landing_zone($share) . "/$path/$filename";
-        $share_file_link_to = FALSE;
         if (is_link($share_file)) {
             $share_file_link_to = readlink($share_file);
-        }
-        if (!is_array($metafiles)) {
-            $metafiles = array();
-        }
-        foreach ($metafiles as $key => $metafile) {
-            if ($metafile->state == 'OK' && $share_file_link_to !== FALSE) {
-                if (@$metafile->is_linked && $metafile->path != $share_file_link_to) {
-                    if (!$quiet) {
-                        Log::debug('  Changing is_linked to FALSE for ' . $metafile->path);
+            if ($share_file_link_to !== FALSE) {
+                foreach ($metafiles as $key => $metafile) {
+                    if ($metafile->state == 'OK') {
+                        if (@$metafile->is_linked && $metafile->path != $share_file_link_to) {
+                            if (!$quiet) {
+                                Log::debug('  Changing is_linked to FALSE for ' . $metafile->path);
+                            }
+                            $metafile->is_linked = FALSE;
+                            $metafiles[$key] = $metafile;
+                            save_metafiles($share, $path, $filename, $metafiles);
+                        } else if (empty($metafile->is_linked) && $metafile->path == $share_file_link_to) {
+                            if (!$quiet) {
+                                Log::debug('  Changing is_linked to TRUE for ' . $metafile->path);
+                            }
+                            $metafile->is_linked = TRUE;
+                            $metafiles[$key] = $metafile;
+                            save_metafiles($share, $path, $filename, $metafiles);
+                        }
                     }
-                    $metafile->is_linked = FALSE;
-                    $metafiles[$key] = $metafile;
-                    save_metafiles($share, $path, $filename, $metafiles);
-                } else if (empty($metafile->is_linked) && $metafile->path == $share_file_link_to) {
-                    if (!$quiet) {
-                        Log::debug('  Changing is_linked to TRUE for ' . $metafile->path);
-                    }
-                    $metafile->is_linked = TRUE;
-                    $metafiles[$key] = $metafile;
-                    save_metafiles($share, $path, $filename, $metafiles);
                 }
             }
         }
