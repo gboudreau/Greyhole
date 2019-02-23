@@ -2054,6 +2054,7 @@ function gh_fsck_task($task) {
     }
 
     Log::info("Starting fsck for $fscked_dir");
+    FSCKWorkLog::startTask($task->id);
     initialize_fsck_report($fscked_dir);
     clearstatcache();
 
@@ -2145,17 +2146,7 @@ function gh_fsck_task($task) {
 
     Settings::set('last_fsck_conf_md5', $new_conf_md5);
 
-    if (task_has_option($task, OPTION_EMAIL) || Hook::hasHookForEvent(LogHook::EVENT_TYPE_FSCK)) {
-        // Email report for fsck
-        $subject = 'fsck of Greyhole shares on ' . exec('hostname');
-        $fsck_report_mail = get_fsck_report();
-        if (task_has_option($task, OPTION_EMAIL)) {
-            $email_to = Config::get(CONFIG_EMAIL_TO);
-            Log::debug("Sending fsck report to $email_to");
-            mail($email_to, $subject, $fsck_report_mail);
-        }
-        LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $subject . "\n" . $fsck_report_mail);
-    }
+    FSCKWorkLog::taskCompleted($task->id, task_has_option($task, OPTION_EMAIL));
 
     return TRUE;
 }
@@ -2840,18 +2831,22 @@ function initialize_fsck_report($what) {
     $fsck_report['wrong_file_size'] = array();
     $fsck_report['temp_files'] = array();
     $fsck_report['gone_ok'] = 0;
+    return $fsck_report;
 }
 
-function get_fsck_report() {
-    global $fsck_report, $options;
-    
+function get_fsck_report($_report = NULL, $include_trash_size = TRUE) {
+    if (!empty($_report)) {
+        $fsck_report = $_report;
+    } else {
+        global $fsck_report;
+    }
+    global $options;
+
     $fsck_report['end'] = time();
     
     $displayable_duration = duration_to_human($fsck_report['end'] - $fsck_report['start']);
     
-    $report = "fsck report
------------
-Scanned directory: " . $fsck_report['what'] . "
+    $report = "Scanned directory: " . $fsck_report['what'] . "
 
 Started:  " . date('Y-m-d H:i:s', $fsck_report['start']) . "
 Ended:    " . date('Y-m-d H:i:s', $fsck_report['end']) . "
@@ -2865,19 +2860,7 @@ Landing Zone (shares):
   Found " . number_format($fsck_report['landing_zone']['num_dirs']) . " directories
   Found " . number_format($fsck_report['landing_zone']['num_files']) . " files
   Found " . number_format($fsck_report['orphaned']['num_orphans']) . " orphans
-
-Trash size:\n";
-
-    foreach (Config::storagePoolDrives() as $sp_drive) {
-        $trash_path = clean_dir("$sp_drive/.gh_trash");
-        if (is_dir($trash_path)) {
-            $report .= "  $trash_path = " . trim(exec("du -sh " . escapeshellarg($trash_path) . " | awk '{print $1}'"))."\n";
-        } else if (!file_exists($sp_drive)) {
-            $report .= "  $sp_drive = N/A\n";
-        } else {
-            $report .= "  $trash_path = empty\n";
-        }
-    }
+";
 
     // Errors
     if (empty($fsck_report['no_copies_found_files']) && count($fsck_report['wrong_file_size']) == 0) {
@@ -2937,6 +2920,21 @@ Trash size:\n";
   where path is one of:\n";
             $report .= "    " . implode("\n    ", array_keys(StoragePool::get_gone_ok_drives())) . "\n\n";
         }
+    }
+
+    if ($include_trash_size) {
+        $report .= "==========\n\nTrash size:\n";
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            $trash_path = clean_dir("$sp_drive/.gh_trash");
+            if (is_dir($trash_path)) {
+                $report .= "  $trash_path = " . trim(exec("du -sh " . escapeshellarg($trash_path) . " | awk '{print $1}'"))."\n";
+            } else if (!file_exists($sp_drive)) {
+                $report .= "  $sp_drive = N/A\n";
+            } else {
+                $report .= "  $trash_path = empty\n";
+            }
+        }
+        $report .= "\n";
     }
 
     return $report;

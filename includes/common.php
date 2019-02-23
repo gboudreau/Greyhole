@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau, Andrew Hopkinson
+Copyright 2009-2019 Guillaume Boudreau, Andrew Hopkinson
 
 This file is part of Greyhole.
 
@@ -296,6 +296,97 @@ class metafile_iterator implements Iterator {
     }
 }
 
+class FSCKWorkLog {
+    const FILE = '/usr/share/greyhole/fsck_work_log.dat';
+
+    CONST STATUS_PENDING  = 'pending';
+    CONST STATUS_ONGOING  = 'ongoing';
+    CONST STATUS_COMPLETE = 'complete';
+
+    public static function initiate($dir, $options, $task_ids) {
+        $fsck_work_log = (object) [
+            'dir'     => $dir,
+            'options' => $options,
+            'tasks'   => array(),
+        ];
+        foreach ($task_ids as $task_id) {
+            $fsck_work_log->tasks[] = (object) ['id' => $task_id, 'status' => static::STATUS_PENDING];
+        }
+        static::saveToDisk($fsck_work_log);
+    }
+
+    public static function startTask($task_id) {
+        $fsck_work_log = static::getFromDisk();
+        foreach ($fsck_work_log->tasks as $task) {
+            if ($task->id == $task_id) {
+                $task->status = static::STATUS_ONGOING;
+                static::saveToDisk($fsck_work_log);
+                break;
+            }
+        }
+    }
+
+    public static function taskCompleted($task_id, $send_email) {
+        $fsck_work_log = static::getFromDisk();
+        foreach ($fsck_work_log->tasks as $task) {
+            if ($task->id == $task_id) {
+                $task->status = static::STATUS_COMPLETE;
+                global $fsck_report;
+                $task->report = $fsck_report;
+                static::saveToDisk($fsck_work_log);
+                break;
+            }
+        }
+        $completed_tasks = static::getNumCompletedTasks();
+        $total_tasks = count($fsck_work_log->tasks);
+        if ($total_tasks > 1) {
+            Log::info("Completed $completed_tasks/$total_tasks fsck tasks.");
+        }
+        if ($completed_tasks == $total_tasks) {
+            // All tasks completed; email report
+            if ($send_email || Hook::hasHookForEvent(LogHook::EVENT_TYPE_FSCK)) {
+                // Email report for fsck
+                $subject = "[Greyhole] fsck of $fsck_work_log->dir completed on " . exec('hostname');
+
+                $fsck_report_body = "==========\n\n";
+                foreach ($fsck_work_log->tasks as $task) {
+                    $is_last = array_search($task, $fsck_work_log->tasks) == count($fsck_work_log->tasks)-1;
+                    $fsck_report_body .= get_fsck_report($task->report, $is_last);
+                    $fsck_report_body .= "==========\n\n";
+                }
+
+                if ($send_email) {
+                    $email_to = Config::get(CONFIG_EMAIL_TO);
+                    Log::debug("Sending fsck report to $email_to");
+                    mail($email_to, $subject, $fsck_report_body);
+                }
+
+                LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $subject . "\n" . $fsck_report_body);
+            }
+        }
+    }
+
+    private static function saveToDisk($fsck_work_log) {
+        file_put_contents(static::FILE, serialize($fsck_work_log));
+    }
+
+    private static function getFromDisk() {
+        $fsck_work_log = unserialize(file_get_contents(static::FILE));
+        return $fsck_work_log;
+    }
+
+    private static function getNumCompletedTasks() {
+        $completed_tasks = 0;
+        $fsck_work_log = static::getFromDisk();
+        foreach ($fsck_work_log->tasks as $task) {
+            if ($task->status == static::STATUS_COMPLETE) {
+                $completed_tasks++;
+            }
+        }
+        return $completed_tasks;
+    }
+}
+
 class FSCKLogFile {
     const PATH = '/usr/share/greyhole';
 
@@ -341,7 +432,7 @@ class FSCKLogFile {
             global $fsck_report;
             $fsck_report = unserialize(file_get_contents($logfile));
             unlink($logfile);
-            return get_fsck_report() . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
+            return get_fsck_report(NULL, FALSE) . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
         } else {
             return '[empty]';
         }
@@ -349,11 +440,11 @@ class FSCKLogFile {
     
     private function getSubject() {
         if ($this->filename == 'fsck_checksums.log') {
-            return 'Mismatched checksums in Greyhole file copies';
+            return '[Greyhole] Mismatched checksums in file copies on ' . exec('hostname');
         } else if ($this->filename == 'fsck_files.log') {
-            return 'fsck_files of Greyhole shares on ' . exec('hostname');
+            return '[Greyhole] fsck_files of Greyhole shares on ' . exec('hostname');
         } else {
-            return 'Unknown FSCK report';
+            return '[Greyhole] Unknown fsck report on ' . exec('hostname');
         }
     }
     
@@ -418,14 +509,16 @@ function fix_symlinks_on_share($share_name) {
 }
 
 function schedule_fsck_all_shares($fsck_options=array()) {
+    $task_ids = array();
     foreach (SharesConfig::getShares() as $share_name => $share_options) {
         $query = "INSERT INTO tasks SET action = 'fsck', share = :full_path, additional_info = :fsck_options, complete = 'yes'";
         $params = array(
             'full_path' => $share_options[CONFIG_LANDING_ZONE],
             'fsck_options' => empty($fsck_options) ? NULL : implode('|', $fsck_options)
         );
-        DB::insert($query, $params);
+        $task_ids[] = DB::insert($query, $params);
     }
+    return $task_ids;
 }
 
 function kshift(&$arr) {

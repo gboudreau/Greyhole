@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2019 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -62,8 +62,9 @@ class FsckCliRunner extends AbstractCliRunner {
 
     public function run() {
         if (empty($this->dir)) {
-            schedule_fsck_all_shares($this->fsck_options);
+            $task_ids = schedule_fsck_all_shares($this->fsck_options);
             $this->dir = 'all shares';
+            $fsck_options = NULL;
         } else {
             $query = "INSERT INTO tasks SET action = 'fsck', share = :full_path, additional_info = :fsck_options, complete = 'yes'";
             if (empty($this->fsck_options)) {
@@ -75,8 +76,12 @@ class FsckCliRunner extends AbstractCliRunner {
                 'full_path' => $this->dir,
                 'fsck_options' => $fsck_options,
             );
-            DB::insert($query, $params);
+            $task_id = DB::insert($query, $params);
+            $task_ids = array($task_id);
         }
+
+        FSCKWorkLog::initiate($this->dir, $fsck_options, $task_ids);
+
         $this->log("fsck of $this->dir has been scheduled. It will start after all currently pending tasks have been completed.");
         if (isset($this->options['checksums'])) {
             $this->log("Any mismatch in checksums will be logged in both " . Config::get(CONFIG_GREYHOLE_LOG_FILE) . " and " . FSCKLogFile::PATH . "/fsck_checksums.log");
