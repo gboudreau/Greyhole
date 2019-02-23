@@ -452,6 +452,12 @@ function string_starts_with($haystack, $needle) {
 }
 
 function json_pretty_print($json) {
+    if (defined('JSON_PRETTY_PRINT')) {
+        if (is_string($json)) {
+            $json = json_decode($json);
+        }
+        return json_encode($json, JSON_PRETTY_PRINT);
+    }
     if (!is_string($json)) {
         $json = json_encode($json);
     }

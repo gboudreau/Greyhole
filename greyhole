@@ -1,7 +1,7 @@
 #!/usr/bin/greyhole-php
 <?php
 /*
-Copyright 2009-2017 Guillaume Boudreau, Andrew Hopkinson
+Copyright 2009-2019 Guillaume Boudreau, Andrew Hopkinson
 
 This file is part of Greyhole.
 
@@ -197,176 +197,9 @@ function execute_next_task() {
             gh_check_md5($task);
             break;
         case 'fsck':
-            $new_conf_md5 = get_conf_md5();
-            if (task_has_option($task, OPTION_IF_CONF_CHANGED)) {
-                // Let's check if the conf file changed since the last fsck
-
-                // Last value
-                $last_md5 = Settings::get('last_fsck_conf_md5');
-                
-                // New value
-                if ($new_conf_md5 == $last_md5) {
-                    Log::info("Skipping fsck; --if-conf-changed was specified, and the configuration file didn't change since the last fsck.");
-                    break;
-                }
-            }
-
-            $fscked_dir = $task->share;
-
-            $where_clause = "";
-            $params = array();
-            if ($fscked_dir == '') {
-                $fsck_what_dir = 'All shares';
-            } else {
-                $fsck_what_dir = $fscked_dir;
-                $max_lz_length = 0;
-                foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                    if (strpos($fsck_what_dir, $share_options[CONFIG_LANDING_ZONE]) === 0 && strlen($share_options[CONFIG_LANDING_ZONE]) > $max_lz_length) {
-                        $max_lz_length = strlen($share_options[CONFIG_LANDING_ZONE]);
-                        $where_clause = "AND share = :share";
-                        $params['share'] = $share_name;
-                    }
-                }
-            }
-
-            // First, let's remove all md5 tasks that would be duplicates of the ones we'll create during this fsck
-            DB::execute("DELETE FROM tasks WHERE action = 'md5' $where_clause", $params);
-
-            // Second, let's make sure all fsck_file tasks marked idle get executed.
-            $query = "UPDATE tasks SET complete = 'yes' WHERE action = 'fsck_file' AND complete = 'idle' AND id < $task->id $where_clause";
-            DB::execute($query, $params);
-            $num_updated_rows = DB::getFirstValue("SELECT COUNT(*) AS num_updated_rows FROM tasks WHERE action = 'fsck_file' AND complete = 'yes' AND id < $task->id $where_clause", $params);
-            if ($num_updated_rows > 0) {
-                // Updated some fsck_file to complete; let's just return here, to allow them to be executed first.
-                Log::info("Will execute all ($num_updated_rows) pending fsck_file operations for $fsck_what_dir before running this fsck (task ID $task->id).");
+            $result = gh_fsck_task($task);
+            if (!$result) {
                 return;
-            }
-
-            Log::info("Starting fsck for $fsck_what_dir");
-            initialize_fsck_report($fsck_what_dir);
-            clearstatcache();
-
-            if (task_has_option($task, OPTION_CHECKSUMS)) {
-                // Spawn md5 worker threads; those will calculate files MD5, and save the result in the DB.
-                // The Greyhole daemon will then read those, and check them against each other to make sure all is fine.
-                $checksums_thread_ids = array();
-                foreach (Config::storagePoolDrives() as $sp_drive) {
-                    $checksums_thread_ids[] = spawn_thread('md5-worker', array($sp_drive));
-                }
-                Log::debug("Spawned " . count($checksums_thread_ids) . " worker threads to calculate MD5 checksums. Will now wait for results, and check them as they come in.");
-            }
-
-            set_fsck_options($task);
-
-            if ($fscked_dir == '') {
-                foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                    gh_fsck_reset_du($share_name);
-                    gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
-                }
-                if (!task_has_option($task, OPTION_SKIP_METASTORE)) {
-                    foreach (get_metastores() as $metastore) {
-                        foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                            gh_fsck_metastore($metastore, "/$share_name", $share_name);
-                        }
-                    }
-                }
-                if (task_has_option($task, OPTION_ORPHANED)) {
-                    foreach (Config::storagePoolDrives() as $sp_drive) {
-                        if (StoragePool::is_pool_drive($sp_drive)) {
-                            foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                                gh_fsck("$sp_drive/$share_name", $share_name, $sp_drive);
-                            }
-                        }
-                    }
-                }
-            } else {
-                $storage_volume = FALSE;
-                $share_options = get_share_options_from_full_path($fscked_dir);
-                if ($share_options === FALSE) {
-                    // Since share_options is FALSE we didn't get a share path, maybe we got a storage volume path, let's check 
-                    $storage_volume = get_storage_volume_from_path($fscked_dir);
-                    $share_options = get_share_options_from_storage_volume($fscked_dir, $storage_volume);
-                }
-                Log::debug("  Storage volume? " . ($storage_volume ? $storage_volume : 'No'));
-                Log::debug("  Share? " . ($share_options ? $share_options['name'] : 'No'));
-
-                if ($share_options === FALSE) {
-                    if ($storage_volume !== FALSE) {
-                        // fsck a full storage pool drive
-                        foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                            gh_fsck("$storage_volume/$share_name", $share_name, $storage_volume);
-                        }
-                    } else {
-                        Log::error("Unknown folder to fsck. You should specify a storage pool folder, a metadata store folder, a shared folder, or a subdirectory of any of those.", Log::EVENT_CODE_FSCK_UNKNOWN_FOLDER);
-                    }
-                } else {
-                    $share = $share_options['name'];
-                    $metastore = get_metastore_from_path($fscked_dir);
-
-                    if ($storage_volume === FALSE && $metastore === FALSE) {
-                        $fsck_type = FSCK_TYPE_SHARE;
-                    } else if ($storage_volume !== FALSE) {
-                        $fsck_type = FSCK_TYPE_STORAGE_POOL_DRIVE;
-                    } else {
-                        $fsck_type = FSCK_TYPE_METASTORE;
-                    }
-
-                    // Only calculate du stats if the user specified a folder in a share
-                    if ($fsck_type == FSCK_TYPE_SHARE) {
-                        $subdir = trim(str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir), '/');
-                        gh_fsck_reset_du($share, $subdir);
-                    }
-                        
-                    // Only kick off an fsck on the passed dir if it's not a metastore; that will be handled below.
-                    if ($fsck_type != FSCK_TYPE_METASTORE) {
-                        gh_fsck($fscked_dir, $share, $storage_volume);
-                    }
-
-                    Log::debug("  Scan metadata stores? " . (task_has_option($task, OPTION_SKIP_METASTORE) ? 'No' : 'Yes'));
-                    if (task_has_option($task, OPTION_SKIP_METASTORE) === FALSE) {
-                        if ($fsck_type == FSCK_TYPE_METASTORE) {
-                            // This is a metastore directory, so only kick off a metastore fsck for the indicated directory (this will not fsck the corresponding metastore path on other volumes)
-                            $subdir = str_replace("$metastore", '', $fscked_dir);
-                            Log::debug("Starting metastore fsck for $metastore/$subdir");
-                            gh_fsck_metastore($metastore, $subdir, $share);
-                        } else {
-                            // This isn't a metastore dir so we'll check the metastore of this path on all volumes
-                            if ($fsck_type == FSCK_TYPE_STORAGE_POOL_DRIVE) {
-                                $subdir = str_replace($storage_volume, '', $fscked_dir);
-                            } else {
-                                $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
-                            }
-                            Log::debug("Starting metastores fsck for $subdir");
-                            foreach (get_metastores() as $metastore) {
-                                gh_fsck_metastore($metastore, $subdir, $share);
-                            }
-                        }
-                    }
-                    if ($fsck_type != FSCK_TYPE_STORAGE_POOL_DRIVE && task_has_option($task, OPTION_ORPHANED)) {
-                        $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
-                        Log::debug("Starting orphans search for $subdir");
-                        foreach (Config::storagePoolDrives() as $sp_drive) {
-                            if (StoragePool::is_pool_drive($sp_drive)) {
-                                gh_fsck("$sp_drive/$subdir", $share, $sp_drive);
-                            }
-                        }
-                    }
-                }
-            }
-            Log::info("fsck for " . ($fscked_dir == '' ? 'All shares' : $fscked_dir) . " completed.");
-            
-            Settings::set('last_fsck_conf_md5', $new_conf_md5);
-            
-            if (task_has_option($task, OPTION_EMAIL) || Hook::hasHookForEvent(LogHook::EVENT_TYPE_FSCK)) {
-                // Email report for fsck
-                $subject = 'fsck of Greyhole shares on ' . exec('hostname');
-                $fsck_report_mail = get_fsck_report();
-                if (task_has_option($task, OPTION_EMAIL)) {
-                    $email_to = Config::get(CONFIG_EMAIL_TO);
-                    Log::debug("Sending fsck report to $email_to");
-                    mail($email_to, $subject, $fsck_report_mail);
-                }
-                LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $subject . "\n" . $fsck_report_mail);
             }
             break;
         case 'mkdir':
@@ -2176,6 +2009,155 @@ You probably want to do something about this!
     }
 
     return $drives;
+}
+
+function gh_fsck_task($task) {
+    $new_conf_md5 = get_conf_md5();
+    if (task_has_option($task, OPTION_IF_CONF_CHANGED)) {
+        // Let's check if the conf file changed since the last fsck
+
+        // Last value
+        $last_md5 = Settings::get('last_fsck_conf_md5');
+
+        // New value
+        if ($new_conf_md5 == $last_md5) {
+            Log::info("Skipping fsck; --if-conf-changed was specified, and the configuration file didn't change since the last fsck.");
+            return TRUE;
+        }
+    }
+
+    $fscked_dir = $task->share;
+
+    $where_clause = "";
+    $params = array();
+
+    $max_lz_length = 0;
+    foreach (SharesConfig::getShares() as $share_name => $share_options) {
+        if (strpos($fscked_dir, $share_options[CONFIG_LANDING_ZONE]) === 0 && strlen($share_options[CONFIG_LANDING_ZONE]) > $max_lz_length) {
+            $max_lz_length = strlen($share_options[CONFIG_LANDING_ZONE]);
+            $where_clause = "AND share = :share";
+            $params['share'] = $share_name;
+        }
+    }
+
+    // First, let's remove all md5 tasks that would be duplicates of the ones we'll create during this fsck
+    DB::execute("DELETE FROM tasks WHERE action = 'md5' $where_clause", $params);
+
+    // Second, let's make sure all fsck_file tasks marked idle get executed.
+    $query = "UPDATE tasks SET complete = 'yes' WHERE action = 'fsck_file' AND complete = 'idle' AND id < $task->id $where_clause";
+    DB::execute($query, $params);
+    $num_updated_rows = DB::getFirstValue("SELECT COUNT(*) AS num_updated_rows FROM tasks WHERE action = 'fsck_file' AND complete = 'yes' AND id < $task->id $where_clause", $params);
+    if ($num_updated_rows > 0) {
+        // Updated some fsck_file to complete; let's just return here, to allow them to be executed first.
+        Log::info("Will execute all ($num_updated_rows) pending fsck_file operations for $fscked_dir before running this fsck (task ID $task->id).");
+        return FALSE;
+    }
+
+    Log::info("Starting fsck for $fscked_dir");
+    initialize_fsck_report($fscked_dir);
+    clearstatcache();
+
+    if (task_has_option($task, OPTION_CHECKSUMS)) {
+        // Spawn md5 worker threads; those will calculate files MD5, and save the result in the DB.
+        // The Greyhole daemon will then read those, and check them against each other to make sure all is fine.
+        $checksums_thread_ids = array();
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            $checksums_thread_ids[] = spawn_thread('md5-worker', array($sp_drive));
+        }
+        Log::debug("Spawned " . count($checksums_thread_ids) . " worker threads to calculate MD5 checksums. Will now wait for results, and check them as they come in.");
+    }
+
+    set_fsck_options($task);
+
+    $storage_volume = FALSE;
+    $share_options = get_share_options_from_full_path($fscked_dir);
+    if ($share_options === FALSE) {
+        // Since share_options is FALSE we didn't get a share path, maybe we got a storage volume path, let's check
+        $storage_volume = get_storage_volume_from_path($fscked_dir);
+        $share_options = get_share_options_from_storage_volume($fscked_dir, $storage_volume);
+    }
+    Log::debug("  Storage volume? " . ($storage_volume ? $storage_volume : 'No'));
+    Log::debug("  Share? " . ($share_options ? $share_options['name'] : 'No'));
+
+    if ($share_options === FALSE) {
+        if ($storage_volume !== FALSE) {
+            // fsck a full storage pool drive
+            foreach (SharesConfig::getShares() as $share_name => $share_options) {
+                gh_fsck("$storage_volume/$share_name", $share_name, $storage_volume);
+            }
+        } else {
+            Log::error("Unknown folder to fsck. You should specify a storage pool folder, a metadata store folder, a shared folder, or a subdirectory of any of those.", Log::EVENT_CODE_FSCK_UNKNOWN_FOLDER);
+        }
+    } else {
+        $share = $share_options['name'];
+        $metastore = get_metastore_from_path($fscked_dir);
+
+        if ($storage_volume === FALSE && $metastore === FALSE) {
+            $fsck_type = FSCK_TYPE_SHARE;
+        } else if ($storage_volume !== FALSE) {
+            $fsck_type = FSCK_TYPE_STORAGE_POOL_DRIVE;
+        } else {
+            $fsck_type = FSCK_TYPE_METASTORE;
+        }
+
+        // Only calculate du stats if the user specified a folder in a share
+        if ($fsck_type == FSCK_TYPE_SHARE) {
+            $subdir = trim(str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir), '/');
+            gh_fsck_reset_du($share, $subdir);
+        }
+
+        // Only kick off an fsck on the passed dir if it's not a metastore; that will be handled below.
+        if ($fsck_type != FSCK_TYPE_METASTORE) {
+            gh_fsck($fscked_dir, $share, $storage_volume);
+        }
+
+        Log::debug("  Scan metadata stores? " . (task_has_option($task, OPTION_SKIP_METASTORE) ? 'No' : 'Yes'));
+        if (task_has_option($task, OPTION_SKIP_METASTORE) === FALSE) {
+            if ($fsck_type == FSCK_TYPE_METASTORE) {
+                // This is a metastore directory, so only kick off a metastore fsck for the indicated directory (this will not fsck the corresponding metastore path on other volumes)
+                $subdir = str_replace("$metastore", '', $fscked_dir);
+                Log::debug("Starting metastore fsck for $metastore/$subdir");
+                gh_fsck_metastore($metastore, $subdir, $share);
+            } else {
+                // This isn't a metastore dir so we'll check the metastore of this path on all volumes
+                if ($fsck_type == FSCK_TYPE_STORAGE_POOL_DRIVE) {
+                    $subdir = str_replace($storage_volume, '', $fscked_dir);
+                } else {
+                    $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
+                }
+                Log::debug("Starting metastores fsck for $subdir");
+                foreach (get_metastores() as $metastore) {
+                    gh_fsck_metastore($metastore, $subdir, $share);
+                }
+            }
+        }
+        if ($fsck_type != FSCK_TYPE_STORAGE_POOL_DRIVE && task_has_option($task, OPTION_ORPHANED)) {
+            $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
+            Log::debug("Starting orphans search for $subdir");
+            foreach (Config::storagePoolDrives() as $sp_drive) {
+                if (StoragePool::is_pool_drive($sp_drive)) {
+                    gh_fsck("$sp_drive/$subdir", $share, $sp_drive);
+                }
+            }
+        }
+    }
+    Log::info("fsck for $fscked_dir completed.");
+
+    Settings::set('last_fsck_conf_md5', $new_conf_md5);
+
+    if (task_has_option($task, OPTION_EMAIL) || Hook::hasHookForEvent(LogHook::EVENT_TYPE_FSCK)) {
+        // Email report for fsck
+        $subject = 'fsck of Greyhole shares on ' . exec('hostname');
+        $fsck_report_mail = get_fsck_report();
+        if (task_has_option($task, OPTION_EMAIL)) {
+            $email_to = Config::get(CONFIG_EMAIL_TO);
+            Log::debug("Sending fsck report to $email_to");
+            mail($email_to, $subject, $fsck_report_mail);
+        }
+        LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $subject . "\n" . $fsck_report_mail);
+    }
+
+    return TRUE;
 }
 
 function gh_fsck_reset_du($share, $full_path=null) {
