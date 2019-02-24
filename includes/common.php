@@ -332,6 +332,7 @@ class FSCKWorkLog {
             if ($task->id == $task_id) {
                 $task->status = static::STATUS_COMPLETE;
                 global $fsck_report;
+                $fsck_report['end'] = time();
                 $task->report = $fsck_report;
                 static::saveToDisk($fsck_work_log);
                 break;

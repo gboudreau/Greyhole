@@ -2842,8 +2842,10 @@ function get_fsck_report($_report = NULL, $include_trash_size = TRUE) {
     }
     global $options;
 
-    $fsck_report['end'] = time();
-    
+    if (empty($fsck_report['end'])) {
+        $fsck_report['end'] = time();
+    }
+
     $displayable_duration = duration_to_human($fsck_report['end'] - $fsck_report['start']);
     
     $report = "Scanned directory: " . $fsck_report['what'] . "
