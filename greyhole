@@ -995,6 +995,11 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
 }
 
 function gh_copy_file($source_file, &$destination_file) {
+    if (gh_is_file($source_file) && $source_file == $destination_file) {
+        Log::debug("  Destination $destination_file is the same as the source. Nothing to do here; this file copy is ready!");
+        return TRUE;
+    }
+
     $start_time = time();
     $source_size = gh_filesize($source_file);
     $temp_path = get_temp_filename($destination_file);
