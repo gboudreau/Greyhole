@@ -943,6 +943,11 @@ function create_copies_from_metafiles($metafiles, $share, $full_path, $source_fi
             if ($metafile->is_linked) {
                 $metafile->is_linked = FALSE;
                 $link_next = TRUE;
+                if (@readlink("$landing_zone/$full_path") == $metafile->path) {
+                    // Symlink in landing zone is pointing to this file copy; we need to remove it, otherwise, we'd end up with a broken symlink after gh_recycle()
+                    Log::debug("  Deleting symlink from landing zone, before recycling the file copy it points to.");
+                    unlink("$landing_zone/$full_path");
+                }
             }
             $metafile->state = 'Gone';
             gh_recycle($metafile->path);
