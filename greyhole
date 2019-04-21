@@ -1313,7 +1313,7 @@ function get_metafiles_for_file($share, $path, $filename=null, $load_nok_metafil
             }
             $ok_metafiles[$key] = $metafile;
         } else {
-            if (!$valid_path) {
+            if (!$valid_path && $metafile->state != 'Gone') {
                 Log::warn("Found a metadata file pointing to a drive not defined in your storage pool: '$metafile->path'. Will mark it as Gone.", Log::EVENT_CODE_METADATA_POINTS_TO_GONE_DRIVE);
                 $metafile->state = 'Gone';
                 $metafiles[$key] = $metafile;
