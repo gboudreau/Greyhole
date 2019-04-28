@@ -9,7 +9,7 @@ How to build the VFS module binaries for a new Samba version.
 
 2. If needed, create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
 
-3. Add the new Samba version number in `build_vfs.sh @L16`
+3. Add the new Samba version number in `build_vfs.sh @L24`
 
 4. Run the build_vfs.sh script
 
@@ -44,7 +44,7 @@ How to build the VFS module binaries for a new Samba version.
 
 6. Edit `INSTALL`
     - Change latest version of Samba supported in point 3 (near L76).
-    - Add an `if` block near L78
+    - Add an `if` block near L98
     - Change the example near L96 & L101: `SAMBA_VERSION=4.6.0 # Or whatever is the latest version of Samba4.`
 
 7. Edit DEBIAN/Makefile

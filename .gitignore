@@ -5,3 +5,4 @@ release/
 .irc_password
 .idea
 .ftpconfig
+.github_token

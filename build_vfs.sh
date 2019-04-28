@@ -2,6 +2,8 @@
 
 # See samba-modules/HOWTO for details on usage
 
+set -e
+
 export GREYHOLE_INSTALL_DIR="$HOME/Greyhole"
 
 ###
@@ -21,7 +23,7 @@ fi
 
 cd "$HOME"
 
-for version in 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
+for version in 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
 	echo "Working on samba-${version} ... "
 	if [ ! -d samba-${version} ]; then
 		curl -LO http://samba.org/samba/ftp/stable/samba-${version}.tar.gz && tar zxf samba-${version}.tar.gz && rm -f samba-${version}.tar.gz
@@ -36,10 +38,12 @@ for version in 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
 		if  [ ! -f source3/modules/vfs_greyhole.c ]; then
 			NEEDS_CONFIGURE=1
 		fi
+		set +e
         grep -i vfs_greyhole source3/wscript >/dev/null
 		if  [ $? -ne 0 ]; then
 			NEEDS_CONFIGURE=1
 		fi
+		set -e
 
 	    rm -f source3/modules/vfs_greyhole.c source3/bin/greyhole.so bin/default/source3/modules/libvfs*greyhole.so
         if [ -f ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.${m}.c ]; then
@@ -62,7 +66,9 @@ for version in 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
 		        if [ ${m} -gt 6 ]; then
 		            CONF_OPTIONS="${CONF_OPTIONS} --disable-python"
 		        fi
-		        if [ ${m} -gt 8 ]; then
+		        if [ ${m} -gt 9 ]; then
+		            CONF_OPTIONS="${CONF_OPTIONS} --without-json --without-libarchive"
+			    elif [ ${m} -gt 8 ]; then
 		            CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
 			    fi
 		        ./configure ${CONF_OPTIONS}
