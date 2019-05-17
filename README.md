@@ -15,7 +15,7 @@ Features
 
 __JBOD concatenation storage pool__
 
-Configure as many hard drives as you'd like to be included in your pool. You're storage pool size will be the sum of the free space in all the hard drives you include. Your hard drives can be internal, external (USB, e-Sata, Firewire...), or even mount of remote file systems, and you can include hard drives of any size in your pool.
+Configure as many hard drives as you'd like to be included in your pool. Your storage pool size will be the sum of the free space in all the hard drives you include. Your hard drives can be internal, external (USB, e-Sata, Firewire...), or even mount of remote file systems, and you can include hard drives of any size in your pool.
 
 __Per-share redundancy__
 
