@@ -146,7 +146,7 @@ elif [ "$_OSTYPE" = "apt-get" ]; then
     if [ $? -eq 0 ]; then
         apt-get -y install php-mbstring
     fi
-    echo "deb http://www.greyhole.net/releases/deb stable main" > /etc/apt/sources.list.d/greyhole.list
+    echo "deb https://www.greyhole.net/releases/deb stable main" > /etc/apt/sources.list.d/greyhole.list
     curl -s https://www.greyhole.net/releases/deb/greyhole-debsig.asc | apt-key add -
     apt-get update
     apt-get -y -o DPkg::options::=--force-confmiss install greyhole
