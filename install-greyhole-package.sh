@@ -136,7 +136,16 @@ if [ "$_OSTYPE" = "yum" ]; then
         echo "Will install either one (whichever is available for your distribution)."
         install_php_mysql
     fi
-    
+
+    if [ ! -f /sbin/chkconfig -a ! -f /usr/sbin/update-rc.d ]; then
+        echo "Installing chkconfig..."
+	    sudo yum install -y chkconfig
+	fi
+    if [ ! -f /sbin/service ]; then
+        echo "Installing initscripts..."
+	    sudo yum install -y initscripts
+	fi
+
     sudo yum install -y greyhole
     if [ $? -ne 0 ]; then
         exit -2;
