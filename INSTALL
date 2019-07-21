@@ -98,24 +98,10 @@ If you know what you're doing, you should have no problem installing on any othe
 3. For Samba 4.11 and later: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
-   The following is for Samba 4.x. For Samba 3, see a previous version of this file: https://github.com/gboudreau/Greyhole/blob/0.9.35/INSTALL
-
 	Fedora: sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen
 	Ubuntu: sudo apt-get -y install build-essential python-dev libgnutls-dev
 
-	SAMBA_VERSION=`/usr/sbin/smbd --version | awk '{print $2}'`
-	wget http://samba.org/samba/ftp/stable/samba-${SAMBA_VERSION}.tar.gz
-	tar zxf samba-${SAMBA_VERSION}.tar.gz && rm -f samba-${SAMBA_VERSION}.tar.gz
-	cd samba-${SAMBA_VERSION}
-	cp ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-4.10.c source3/modules/vfs_greyhole.c
-	patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-4.10.patch
-	./configure --enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --without-ad-dc --disable-python --without-json --without-libarchive && make
-
-    # Create a symlink in the Samba VFS modules dir pointing to the compiled VFS
-    if [ -d /usr/lib/x86_64-linux-gnu ]; then LIBDIR=/usr/lib/x86_64-linux-gnu; elif [ "`uname -m`" = "x86_64" ]; then LIBDIR=/usr/lib64; else LIBDIR=/usr/lib; fi
-    V=`/usr/sbin/smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1$2}'`
-    cp bin/default/source3/modules/libvfs*greyhole.so greyhole-samba${V}.so
-    sudo ln -s `pwd`/greyhole-samba${V}.so ${LIBDIR}/samba/vfs/greyhole.so
+	$GREYHOLE_INSTALL_DIR/build_vfs_one.sh current
 
 4. Add Greyhole to services that start on boot:
 

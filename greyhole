@@ -1429,12 +1429,12 @@ function samba_check_vfs() {
     $vfs_is_ok = FALSE;
 
     // Samba version
-     $version = str_replace('.', '', samba_get_version());
+    $version = str_replace('.', '', samba_get_version());
       
     // CPU architecture (x86_64 or i386 or armv6l or armv5*)
     $arch = exec('uname -m');
 
-      // Find VFS symlink
+    // Find VFS symlink
     if (file_exists('/usr/lib/x86_64-linux-gnu/samba/vfs')) {
         $source_libdir = '/usr/lib64'; # Makefile will always install Greyhole .so files in /usr/lib64, for x86_64 CPUs. @see Makefile
         $target_libdir = '/usr/lib/x86_64-linux-gnu';
@@ -1475,10 +1475,16 @@ function samba_check_vfs() {
         samba_restart();
     }
 
-    # Bugfix for Ubuntu 14 (Trusty) that is missing libsmbd_base.so, which is used to compile the VFS
+    // Bugfix for Ubuntu 14 (Trusty) that is missing libsmbd_base.so, which is used to compile the VFS
     if (file_exists("$target_libdir/samba/libsmbd_base.so.0") && !file_exists("$target_libdir/samba/libsmbd_base.so")) {
         Log::info("  Ubuntu 14 bugfix: creating symlink pointing to libsmbd_base.so.0 as libsmbd_base.so.");
         gh_symlink("$target_libdir/samba/libsmbd_base.so.0", "$target_libdir/samba/libsmbd_base.so");
+    }
+
+    // Checking shared libraries required by greyhole.so
+    exec("ldd " . escapeshellarg($vfs_file) . " | grep 'not found'", $output);
+    if (!empty($output)) {
+        Log::warn("  Greyhole VFS module ($vfs_file) seems to be missing some required libraries. If you have issues connecting to your Greyhole-enabled shares, try to compile a new VFS module for Samba by running this command: /usr/share/greyhole/build_vfs.sh current", Log::EVENT_CODE_VFS_MODULE_WRONG);
     }
 }
 
