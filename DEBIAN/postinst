@@ -90,8 +90,13 @@ fi
 
 SOURCE_LIB="${SOURCE_LIBDIR}/greyhole/${LIB_FILE}"
 
-rm -f ${TARGET_SYMLINK}
-ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
+ls -l "${TARGET_SYMLINK}" 2>/dev/null | grep '/usr/share/greyhole/vfs-build/' >/dev/null
+if [ $? -eq 0 ]; then
+	echo "Detected custom (locally-compiled) Greyhole VFS module at ${TARGET_SYMLINK}; will NOT overwrite it."
+else
+	rm -f ${TARGET_SYMLINK}
+	ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
+fi
 
 # Bugfix for Ubuntu / Debian that are missing symlinks in ${TARGET_LIBDIR}/samba/
 MAJOR_SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1}'`"
