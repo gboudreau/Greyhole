@@ -121,6 +121,7 @@ if [ ! -f ${SOURCE_LIB} ]; then
 	exit 1
 fi
 
+set +e
 ls -l "${TARGET_SYMLINK}" 2>/dev/null | grep '/usr/share/greyhole/vfs-build/' >/dev/null
 if [ $? -eq 0 ]; then
 	echo "Detected custom (locally-compiled) Greyhole VFS module at ${TARGET_SYMLINK}; will NOT overwrite it."
@@ -128,6 +129,7 @@ else
 	rm -f ${TARGET_SYMLINK}
 	ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
 fi
+set -e
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
 	# cifs client workaround
