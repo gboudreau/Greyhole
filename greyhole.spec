@@ -170,19 +170,21 @@ man logrotate > /dev/null 2>&1 || echo "Warning! logrotate is not installed. You
 
 %preun
 
-# Delete VFS module symlinks, if any
-rm -f /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so
-rm -f /usr/lib64/samba/vfs/greyhole.so
-rm -f /usr/lib/samba/vfs/greyhole.so
-
 # Delete cache folder
 rm -rf /var/cache/greyhole-dfree
 
 if [ "$1" != 0 ]; then
+	set +e
 	/sbin/service greyhole condrestart 2>&1 > /dev/null
+	set -e
 else
 	# not an update, a complete uninstall
-	
+
+	# Delete VFS module symlinks, if any
+	rm -f /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so
+	rm -f /usr/lib64/samba/vfs/greyhole.so
+	rm -f /usr/lib/samba/vfs/greyhole.so
+
 	# Service removal
 	/sbin/service greyhole stop 2>&1 > /dev/null
 	/sbin/chkconfig --del greyhole

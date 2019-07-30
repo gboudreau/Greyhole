@@ -128,7 +128,7 @@ ssh ${HOST} ${PATH_TO_REPOS_UPDATER}/update_yum_repodata.sh
 echo
 echo "*******************"
 echo "You now need to execute the following command in the SSH shell that will open:"
-echo "  ${PATH_TO_REPOS_UPDATER}/update_deb_repodata.sh $VERSION $BUILD_NUMBER ; exit"
+echo "  ${PATH_TO_REPOS_UPDATER}/update_deb_repodata.sh $VERSION $BUILD_NUMBER && exit"
 echo "*******************"
 ssh ${HOST}
 
@@ -136,12 +136,14 @@ ssh ${HOST}
 ############################################################
 # Update local greyhole package to latest, from YUM/APT repo
 
+set -e
 if [ -x /usr/bin/yum ]; then
 	sudo yum update greyhole
 	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree /usr/bin/greyhole-php
 	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
 	sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
+	chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
 	sudo service greyhole condrestart
 elif [ -x /usr/bin/apt-get ]; then
 	sudo apt-get update && sudo apt-get install greyhole
@@ -149,10 +151,10 @@ elif [ -x /usr/bin/apt-get ]; then
 	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
 	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
 	sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
+	chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
 	sudo service greyhole restart
 fi
-chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
-
+set +e
 
 ####################
 # Tag the git branch
