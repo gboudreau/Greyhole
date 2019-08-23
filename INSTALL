@@ -101,7 +101,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	Fedora: sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen
 	Ubuntu: sudo apt-get -y install build-essential python-dev libgnutls-dev
 
-	$GREYHOLE_INSTALL_DIR/build_vfs_one.sh current
+	$GREYHOLE_INSTALL_DIR/build_vfs.sh current
 
 4. Add Greyhole to services that start on boot:
 

@@ -102,9 +102,9 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
         fi
         if [[ ${m} -gt 9 ]]; then
             CONF_OPTIONS="${CONF_OPTIONS} --without-json --without-libarchive"
-	    elif [[ ${m} -gt 8 ]]; then
+        elif [[ ${m} -gt 8 ]]; then
             CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
-	    fi
+        fi
         ./configure ${CONF_OPTIONS} >gh_vfs_build.log 2>&1 &
         PROC_ID=$!
 	fi
