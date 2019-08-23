@@ -121,6 +121,13 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     fi
 fi
 
+# Patch for compiling Samba on Alpine Linux
+sed -i -e 's/NETDB_INTERNAL/-1/' nsswitch/wins.c
+sed -i -e 's/NETDB_SUCCESS/0/' nsswitch/wins.c
+echo '#include <sys/types.h>' > file.txt
+sed -i '/#include <stdbool.h>/r file.txt' -- lib/tevent/tevent.h
+rm file.txt
+
 echo "  Compiling Samba..."
 make -j >gh_vfs_build.log 2>&1 &
 PROC_ID=$!
