@@ -162,9 +162,9 @@ echo "Greyhole VFS module successfully compiled into ${GREYHOLE_COMPILED_MODULE}
 if [[ ${create_symlink} -eq 1 ]]; then
 	echo
     echo "Creating the required symlink in the Samba VFS library folder."
-    if [[ -d /usr/lib/x86_64-linux-gnu ]]; then
+    if [[ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]]; then
         LIBDIR=/usr/lib/x86_64-linux-gnu
-    elif [[ "`uname -m`" = "x86_64" ]]; then
+    elif [[ -d /usr/lib64/samba/vfs ]]; then
         LIBDIR=/usr/lib64
     else
         LIBDIR=/usr/lib
