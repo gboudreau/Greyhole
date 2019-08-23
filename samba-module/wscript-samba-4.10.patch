@@ -20,8 +20,7 @@ diff -Naur a/source3/modules/wscript_build b/source3/modules/wscript_build
 diff -Naur a/source3/wscript b/source3/wscript
 --- a/source3/wscript
 +++ b/source3/wscript
-@@ -1664,6 +1664,6 @@
-                                       vfs_readahead vfs_xattr_tdb
+@@ -1665,5 +1665,5 @@
                                        vfs_streams_xattr vfs_streams_depot vfs_acl_xattr vfs_acl_tdb
                                        vfs_preopen vfs_catia
 -                                      vfs_media_harmony vfs_unityed_media vfs_fruit vfs_shell_snap
