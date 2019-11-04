@@ -19,7 +19,7 @@ deb: dist
 	sed -i 's@ \./@ @' release/$(PACKAGE)-$(VERSION)/DEBIAN/md5sums
 	(cd release/$(PACKAGE)-$(VERSION) && chmod +x DEBIAN/postinst DEBIAN/postrm)
 	(cd release/$(PACKAGE)-$(VERSION) && sudo chown -R root:root .)
-	(cd release && sudo dpkg-deb --build $(PACKAGE)-$(VERSION) greyhole-$(VERSION)-$(BUILD_NUMBER).$(ARCH).deb)
+	(cd release && sudo dpkg-deb -Zgzip --build $(PACKAGE)-$(VERSION) greyhole-$(VERSION)-$(BUILD_NUMBER).$(ARCH).deb)
 	(cd release && sudo rm -rf $(PACKAGE)-$(VERSION))
 
 rpm: dist
