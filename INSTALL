@@ -95,11 +95,12 @@ If you know what you're doing, you should have no problem installing on any othe
 	Ubuntu (15+): /etc/init.d/smbd restart
 	Debian: service samba restart
 
-3. For Samba 4.11 and later: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba 4.12 and later: The greyhole.so files packaged with Greyhole won't work on your system.
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
 	Fedora: sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen
 	Ubuntu: sudo apt-get -y install build-essential python-dev libgnutls-dev
+	Debian: sudo apt-get -y install build-essential python-dev libgnutls28-dev pkg-config
 
 	$GREYHOLE_INSTALL_DIR/build_vfs.sh current
 

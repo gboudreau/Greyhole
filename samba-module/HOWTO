@@ -9,7 +9,7 @@ How to build the VFS module binaries for a new Samba version.
 
 2. If needed, create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
 
-3. Add the new Samba version number in `build_vfs_all.sh @L24`
+3. Add the new Samba version number in `build_vfs_all.sh @L23`
 
 4. Run the build_vfs_all.sh script
 
@@ -17,18 +17,18 @@ How to build the VFS module binaries for a new Samba version.
 
         SSH_HOST="gh-builder-i386"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs_all.sh ; exec bash"'
+        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build_vfs_all.sh ; exec bash"'
 
         SSH_HOST="gh-builder-x86_64"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'screen sh -c "~/Greyhole/build_vfs_all.sh ; exec bash"'
+        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build_vfs_all.sh ; exec bash"'
 
         # ARMHF (Raspberry Pi)
         cd ~/Temp/qemu-arm
         ./boot.sh
         sleep 180
         rsync -av --exclude .git --exclude release -e "ssh -p 2223" ~/git/Greyhole/ 127.0.0.1:Greyhole
-        ssh -p 2223 -t 127.0.0.1 'screen sh -c "~/Greyhole/build_vfs_all.sh ; exec bash"'
+        ssh -p 2223 -t 127.0.0.1 'screen sh -c "sudo /home/gb/Greyhole/build_vfs_all.sh ; exec bash"'
 
 5. Copy the resulting binaries back into your workstation:
 
@@ -43,15 +43,13 @@ How to build the VFS module binaries for a new Samba version.
         rsync -av -e "ssh -p 2223" 127.0.0.1:Greyhole/samba-module/bin/ .
 
 6. Edit `INSTALL`
-    - Change latest version of Samba supported in point 3 (near L76).
-    - Add an `if` block near L98
-    - Change the example near L96 & L101: `SAMBA_VERSION=4.6.0 # Or whatever is the latest version of Samba4.`
+    - Change latest version of Samba supported in point 3 (near L98).
 
 7. Edit DEBIAN/Makefile
-    - Add lines near L83, L96, L108
+    - Add lines near L88, L104, L121
 
 8. Edit DEBIAN/postinst
-    - Add an `elif` block near L77, and change the `else` block to use the latest version
+    - Add an `elif` block near L85, and change the `else` block to use the latest version
 
 9. Commit all changes & new binaries
    See [this commit](https://github.com/gboudreau/Greyhole/commit/7d5a46aa35392e524ac8ef8a360a9544219a446a) for an example of what your commit should contain.
