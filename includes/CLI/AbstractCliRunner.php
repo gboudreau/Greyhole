@@ -42,11 +42,18 @@ abstract class AbstractCliRunner extends AbstractRunner {
     protected function restart_service() {
         if (is_file('/etc/init.d/greyhole')) {
             exec("/etc/init.d/greyhole condrestart");
+            return;
         } else if (is_file('/etc/init/greyhole.conf')) {
             exec("/sbin/restart greyhole");
-        } else {
-            $this->log("You should now restart the Greyhole daemon.");
+            return;
+        } else if (is_file('/usr/bin/supervisorctl')) {
+            exec("/usr/bin/supervisorctl status greyhole", $out, $return);
+            if ($return === 0) {
+                exec("/usr/bin/supervisorctl restart greyhole");
+                return;
+            }
         }
+        $this->log("You should now restart the Greyhole daemon.");
     }
 
     protected function parseCmdParamAsDriveAndExpect($expectedParamValues) {
