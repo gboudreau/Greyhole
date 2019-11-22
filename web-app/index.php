@@ -104,6 +104,7 @@ function escape($string) {
               if ($row->file_path[strlen($row->file_path)-1] == '/') {
                   $row->file_path = substr($row->file_path, 0, strlen($row->file_path)-1);
               }
+              $row->file_path = substr($row->file_path, strlen($parent)+1);
               echo "['" . escape($row->file_path) . "','".escape($parent)."',$bytes,$bytes],\n";
           }
           ?>
@@ -135,7 +136,7 @@ function escape($string) {
                 }
             } else if (text_data[tree.getSelection()[0].row].path != 'Files') {
                 $('chart_div').innerHTML = 'Loading...';
-                window.location.href='<?php echo $_SERVER['SCRIPT_NAME'] ?>?path=' + encodeURIComponent(text_data[tree.getSelection()[0].row].path) + '&level=<?php echo ($level_min+1) ?>';
+                window.location.href='<?php echo $_SERVER['SCRIPT_NAME'] ?>?path=' + encodeURIComponent('<?php echo escape($path) ?>/' + text_data[tree.getSelection()[0].row].path) + '&level=<?php echo ($level_min+1) ?>';
                 return false;
             }
         });
