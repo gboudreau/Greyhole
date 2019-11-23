@@ -34,6 +34,9 @@ class LogsCliRunner extends AbstractAnonymousCliRunner {
             $files = escapeshellarg($greyhole_log_file);
             passthru("tail -n 1 $files");
             if (!empty($greyhole_error_log_file)) {
+                if (!file_exists($greyhole_error_log_file)) {
+                    file_put_contents($greyhole_error_log_file, '');
+                }
                 $files = escapeshellarg($greyhole_error_log_file) . " " . $files;
             }
             passthru("tail -qF -n 0 $files");
