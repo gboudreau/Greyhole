@@ -18,6 +18,9 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
    
 2. Setup Samba:
 
+	Before you continue, make sure you have shares created on Samba, and that you are able to connect to those shares remotely (or locally, using mount.cifs).
+	Of note: Samba uses its own users database; you'll need to create your user(s) using `smbpasswd -a` before you can connect to your shares.
+
 	Edit /etc/samba/smb.conf
 	Change or add the following values in the [global] section (making sure this section is above all shares definition):
 
