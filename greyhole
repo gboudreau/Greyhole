@@ -892,11 +892,19 @@ function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $
 
     save_metafiles($share, $path, $filename, $metafiles);
 
+    // Let's look for duplicate 'write' tasks that we could safely skip
+    $q = "SELECT id FROM tasks WHERE action = 'write' AND share = :share AND full_path = :full_path AND complete IN ('yes', 'thawed', 'idle') AND id > :task_id";
+    $duplicate_tasks_to_delete = DB::getAllValues($q, ['share' => $share, 'full_path' => $full_path, 'task_id' => $task_id]);
+
     if (!create_copies_from_metafiles($metafiles, $share, $full_path, $source_file)) {
         // If create_copies_from_metafiles returns FALSE, we want to abort this op, thus why we return TRUE here
         return TRUE;
     }
 
+    if (!empty($duplicate_tasks_to_delete)) {
+        Log::debug("  Deleting " . count($duplicate_tasks_to_delete) . " future 'write' tasks that are duplicate of this one.");
+        delete_tasks($duplicate_tasks_to_delete);
+    }
     return $metafiles;
 }
 
@@ -3784,6 +3792,20 @@ function gh_check_md5($task) {
 }
 
 function delete_tasks($task_ids) {
+    if (empty($task_ids)) {
+        return;
+    }
+    if (is_array($task_ids)) {
+        global $next_tasks;
+        foreach ($next_tasks as $k => $task) {
+            if (array_contains($task_ids, $task->id)) {
+                unset($next_tasks[$k]);
+            }
+        }
+        $next_tasks = array_values($next_tasks);
+
+        $task_ids = implode(',', $task_ids);
+    }
     DB::execute("DELETE FROM tasks WHERE id IN ($task_ids)");
 }
 
