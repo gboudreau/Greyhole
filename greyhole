@@ -410,7 +410,9 @@ function gh_copy_file($source_file, &$destination_file) {
         // Wasn't renamed; need to be copied.
         $copy_source = is_link($source_file) ? readlink($source_file) : $source_file;
         $original_file_infos = gh_get_file_infos($copy_source);
-        exec(get_copy_cmd($copy_source, $temp_path));
+        $out = exec(get_copy_cmd($copy_source, $temp_path));
+        $md5 = first(explode(' ', $out));
+        Log::debug("    Copied file MD5 = $md5");
     }
 
     $it_worked = file_exists($temp_path) && ($renamed || file_exists($source_file)) && gh_filesize($temp_path) == $source_size;
@@ -431,6 +433,11 @@ function gh_copy_file($source_file, &$destination_file) {
         gh_rename($temp_path, $destination_file);
         /** @noinspection PhpUndefinedVariableInspection */
         gh_chperm($destination_file, $original_file_infos);
+        if (!empty($md5)) {
+            /** @noinspection PhpUndefinedVariableInspection */
+            list($share, $full_path) = get_share_and_fullpath_from_realpath($copy_source);
+            log_file_checksum($share, $full_path, $md5);
+        }
     } else {
         Log::warn("    Failed file copy. Will mark this metadata file 'Gone'.", Log::EVENT_CODE_FILE_COPY_FAILED);
         if ($renamed) {
@@ -1414,14 +1421,7 @@ function how_long_ago($past_time) {
 }
 
 function get_copy_cmd($source, $destination) {
-    $copy_method = Config::get('copy_method');
-    if ($copy_method === 'rsync') {
-        return "rsync -t " . escapeshellarg($source) . " " . escapeshellarg($destination);
-    } elseif (substr($copy_method, 0, 6) === "custom" && strpos($copy_method, ":") !== FALSE) {
-        return substr($copy_method, strpos($copy_method, ":") + 1) . " " . escapeshellarg($source) . " " . escapeshellarg($destination);
-    } else {
-        return "cp -p " . escapeshellarg($source) . " " . escapeshellarg($destination);
-    }
+    return "cat " . escapeshellarg($source) . " | tee " . escapeshellarg($destination) . " | md5sum";
 }
 
 function remove_drive_definition($going_drive) {

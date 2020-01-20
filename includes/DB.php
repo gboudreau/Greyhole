@@ -169,6 +169,10 @@ final class DB {
             DB::migrate_12_force_update_complete();
             Settings::set('db_version', 12);
         }
+        if ($db_version < 13) {
+            DB::migrate_13_checksums();
+            Settings::set('db_version', 13);
+        }
     }
 
     // Migration #1 (complete = frozen|thawed)
@@ -424,6 +428,11 @@ final class DB {
         DB::execute($q);
         $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`(255))";
         DB::execute($q);
+    }
+
+    private static function migrate_13_checksums() {
+        $query = "CREATE TABLE IF NOT EXISTS `checksums` (`id` char(32) NOT NULL DEFAULT '', `share` varchar(255) CHARACTER SET utf8 NOT NULL DEFAULT '', `full_path` text CHARACTER SET utf8 NOT NULL, `checksum` char(32) NOT NULL DEFAULT '', `last_checked` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(), PRIMARY KEY (`id`)) ENGINE = MYISAM DEFAULT CHARSET=ascii";
+        DB::execute($query);
     }
 
     public static function repairTables() {

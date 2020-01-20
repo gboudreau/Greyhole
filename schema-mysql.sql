@@ -6,7 +6,7 @@ PRIMARY KEY (`name`)
 
 INSERT INTO `settings` (`name`, `value`) VALUES ('last_read_log_smbd_line', '0');
 INSERT INTO `settings` (`name`, `value`) VALUES ('last_OOS_notification', '0');
-INSERT INTO `settings` (`name`, `value`) VALUES ('db_version', '11');
+INSERT INTO `settings` (`name`, `value`) VALUES ('db_version', '13');
 
 CREATE TABLE `tasks` (
 `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -39,3 +39,12 @@ CREATE TABLE `du_stats` (
 `size` BIGINT(20) UNSIGNED NOT NULL,
 UNIQUE KEY `uniqness` (`share`(64),`full_path`)
 ) ENGINE = MYISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE `checksums` (
+`id` char(32) NOT NULL DEFAULT '',
+`share` varchar(255) CHARACTER SET utf8 NOT NULL DEFAULT '',
+`full_path` text CHARACTER SET utf8 NOT NULL,
+`checksum` char(32) NOT NULL DEFAULT '',
+`last_checked` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+PRIMARY KEY (`id`)
+) ENGINE = MYISAM DEFAULT CHARSET=ascii;

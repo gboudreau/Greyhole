@@ -694,4 +694,40 @@ function to_object($o) {
     return $o;
 }
 
+function first($array) {
+    foreach ($array as $el) {
+        return $el;
+    }
+    return NULL;
+}
+
+function log_file_checksum($share, $full_path, $checksum) {
+    $q = "INSERT INTO checksums SET id = :id, share = :share, full_path = :full_path, checksum = :checksum ON DUPLICATE KEY UPDATE checksum = VALUES(checksum)";
+    DB::insert(
+        $q,
+        [
+            'id'        => md5(clean_dir("$share/$full_path")),
+            'share'     => $share,
+            'full_path' => $full_path,
+            'checksum'  => $checksum,
+        ]
+    );
+}
+
+function get_share_and_fullpath_from_realpath($real_path) {
+    $prefix = get_storage_volume_from_path($real_path);
+    if (!$prefix) {
+        $share_options = get_share_options_from_full_path($real_path);
+        $lz = $share_options['landing_zone'];
+        $array = explode('/', $lz);
+        array_pop($array);
+        $prefix = implode('/', $array);
+    }
+    $share_and_fullpath = substr($real_path, strlen($prefix)+1);
+    $array = explode('/', $share_and_fullpath);
+    $share = array_shift($array);
+    $full_path = implode('/', $array);
+    return array($share, $full_path);
+}
+
 ?>

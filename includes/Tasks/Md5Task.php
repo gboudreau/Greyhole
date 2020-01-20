@@ -81,6 +81,7 @@ class Md5Task extends AbstractTask {
                     "  The underlying filesystem probably contains errors. You should unmount that partition, and check it using e2fsck -cfp"
                 );
             } else {
+                log_file_checksum($task->share, $task->full_path, $md5);
                 Log::debug("  All copies have the same MD5 checksum: $md5");
             }
         }
@@ -132,6 +133,7 @@ class Md5Task extends AbstractTask {
                     $md5 = md5_file($latest_file_copy);
                     Log::debug("    MD5 = $md5");
                     if ($md5 == $original_md5) {
+                        log_file_checksum($task->share, $task->full_path, $md5);
                         Log::debug("  All copies have the same MD5 checksum: $md5");
                         DBSpool::getInstance()->delete_tasks($complete_tasks->ids);
                         return;
