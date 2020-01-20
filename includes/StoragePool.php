@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -159,14 +159,15 @@ final class StoragePool {
             get_metastores(FALSE); // FALSE => Resets the metastores cache
             clearstatcache();
 
-            initialize_fsck_report('All shares');
+            $fsck_task = FsckTask::getCurrentTask();
+            $fsck_task->initialize_fsck_report('All shares');
             if ($needs_fsck === 2) {
                 foreach ($returned_drives as $drive) {
                     $metastores = get_metastores_from_storage_volume($drive);
                     Log::info("Starting fsck for metadata store on $drive which came back online.");
                     foreach ($metastores as $metastore) {
                         foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                            gh_fsck_metastore($metastore,"/$share_name", $share_name);
+                            $fsck_task->gh_fsck_metastore($metastore,"/$share_name", $share_name);
                         }
                     }
                     Log::info("fsck for returning drive $drive's metadata store completed.");

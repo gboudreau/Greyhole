@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -53,18 +53,17 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
             $going_drive = $this->drive;
 
             // For the fsck_file calls to be able to use the files on $going_drive if needed, to create extra copies.
-            global $options;
-            $options['find-orphans'] = TRUE;
+            $fsck_task = FsckTask::getCurrentTask(array('additional_info' => 'find-orphans'));
 
             // fsck shares with only 1 file copy to remove those from $this->drive
-            initialize_fsck_report('Shares with only 1 copy');
+            $fsck_task->initialize_fsck_report('Shares with only 1 copy');
             foreach (SharesConfig::getShares() as $share_name => $share_options) {
                 $this->log();
                 if ($share_options[CONFIG_NUM_COPIES] == 1) {
                     $this->logn("Moving file copies for share '$share_name'... Please be patient... ");
                     if (is_dir("$going_drive/$share_name")) {
-                        gh_fsck_reset_du($share_name);
-                        gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
+                        $fsck_task->gh_fsck_reset_du($share_name);
+                        $fsck_task->gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
                     }
                     $this->log("Done.");
                 } else {
@@ -137,7 +136,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
                 if (count($file_copies_inodes) == 0) {
                     Log::debug("Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
                     echo ".";
-                    gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
+                    FsckTask::getCurrentTask()->gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
                 }
             }
         }

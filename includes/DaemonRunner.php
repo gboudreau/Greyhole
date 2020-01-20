@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -19,6 +19,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 class DaemonRunner extends AbstractRunner {
+
+	public static $was_idle = TRUE;
 	
 	public function run() {
 		// Prevent multiple daemons from running simultaneously
@@ -30,20 +32,20 @@ class DaemonRunner extends AbstractRunner {
 		Log::info($log);
 		$this->initialize();
 
-		global $was_idle;
-        $was_idle = TRUE;
         LogHook::trigger(LogHook::EVENT_TYPE_IDLE, Log::EVENT_CODE_IDLE, $log);
+
+        $db_spool = DBSpool::getInstance();
 
         // The daemon runs indefinitely, this the infinite loop here.
 		while (TRUE) {
-			// Process the spool directory, and insert each task found there into the database.
-            parse_samba_spool();
+			// Process the spool directory, and insert each task found there into the database spool.
+			SambaSpool::parse_samba_spool();
 
 			// Check that storage pool drives are OK (using their UUID, or .greyhole_uses_this files)
             StoragePool::check_drives();
 
 			// Execute the next task from the tasks queue ('tasks' table in the database)
-            execute_next_task();
+			$db_spool->execute_next_task();
 		}
 	}
 	
@@ -73,13 +75,13 @@ class DaemonRunner extends AbstractRunner {
         Settings::backup();
 		
 		// Check that the Greyhole VFS module used by Samba is the correct one for the current Samba version. This is needed when Samba is updated to a new major version after Greyhole is installed.
-        samba_check_vfs();
+        SambaUtils::samba_check_vfs();
 
         // Check if the in-memory spool folder exists, and if no, create it and mount a tmpfs there. VFS will write there recvfile (etc.) operations.
-        create_mem_spool();
+		SambaSpool::create_mem_spool();
 		
 		// Process the spool directory, and insert each task found there into the database.
-        parse_samba_spool();
+		SambaSpool::parse_samba_spool();
 		
         // Create the dfree cache folder, if it doesn't exist
         gh_mkdir('/var/cache/greyhole-dfree', (object) array('fileowner' => 0, 'filegroup' => 0, 'fileperms' => (int) base_convert("0777", 8, 10)));

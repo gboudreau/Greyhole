@@ -26,9 +26,7 @@ final class DB {
 	protected static $handle; // database handle
 
 	public static function setOptions($options) {
-        if (is_array($options)) {
-            $options = (object) $options;
-        }
+        $options = to_object($options);
 		self::$options = $options;
 	}
 
@@ -202,7 +200,7 @@ final class DB {
         }
     }
 
-    // Migration #4 (new index for find_next_task function, used by simplify_task, and also for execute_next_task function; also remove deprecated indexes)
+    // Migration #4 (new index for find_next_task function, used by DBSpool::execute_next_task() function; also remove deprecated indexes)
     private static function migrate_4_find_next_task_index() {
         $query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task'";
         $row = DB::getFirst($query);

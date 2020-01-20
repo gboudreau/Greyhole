@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -30,7 +30,7 @@ class StatusCliRunner extends AbstractAnonymousCliRunner {
             $this->finish(1);
         }
 
-        $tasks = get_next_tasks(TRUE);
+        $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE);
         if (empty($tasks)) {
             $this->log();
             $this->log("Currently idle.");

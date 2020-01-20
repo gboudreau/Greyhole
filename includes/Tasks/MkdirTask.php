@@ -18,16 +18,12 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-require_once('includes/CLI/AbstractCliRunner.php');
+class MkdirTask extends AbstractTask {
 
-class CreateMemSpoolRunner extends AbstractCliRunner {
-    public function run() {
-        if (SambaSpool::create_mem_spool() && SambaSpool::create_mem_spool()) {
-            $this->log("There was a problem creating the in-memory spool folder. Check your Greyhole log for details.");
-        } else {
-            $this->log("The in-memory spool folder is now correctly mounted and ready to be used by the Samba VFS module.");
-        }
+    public function execute() {
+        // Nothing to do
     }
+
 }
 
 ?>
