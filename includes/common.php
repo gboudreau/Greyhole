@@ -375,8 +375,7 @@ class FSCKWorkLog {
     }
 
     private static function getFromDisk() {
-        $fsck_work_log = unserialize(file_get_contents(static::FILE));
-        return $fsck_work_log;
+        return unserialize(file_get_contents(static::FILE));
     }
 
     private static function getNumCompletedTasks() {

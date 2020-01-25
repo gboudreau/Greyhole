@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2014 Guillaume Boudreau
+Copyright 2014-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -22,12 +22,13 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 final class DB {
 
+    /** @var stdClass */
 	protected static $options; // connection options
+    /** @var PDO */
 	protected static $handle; // database handle
 
 	public static function setOptions($options) {
-        $options = to_object($options);
-		self::$options = $options;
+		self::$options = to_object($options);
 	}
 
 	public static function connect($retry_until_successful=FALSE) {
@@ -139,11 +140,6 @@ final class DB {
             return TRUE;
         }
         return $lastInsertedId;
-    }
-
-    public static function quote($string) {
-        $escaped_string = self::$handle->quote($string);
-        return substr($escaped_string, 1, -1);
     }
 
     public static function error() {

@@ -25,12 +25,19 @@ final class DBSpool {
     /** @var self */
     private static $_instance;
 
+    /** @var bool */
     private $use_old_vfs = FALSE;
+    /** @var self|null */
     private $current_task = NULL;
+    /** @var array */
     private $locked_shares = array();
+    /** @var array */
     private $sleep_before_task = array();
+    /** @var array */
     private $next_tasks = array();
+    /** @var array */
     private $locked_files = array();
+    /** @var array */
     private $written_files = array();
 
     /**
@@ -51,6 +58,13 @@ final class DBSpool {
         }
     }
 
+    /**
+     * @param bool $incl_md5    Include or not MD5 tasks?
+     * @param bool $update_idle If no tasks are found, return 'complete=idle' tasks, if any.
+     *
+     * @return stdClass[]
+     * @throws Exception
+     */
     public function fetch_next_tasks($incl_md5, $update_idle) {
         $where_clause = "";
         if (!empty($this->locked_shares)) {
@@ -72,10 +86,20 @@ final class DBSpool {
         return $tasks;
     }
 
+    /**
+     * Get the currently active task.
+     *
+     * @return DBSpool
+     */
     public static function getCurrentTask() {
         return static::getInstance()->current_task;
     }
 
+    /**
+     * Is the currently active task a retry?
+     *
+     * @return bool
+     */
     public static function isCurrentTaskRetry() {
         $current_task = static::getCurrentTask();
         /** @var $current_task stdClass */
@@ -351,6 +375,13 @@ final class DBSpool {
         return DB::getFirst($query, array('share' => $share, 'task_id' => $task_id));
     }
 
+    /**
+     * Counts the number of tasks currently in the DB spool.
+     *
+     * @param string|null $action If specified, count only the tasks for this action.
+     *
+     * @return int Number of tasks in the DB spool.
+     */
     public static function get_num_tasks($action = NULL) {
         $query = "SELECT COUNT(*) FROM tasks";
         $params = [];

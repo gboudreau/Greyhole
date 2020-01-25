@@ -8,7 +8,10 @@ Greyhole is an application that uses Samba to create a storage pool of all your 
 Links
 -----
 * [Official website](https://www.greyhole.net/)
-* [Support](http://support.greyhole.net)
+* [Support](https://greyhole.freshdesk.com/) on FreshDesk
+* The [wiki on Github](https://github.com/gboudreau/Greyhole/wiki#get-help-or-resolve-a-problem) is filled with useful information, including a FAQ.
+* Search the [Issues on Github](https://github.com/gboudreau/Greyhole/issues?q=is%3Aissue), to see if someone else had the same problem in the past, and what the resolution/workarounds were suggested.
+
 
 Features
 --------
@@ -28,9 +31,3 @@ Greyhole file copies are regular files, visible on any machine, without any hard
 Documentation
 -------------
 The [GitHub Wiki](https://github.com/gboudreau/Greyhole/wiki) contains the Greyhole documentation.
-
-Acks
-----
-Greyhole is developed mainly using a free open-source license of  
-![PHPStorm](https://d3uepj124s5rcx.cloudfront.net/items/0V0z2p0e0K1D0F3t2r1P/logo_PhpStorm.png)  
-kindly provided by [JetBrains](http://www.jetbrains.com/). Thanks guys!

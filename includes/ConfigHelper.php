@@ -357,7 +357,7 @@ final class ConfigHelper {
         if (!string_starts_with($name, [CONFIG_NUM_COPIES, CONFIG_DELETE_MOVES_TO_TRASH, CONFIG_MODIFIED_MOVES_TO_TRASH, CONFIG_DRIVE_SELECTION_GROUPS, CONFIG_DRIVE_SELECTION_ALGORITHM])) {
             return FALSE;
         }
-        if (!preg_match('/^(.*)\[\s*(.*)\s*\]$/', $name, $matches)) {
+        if (!preg_match('/^(.*)\[\s*(.*)\s*]$/', $name, $matches)) {
             error_log("Error parsing config file; can't find share name in $name");
             return FALSE;
         }
@@ -401,7 +401,7 @@ final class ConfigHelper {
 
     private static function parse_line_hook($name, $value) {
         if (string_starts_with($name, CONFIG_HOOK)) {
-            if (!preg_match('/hook\[([^\]]+)\]/', $name, $re)) {
+            if (!preg_match('/hook\[([^]]+)]/', $name, $re)) {
                 Log::warn("Can't parse the following config line: $name; ignoring.", Log::EVENT_CODE_CONFIG_UNPARSEABLE_LINE);
                 return TRUE;
             }
@@ -436,7 +436,7 @@ final class ConfigHelper {
         foreach ($config_text as $line) {
             $line = trim($line);
             if (mb_strlen($line) == 0) { continue; }
-            if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
+            if ($line[0] == '[' && preg_match('/\[([^]]+)]/', $line, $regs)) {
                 $share_name = $regs[1];
             }
             if (isset($share_name) && !SharesConfig::exists($share_name) && !array_contains(self::$trash_share_names, $share_name)) {

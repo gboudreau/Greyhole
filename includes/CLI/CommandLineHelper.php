@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2015 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -51,8 +51,10 @@ require_once('includes/CLI/ViewQueueCliRunner.php');
 require_once('includes/CLI/WaitForCliRunner.php');
 
 class CommandLineHelper {
+    /** @var CliCommandDefinition */
     protected $actionCmd = null;
     protected $options = array();
+    /** @var CliCommandDefinition[] */
     protected $cliCommandsDefinitions;
     protected $cliOptionsDefinitions;
     

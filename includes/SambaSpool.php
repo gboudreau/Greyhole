@@ -54,10 +54,11 @@ final class SambaSpool {
         //   and this will allow the end-user to see real activity, other that new rows in greyhole.tasks...
         $num_rows = DBSpool::get_num_tasks();
         $max_queued_tasks = Config::get(CONFIG_MAX_QUEUED_TASKS);
-        if ($num_rows >= ($max_queued_tasks * 0.9)) {
+        $queued_tasks_limit = round($max_queued_tasks * 0.9);
+        if ($num_rows >= $queued_tasks_limit) {
             Log::restorePreviousAction();
             if (time() % 10 == 0) {
-                Log::debug("  More than " . ($max_queued_tasks * 0.9) . " tasks queued... Won't queue any more at this time.");
+                Log::debug("  More than $queued_tasks_limit tasks queued... Won't queue any more at this time.");
             }
             return;
         }
