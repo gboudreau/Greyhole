@@ -26,6 +26,7 @@ class Md5Task extends AbstractTask {
     }
 
     public static function gh_check_md5($task) {
+        /** @var $task AbstractTask */
         $share_options = SharesConfig::getConfigForShare($task->share);
 
         $query = "SELECT complete, COUNT(*) AS num, GROUP_CONCAT(id) AS ids FROM tasks WHERE action = 'md5' AND share = :share AND full_path = :full_path GROUP BY complete ORDER BY complete";
@@ -42,8 +43,7 @@ class Md5Task extends AbstractTask {
         $incomplete_tasks = $rows;
         if (count($incomplete_tasks) > 0) {
             // We don't have all of them yet. Let's post-pone this until we do.
-            $query = "INSERT INTO tasks (action, share, full_path, additional_info, complete) SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = :task_id";
-            DB::insert($query, array('task_id' => $task->id));
+            $task->postpone();
 
             // If some worker threads disappeared, spawn them back to life.
             $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | grep -v bash | wc -l"));
@@ -209,6 +209,10 @@ class Md5Task extends AbstractTask {
             }
         }
         return $checksums_thread_ids;
+    }
+
+    public static function queue($share, $full_path, $additional_info = NULL, $complete = 'no') {
+        parent::_queue('md5', $share, $full_path, $additional_info, $complete);
     }
 
 }

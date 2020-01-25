@@ -252,7 +252,7 @@ class FsckTask extends AbstractTask {
                                 $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete = 'yes' AND action = 'md5' ORDER BY id LIMIT 1";
                                 $task = DB::getFirst($query);
                                 if ($task) {
-                                    Md5Task::gh_check_md5($task);
+                                    Md5Task::gh_check_md5(AbstractTask::instantiate($task));
                                 } else {
                                     sleep(5);
                                 }
@@ -330,8 +330,7 @@ class FsckTask extends AbstractTask {
             if($storage_path === FALSE) {
                 // Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
                 Log::info("$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
-                $query = "INSERT INTO tasks SET action = 'write', share = :share, full_path = :full_path, complete = 'yes'";
-                DB::insert($query, array('share' => $share, 'full_path' => clean_dir("$file_path/$filename")));
+                WriteTask::queue($share, clean_dir("$file_path/$filename"));
                 return;
             }
         } else {
@@ -604,12 +603,7 @@ class FsckTask extends AbstractTask {
                 gh_recycle("$landing_zone/$file_path/$filename");
             } else if (gh_is_file("$landing_zone/$file_path/$filename")) {
                 Log::info("$share/$file_path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
-                $query = "INSERT INTO tasks SET action = 'write', share = :share, full_path = :full_path, complete = 'yes'";
-                $params = array(
-                    'share' => $share,
-                    'full_path' => empty($file_path) ? $filename : clean_dir("$file_path/$filename"),
-                );
-                DB::insert($query, $params);
+                WriteTask::queue($share, empty($file_path) ? $filename : clean_dir("$file_path/$filename"));
             }
             if ($this->has_option(OPTION_DEL_ORPHANED_METADATA)) {
                 remove_metafiles($share, $file_path, $filename);
@@ -799,13 +793,7 @@ class FsckTask extends AbstractTask {
                     $inode_number = @gh_fileinode($metafile->path);
                     if ($inode_number !== FALSE) {
                         // Let's calculate this file's MD5 checksum to validate that all copies are valid.
-                        $query = "INSERT INTO tasks SET action = 'md5', share = :share, full_path = :full_path, additional_info = :additional_info, complete = 'no'";
-                        $params = array(
-                            'share' => $share,
-                            'full_path' => clean_dir("$file_path/$filename"),
-                            'additional_info' => $metafile->path
-                        );
-                        DB::insert($query, $params);
+                        Md5Task::queue($share, clean_dir("$file_path/$filename"), $metafile->path);
                     }
                 }
             }

@@ -161,6 +161,10 @@ class WriteTask extends AbstractTask {
         return TRUE;
     }
 
+    public static function queue($share, $full_path, $complete = 'yes') {
+        parent::_queue('write', $share, $full_path, NULL, $complete);
+    }
+
 }
 
 ?>

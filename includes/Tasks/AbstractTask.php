@@ -77,6 +77,23 @@ abstract class AbstractTask {
 
     abstract function execute();
 
+    protected static function _queue($action, $share, $full_path, $additional_info, $complete) {
+        $query = "INSERT INTO tasks SET action = :action, share = :share, full_path = :full_path, complete = :complete, additional_info = :additional_info";
+        $params = array(
+            'action'          => $action,
+            'share'           => $share,
+            'full_path'       => $full_path,
+            'additional_info' => $additional_info,
+            'complete'        => $complete,
+        );
+        DB::insert($query, $params);
+    }
+
+    public function postpone() {
+        $query = "INSERT INTO tasks (action, share, full_path, additional_info, complete) SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = :task_id";
+        DB::insert($query, array('task_id' => $this->id));
+    }
+
 }
 
 ?>
