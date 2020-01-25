@@ -124,6 +124,24 @@ class Md5Task extends AbstractTask {
                     list($path, $filename) = explode_full_path($task->full_path);
                     foreach (get_metafiles($task->share, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
                         foreach ($existing_metafiles as $key => $metafile) {
+                            if ($metafile->path == $latest_file_copy) {
+                                // This is the metafile for the just-trashed file copy
+                                // Make sure that storage pool has enough free space for the new copy!
+                                $sp_drive = get_storage_volume_from_path($latest_file_copy);
+                                $dfs = get_free_space_in_storage_pool_drives();
+                                if (!isset($dfs[$sp_drive])) {
+                                    $free_space = 0;
+                                } else {
+                                    $free_space = $dfs[$sp_drive]['free'];
+                                }
+                                $file_size = gh_filesize($latest_file_copy);
+                                if ($free_space <= $file_size/1024) {
+                                    Log::info("  Not enough free space left on $sp_drive. Will not re-create this file copy right now; will instead queue a fsck_file operation.");
+                                    FsckFileTask::queue($task->share, $task->full_path);
+                                    DBSpool::getInstance()->delete_tasks($complete_tasks->ids);
+                                    return;
+                                }
+                            }
                             $metafiles[$key] = $metafile;
                         }
                     }

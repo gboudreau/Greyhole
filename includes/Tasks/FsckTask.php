@@ -346,13 +346,7 @@ class FsckTask extends AbstractTask {
                         // Maybe this file was removed after fsck started, and thus shouldn't be re-created here!
                         // We'll queue this file fsck (to restore the symlink) for when all other file operations have been executed.
                         Log::debug("  Queuing a new fsck_file task for " . clean_dir("$share/$file_path/$filename"));
-                        $query = "INSERT INTO tasks SET action = 'fsck_file', share = :share, full_path = :full_path, complete = 'idle', additional_info = :additional_info";
-                        $params = array(
-                            'share' => $share,
-                            'full_path' => empty($file_path) ? $filename : clean_dir("$file_path/$filename"),
-                            'additional_info' => $this->additional_info,
-                        );
-                        DB::insert($query, $params);
+                        FsckFileTask::queue($share, empty($file_path) ? $filename : clean_dir("$file_path/$filename"), $this->additional_info);
                         return;
                     }
                 }

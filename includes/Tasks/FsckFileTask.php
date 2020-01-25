@@ -38,6 +38,17 @@ class FsckFileTask extends FsckTask {
         return TRUE;
     }
 
+    public static function queue($share, $full_path, $additional_info = NULL, $complete = 'idle') {
+        $query = "INSERT INTO tasks SET action = 'fsck_file', share = :share, full_path = :full_path, complete = :complete, additional_info = :additional_info";
+        $params = array(
+            'share'           => $share,
+            'full_path'       => $full_path,
+            'additional_info' => $additional_info,
+            'complete'        => $complete,
+        );
+        DB::insert($query, $params);
+    }
+
 }
 
 ?>
