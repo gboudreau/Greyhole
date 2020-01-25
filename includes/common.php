@@ -555,6 +555,14 @@ function string_contains($haystack, $needle) {
 }
 
 function string_starts_with($haystack, $needle) {
+    if (is_array($needle)) {
+        foreach ($needle as $n) {
+            if (mb_strpos($haystack, $n) === 0) {
+                return TRUE;
+            }
+        }
+        return FALSE;
+    }
     return mb_strpos($haystack, $needle) === 0;
 }
 

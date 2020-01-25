@@ -354,24 +354,33 @@ final class ConfigHelper {
     }
 
     private static function parse_line_share_option($name, $value) {
-        if (string_starts_with($name, CONFIG_NUM_COPIES)) {
-            $share = mb_substr($name, 11, mb_strlen($name)-12);
+        if (!string_starts_with($name, [CONFIG_NUM_COPIES, CONFIG_DELETE_MOVES_TO_TRASH, CONFIG_MODIFIED_MOVES_TO_TRASH, CONFIG_DRIVE_SELECTION_GROUPS, CONFIG_DRIVE_SELECTION_ALGORITHM])) {
+            return FALSE;
+        }
+        if (!preg_match('/^(.*)\[\s*(.*)\s*\]$/', $name, $matches)) {
+            error_log("Error parsing config file; can't find share name in $name");
+            return FALSE;
+        }
+
+        $name = trim($matches[1]);
+        $share = trim($matches[2]);
+
+        switch ($name) {
+        case CONFIG_NUM_COPIES:
             if (mb_stripos($value, 'max') === 0) {
                 $value = 9999;
+            } else {
+                $value = (int) $value;
             }
-            SharesConfig::set($share, CONFIG_NUM_COPIES, (int) $value);
-        } else if (string_starts_with($name, CONFIG_DELETE_MOVES_TO_TRASH)) {
-            $share = mb_substr($name, 22, mb_strlen($name)-23);
-            $value = strtolower(trim($value));
-            $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-            SharesConfig::set($share, CONFIG_DELETE_MOVES_TO_TRASH, $bool);
-        } else if (string_starts_with($name, CONFIG_MODIFIED_MOVES_TO_TRASH)) {
-            $share = mb_substr($name, 24, mb_strlen($name)-25);
-            $value = strtolower(trim($value));
-            $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-            SharesConfig::set($share, CONFIG_MODIFIED_MOVES_TO_TRASH, $bool);
-        } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_GROUPS)) {
-            $share = mb_substr($name, 23, mb_strlen($name)-24);
+            SharesConfig::set($share, $name, $value);
+            break;
+        case CONFIG_DELETE_MOVES_TO_TRASH:
+        case CONFIG_MODIFIED_MOVES_TO_TRASH:
+            $value = strtolower($value);
+            $bool = $value === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
+            SharesConfig::set($share, $name, $bool);
+            break;
+        case CONFIG_DRIVE_SELECTION_GROUPS:
             if (preg_match("/(.+):(.+)/", $value, $regs)) {
                 $group_name = trim($regs[1]);
                 $group_definition = array_map('trim', explode(',', $regs[2]));
@@ -379,14 +388,13 @@ final class ConfigHelper {
                 global $parsing_drive_selection_groups;
                 $parsing_drive_selection_groups = $share;
             }
-        } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_ALGORITHM)) {
-            $share = mb_substr($name, 26, mb_strlen($name)-27);
+            break;
+        case CONFIG_DRIVE_SELECTION_ALGORITHM:
             if (SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS) === FALSE) {
                 SharesConfig::set($share, CONFIG_DRIVE_SELECTION_GROUPS, Config::get(CONFIG_DRIVE_SELECTION_GROUPS));
             }
             SharesConfig::set($share, CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS)));
-        } else {
-            return FALSE;
+            break;
         }
         return TRUE;
     }
