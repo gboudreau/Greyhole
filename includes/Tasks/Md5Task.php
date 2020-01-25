@@ -45,9 +45,9 @@ class Md5Task extends AbstractTask {
             $query = "INSERT INTO tasks (action, share, full_path, additional_info, complete) SELECT action, share, full_path, additional_info, complete FROM tasks WHERE id = :task_id";
             DB::insert($query, array('task_id' => $task->id));
 
-            // If there's no worker thread alive, spawn all of them. The idle ones will just die.
+            // If some worker threads disappeared, spawn them back to life.
             $num_worker_threads = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker' | grep -v grep | grep -v bash | wc -l"));
-            if ($num_worker_threads == 0) {
+            if ($num_worker_threads < count(Config::storagePoolDrives())) {
                 Log::debug("  Will spawn new worker threads to work on this.");
                 static::spawn_threads_for_pool_drives();
             } else {
@@ -184,7 +184,10 @@ class Md5Task extends AbstractTask {
         $checksums_thread_ids = array();
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (StoragePool::is_pool_drive($sp_drive)) {
-                $checksums_thread_ids[] = spawn_thread('md5-worker', array($sp_drive));
+                $already_running = (int) trim(exec("ps x | grep '/usr/bin/greyhole --md5-worker --drive=$sp_drive' | grep -v grep | grep -v bash | wc -l"));
+                if ($already_running === 0) {
+                    $checksums_thread_ids[] = spawn_thread('md5-worker', array($sp_drive));
+                }
             }
         }
         return $checksums_thread_ids;
