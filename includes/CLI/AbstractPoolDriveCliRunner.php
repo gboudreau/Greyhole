@@ -26,10 +26,10 @@ abstract class AbstractPoolDriveCliRunner extends AbstractCliRunner {
 
     function __construct($options, $cli_command) {
         parent::__construct($options, $cli_command);
-        $this->asserPoolDriveSpecified();
+        $this->assertPoolDriveSpecified();
     }
 
-    protected function asserPoolDriveSpecified() {
+    protected function assertPoolDriveSpecified() {
         $simple_long_opt = str_replace(':', '', $this->cli_command->getLongOpt());
         $this->drive = $this->parseCmdParamAsDriveAndExpect(Config::storagePoolDrives());
         if ($this->drive === FALSE) {

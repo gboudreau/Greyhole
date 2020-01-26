@@ -69,7 +69,7 @@ class DaemonRunner extends AbstractRunner {
         MigrationHelper::terminologyConversion();
 
 		// For files which don't have extra copies, we at least create a copy of the metadata on a separate drive, in order to be able to identify the missing files if a hard drive fails.
-        set_metastore_backup();
+        Metastores::choose_metastores_backups();
 
 		// We backup the database settings to disk, in order to be able to restore them if the database is lost.
         Settings::backup();

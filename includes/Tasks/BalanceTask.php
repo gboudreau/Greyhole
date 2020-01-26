@@ -198,12 +198,12 @@ class BalanceTask extends AbstractTask {
                     }
 
                     // Update metafiles
-                    foreach (get_metafiles($share_name, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
+                    foreach (Metastores::get_metafiles($share_name, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
                         foreach ($existing_metafiles as $key => $metafile) {
                             if ($metafile->path == $file) {
                                 $metafile->path = "$sp_drive/$share_name/$full_path";
                                 unset($existing_metafiles[$key]);
-                                $metafile->state = 'OK';
+                                $metafile->state = Metafile::STATE_OK;
                                 if ($metafile->is_linked) {
                                     // Re-create correct symlink
                                     $landing_zone = $share_options[CONFIG_LANDING_ZONE];
@@ -215,7 +215,7 @@ class BalanceTask extends AbstractTask {
                                     @gh_symlink($metafile->path, "$landing_zone/$full_path");
                                 }
                                 $existing_metafiles[$metafile->path] = $metafile;
-                                save_metafiles($share_name, $path, $filename, $existing_metafiles);
+                                Metastores::save_metafiles($share_name, $path, $filename, $existing_metafiles);
                                 break;
                             }
                         }

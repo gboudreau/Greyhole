@@ -36,8 +36,8 @@ class DeleteMetadataCliRunner extends AbstractCliRunner {
         $share = trim(mb_substr($this->dir, 0, mb_strpos($this->dir, '/')+1), '/');
         $full_path = trim(mb_substr($this->dir, mb_strpos($this->dir, '/')+1), '/');
         list($path, $filename) = explode_full_path($full_path);
-        set_metastore_backup();
-        foreach (get_metafile_data_filenames($share, $path, $filename) as $file) {
+        Metastores::choose_metastores_backups();
+        foreach (Metastores::get_metafile_data_filenames($share, $path, $filename) as $file) {
             if (file_exists($file)) {
                 $this->log("Deleting $file");
                 unlink($file);

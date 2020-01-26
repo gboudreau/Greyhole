@@ -117,7 +117,7 @@ final class SambaSpool {
                     $dir_fullpath = get_share_landing_zone($share) . "/$line[0]";
                     Log::debug("Directory created: $share/$line[0]");
                     foreach (Config::get(CONFIG_METASTORE_BACKUPS) as $metastore_backup_drive) {
-                        $backup_drive = str_replace('/.gh_metastore_backup', '', $metastore_backup_drive);
+                        $backup_drive = str_replace('/' . Metastores::METASTORE_BACKUP_DIR, '', $metastore_backup_drive);
                         if (StoragePool::is_pool_drive($backup_drive)) {
                             gh_mkdir("$backup_drive/$share/$line[0]", $dir_fullpath);
                         }

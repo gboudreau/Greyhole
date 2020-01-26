@@ -126,7 +126,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         $this->log();
         $this->log("Metadata store:");
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            $metastore = clean_dir("$sp_drive/.gh_metastore");
+            $metastore = clean_dir("$sp_drive/" . Metastores::METASTORE_DIR);
             if (file_exists("$metastore/$share/$full_path")) {
                 passthru("ls -l " . escapeshellarg("$metastore/$share/$full_path"));
                 $data = unserialize(file_get_contents("$metastore/$share/$full_path"));

@@ -45,7 +45,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
 
         if ($this->isGoing()) {
             file_put_contents($this->drive . "/.greyhole_used_this", "Flag to prevent Greyhole from thinking this drive disappeared for no reason...");
-            set_metastore_backup();
+            Metastores::choose_metastores_backups();
             Log::info("Storage pool drive " . $this->drive . " will be removed from the storage pool.");
             echo("Storage pool drive " . $this->drive . " will be removed from the storage pool.\n");
 

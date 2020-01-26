@@ -72,7 +72,7 @@ class WriteTask extends AbstractTask {
             }
             Log::debug("  Will use source file: $source_file");
 
-            foreach (get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
+            foreach (Metastores::get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
                 // Remove old copies (but not the one that was updated!)
                 $keys_to_remove = array();
                 $found_source_file = FALSE;
@@ -80,7 +80,7 @@ class WriteTask extends AbstractTask {
                     $metafile->path = clean_dir($metafile->path);
                     if ($metafile->path == $source_file) {
                         $metafile->is_linked = TRUE;
-                        $metafile->state = 'OK';
+                        $metafile->state = Metafile::STATE_OK;
                         $found_source_file = TRUE;
                     } else {
                         Log::debug("  Will remove copy at $metafile->path");
@@ -93,7 +93,7 @@ class WriteTask extends AbstractTask {
                     $source_file = $existing_metafiles[$key]->path;
                     Log::debug("  Change of mind... Will use source file: $source_file");
                 }
-                $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove);
+                $new_metafiles = $this->gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove);
                 if ($new_metafiles === FALSE || $new_metafiles === TRUE) {
                     return $new_metafiles;
                 }
@@ -103,7 +103,7 @@ class WriteTask extends AbstractTask {
                     Log::debug("  Source file is not needed anymore. Deleting...");
                     $is_ok = FALSE;
                     foreach ($new_metafiles as $metafile) {
-                        if ($metafile->state == 'OK') {
+                        if ($metafile->state == Metafile::STATE_OK) {
                             $is_ok = TRUE;
                             break;
                         }
@@ -136,13 +136,13 @@ class WriteTask extends AbstractTask {
 
             // There might be old metafiles... for example, when a delete task was skipped.
             // Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_metafiles()
-            foreach (get_metafiles($share, $path, $filename) as $existing_metafiles) {
+            foreach (Metastores::get_metafiles($share, $path, $filename) as $existing_metafiles) {
                 Log::debug(count($existing_metafiles) . " metafiles loaded.");
                 if (count($existing_metafiles) > 0) {
                     foreach ($existing_metafiles as $metafile) {
                         gh_recycle($metafile->path);
                     }
-                    remove_metafiles($share, $path, $filename);
+                    Metastores::remove_metafiles($share, $path, $filename);
                     $existing_metafiles = array();
                     // Maybe there's other file copies, that weren't metafiles, or were NOK metafiles!
                     foreach (Config::storagePoolDrives() as $sp_drive) {
@@ -151,7 +151,7 @@ class WriteTask extends AbstractTask {
                         }
                     }
                 }
-                $new_metafiles = gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
+                $new_metafiles = $this->gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id);
                 if ($new_metafiles === FALSE || $new_metafiles === TRUE) {
                     return $new_metafiles;
                 }
@@ -159,6 +159,76 @@ class WriteTask extends AbstractTask {
             FileHook::trigger(FileHook::EVENT_TYPE_CREATE, $share, $full_path);
         }
         return TRUE;
+    }
+
+
+    /**
+     * @param int    $num_copies_required
+     * @param array  $existing_metafiles
+     * @param string $share
+     * @param string $full_path
+     * @param string $source_file
+     * @param int    $filesize
+     * @param int    $task_id
+     * @param null   $keys_to_remove
+     *
+     * @return array|bool FALSE if the operation failed, and should be retried, TRUE if it failed, but should not be retried, or an array of metafiles if it succeeded.
+     */
+    private function gh_write_process_metafiles($num_copies_required, $existing_metafiles, $share, $full_path, $source_file, $filesize, $task_id, $keys_to_remove=NULL) {
+        $landing_zone = get_share_landing_zone($share);
+        list($path, $filename) = explode_full_path($full_path);
+
+        // Only need to check for locking if we have something to do!
+        if ($num_copies_required > 1 || count($existing_metafiles) == 0) {
+            // Check if another process locked this file before we work on it.
+            if (gh_check_file_locked($share, $full_path)) {
+                return FALSE;
+            }
+            DBSpool::resetSleepingTasks();
+        }
+
+        if ($keys_to_remove !== NULL) {
+            foreach ($keys_to_remove as $key) {
+                if ($existing_metafiles[$key]->path != $source_file) {
+                    gh_recycle($existing_metafiles[$key]->path, TRUE);
+                }
+            }
+            // Empty the existing metafiles array, to be able to recreate all new copies on the correct drives, per the dir_selection_algorithm
+            $existing_metafiles = array();
+        }
+
+        $metafiles = Metastores::create_metafiles($share, $full_path, $num_copies_required, $filesize, $existing_metafiles);
+
+        if (count($metafiles) == 0) {
+            Log::error("  No metadata files could be created. Will wait until metadata files can be created to work on this file.", Log::EVENT_CODE_NO_METADATA_SAVED);
+            DBSpool::getInstance()->postpone_task($task_id);
+            return array();
+        }
+
+        if (!is_link("$landing_zone/$full_path")) {
+            // Use the 1st metafile for the symlink; it might be on a sticky drive.
+            $i = 0;
+            foreach ($metafiles as $metafile) {
+                $metafile->is_linked = ($i++ == 0);
+            }
+        }
+
+        Metastores::save_metafiles($share, $path, $filename, $metafiles);
+
+        // Let's look for duplicate 'write' tasks that we could safely skip
+        $q = "SELECT id FROM tasks WHERE action = 'write' AND share = :share AND full_path = :full_path AND complete IN ('yes', 'thawed', 'idle') AND id > :task_id";
+        $duplicate_tasks_to_delete = DB::getAllValues($q, ['share' => $share, 'full_path' => $full_path, 'task_id' => $task_id]);
+
+        if (!create_copies_from_metafiles($metafiles, $share, $full_path, $source_file)) {
+            // If create_copies_from_metafiles returns FALSE, we want to abort this op, thus why we return TRUE here
+            return TRUE;
+        }
+
+        if (!empty($duplicate_tasks_to_delete)) {
+            Log::debug("  Deleting " . count($duplicate_tasks_to_delete) . " future 'write' tasks that are duplicate of this one.");
+            DBSpool::getInstance()->delete_tasks($duplicate_tasks_to_delete);
+        }
+        return $metafiles;
     }
 
     public static function queue($share, $full_path, $complete = 'yes') {

@@ -24,6 +24,7 @@ require_once('includes/DB.php');
 require_once('includes/DBSpool.php');
 require_once('includes/Hook.php');
 require_once('includes/Log.php');
+require_once('includes/Metastores.php');
 require_once('includes/MigrationHelper.php');
 require_once('includes/PoolDriveSelector.php');
 require_once('includes/SambaSpool.php');
@@ -207,95 +208,6 @@ function memory_check() {
     $used = $used * 100;
     if ($used > 95) {
         Log::critical("$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in /etc/greyhole.conf", Log::EVENT_CODE_MEMORY_LIMIT_REACHED);
-    }
-}
-
-class metafile_iterator implements Iterator {
-    private $path;
-    private $share;
-    private $load_nok_metafiles;
-    private $quiet;
-    private $check_symlink;
-    private $metafiles;
-    private $metastores;
-    private $dir_handle;
-    private $directory_stack;
-
-    public function __construct($share, $path, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
-        $this->quiet = $quiet;
-        $this->share = $share;
-        $this->path = $path;
-        $this->check_symlink = $check_symlink;
-        $this->load_nok_metafiles = $load_nok_metafiles;
-    }
-
-    public function rewind() {
-        $this->metastores = get_metastores();
-        $this->directory_stack = array($this->path);
-        $this->dir_handle = NULL;
-        $this->metafiles = array();
-        $this->next();
-    }
-
-    public function current() {
-        return $this->metafiles;
-    }
-
-    public function key() {
-        return count($this->metafiles);
-    }
-
-    public function next() {
-        $this->metafiles = array();
-        while (count($this->directory_stack) > 0 && $this->directory_stack !== NULL) {
-            $dir = array_pop($this->directory_stack);
-            if (!$this->quiet) {
-                Log::debug("Loading metadata files for (dir) " . clean_dir($this->share . (!empty($dir) ? "/" . $dir : "")) . " ...");
-            }
-            for ($i = 0; $i < count($this->metastores); $i++) {
-                $metastore = $this->metastores[$i];
-                $base = "$metastore/" . $this->share . "/";
-                if (!file_exists($base . $dir)) {
-                    continue;
-                }    
-                if ($this->dir_handle = opendir($base . $dir)) {
-                    while (false !== ($file = readdir($this->dir_handle))) {
-                        memory_check();
-                        if ($file=='.' || $file=='..') {
-                            continue;
-                        }
-                        if (!empty($dir)) {
-                            $full_filename = $dir . '/' . $file;
-                        } else {
-                            $full_filename = $file;
-                        }
-                        if (is_dir($base . $full_filename)) {
-                            $this->directory_stack[] = $full_filename;
-                        } else {
-                            $full_filename = str_replace("$this->path/",'',$full_filename);
-                            if (isset($this->metafiles[$full_filename])) {
-                                continue;
-                            }                        
-                            $this->metafiles[$full_filename] = get_metafiles_for_file($this->share, $dir, $file, $this->load_nok_metafiles, $this->quiet, $this->check_symlink);
-                        }
-                    }
-                    closedir($this->dir_handle);
-                    $this->directory_stack = array_unique($this->directory_stack);
-                }
-            }
-            if (count($this->metafiles) > 0) {
-                break;
-            }
-            
-        }
-        if (!$this->quiet) {
-            Log::debug('Found ' . count($this->metafiles) . ' metadata files.');
-        }
-        return $this->metafiles;
-    }
-    
-    public function valid() {
-        return count($this->metafiles) > 0;
     }
 }
 
@@ -701,11 +613,13 @@ function to_object($o) {
     return $o;
 }
 
-function first($array) {
-    foreach ($array as $el) {
-        return $el;
+function first($array, $default=NULL) {
+    if (is_iterable($array)) {
+        foreach ($array as $el) {
+            return $el;
+        }
     }
-    return NULL;
+    return $default;
 }
 
 function log_file_checksum($share, $full_path, $checksum) {
@@ -735,6 +649,33 @@ function get_share_and_fullpath_from_realpath($real_path) {
     $share = array_shift($array);
     $full_path = implode('/', $array);
     return array($share, $full_path);
+}
+
+/**
+ * Return a human-readable string that indicates how long ago the specified time occurred.
+ *
+ * @param $past_time int Timestamp
+ *
+ * @return string
+ */
+function how_long_ago($past_time) {
+    $ago = '';
+    $s = time() - $past_time;
+    $m = floor($s / 60);
+    if ($m > 0) {
+        $s -= $m * 60;
+        $h = floor($m / 60);
+        if ($h > 0) {
+            $ago = $h . "h ";
+            $m -= $h * 60;
+        }
+        $ago = $ago . $m . "m ";
+    }
+    $ago = $ago . $s . "s";
+    if ($ago == '0s') {
+        return 'just now';
+    }
+    return "$ago ago";
 }
 
 ?>

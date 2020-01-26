@@ -155,15 +155,15 @@ final class StoragePool {
             mail(Config::get(CONFIG_EMAIL_TO), $subject, $body);
         }
         if ($needs_fsck !== FALSE) {
-            set_metastore_backup();
-            get_metastores(FALSE); // FALSE => Resets the metastores cache
+            Metastores::choose_metastores_backups();
+            Metastores::get_metastores(FALSE); // FALSE => Resets the metastores cache
             clearstatcache();
 
             $fsck_task = FsckTask::getCurrentTask();
             $fsck_task->initialize_fsck_report('All shares');
             if ($needs_fsck === 2) {
                 foreach ($returned_drives as $drive) {
-                    $metastores = get_metastores_from_storage_volume($drive);
+                    $metastores = Metastores::get_metastores_from_storage_volume($drive);
                     Log::info("Starting fsck for metadata store on $drive which came back online.");
                     foreach ($metastores as $metastore) {
                         foreach (SharesConfig::getShares() as $share_name => $share_options) {

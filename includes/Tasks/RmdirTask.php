@@ -45,7 +45,7 @@ class RmdirTask extends AbstractTask {
             if (@rmdir("$sp_drive/$share/$full_path/")) {
                 Log::debug("  Removed copy at $sp_drive/$share/$full_path");
             }
-            $metastore = "$sp_drive/.gh_metastore";
+            $metastore = "$sp_drive/" . Metastores::METASTORE_DIR;
             if (@rmdir("$metastore/$share/$full_path/")) {
                 Log::debug("  Removed metadata files directory $metastore/$share/$full_path");
             }

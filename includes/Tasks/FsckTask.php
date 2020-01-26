@@ -116,7 +116,7 @@ class FsckTask extends AbstractTask {
             }
         } else {
             $share = $share_options['name'];
-            $metastore = get_metastore_from_path($fscked_dir);
+            $metastore = Metastores::get_metastore_from_path($fscked_dir);
 
             if ($storage_volume === FALSE && $metastore === FALSE) {
                 $fsck_type = FSCK_TYPE_SHARE;
@@ -152,7 +152,7 @@ class FsckTask extends AbstractTask {
                         $subdir = "/$share" . str_replace($share_options[CONFIG_LANDING_ZONE], '', $fscked_dir);
                     }
                     Log::debug("Starting metastores fsck for $subdir");
-                    foreach (get_metastores() as $metastore) {
+                    foreach (Metastores::get_metastores() as $metastore) {
                         $this->gh_fsck_metastore($metastore, $subdir, $share);
                     }
                 }
@@ -352,7 +352,7 @@ class FsckTask extends AbstractTask {
             }
         }
 
-        if (get_metafile_data_filename($share, $file_path, $filename) === FALSE && get_metafile_data_filename($share, normalize_utf8_characters($file_path), normalize_utf8_characters($filename)) === FALSE) {
+        if (Metastores::get_metafile_data_filename($share, $file_path, $filename) === FALSE && Metastores::get_metafile_data_filename($share, normalize_utf8_characters($file_path), normalize_utf8_characters($filename)) === FALSE) {
             $full_path = clean_dir("$path/$filename");
 
             // Check if this is a temporary file; if so, just delete it.
@@ -394,7 +394,7 @@ class FsckTask extends AbstractTask {
             $original_file_path = $metadata->path;
         }
 
-        foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
+        foreach (Metastores::get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
             foreach ($metafile_block as $metafile) {
                 $inode_number = @gh_fileinode($metafile->path);
                 $root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $metafile->path);
@@ -404,7 +404,7 @@ class FsckTask extends AbstractTask {
                     if ($root_path == $metafile->path) {
                         Log::warn("Couldn't find root path for $metafile->path", Log::EVENT_CODE_FSCK_METAFILE_ROOT_PATH_NOT_FOUND);
                     }
-                    if ($inode_number !== FALSE && $metafile->state == 'OK') {
+                    if ($inode_number !== FALSE && $metafile->state == Metafile::STATE_OK) {
                         Log::debug("Found $metafile->path");
                     }
                 }
@@ -431,7 +431,7 @@ class FsckTask extends AbstractTask {
                     $inode_number = FALSE;
                 }
                 if ($inode_number === FALSE || !StoragePool::is_pool_drive($root_path)) {
-                    $metafile->state = 'Gone';
+                    $metafile->state = Metafile::STATE_GONE;
                     $metafile->is_linked = FALSE;
                     if (StoragePool::gone_ok($root_path)) {
                         // Let's not replace this copy yet...
@@ -442,11 +442,11 @@ class FsckTask extends AbstractTask {
                 } else if (is_dir($metafile->path)) {
                     Log::debug("Found a directory that should be a file! Will try to remove it, if it's empty.");
                     @rmdir($metafile->path);
-                    $metafile->state = 'Gone';
+                    $metafile->state = Metafile::STATE_GONE;
                     $metafile->is_linked = FALSE;
                     continue;
                 } else {
-                    $metafile->state = 'OK';
+                    $metafile->state = Metafile::STATE_OK;
                     if (!isset($file_metafiles[$metafile->path])) {
                         $file_copies_inodes[$inode_number] = $metafile->path;
                         $num_ok++;
@@ -475,7 +475,7 @@ class FsckTask extends AbstractTask {
                         break;
                     } else {
                         $metafile->is_linked = FALSE;
-                        $metafile->state = 'Gone';
+                        $metafile->state = Metafile::STATE_GONE;
                     }
                 }
             }
@@ -483,7 +483,7 @@ class FsckTask extends AbstractTask {
             if (!$found_linked_metafile) {
                 foreach ($file_metafiles as $first_metafile) {
                     $root_path = str_replace(clean_dir("/$share/$file_path/$filename"), '', $first_metafile->path);
-                    if ($first_metafile->state == 'OK' && StoragePool::is_pool_drive($root_path)) {
+                    if ($first_metafile->state == Metafile::STATE_OK && StoragePool::is_pool_drive($root_path)) {
                         $first_metafile->is_linked = TRUE;
                         $expected_file_size = gh_filesize($first_metafile->path);
                         $original_file_path = $first_metafile->path;
@@ -588,15 +588,15 @@ class FsckTask extends AbstractTask {
                 }
                 foreach ($file_metafiles as $key => $metafile) {
                     if ($metafile->is_linked) {
-                        $this->gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
+                        $this->update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
                         break;
                     }
                 }
-                save_metafiles($share, $file_path, $filename, $file_metafiles);
+                Metastores::save_metafiles($share, $file_path, $filename, $file_metafiles);
             }
         } else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
             Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool: "' . clean_dir("$share/$file_path/$filename") . '". ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')), Log::EVENT_CODE_FSCK_NO_FILE_COPIES);
-            if ($source == 'metastore' || get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
+            if ($source == 'metastore' || Metastores::get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
                 $this->fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
             }
             if (is_link("$landing_zone/$file_path/$filename")) {
@@ -606,9 +606,9 @@ class FsckTask extends AbstractTask {
                 WriteTask::queue($share, empty($file_path) ? $filename : clean_dir("$file_path/$filename"));
             }
             if ($this->has_option(OPTION_DEL_ORPHANED_METADATA)) {
-                remove_metafiles($share, $file_path, $filename);
+                Metastores::remove_metafiles($share, $file_path, $filename);
             } else {
-                save_metafiles($share, $file_path, $filename, $file_metafiles);
+                Metastores::save_metafiles($share, $file_path, $filename, $file_metafiles);
             }
         } else if (count($file_copies_inodes) < $num_copies_required && $num_copies_required > 0) {
             // Create new copies
@@ -617,7 +617,7 @@ class FsckTask extends AbstractTask {
                 $this->fsck_report['missing_copies']++;
             }
             clearstatcache(); $filesize = gh_filesize($original_file_path);
-            $file_metafiles = create_metafiles($share, "$file_path/$filename", $num_copies_required, $filesize, $file_metafiles);
+            $file_metafiles = Metastores::create_metafiles($share, "$file_path/$filename", $num_copies_required, $filesize, $file_metafiles);
 
             // Re-copy the file everywhere, and re-create the symlink
             $symlink_created = FALSE;
@@ -630,34 +630,34 @@ class FsckTask extends AbstractTask {
             foreach ($file_metafiles as $key => $metafile) {
                 if ($original_file_path != $metafile->path) {
                     if ($num_copies_current >= $num_copies_required) {
-                        $metafile->state = 'Gone';
+                        $metafile->state = Metafile::STATE_GONE;
                         $file_metafiles[$key] = $metafile;
                         continue;
                     }
 
                     list($metafile_dir_path, ) = explode_full_path($metafile->path);
 
-                    if ($metafile->state == 'Gone') {
+                    if ($metafile->state == Metafile::STATE_GONE) {
                         foreach (Config::storagePoolDrives() as $sp_drive) {
                             if (get_storage_volume_from_path($metafile_dir_path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
-                                $metafile->state = 'Pending';
+                                $metafile->state = Metafile::STATE_PENDING;
                                 $file_metafiles[$key] = $metafile;
                                 break;
                             }
                         }
                     }
 
-                    if ($metafile->state != 'Gone') {
+                    if ($metafile->state != Metafile::STATE_GONE) {
                         list($original_path, ) = explode_full_path(get_share_landing_zone($share) . "/$file_path");
                         if (!gh_mkdir($metafile_dir_path, $original_path)) {
-                            $metafile->state = 'Gone';
+                            $metafile->state = Metafile::STATE_GONE;
                             $file_metafiles[$key] = $metafile;
                             continue;
                         }
                     }
 
-                    if (!is_dir($metafile_dir_path) || $metafile->state == 'Gone') {
-                        if ($metafile->state != 'Gone') {
+                    if (!is_dir($metafile_dir_path) || $metafile->state == Metafile::STATE_GONE) {
+                        if ($metafile->state != Metafile::STATE_GONE) {
                             // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
                             if (is_dir(normalize_utf8_characters($metafile_dir_path))) {
                                 // Bingo!
@@ -669,15 +669,15 @@ class FsckTask extends AbstractTask {
                         }
                     }
 
-                    if ($metafile->state == 'Pending') {
+                    if ($metafile->state == Metafile::STATE_PENDING) {
                         if (gh_copy_file($original_file_path, $metafile->path)) {
-                            $metafile->state = 'OK';
+                            $metafile->state = Metafile::STATE_OK;
                             $num_copies_current++;
                         } else {
                             if ($metafile->is_linked) {
                                 $metafile->is_linked = FALSE;
                             }
-                            $metafile->state = 'Gone';
+                            $metafile->state = Metafile::STATE_GONE;
                         }
                         $file_metafiles[$key] = $metafile;
                     }
@@ -685,7 +685,7 @@ class FsckTask extends AbstractTask {
                 if ($original_file_path == $metafile->path || $metafile->is_linked) {
                     if (!empty($going_drive) && get_storage_volume_from_path($original_file_path) == $going_drive) {
                         $metafile->is_linked = FALSE;
-                        $metafile->state = 'Gone';
+                        $metafile->state = Metafile::STATE_GONE;
                         $file_metafiles[$key] = $metafile;
                         continue;
                     }
@@ -695,21 +695,21 @@ class FsckTask extends AbstractTask {
                         continue;
                     }
 
-                    $this->gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
+                    $this->update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
                     $symlink_created = TRUE;
                 }
             }
             if (!$symlink_created) {
                 foreach ($file_metafiles as $key => $metafile) {
-                    if ($metafile->state == 'OK') {
+                    if ($metafile->state == Metafile::STATE_OK) {
                         $metafile->is_linked = TRUE;
                         $file_metafiles[$key] = $metafile;
-                        $this->gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
+                        $this->update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
                         break;
                     }
                 }
             }
-            save_metafiles($share, $file_path, $filename, $file_metafiles);
+            Metastores::save_metafiles($share, $file_path, $filename, $file_metafiles);
         } else {
             # Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
             foreach ($file_copies_inodes as $inode => $path) {
@@ -749,7 +749,7 @@ class FsckTask extends AbstractTask {
                             $metafile = $file_metafiles[$key];
                         }
                         /** @noinspection PhpUndefinedVariableInspection */
-                        if (gh_file_exists($key) || $metafile->state == 'OK') {
+                        if (gh_file_exists($key) || $metafile->state == Metafile::STATE_OK) {
                             Log::debug("    Found file copy at $key, or metadata file is marked OK.");
                             if (real_file_is_locked($key) !== FALSE) {
                                 Log::debug("    File copy is locked. Won't remove it.");
@@ -777,19 +777,19 @@ class FsckTask extends AbstractTask {
                 }
                 if (!$found_linked_metafile) {
                     $metafile = reset($file_metafiles);
-                    $this->gh_fsck_update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
+                    $this->update_symlink($metafile->path, "$landing_zone/$file_path/$filename", $share, $file_path, $filename);
                     reset($file_metafiles)->is_linked = TRUE;
                 }
 
-                save_metafiles($share, $file_path, $filename, $file_metafiles);
+                Metastores::save_metafiles($share, $file_path, $filename, $file_metafiles);
             }
         }
 
         // Queue all file copies checksum calculations, if --checksums was specified
         if ($this->has_option(OPTION_CHECKSUMS)) {
-            foreach (get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
+            foreach (Metastores::get_metafiles($share, $file_path, $filename, TRUE) as $metafile_block) {
                 foreach ($metafile_block as $metafile) {
-                    if ($metafile->state != 'OK') { continue; }
+                    if ($metafile->state != Metafile::STATE_OK) { continue; }
                     $inode_number = @gh_fileinode($metafile->path);
                     if ($inode_number !== FALSE) {
                         // Let's calculate this file's MD5 checksum to validate that all copies are valid.
@@ -800,7 +800,7 @@ class FsckTask extends AbstractTask {
         }
     }
 
-    private function gh_fsck_update_symlink($target, $symlink, $share, $file_path, $filename) {
+    private function update_symlink($target, $symlink, $share, $file_path, $filename) {
         clearstatcache();
         if (!file_exists($symlink)) {
             Log::debug("  Missing symlink... A pending unlink transaction maybe?");

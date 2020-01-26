@@ -38,7 +38,7 @@ class RenameTask extends AbstractTask {
             return TRUE;
         }
 
-        if (is_dir("$landing_zone/$target_full_path") || is_a_metastore_dir($share, $full_path)) {
+        if (is_dir("$landing_zone/$target_full_path") || Metastores::dir_exists_in_metastores($share, $full_path)) {
             Log::info("Directory renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
             foreach (Config::storagePoolDrives() as $sp_drive) {
@@ -63,15 +63,15 @@ class RenameTask extends AbstractTask {
                     Log::debug("  Directory moved: $sp_drive/$share/$full_path -> $sp_drive/$share/$target_full_path");
                 }
 
-                list($path, ) = explode_full_path("$sp_drive/.gh_metastore/$share/$target_full_path");
+                list($path, ) = explode_full_path("$sp_drive/" . Metastores::METASTORE_DIR . "/$share/$target_full_path");
                 gh_mkdir($path, $original_path);
-                $result = @gh_rename("$sp_drive/.gh_metastore/$share/$full_path", "$sp_drive/.gh_metastore/$share/$target_full_path");
+                $result = @gh_rename("$sp_drive/" . Metastores::METASTORE_DIR . "/$share/$full_path", "$sp_drive/" . Metastores::METASTORE_DIR . "/$share/$target_full_path");
                 if ($result) {
-                    Log::debug("  Metadata Store directory moved: $sp_drive/.gh_metastore/$share/$full_path -> $sp_drive/.gh_metastore/$share/$target_full_path");
+                    Log::debug("  Metadata Store directory moved: $sp_drive/" . Metastores::METASTORE_DIR ."/$share/$full_path -> $sp_drive/" . Metastores::METASTORE_DIR . "/$share/$target_full_path");
                 }
-                $result = @gh_rename("$sp_drive/.gh_metastore_backup/$share/$full_path", "$sp_drive/.gh_metastore_backup/$share/$target_full_path");
+                $result = @gh_rename("$sp_drive/" . Metastores::METASTORE_BACKUP_DIR . "/$share/$full_path", "$sp_drive/" . Metastores::METASTORE_BACKUP_DIR . "/$share/$target_full_path");
                 if ($result) {
-                    Log::debug("  Backup Metadata Store directory moved: $sp_drive/.gh_metastore_backup/$share/$full_path -> $sp_drive/.gh_metastore_backup/$share/$target_full_path");
+                    Log::debug("  Backup Metadata Store directory moved: $sp_drive/" . Metastores::METASTORE_BACKUP_DIR . "/$share/$full_path -> $sp_drive/" . Metastores::METASTORE_BACKUP_DIR . "/$share/$target_full_path");
                 }
             }
 
@@ -82,7 +82,7 @@ class RenameTask extends AbstractTask {
                 FsckTask::getCurrentTask()->gh_fsck_file($file_path, $filename, 'file', 'landing_zone', $share);
             }
 
-            foreach (get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles) {
+            foreach (Metastores::get_metafiles($share, $target_full_path, null, FALSE, FALSE, FALSE) as $existing_metafiles) {
                 Log::debug("Existing metadata files: " . count($existing_metafiles));
                 foreach ($existing_metafiles as $file_path => $file_metafiles) {
                     Log::debug("  File metafiles: " . count($file_metafiles));
@@ -122,7 +122,7 @@ class RenameTask extends AbstractTask {
                     }
 
                     list($path, $filename) = explode_full_path("$target_full_path/$file_path");
-                    save_metafiles($share, $path, $filename, $new_file_metafiles);
+                    Metastores::save_metafiles($share, $path, $filename, $new_file_metafiles);
                 }
             }
         } else {
@@ -136,25 +136,25 @@ class RenameTask extends AbstractTask {
             list($path, $filename) = explode_full_path($full_path);
             list($target_path, $target_filename) = explode_full_path($target_full_path);
 
-            foreach (get_metafiles($share, $path, $filename, FALSE, FALSE, FALSE) as $existing_metafiles) {
+            foreach (Metastores::get_metafiles($share, $path, $filename, FALSE, FALSE, FALSE) as $existing_metafiles) {
                 // There might be old metafiles... for example, when a delete task was skipped.
                 // Let's remove the file copies if there are any leftovers; correct copies will be re-created below.
                 if (file_exists("$landing_zone/$target_full_path") && (count($existing_metafiles) > 0 || !is_link("$landing_zone/$target_full_path"))) {
-                    foreach (get_metafiles($share, $target_path, $target_filename, TRUE, FALSE, FALSE) as $existing_target_metafiles) {
+                    foreach (Metastores::get_metafiles($share, $target_path, $target_filename, TRUE, FALSE, FALSE) as $existing_target_metafiles) {
                         if (count($existing_target_metafiles) > 0) {
                             foreach ($existing_target_metafiles as $metafile) {
                                 gh_recycle($metafile->path);
                             }
-                            remove_metafiles($share, $target_path, $target_filename);
+                            Metastores::remove_metafiles($share, $target_path, $target_filename);
                         }
                     }
                 }
 
                 if (count($existing_metafiles) == 0) {
                     // Any NOK metafiles that need to be removed?
-                    foreach (get_metafiles($share, $path, $filename, TRUE, FALSE, FALSE) as $all_existing_metafiles) {
+                    foreach (Metastores::get_metafiles($share, $path, $filename, TRUE, FALSE, FALSE) as $all_existing_metafiles) {
                         if (count($all_existing_metafiles) > 0) {
-                            remove_metafiles($share, $path, $filename);
+                            Metastores::remove_metafiles($share, $path, $filename);
                         }
                     }
                     // New file
@@ -192,8 +192,8 @@ class RenameTask extends AbstractTask {
                         $existing_metafiles[$key] = $metafile;
                         $symlink_target = $metafile->path;
                     }
-                    remove_metafiles($share, $path, $filename);
-                    save_metafiles($share, $target_path, $target_filename, $existing_metafiles);
+                    Metastores::remove_metafiles($share, $path, $filename);
+                    Metastores::save_metafiles($share, $target_path, $target_filename, $existing_metafiles);
 
                     if (is_link("$landing_zone/$target_full_path")) {
                         // New link exists...

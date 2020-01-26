@@ -122,7 +122,7 @@ class Md5Task extends AbstractTask {
 
                     $metafiles = array();
                     list($path, $filename) = explode_full_path($task->full_path);
-                    foreach (get_metafiles($task->share, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
+                    foreach (Metastores::get_metafiles($task->share, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
                         foreach ($existing_metafiles as $key => $metafile) {
                             if ($metafile->path == $latest_file_copy) {
                                 // This is the metafile for the just-trashed file copy

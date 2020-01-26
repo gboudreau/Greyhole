@@ -664,7 +664,7 @@ function logd($what) {
 function _assert($file, $expected_content) {
     $content = @file_get_contents($file);
     // This ls is somehow needed to allow PHP to refresh it's file cache. Without it, some tests will sometimes fail...
-    if (DEBUG) { echo "*** " . get_date() . "\n"; passthru('find /mnt/hdd*/gh/TimeMachine/ /mnt/hdd*/gh/.gh_metastore/TimeMachine/ /mnt/hdd5/shares/TimeMachine/ /mnt/hdd*/gh/TimeMachine/*/ /mnt/hdd*/gh/.gh_metastore/TimeMachine/*/ /mnt/hdd5/shares/TimeMachine/*/ -type f 2>/dev/null'); echo "***\n"; }
+    if (DEBUG) { echo "*** " . get_date() . "\n"; passthru('find /mnt/hdd*/gh/TimeMachine/ /mnt/hdd*/gh/' . Metastores::METASTORE_DIR . '/TimeMachine/ /mnt/hdd5/shares/TimeMachine/ /mnt/hdd*/gh/TimeMachine/*/ /mnt/hdd*/gh/' . Metastores::METASTORE_DIR . '/TimeMachine/*/ /mnt/hdd5/shares/TimeMachine/*/ -type f 2>/dev/null'); echo "***\n"; }
         if ($expected_content != $content) {
         $file_exists = file_exists($file);
         die(get_date() . "assert failed: $file should contain '$expected_content'; it contains '$content' (file exists? " . ($file_exists ? 'yes' : 'no') . ").\n");

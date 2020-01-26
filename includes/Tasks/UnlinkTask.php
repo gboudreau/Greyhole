@@ -75,12 +75,12 @@ class UnlinkTask extends AbstractTask {
 
         list($path, $filename) = explode_full_path($full_path);
 
-        foreach (get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
+        foreach (Metastores::get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
             foreach ($existing_metafiles as $metafile) {
                 gh_recycle($metafile->path);
             }
         }
-        remove_metafiles($share, $path, $filename);
+        Metastores::remove_metafiles($share, $path, $filename);
 
         FileHook::trigger(FileHook::EVENT_TYPE_DELETE, $share, $full_path);
 
