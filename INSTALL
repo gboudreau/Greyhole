@@ -9,10 +9,10 @@ If you can't install a pre-packaged version, follow the steps below to install f
 The following instructions have been tested on Fedora 12, and Ubuntu 9 & 10.
 If you know what you're doing, you should have no problem installing on any other Linux variant.
 
-1. Install the required applications: PHP 5+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
+1. Install the required applications: PHP 7+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
 	Fedora: yum -y install mysql-server php php-mysql php-mbstring php-intl samba samba-common php-pear rsync lsof
-	Ubuntu: apt-get -y install mysql-server php5-cli php5-mysql php5-mysqlnd php5-intl samba samba-common samba-common-bin php-pear rsync lsof sysstat
+	Ubuntu: apt-get -y install mysql-server php-cli php-mysql php-mysqlnd php-mbstring php-intl samba samba-common samba-common-bin php-pear rsync lsof sysstat
 
 2. Install Greyhole (as root):
 
