@@ -30,8 +30,10 @@ require_once('includes/PoolDriveSelector.php');
 require_once('includes/SambaSpool.php');
 require_once('includes/SambaUtils.php');
 require_once('includes/Settings.php');
+require_once('includes/StorageFile.php');
 require_once('includes/StoragePool.php');
 require_once('includes/SystemHelper.php');
+require_once('includes/Trash.php');
 
 $constarray = get_defined_constants(true);
 foreach($constarray['user'] as $key => $val) {
@@ -636,9 +638,9 @@ function log_file_checksum($share, $full_path, $checksum) {
 }
 
 function get_share_and_fullpath_from_realpath($real_path) {
-    $prefix = get_storage_volume_from_path($real_path);
+    $prefix = StoragePool::getDriveFromPath($real_path);
     if (!$prefix) {
-        $share_options = get_share_options_from_full_path($real_path);
+        $share_options = SharesConfig::getShareOptions($real_path);
         $lz = $share_options['landing_zone'];
         $array = explode('/', $lz);
         array_pop($array);

@@ -29,7 +29,7 @@ class UnlinkTask extends AbstractTask {
             return TRUE;
         }
 
-        if (should_ignore_file($share, $full_path)) {
+        if ($this->should_ignore_file()) {
             return TRUE;
         }
 
@@ -77,7 +77,7 @@ class UnlinkTask extends AbstractTask {
 
         foreach (Metastores::get_metafiles($share, $path, $filename, TRUE) as $existing_metafiles) {
             foreach ($existing_metafiles as $metafile) {
-                gh_recycle($metafile->path);
+                Trash::trash_file($metafile->path);
             }
         }
         Metastores::remove_metafiles($share, $path, $filename);

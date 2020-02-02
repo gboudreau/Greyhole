@@ -30,12 +30,12 @@ class WriteTask extends AbstractTask {
             return TRUE;
         }
 
-        if (should_ignore_file($share, $full_path)) {
+        if ($this->should_ignore_file()) {
             return TRUE;
         }
 
         if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore.')) {
-            $new_full_path = find_future_full_path($share, $full_path, $task_id);
+            $new_full_path = static::find_future_full_path($share, $full_path, $task_id);
             if ($new_full_path != $full_path && gh_is_file("$landing_zone/$new_full_path")) {
                 Log::debug("  Found that $full_path has been renamed to $new_full_path. Will work using that instead.");
                 if (is_link("$landing_zone/$new_full_path")) {
@@ -52,7 +52,7 @@ class WriteTask extends AbstractTask {
             }
         }
 
-        $num_copies_required = get_num_copies($share);
+        $num_copies_required = SharesConfig::getNumCopies($share);
         if ($num_copies_required === -1) {
             return TRUE;
         }
@@ -110,7 +110,7 @@ class WriteTask extends AbstractTask {
                     }
                     if ($is_ok) {
                         // Ok, now we're sure.
-                        gh_recycle($source_file, TRUE);
+                        Trash::trash_file($source_file, TRUE);
                     } else {
                         Log::debug("  Change of mind... Couldn't find any OK metadata file... Will keep the source!");
                     }
@@ -140,14 +140,14 @@ class WriteTask extends AbstractTask {
                 Log::debug(count($existing_metafiles) . " metafiles loaded.");
                 if (count($existing_metafiles) > 0) {
                     foreach ($existing_metafiles as $metafile) {
-                        gh_recycle($metafile->path);
+                        Trash::trash_file($metafile->path);
                     }
                     Metastores::remove_metafiles($share, $path, $filename);
                     $existing_metafiles = array();
                     // Maybe there's other file copies, that weren't metafiles, or were NOK metafiles!
                     foreach (Config::storagePoolDrives() as $sp_drive) {
                         if (file_exists("$sp_drive/$share/$path/$filename")) {
-                            gh_recycle("$sp_drive/$share/$path/$filename");
+                            Trash::trash_file("$sp_drive/$share/$path/$filename");
                         }
                     }
                 }
@@ -180,8 +180,8 @@ class WriteTask extends AbstractTask {
 
         // Only need to check for locking if we have something to do!
         if ($num_copies_required > 1 || count($existing_metafiles) == 0) {
-            // Check if another process locked this file before we work on it.
-            if (gh_check_file_locked($share, $full_path)) {
+            // Check if another process locked this file before we work on it
+            if ($this->is_file_locked($share, $full_path)) {
                 return FALSE;
             }
             DBSpool::resetSleepingTasks();
@@ -190,7 +190,7 @@ class WriteTask extends AbstractTask {
         if ($keys_to_remove !== NULL) {
             foreach ($keys_to_remove as $key) {
                 if ($existing_metafiles[$key]->path != $source_file) {
-                    gh_recycle($existing_metafiles[$key]->path, TRUE);
+                    Trash::trash_file($existing_metafiles[$key]->path, TRUE);
                 }
             }
             // Empty the existing metafiles array, to be able to recreate all new copies on the correct drives, per the dir_selection_algorithm
@@ -219,7 +219,7 @@ class WriteTask extends AbstractTask {
         $q = "SELECT id FROM tasks WHERE action = 'write' AND share = :share AND full_path = :full_path AND complete IN ('yes', 'thawed', 'idle') AND id > :task_id";
         $duplicate_tasks_to_delete = DB::getAllValues($q, ['share' => $share, 'full_path' => $full_path, 'task_id' => $task_id]);
 
-        if (!create_copies_from_metafiles($metafiles, $share, $full_path, $source_file)) {
+        if (!StorageFile::create_file_copies_from_metafiles($metafiles, $share, $full_path, $source_file)) {
             // If create_copies_from_metafiles returns FALSE, we want to abort this op, thus why we return TRUE here
             return TRUE;
         }
@@ -233,6 +233,21 @@ class WriteTask extends AbstractTask {
 
     public static function queue($share, $full_path, $complete = 'yes') {
         parent::_queue('write', $share, $full_path, NULL, $complete);
+    }
+
+    private static function find_future_full_path($share, $full_path, $task_id) {
+        $new_full_path = $full_path;
+        while ($next_task = DBSpool::getInstance()->find_next_rename_task($share, $new_full_path, $task_id)) {
+            if ($next_task->full_path == $full_path) {
+                // File was renamed
+                $new_full_path = $next_task->additional_info;
+            } else {
+                // A parent directory was renamed
+                $new_full_path = preg_replace("@^$next_task->full_path@", $next_task->additional_info, $new_full_path);
+            }
+            $task_id = $next_task->id;
+        }
+        return $new_full_path;
     }
 
 }

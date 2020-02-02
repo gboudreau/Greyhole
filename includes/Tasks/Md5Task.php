@@ -118,7 +118,7 @@ class Md5Task extends AbstractTask {
                     }
 
                     Log::warn("  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5. This copy will be deleted, and replaced with a new copy from $original_file_path", Log::EVENT_CODE_FSCK_MD5_MISMATCH);
-                    gh_recycle($latest_file_copy);
+                    Trash::trash_file($latest_file_copy);
 
                     $metafiles = array();
                     list($path, $filename) = explode_full_path($task->full_path);
@@ -127,12 +127,12 @@ class Md5Task extends AbstractTask {
                             if ($metafile->path == $latest_file_copy) {
                                 // This is the metafile for the just-trashed file copy
                                 // Make sure that storage pool has enough free space for the new copy!
-                                $sp_drive = get_storage_volume_from_path($latest_file_copy);
-                                $dfs = get_free_space_in_storage_pool_drives();
-                                if (!isset($dfs[$sp_drive])) {
+                                $sp_drive = StoragePool::getDriveFromPath($latest_file_copy);
+                                $df = StoragePool::get_free_space($sp_drive);
+                                if (!$df) {
                                     $free_space = 0;
                                 } else {
-                                    $free_space = $dfs[$sp_drive]['free'];
+                                    $free_space = $df['free'];
                                 }
                                 $file_size = gh_filesize($latest_file_copy);
                                 if ($free_space <= $file_size/1024) {
@@ -145,7 +145,7 @@ class Md5Task extends AbstractTask {
                             $metafiles[$key] = $metafile;
                         }
                     }
-                    create_copies_from_metafiles($metafiles, $task->share, $task->full_path, $original_file_path, TRUE);
+                    StorageFile::create_file_copies_from_metafiles($metafiles, $task->share, $task->full_path, $original_file_path, TRUE);
 
                     Log::debug("  Calculating MD5 for new file copy at $latest_file_copy ...");
                     $md5 = md5_file($latest_file_copy);

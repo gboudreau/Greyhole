@@ -41,7 +41,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
 
     public function run() {
         // Removing this drive here will insure it won't be used for new files while we're moving files away, and that it can later be replaced.
-        remove_drive_definition($this->drive);
+        StoragePool::remove_drive($this->drive);
 
         if ($this->isGoing()) {
             file_put_contents($this->drive . "/.greyhole_used_this", "Flag to prevent Greyhole from thinking this drive disappeared for no reason...");
@@ -132,7 +132,7 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
             } else {
                 $file_path = trim(mb_substr($path, mb_strlen("$going_drive/$share")+1), '/');
                 $file_metafiles = array();
-                $file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
+                $file_copies_inodes = StoragePool::get_file_copies_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
                 if (count($file_copies_inodes) == 0) {
                     Log::debug("Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
                     echo ".";

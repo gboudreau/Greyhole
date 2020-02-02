@@ -31,36 +31,31 @@ class BalanceTask extends AbstractTask {
         uasort($sorted_shares_options, array('BalanceTask', 'compare_share_balance'));
         $skip_stickies = FALSE;
         Log::debug("┌ Will balance the shares in the following order: " . implode(", ", array_keys($sorted_shares_options)));
-        foreach ($sorted_shares_options as $share_name => $share_options) {
+        foreach ($sorted_shares_options as $share => $share_options) {
             if ($share_options[CONFIG_NUM_COPIES] == count(Config::storagePoolDrives())) {
                 // Files are everywhere; won't be able to use that share to balance available space!
-                Log::debug("├ Skipping share $share_name; has num_copies = max");
+                Log::debug("├ Skipping share $share; has num_copies = max");
                 continue;
             }
 
-            if ($skip_stickies && is_share_sticky($share_name)) {
-                Log::debug("├ Skipping share $share_name; is sticky");
+            if ($skip_stickies && static::is_share_sticky($share)) {
+                Log::debug("├ Skipping share $share; is sticky");
                 continue;
             }
 
-            Log::debug("├┐ Balancing share: $share_name");
+            Log::debug("├┐ Balancing share: $share");
 
             // Move files from the drive with the less available space to the drive with the most available space.
-            $sorted_pool_drives = sort_storage_drives_available_space();
-            $pool_drives_avail_space = array();
-            foreach ($sorted_pool_drives as $available_space => $drive) {
-                $pool_drives_avail_space[$drive] = $available_space;
-            }
-            $num_total_drives = count($sorted_pool_drives);
+            $pool_drives_avail_space = StoragePool::get_drives_available_space();
+            $num_total_drives = count($pool_drives_avail_space);
 
             $balance_direction_asc = array();
-            foreach ($sorted_pool_drives as $available_space => $drive) {
+            foreach ($pool_drives_avail_space as $drive => $available_space) {
                 $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
                 $balance_direction_asc[$drive] = $pool_drives_avail_space[$drive] < $target_avail_space;
             }
 
-            foreach ($sorted_pool_drives as $source_drive) {
-                $current_avail_space = $pool_drives_avail_space[$source_drive];
+            foreach ($pool_drives_avail_space as $source_drive => $current_avail_space) {
                 $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
                 $delta_needed = $target_avail_space - $current_avail_space;
                 if ($delta_needed <= 10*1024) {
@@ -72,10 +67,10 @@ class BalanceTask extends AbstractTask {
 
                 // Files candidate to get moved
                 $files = array();
-                if (is_dir("$source_drive/$share_name")) {
+                if (is_dir("$source_drive/$share")) {
                     $max_file_size = floor($delta_needed / 1024);
-                    $command = "find ". escapeshellarg("$source_drive/$share_name") ." -type f -size +10M -size -{$max_file_size}M";
-                    Log::debug("│││ Looking for files to move on $share_name, with file size between 10-{$max_file_size}MB ...");
+                    $command = "find ". escapeshellarg("$source_drive/$share") ." -type f -size +10M -size -{$max_file_size}M";
+                    Log::debug("│││ Looking for files to move on $share, with file size between 10-{$max_file_size} MB ...");
                     exec($command, $files);
                 }
                 if (count($files) == 0) {
@@ -95,7 +90,7 @@ class BalanceTask extends AbstractTask {
                     }
 
                     // Let's not try to move locked files!
-                    if (real_file_is_locked($file) !== FALSE) {
+                    if (gh_is_file_locked($file) !== FALSE) {
                         Log::debug("││├ File $file is locked by another process. Skipping.");
                         continue;
                     }
@@ -107,25 +102,25 @@ class BalanceTask extends AbstractTask {
                         continue;
                     }
 
-                    $full_path = mb_substr($file, mb_strlen("$source_drive/$share_name/"));
+                    $full_path = mb_substr($file, mb_strlen("$source_drive/$share/"));
                     list($path, ) = explode_full_path($full_path);
-                    Log::debug("││├┐ Working on file: $share_name/$full_path (". bytes_to_human($filesize*1024, FALSE) .")");
+                    Log::debug("││├┐ Working on file: $share/$full_path (". bytes_to_human($filesize*1024, FALSE) .")");
 
-                    // $is_sticky is set in order_target_drives(), based on $share_name & $path
-                    $sp_drives = order_target_drives($filesize, FALSE, $share_name, $path, '  ', $is_sticky);
+                    // $is_sticky is set in choose_target_drives(), based on $share & $path
+                    $target_drives = StoragePool::choose_target_drives($filesize, FALSE, $share, $path, '  ', $is_sticky);
 
                     unset($sp_drive);
                     if ($is_sticky) {
                         /** @noinspection PhpStatementHasEmptyBodyInspection */
-                        if (count($sp_drives) == $num_total_drives - 1 && !array_contains($sp_drives, $source_drive)) {
+                        if (count($target_drives) == $num_total_drives - 1 && !array_contains($target_drives, $source_drive)) {
                             // Only drive full is the source drive. Let's move files away from there!
-                        } else if (count($sp_drives) < $num_total_drives) {
+                        } else if (count($target_drives) < $num_total_drives) {
                             $skip_stickies = TRUE;
                             Log::debug("│├┴┘ Some drives are full. Skipping sticky shares until all drives have some free space.");
                             break;
                         }
 
-                        $sticky_drives = array_slice($sp_drives, 0, get_num_copies($share_name));
+                        $sticky_drives = array_slice($target_drives, 0, SharesConfig::getNumCopies($share));
                         if (array_contains($sticky_drives, $source_drive)) {
                             // Source drive is a stick_into drive; let's not move that file!
                             Log::debug("││├┘ Source is sticky. Skipping.");
@@ -133,16 +128,16 @@ class BalanceTask extends AbstractTask {
                         }
                         $already_stuck_copies = 0;
                         foreach ($sticky_drives as $drive) {
-                            if (file_exists("$drive/$share_name/$full_path")) {
+                            if (file_exists("$drive/$share/$full_path")) {
                                 $already_stuck_copies++;
                             } else {
                                 $sp_drive = $drive;
                             }
                         }
                     } else {
-                        while (count($sp_drives) > 0) {
-                            $drive = array_shift($sp_drives);
-                            if (!file_exists("$drive/$share_name/$full_path")) {
+                        while (count($target_drives) > 0) {
+                            $drive = array_shift($target_drives);
+                            if (!file_exists("$drive/$share/$full_path")) {
                                 $sp_drive = $drive;
                                 break;
                             }
@@ -176,18 +171,18 @@ class BalanceTask extends AbstractTask {
                     }
 
                     // Make sure the parent directory exists, before we try moving something there...
-                    $original_path = clean_dir("$source_drive/$share_name/$path");
-                    list($target_path, $filename) = explode_full_path("$sp_drive/$share_name/$full_path");
+                    $original_path = clean_dir("$source_drive/$share/$path");
+                    list($target_path, $filename) = explode_full_path("$sp_drive/$share/$full_path");
                     gh_mkdir($target_path, $original_path);
 
                     // Move the file
-                    $temp_path = get_temp_filename("$sp_drive/$share_name/$full_path");
-                    $file_infos = gh_get_file_infos($file);
+                    $temp_path = StorageFile::get_temp_filename("$sp_drive/$share/$full_path");
+                    $file_permissions = StorageFile::get_file_permissions($file);
                     Log::debug("││││ Moving file copy...");
                     $it_worked = gh_rename($file, $temp_path);
                     if ($it_worked) {
-                        gh_rename($temp_path, "$sp_drive/$share_name/$full_path");
-                        gh_chperm("$sp_drive/$share_name/$full_path", $file_infos);
+                        gh_rename($temp_path, "$sp_drive/$share/$full_path");
+                        StorageFile::set_file_permissions("$sp_drive/$share/$full_path", $file_permissions);
 
                         $pool_drives_avail_space[$sp_drive] -= $filesize;
                         $pool_drives_avail_space[$source_drive] += $filesize;
@@ -198,10 +193,10 @@ class BalanceTask extends AbstractTask {
                     }
 
                     // Update metafiles
-                    foreach (Metastores::get_metafiles($share_name, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
+                    foreach (Metastores::get_metafiles($share, $path, $filename, TRUE, TRUE, FALSE) as $existing_metafiles) {
                         foreach ($existing_metafiles as $key => $metafile) {
                             if ($metafile->path == $file) {
-                                $metafile->path = "$sp_drive/$share_name/$full_path";
+                                $metafile->path = "$sp_drive/$share/$full_path";
                                 unset($existing_metafiles[$key]);
                                 $metafile->state = Metafile::STATE_OK;
                                 if ($metafile->is_linked) {
@@ -209,13 +204,13 @@ class BalanceTask extends AbstractTask {
                                     $landing_zone = $share_options[CONFIG_LANDING_ZONE];
                                     Log::debug("││││ Updating symlink at $landing_zone/$full_path to point to $metafile->path");
                                     if (is_link("$landing_zone/$full_path")) {
-                                        gh_recycle("$landing_zone/$full_path");
+                                        Trash::trash_file("$landing_zone/$full_path");
                                     }
                                     // Creating this symlink can fail if the parent dir was removed
                                     @gh_symlink($metafile->path, "$landing_zone/$full_path");
                                 }
                                 $existing_metafiles[$metafile->path] = $metafile;
-                                Metastores::save_metafiles($share_name, $path, $filename, $existing_metafiles);
+                                Metastores::save_metafiles($share, $path, $filename, $existing_metafiles);
                                 break;
                             }
                         }
@@ -231,7 +226,7 @@ class BalanceTask extends AbstractTask {
                 }
             }
 
-            Log::debug("├┘ Done balancing share: $share_name");
+            Log::debug("├┘ Done balancing share: $share");
         }
         Log::debug("└ Done balancing all shares");
 
@@ -251,10 +246,10 @@ class BalanceTask extends AbstractTask {
     }
 
     private static function compare_share_balance($a, $b) {
-        if (is_share_sticky($a['name']) && !is_share_sticky($b['name'])) {
+        if (static::is_share_sticky($a['name']) && !static::is_share_sticky($b['name'])) {
             return -1;
         }
-        if (!is_share_sticky($a['name']) && is_share_sticky($b['name'])) {
+        if (!static::is_share_sticky($a['name']) && static::is_share_sticky($b['name'])) {
             return 1;
         }
         if ($a[CONFIG_NUM_COPIES] != $b[CONFIG_NUM_COPIES]) {
@@ -262,6 +257,18 @@ class BalanceTask extends AbstractTask {
         }
         // Randomize order of the shares that have the same num_copies, in order to not always work with the same shares first
         return rand(0, 1) === 0 ? -1 : 1;
+    }
+
+    private static function is_share_sticky($share_name) {
+        $sticky_files = Config::get(CONFIG_STICKY_FILES);
+        if (!empty($sticky_files)) {
+            foreach ($sticky_files as $share_dir => $stick_into) {
+                if (string_starts_with($share_dir, $share_name)) {
+                    return TRUE;
+                }
+            }
+        }
+        return FALSE;
     }
 
 }

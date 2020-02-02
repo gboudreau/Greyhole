@@ -20,9 +20,10 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 class RenameTask extends AbstractTask {
 
+    private $fix_symlinks_scanned_dirs = [];
+
     public function execute() {
-        global $fix_symlinks_scanned_dirs;
-        $fix_symlinks_scanned_dirs = array();
+        $this->fix_symlinks_scanned_dirs = [];
 
         $share = $this->share;
         $full_path = $this->full_path;
@@ -34,7 +35,7 @@ class RenameTask extends AbstractTask {
             return TRUE;
         }
 
-        if (should_ignore_file($share, $target_full_path)) {
+        if ($this->should_ignore_file()) {
             return TRUE;
         }
 
@@ -55,10 +56,10 @@ class RenameTask extends AbstractTask {
                     gh_rename("$sp_drive/$share/$full_path", "$sp_drive/$share/$target_full_path");
 
                     // Make sure all the copies of this folder have the right owner & permissions
-                    $dir_infos = gh_get_file_infos("$landing_zone/$target_full_path");
-                    chown("$sp_drive/$share/$target_full_path", $dir_infos->fileowner);
-                    chgrp("$sp_drive/$share/$target_full_path", $dir_infos->filegroup);
-                    chmod("$sp_drive/$share/$target_full_path", $dir_infos->fileperms);
+                    $dir_permissions = StorageFile::get_file_permissions("$landing_zone/$target_full_path");
+                    chown("$sp_drive/$share/$target_full_path", $dir_permissions->fileowner);
+                    chgrp("$sp_drive/$share/$target_full_path", $dir_permissions->filegroup);
+                    chmod("$sp_drive/$share/$target_full_path", $dir_permissions->fileperms);
 
                     Log::debug("  Directory moved: $sp_drive/$share/$full_path -> $sp_drive/$share/$target_full_path");
                 }
@@ -118,7 +119,7 @@ class RenameTask extends AbstractTask {
                         unlink("$landing_zone/$full_path/$file_path");
                         gh_symlink($symlink_target, "$landing_zone/$full_path/$file_path");
                     } else {
-                        fix_symlinks($landing_zone, $share, "$full_path/$file_path", "$target_full_path/$file_path");
+                        $this->fix_symlinks($landing_zone, $share, "$full_path/$file_path", "$target_full_path/$file_path");
                     }
 
                     list($path, $filename) = explode_full_path("$target_full_path/$file_path");
@@ -129,7 +130,7 @@ class RenameTask extends AbstractTask {
             Log::info("File renamed: $landing_zone/$full_path -> $landing_zone/$target_full_path");
 
             // Check if another process locked this file before we work on it.
-            if (gh_check_file_locked($share, $target_full_path)) {
+            if ($this->is_file_locked($share, $target_full_path)) {
                 return FALSE;
             }
 
@@ -143,7 +144,7 @@ class RenameTask extends AbstractTask {
                     foreach (Metastores::get_metafiles($share, $target_path, $target_filename, TRUE, FALSE, FALSE) as $existing_target_metafiles) {
                         if (count($existing_target_metafiles) > 0) {
                             foreach ($existing_target_metafiles as $metafile) {
-                                gh_recycle($metafile->path);
+                                Trash::trash_file($metafile->path);
                             }
                             Metastores::remove_metafiles($share, $target_path, $target_filename);
                         }
@@ -210,7 +211,7 @@ class RenameTask extends AbstractTask {
                         unlink("$landing_zone/$full_path");
                         gh_symlink($symlink_target, "$landing_zone/$full_path");
                     } else {
-                        fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
+                        $this->fix_symlinks($landing_zone, $share, $full_path, $target_full_path);
                     }
                 }
             }
@@ -220,6 +221,40 @@ class RenameTask extends AbstractTask {
         FileHook::trigger(FileHook::EVENT_TYPE_RENAME, $share, $target_full_path, $full_path);
 
         return TRUE;
+    }
+
+    public function should_ignore_file($share = NULL, $full_path = NULL) {
+        // We ignore this task, if the target is ignored, whatever the source ($this->full_path) is
+        if (empty($full_path)) {
+            $full_path = $this->additional_info;
+        }
+        return parent::should_ignore_file($share, $full_path);
+    }
+
+    private function fix_symlinks($landing_zone, $share, $full_path, $target_full_path) {
+        if (isset($this->fix_symlinks_scanned_dirs[$landing_zone])) {
+            return;
+        }
+        Log::info("  Scanning $landing_zone for broken links... This can take a while!");
+        exec("find -L " . escapeshellarg($landing_zone) . " -type l", $broken_links);
+        Log::debug("    Found " . count($broken_links) . " broken links.");
+        foreach ($broken_links as $broken_link) {
+            $fixed_link_target = readlink($broken_link);
+            Log::debug("    Found a broken symlink to update: $broken_link. Broken target: $fixed_link_target");
+            foreach (Config::storagePoolDrives() as $sp_drive) {
+                $fixed_link_target = str_replace(clean_dir("$sp_drive/$share/$full_path/"), clean_dir("$sp_drive/$share/$target_full_path/"), $fixed_link_target);
+                if ($fixed_link_target == "$sp_drive/$share/$full_path") {
+                    $fixed_link_target = "$sp_drive/$share/$target_full_path";
+                    break;
+                }
+            }
+            if (gh_is_file($fixed_link_target)) {
+                Log::debug("      New (fixed) target: $fixed_link_target");
+                unlink($broken_link);
+                gh_symlink($fixed_link_target, $broken_link);
+            }
+        }
+        $this->fix_symlinks_scanned_dirs[$landing_zone] = TRUE;
     }
 
 }

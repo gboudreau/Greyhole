@@ -149,7 +149,7 @@ final class Metastores {
     public static function get_metastores_from_storage_volume($storage_volume) {
         $volume_metastores = array();
         foreach (static::get_metastores() as $metastore) {
-            if (get_storage_volume_from_path($metastore) == $storage_volume) {
+            if (StoragePool::getDriveFromPath($metastore) == $storage_volume) {
                 $volume_metastores[] = $metastore;
             }
         }
@@ -243,7 +243,7 @@ final class Metastores {
         foreach ($metafiles as $key => $metafile) {
             $valid_path = FALSE;
 
-            $drive = get_storage_volume_from_path($metafile->path);
+            $drive = StoragePool::getDriveFromPath($metafile->path);
             if ($drive !== FALSE) {
                 $valid_path = TRUE;
             }
@@ -287,11 +287,11 @@ final class Metastores {
             }
 
             // Check free space!
-            $dfs = get_free_space_in_storage_pool_drives();
-            if (!isset($dfs[$sp_drive])) {
+            $df = StoragePool::get_free_space($sp_drive);
+            if (!$df) {
                 $free_space = 0;
             } else {
-                $free_space = $dfs[$sp_drive]['free'];
+                $free_space = $df['free'];
             }
             if ($free_space <= $filesize/1024) {
                 $metafile->state = Metafile::STATE_GONE;
@@ -312,11 +312,11 @@ final class Metastores {
 
         // Select drives that have enough free space for this file
         if ($num_ok < $num_copies_required) {
-            $local_target_drives = order_target_drives($filesize/1024, FALSE, $share, $path, '  ');
+            $target_drives = StoragePool::choose_target_drives($filesize/1024, FALSE, $share, $path, '  ');
         }
         /** @noinspection PhpUndefinedVariableInspection */
-        while ($num_ok < $num_copies_required && count($local_target_drives) > 0) {
-            $sp_drive = array_shift($local_target_drives);
+        while ($num_ok < $num_copies_required && count($target_drives) > 0) {
+            $sp_drive = array_shift($target_drives);
             $clean_target_full_path = clean_dir("$sp_drive/$share/$full_path");
             // Don't use drives that already have a copy
             if (isset($metafiles[$clean_target_full_path])) {
@@ -360,7 +360,7 @@ final class Metastores {
             $data_filepath = clean_dir("$metastore/$share/$path");
             $has_metafile = FALSE;
             foreach ($metafiles as $metafile) {
-                if (get_storage_volume_from_path($metafile->path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
+                if (StoragePool::getDriveFromPath($metafile->path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
                     gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
                     Log::debug("    Saving metadata in " . clean_dir("$data_filepath/$filename"));
                     if (is_dir("$data_filepath/$filename")) {

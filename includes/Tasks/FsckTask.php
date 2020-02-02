@@ -96,11 +96,11 @@ class FsckTask extends AbstractTask {
         }
 
         $storage_volume = FALSE;
-        $share_options = get_share_options_from_full_path($fscked_dir);
+        $share_options = SharesConfig::getShareOptions($fscked_dir);
         if ($share_options === FALSE) {
             // Since share_options is FALSE we didn't get a share path, maybe we got a storage volume path, let's check
-            $storage_volume = get_storage_volume_from_path($fscked_dir);
-            $share_options = get_share_options_from_storage_volume($fscked_dir, $storage_volume);
+            $storage_volume = StoragePool::getDriveFromPath($fscked_dir);
+            $share_options = SharesConfig::getShareOptionsFromDrive($fscked_dir, $storage_volume);
         }
         Log::debug("  Storage volume? " . ($storage_volume ? $storage_volume : 'No'));
         Log::debug("  Share? " . ($share_options ? $share_options['name'] : 'No'));
@@ -203,7 +203,7 @@ class FsckTask extends AbstractTask {
         $this->fsck_report['landing_zone']['num_dirs']++;
 
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (get_storage_volume_from_path($path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
+            if (StoragePool::getDriveFromPath($path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
                 $dir_path = str_replace(clean_dir("$sp_drive/$share"), '', $path);
                 $dir_in_lz = clean_dir(get_share_landing_zone($share) . "/$dir_path");
                 if (!file_exists($dir_in_lz)) {
@@ -356,9 +356,9 @@ class FsckTask extends AbstractTask {
             $full_path = clean_dir("$path/$filename");
 
             // Check if this is a temporary file; if so, just delete it.
-            if (is_temp_file($full_path)) {
+            if (StorageFile::is_temp_file($full_path)) {
                 $this->fsck_report['temp_files'][] = $full_path;
-                gh_recycle($full_path);
+                Trash::trash_file($full_path);
                 return;
             }
 
@@ -375,11 +375,11 @@ class FsckTask extends AbstractTask {
 
         // Look for this file on all available drives
         $file_metafiles = array();
-        $file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles);
+        $file_copies_inodes = StoragePool::get_file_copies_inodes($share, $file_path, $filename, $file_metafiles);
         if (count($file_metafiles) == 0) {
             // If we found 0 file copies the first time, we normalize the file path (using NFC) and try again.
             // Ref: http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization
-            $file_copies_inodes = get_file_inodes($share, normalize_utf8_characters($file_path), normalize_utf8_characters($filename), $file_metafiles);
+            $file_copies_inodes = StoragePool::get_file_copies_inodes($share, normalize_utf8_characters($file_path), normalize_utf8_characters($filename), $file_metafiles);
             if (count($file_metafiles) > 0) {
                 // Bingo!
                 $file_path = normalize_utf8_characters($file_path);
@@ -426,7 +426,7 @@ class FsckTask extends AbstractTask {
                     if (array_contains($file_copies_inodes, $link_target)) {
                         // This link points to another file copy. Bad, bad!
                         Log::warn("Warning! Found a symlink in your storage pool: $metafile->path -> $link_target. Deleting.", Log::EVENT_CODE_FSCK_SYMLINK_FOUND_IN_STORAGE_POOL);
-                        gh_recycle($metafile->path);
+                        Trash::trash_file($metafile->path);
                     }
                     $inode_number = FALSE;
                 }
@@ -456,7 +456,7 @@ class FsckTask extends AbstractTask {
             }
         }
 
-        $num_copies_required = get_num_copies($share);
+        $num_copies_required = SharesConfig::getNumCopies($share);
         if ($num_copies_required == -1) {
             Log::warn("Tried to fsck a share that is missing from greyhole.conf. Skipping.", Log::EVENT_CODE_FSCK_UNKNOWN_SHARE);
             return;
@@ -543,7 +543,7 @@ class FsckTask extends AbstractTask {
                     // Found a file with a different size than the original...
                     // There might be a good reason. Let's look for one!
                     /** @noinspection PhpUndefinedVariableInspection */
-                    if (real_file_is_locked($real_full_path) !== FALSE || real_file_is_locked($original_file_path) !== FALSE) {
+                    if (gh_is_file_locked($real_full_path) !== FALSE || gh_is_file_locked($original_file_path) !== FALSE) {
                         // Write operation in progress
                         continue;
                     }
@@ -563,7 +563,7 @@ class FsckTask extends AbstractTask {
                         unlink($real_full_path);
                     } else {
                         Log::warn("  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.", Log::EVENT_CODE_FSCK_SIZE_MISMATCH_FILE_COPY_FOUND);
-                        gh_recycle($real_full_path);
+                        Trash::trash_file($real_full_path);
                         $this->fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
                     }
                     // Will not count that copy as a valid copy!
@@ -600,7 +600,7 @@ class FsckTask extends AbstractTask {
                 $this->fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
             }
             if (is_link("$landing_zone/$file_path/$filename")) {
-                gh_recycle("$landing_zone/$file_path/$filename");
+                Trash::trash_file("$landing_zone/$file_path/$filename");
             } else if (gh_is_file("$landing_zone/$file_path/$filename")) {
                 Log::info("$share/$file_path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
                 WriteTask::queue($share, empty($file_path) ? $filename : clean_dir("$file_path/$filename"));
@@ -639,7 +639,7 @@ class FsckTask extends AbstractTask {
 
                     if ($metafile->state == Metafile::STATE_GONE) {
                         foreach (Config::storagePoolDrives() as $sp_drive) {
-                            if (get_storage_volume_from_path($metafile_dir_path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
+                            if (StoragePool::getDriveFromPath($metafile_dir_path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
                                 $metafile->state = Metafile::STATE_PENDING;
                                 $file_metafiles[$key] = $metafile;
                                 break;
@@ -670,7 +670,7 @@ class FsckTask extends AbstractTask {
                     }
 
                     if ($metafile->state == Metafile::STATE_PENDING) {
-                        if (gh_copy_file($original_file_path, $metafile->path)) {
+                        if (StorageFile::create_file_copy($original_file_path, $metafile->path)) {
                             $metafile->state = Metafile::STATE_OK;
                             $num_copies_current++;
                         } else {
@@ -683,7 +683,7 @@ class FsckTask extends AbstractTask {
                     }
                 }
                 if ($original_file_path == $metafile->path || $metafile->is_linked) {
-                    if (!empty($going_drive) && get_storage_volume_from_path($original_file_path) == $going_drive) {
+                    if (!empty($going_drive) && StoragePool::getDriveFromPath($original_file_path) == $going_drive) {
                         $metafile->is_linked = FALSE;
                         $metafile->state = Metafile::STATE_GONE;
                         $file_metafiles[$key] = $metafile;
@@ -719,13 +719,13 @@ class FsckTask extends AbstractTask {
             }
             if (count($file_copies_inodes) > $num_copies_required) {
                 Log::info("  Too many file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will try to remove some.");
-                if (file_is_locked($share, "$file_path/$filename") !== FALSE) {
+                if (DBSpool::isFileLocked($share, "$file_path/$filename") !== FALSE) {
                     Log::info("  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
                     return;
                 }
                 $this->fsck_report['too_many_copies']++;
 
-                $local_target_drives = array_values(order_target_drives(0, TRUE, $share, $file_path));
+                $local_target_drives = array_values(StoragePool::choose_target_drives(0, TRUE, $share, $file_path));
 
                 // The drives that are NOT returned by order_target_drives(), but have a file copy, should be removed first
                 $gone_drives = array();
@@ -751,14 +751,14 @@ class FsckTask extends AbstractTask {
                         /** @noinspection PhpUndefinedVariableInspection */
                         if (gh_file_exists($key) || $metafile->state == Metafile::STATE_OK) {
                             Log::debug("    Found file copy at $key, or metadata file is marked OK.");
-                            if (real_file_is_locked($key) !== FALSE) {
+                            if (gh_is_file_locked($key) !== FALSE) {
                                 Log::debug("    File copy is locked. Won't remove it.");
                                 continue;
                             }
                             $this->fsck_report['too_many_files'][] = $key;
                             Log::debug("    Removing copy at $key");
                             unset($file_copies_inodes[gh_fileinode($key)]);
-                            gh_recycle($key);
+                            Trash::trash_file($key);
                             if (isset($file_metafiles[$key])) {
                                 unset($file_metafiles[$key]);
                             }
@@ -819,7 +819,7 @@ class FsckTask extends AbstractTask {
         }
 
         Log::debug("  Updating symlink at $symlink to point to $target");
-        gh_recycle($symlink);
+        Trash::trash_file($symlink);
         gh_mkdir(dirname($symlink), dirname($target));
         gh_symlink($target, $symlink);
     }

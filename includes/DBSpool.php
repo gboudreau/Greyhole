@@ -118,16 +118,53 @@ final class DBSpool {
         array_unshift(static::getInstance()->next_tasks, $task);
     }
 
-    public static function lockFile($idx, $locked_by) {
-        static::getInstance()->locked_files[$idx] = $locked_by;
+    private function lockFile($idx, $locked_by) {
+        $this->locked_files[$idx] = $locked_by;
     }
 
-    public static function isFileLocked($full_path) {
+    public static function isFileLocked($share, $full_path) {
         $db_spool = static::getInstance();
-        if (isset($db_spool->locked_files[$full_path])) {
-            return $db_spool->locked_files[$full_path];
+        $idx = clean_dir("$share/$full_path");
+        if (isset($db_spool->locked_files[$idx])) {
+            return $db_spool->locked_files[$idx];
         }
-        return FALSE;
+
+        if (Config::get(CONFIG_CHECK_FOR_OPEN_FILES) === FALSE) {
+            Log::debug("  Skipping open file (lock) check.");
+            return FALSE;
+        }
+
+        $landing_zone = get_share_landing_zone($share);
+        if (!$landing_zone) {
+            return FALSE;
+        }
+
+        $real_fullpath = "$landing_zone/$full_path";
+
+        $result = gh_is_file_locked($real_fullpath);
+        if ($result !== FALSE) {
+            $db_spool->lockFile($idx, $result);
+            return $result;
+        }
+
+        $query = "SELECT * FROM tasks WHERE complete = 'no' AND action = 'write' AND share = :share AND full_path = :full_path LIMIT 1";
+        $params = array('share' => $share, 'full_path' => $full_path);
+        $row = DB::getFirst($query, $params);
+        if ($row === FALSE) {
+            return FALSE;
+        }
+
+        // Locked, according to DB... But maybe it's not really locked?
+        if (!gh_file_exists($real_fullpath)) {
+            // File doesn't exists anymore... It can't be really locked... Let's assume this is just Samba that 'forgot' to close the file handle.
+            $query = "UPDATE tasks SET complete = 'yes' WHERE complete = 'no' AND action = 'write' AND share = :share AND full_path = :full_path";
+            DB::execute($query, $params);
+            return FALSE;
+        }
+
+        $result = 'samba-vfs-writer';
+        $db_spool->lockFile($idx, $result);
+        return $result;
     }
 
     public function execute_next_task() {
@@ -200,7 +237,7 @@ final class DBSpool {
         }
 
         if ($task->complete == 'written') {
-            if (should_ignore_file($task->share, $task->full_path)) {
+            if ($task->should_ignore_file()) {
                 $this->archive_task($task->id);
                 return;
             }
@@ -224,7 +261,7 @@ final class DBSpool {
 
             if (!empty($this->written_files[clean_dir("$task->share/$task->full_path")])) {
                 Log::debug("  File is still being written to (" . bytes_to_human($filesize, FALSE) . "). Postponing.");
-                static::lockFile(clean_dir("$task->share/$task->full_path"), 'samba-bytes-writer');
+                $this->lockFile(clean_dir("$task->share/$task->full_path"), 'samba-bytes-writer');
                 $this->locked_shares[$task->share] = TRUE;
                 return;
             }

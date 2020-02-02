@@ -82,6 +82,86 @@ function gh_symlink($target, $link) {
     return $success;
 }
 
+function gh_mkdir($directory, $original_directory, $dir_permissions = NULL) {
+    if (empty($dir_permissions) && !empty($original_directory)) {
+        $dir_permissions = StorageFile::get_file_permissions($original_directory);
+    }
+    if (is_dir($directory)) {
+        if (!chown($directory, $dir_permissions->fileowner)) {
+            Log::warn("  Failed to chown directory '$directory'", Log::EVENT_CODE_MKDIR_CHOWN_FAILED);
+        }
+        if (!chgrp($directory, $dir_permissions->filegroup)) {
+            Log::warn("  Failed to chgrp directory '$directory'", Log::EVENT_CODE_MKDIR_CHGRP_FAILED);
+        }
+        if (!chmod($directory, $dir_permissions->fileperms)) {
+            Log::warn("  Failed to chmod directory '$directory'", Log::EVENT_CODE_MKDIR_CHMOD_FAILED);
+        }
+    } else {
+        // Need to mkdir & chown/chgrp all dirs that don't exists, up to the full path ($directory)
+        $dir_parts = explode('/', $directory);
+
+        $i = 0;
+        $parent_directory = clean_dir('/' . $dir_parts[$i++]);
+        while (is_dir($parent_directory) && $i < count($dir_parts)) {
+            $parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
+        }
+        while ($i <= count($dir_parts)) {
+            if (!is_dir($parent_directory) && !@mkdir($parent_directory, $dir_permissions->fileperms)) {
+                if (gh_is_file($parent_directory)) {
+                    gh_rename($parent_directory, "$parent_directory (file copy)");
+                }
+                if (!@mkdir($parent_directory, $dir_permissions->fileperms)) {
+                    // Even if mkdir return false, the folder might have been correctly created... who would think...
+                    if (!is_dir($parent_directory)) {
+                        // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+                        if (is_dir(normalize_utf8_characters($parent_directory))) {
+                            // Bingo!
+                            $parent_directory = normalize_utf8_characters($parent_directory);
+                        } else {
+                            Log::warn("  Failed to create directory $parent_directory", Log::EVENT_CODE_MKDIR_FAILED);
+                            return FALSE;
+                        }
+                    }
+                }
+            }
+            if (!chown($parent_directory, $dir_permissions->fileowner)) {
+                Log::warn("  Failed to chown directory '$parent_directory'", Log::EVENT_CODE_MKDIR_CHOWN_FAILED);
+            }
+            if (!chgrp($parent_directory, $dir_permissions->filegroup)) {
+                Log::warn("  Failed to chgrp directory '$parent_directory'", Log::EVENT_CODE_MKDIR_CHGRP_FAILED);
+            }
+            if (!isset($dir_parts[$i])) {
+                break;
+            }
+            $parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
+        }
+    }
+    return TRUE;
+}
+
+function gh_file_exists($real_path, $log_message = NULL) {
+    clearstatcache();
+    if (!file_exists($real_path)) {
+        if (!empty($log_message)) {
+            eval('$log_message = "' . str_replace('"', '\"', $log_message) . '";');
+            Log::info($log_message);
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
+
+function gh_is_file_locked($real_fullpath) {
+    if (is_link($real_fullpath)) {
+        $real_fullpath = readlink($real_fullpath);
+    }
+    $result = exec("lsof -M -n -P -l " . escapeshellarg($real_fullpath) . " 2> /dev/null");
+    if (string_contains($result, $real_fullpath)) {
+        return $result;
+    }
+    return FALSE;
+}
+
 // Get CPU architecture (x86_64 or i386 or armv6l or armv5*)
 $arch = exec('uname -m');
 if ($arch != 'x86_64') {

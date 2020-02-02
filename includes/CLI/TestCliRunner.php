@@ -22,7 +22,7 @@ require_once('includes/CLI/AbstractCliRunner.php');
 
 class TestCliRunner extends AbstractCliRunner {
     public function run() {
-        process_config();
+        ConfigHelper::test();
         DB::connect();
         DB::repairTables();
         MigrationHelper::convertStoragePoolDrivesTagFiles();
