@@ -400,16 +400,22 @@ final class DBSpool {
     }
 
     public function find_next_rename_task($share, $full_path, $task_id) {
-        $full_paths = array();
-        $full_paths[] = $full_path;
+        $full_paths = [$full_path];
         $parent_full_path = $full_path;
         list($parent_full_path, ) = explode_full_path($parent_full_path);
         while (strlen($parent_full_path) > 1) {
             $full_paths[] = $parent_full_path;
             list($parent_full_path, ) = explode_full_path($parent_full_path);
         }
-        $query = "SELECT * FROM tasks WHERE complete = 'yes' AND share = :share AND action = 'rename' AND full_path IN ('" . implode("','", array_map("DB::quote", $full_paths)) . "') AND id > :task_id ORDER BY id LIMIT 1";
-        return DB::getFirst($query, array('share' => $share, 'task_id' => $task_id));
+        $params = ['share' => $share, 'task_id' => $task_id];
+        $param_names = [];
+        foreach ($full_paths as $i => $full_path) {
+            $param_name = sprintf("fp_%03d", $i);
+            $param_names[] = ":$param_name";
+            $params[$param_name] = $full_path;
+        }
+        $query = "SELECT * FROM tasks WHERE complete = 'yes' AND share = :share AND action = 'rename' AND full_path IN (" . implode(", ", $param_names) . ") AND id > :task_id ORDER BY id LIMIT 1";
+        return DB::getFirst($query, $params);
     }
 
     /**
