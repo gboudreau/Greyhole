@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 /*
-Copyright 2010-2014 Guillaume Boudreau
+Copyright 2010-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -19,28 +19,30 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+require_once __DIR__ . '/includes/Metastores.php';
+
 define('DEBUG', FALSE);
 
-$config = (object) array(
-	'test_dir' => '/mnt/samba/TimeMachine/',
-	'share_dir' => '/mnt/hdd5/shares/TimeMachine/',
-	'pool_dirs' => array(
-		'/mnt/hdd1/gh/TimeMachine',
-		'/mnt/hdd2/gh/TimeMachine',
-		'/mnt/hdd3/gh/TimeMachine',
-		'/mnt/hdd4/gh/TimeMachine',
-		'/mnt/hdd5/gh/TimeMachine',
-		'/mnt/hdd6/gh/TimeMachine',
-		'/mnt/hdd7/gh/TimeMachine',
-        '/mnt/hdd8/gh/TimeMachine',
-        '/mnt/hdd9/gh/TimeMachine',
-	),
+$config = (object) ['share_name' => 'GreyholeTests'];
+$config->log_file  = "/home/gb/docker-services/samba-greyhole/_vol/usr-share-greyhole/log/greyhole.log";
+$config->test_dir  = "/mnt/samba/$config->share_name/";
+$config->share_dir = "/opt/samba-shares/$config->share_name/";
+$config->pool_dirs = [
+    "/mnt/hdd1/gh/$config->share_name",
+    "/mnt/hdd2/gh/$config->share_name",
+    "/mnt/hdd3/gh/$config->share_name",
+    "/mnt/hdd4/gh/$config->share_name",
+    "/mnt/hdd5/gh/$config->share_name",
+    "/mnt/hdd6/gh/$config->share_name",
+    "/mnt/hdd7/gh/$config->share_name",
+    "/mnt/hdd8/gh/$config->share_name",
+    "/mnt/hdd9/gh/$config->share_name",
+];
 
-	'dont_wait' => FALSE,
-	
-	// Run only a specific test
-	//'run_only' => (object) array('test_name' => 'random back and forth dir & file renames', 'start_with_run_num' => 1),
-);
+//$config->dont_wait = TRUE;
+
+// Run only a specific test
+//$config->run_only = (object) ['test_name' => 'random back and forth dir & file renames', 'start_with_run_num' => 26];
 
 $num_test = 1;
 
@@ -413,7 +415,8 @@ $tests = array(
 		'code' => function($run_num) { $i = 1;
 			file_put_contents('file1', 'a');
 			wait($i++, $run_num);
-			exec('/usr/bin/greyhole --fsck --dir /mnt/hdd0/shares/TimeMachine/');
+			global $config;
+			exec('/usr/bin/greyhole --fsck --dir ' . escapeshellarg("/mnt/hdd0/shares/$config->share_name/"));
 			unlink('file1');
 			wait($i++, $run_num);
 
@@ -639,6 +642,7 @@ $tests = array(
 // Actual Tests run
 
 foreach ($tests as $test) {
+    global $num_test;
 	if (isset($config->run_only) && $config->run_only->test_name != $test->name) {
 		continue;
 	}
@@ -648,9 +652,12 @@ foreach ($tests as $test) {
 	}
 	foreach (range($start, $test->repetitions) as $run_num) {
 		check_pool_is_empty();
-		$ok = call_user_func($test->code, $run_num);
-		print_result($test->name, $ok);
-		wait();
+        echo get_date() . "Test #" . ($num_test++) . ": $test->name - Run $run_num/$test->repetitions ...\n";
+        echo get_date() . "  [";
+        $ok = call_user_func($test->code, $run_num);
+        echo "]\n";
+		print_result($ok);
+		wait(0, 0, TRUE);
 		check_pool_is_empty();
 	}
 }
@@ -658,14 +665,31 @@ foreach ($tests as $test) {
 // Functions
 
 function logd($what) {
-    if (DEBUG) echo get_date() . "$what\n";
+    if (DEBUG) {
+        echo get_date() . "$what\n";
+        return TRUE;
+    }
+    return FALSE;
 }
 
 function _assert($file, $expected_content) {
     $content = @file_get_contents($file);
     // This ls is somehow needed to allow PHP to refresh it's file cache. Without it, some tests will sometimes fail...
-    if (DEBUG) { echo "*** " . get_date() . "\n"; passthru('find /mnt/hdd*/gh/TimeMachine/ /mnt/hdd*/gh/' . Metastores::METASTORE_DIR . '/TimeMachine/ /mnt/hdd5/shares/TimeMachine/ /mnt/hdd*/gh/TimeMachine/*/ /mnt/hdd*/gh/' . Metastores::METASTORE_DIR . '/TimeMachine/*/ /mnt/hdd5/shares/TimeMachine/*/ -type f 2>/dev/null'); echo "***\n"; }
-        if ($expected_content != $content) {
+    global $config;
+    if (DEBUG) {
+        echo "*** " . get_date() . "\n";
+        $folders = [
+            "/mnt/hdd*/gh/$config->share_name/",
+            "/mnt/hdd*/gh/" . Metastores::METASTORE_DIR . "/$config->share_name/",
+            "$config->share_dir/",
+            "/mnt/hdd*/gh/$config->share_name/*/",
+            "/mnt/hdd*/gh/" . Metastores::METASTORE_DIR . "/$config->share_name/*/",
+            "$config->share_dir/*/",
+        ];
+        passthru('find ' . implode(' ', array_map('escapeshellarg', $folders)) . ' -type f 2>/dev/null');
+        echo "***\n";
+    }
+    if ($expected_content != $content) {
         $file_exists = file_exists($file);
         die(get_date() . "assert failed: $file should contain '$expected_content'; it contains '$content' (file exists? " . ($file_exists ? 'yes' : 'no') . ").\n");
     }
@@ -675,31 +699,32 @@ function get_date() {
     return date("M ") . sprintf('%2d', (int) date("d")) . date(" H:i:s ");
 }
 
-function print_result($test, $ok) {
-	global $num_test;
-	echo get_date() . "Test #" . ($num_test++) . ": $test: " . ($ok ? 'OK' : 'FAILED') . "\n";
+function print_result($ok) {
+	echo get_date() . "  Result: " . ($ok ? 'OK' : 'FAILED') . "\n";
 	if (!$ok) {
 		die("\n");
 	}
 }
 
-function wait($wait_num=0, $i=0) {
+function wait($wait_num = 0, $i = 0, $quiet = FALSE) {
 	global $config;
-	if ($config->dont_wait) {
+	if (@$config->dont_wait) {
 		return;
 	}
 	$wait = $wait_num == 0 || ($i-1)/(pow(2, $wait_num-1)) % 2 == 1;
 	if ($wait) {
-        logd("  Wait...");
-		$last_line_before = exec('tail -1 /var/log/greyhole.log');
+        $quiet || print('W');
+		$last_line_before = exec('tail -1 ' . escapeshellarg($config->log_file));
 		while (TRUE) {
-			$last_line = exec('tail -1 /var/log/greyhole.log');
+			$last_line = exec('tail -1 ' . escapeshellarg($config->log_file));
 			if ($last_line_before != $last_line && strpos($last_line, '... Sleeping.') !== FALSE) {
 				break;
 			}
 			usleep(1000*100); // 100ms
 		}
-	}
+	} else {
+        $quiet || print('-');
+    }
 }
 
 function check_pool_is_empty() {
