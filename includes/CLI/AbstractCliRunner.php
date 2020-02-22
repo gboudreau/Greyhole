@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -23,7 +23,8 @@ require_once('includes/AbstractRunner.php');
 abstract class AbstractCliRunner extends AbstractRunner {
     
     protected $options;
-    protected $cli_command; // CliCommandDefinition
+    /** @var CliCommandDefinition */
+    protected $cli_command;
 
     function __construct($options, $cli_command) {
         parent::__construct();

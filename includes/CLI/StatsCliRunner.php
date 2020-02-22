@@ -38,10 +38,10 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
             'potential_available_space' => 0
         );
 
-        $dfs = get_free_space_in_storage_pool_drives();
         $stats = array();
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (!isset($dfs[$sp_drive]) || !file_exists($sp_drive)) {
+            $df = StoragePool::get_free_space($sp_drive);
+            if (!$df || !file_exists($sp_drive)) {
                 $stats[$sp_drive] = (object) array();
                 continue;
             }
@@ -63,7 +63,7 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
                 }
             }
 
-            $free_space = $dfs[$sp_drive]['free'];
+            $free_space = $df['free'];
 
             $trash_path = clean_dir("$sp_drive/.gh_trash");
             if (!file_exists($trash_path)) {

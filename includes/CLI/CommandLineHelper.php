@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2015 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -51,8 +51,10 @@ require_once('includes/CLI/ViewQueueCliRunner.php');
 require_once('includes/CLI/WaitForCliRunner.php');
 
 class CommandLineHelper {
+    /** @var CliCommandDefinition */
     protected $actionCmd = null;
     protected $options = array();
+    /** @var CliCommandDefinition[] */
     protected $cliCommandsDefinitions;
     protected $cliOptionsDefinitions;
     
@@ -77,7 +79,7 @@ class CommandLineHelper {
             new CliCommandDefinition('thaw::',           't::', '[=path]',     'ThawCliRunner',           "Thaw a frozen directory. Greyhole will start working on files inside <path>. If you don't supply an option, the list of frozen directories will be displayed."),
             new CliCommandDefinition('wait-for::',       'w::', '[=path]',     'WaitForCliRunner',        "Tell Greyhole that the missing drive at <path> will return soon, and that it shouldn't re-create additional file copies to replace it. If you don't supply an option, the available options (paths) will be displayed."),
             new CliCommandDefinition('gone::',           'g::', '[=path]',     'GoneCliRunner',           "Tell Greyhole that the missing drive at <path> is gone for good. Greyhole will start replacing the missing file copies instantly. If you don't supply an option, the available options (paths) will be displayed."),
-            new CliCommandDefinition('going::',          'n::', '[=path]',      'GoingCliRunner',         "Tell Greyhole that you want to remove a drive. Greyhole will then make sure you don't lose any files, and that the correct number of file copies are created to replace the missing drive. If you don't supply an option, the available options (paths) will be displayed."),
+            new CliCommandDefinition('going::',          'n::', '[=path]',     'GoingCliRunner',          "Tell Greyhole that you want to remove a drive. Greyhole will then make sure you don't lose any files, and that the correct number of file copies are created to replace the missing drive. If you don't supply an option, the available options (paths) will be displayed."),
             new CliCommandDefinition('replace::',        'r::', '[=path]',     'ReplaceCliRunner',        "Tell Greyhole that you replaced the drive at <path>."),
             new CliCommandDefinition('fix-symlinks',     'X',   null,          'FixSymlinksCliRunner',    "Try to find a good file copy to point to for all broken symlinks found on your shares."),
             new CliCommandDefinition('delete-metadata:', 'p:',  '=path',       'DeleteMetadataCliRunner', "Delete all metadata files for <path>, which should be a share name, followed by the path to a file that is gone from your storage pool. Eg. 'Movies/HD/The Big Lebowski.mkv'"),
@@ -155,7 +157,7 @@ class CommandLineHelper {
         } else {
             if ($this->actionCmd->getLongOpt() != 'test-config') {
                 // Those will be tested in TestCliRunner
-                process_config();
+                ConfigHelper::test();
                 $retry_until_successful = ( $this->actionCmd->getLongOpt() == 'boot-init' );
                 DB::connect($retry_until_successful);
             }
@@ -262,12 +264,12 @@ class CommandLineHelper {
                 $i++;
                 continue;
             }
-            if ($arg{0} != "-") {
+            if ($arg[0] != "-") {
                 $i++;
                 continue;
             }
 
-            if (!empty($argv[$i+1]) && $argv[$i+1]{0} != "-") {
+            if (!empty($argv[$i+1]) && $argv[$i+1][0] != "-") {
                 $nextArg = $argv[$i+1];
             } else {
                 $nextArg = FALSE;
@@ -318,29 +320,29 @@ class CommandLineHelper {
 
                 for ($j=1; $j < strlen($arg); $j++) {
 
-                    if (array_contains($opts_no_value, $arg{$j})) {
+                    if (array_contains($opts_no_value, $arg[$j])) {
                         // -a
-                        $options[$arg{$j}][] = FALSE;
+                        $options[$arg[$j]][] = FALSE;
                         if ($j == strlen($arg) - 1) {
                             break;
                         }
-                    } if (array_contains($opts_required_value, $arg{$j})) {
+                    } if (array_contains($opts_required_value, $arg[$j])) {
                         if ($j == strlen($arg) - 1) {
                             // -a value
-                            $options[$arg{$j}][] = $argv[$i+1];
+                            $options[$arg[$j]][] = $argv[$i+1];
                             $i++;
                         } else {
                             // -avalue
-                            $options[$arg{$j}][] = substr($arg, $j+1);
+                            $options[$arg[$j]][] = substr($arg, $j+1);
                         }
                         break;
                     } else {
                         // -a [value]
                         if ($j == strlen($arg) - 1 && $nextArg) {
-                            $options[$arg{$j}][] = $nextArg;
+                            $options[$arg[$j]][] = $nextArg;
                             $i++;
                         } else {
-                            $options[$arg{$j}][] = FALSE;
+                            $options[$arg[$j]][] = FALSE;
                         }
                     }
                 }

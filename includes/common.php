@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2019 Guillaume Boudreau, Andrew Hopkinson
+Copyright 2009-2020 Guillaume Boudreau, Andrew Hopkinson
 
 This file is part of Greyhole.
 
@@ -21,13 +21,19 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 // Other helpers
 require_once('includes/ConfigHelper.php');
 require_once('includes/DB.php');
+require_once('includes/DBSpool.php');
 require_once('includes/Hook.php');
 require_once('includes/Log.php');
+require_once('includes/Metastores.php');
 require_once('includes/MigrationHelper.php');
 require_once('includes/PoolDriveSelector.php');
+require_once('includes/SambaSpool.php');
+require_once('includes/SambaUtils.php');
 require_once('includes/Settings.php');
+require_once('includes/StorageFile.php');
 require_once('includes/StoragePool.php');
 require_once('includes/SystemHelper.php');
+require_once('includes/Trash.php');
 
 $constarray = get_defined_constants(true);
 foreach($constarray['user'] as $key => $val) {
@@ -51,7 +57,7 @@ if (!defined('PHP_VERSION_ID')) {
     define('PHP_VERSION_ID', ($version[0] * 10000 + $version[1] * 100 + $version[2]));
 }
 
-$sleep_before_task = array();
+DBSpool::resetSleepingTasks();
 
 function clean_dir($dir) {
     if (empty($dir)) {
@@ -207,95 +213,6 @@ function memory_check() {
     }
 }
 
-class metafile_iterator implements Iterator {
-    private $path;
-    private $share;
-    private $load_nok_metafiles;
-    private $quiet;
-    private $check_symlink;
-    private $metafiles;
-    private $metastores;
-    private $dir_handle;
-    private $directory_stack;
-
-    public function __construct($share, $path, $load_nok_metafiles=FALSE, $quiet=FALSE, $check_symlink=TRUE) {
-        $this->quiet = $quiet;
-        $this->share = $share;
-        $this->path = $path;
-        $this->check_symlink = $check_symlink;
-        $this->load_nok_metafiles = $load_nok_metafiles;
-    }
-
-    public function rewind() {
-        $this->metastores = get_metastores();
-        $this->directory_stack = array($this->path);
-        $this->dir_handle = NULL;
-        $this->metafiles = array();
-        $this->next();
-    }
-
-    public function current() {
-        return $this->metafiles;
-    }
-
-    public function key() {
-        return count($this->metafiles);
-    }
-
-    public function next() {
-        $this->metafiles = array();
-        while (count($this->directory_stack) > 0 && $this->directory_stack !== NULL) {
-            $dir = array_pop($this->directory_stack);
-            if (!$this->quiet) {
-                Log::debug("Loading metadata files for (dir) " . clean_dir($this->share . (!empty($dir) ? "/" . $dir : "")) . " ...");
-            }
-            for ($i = 0; $i < count($this->metastores); $i++) {
-                $metastore = $this->metastores[$i];
-                $base = "$metastore/" . $this->share . "/";
-                if (!file_exists($base . $dir)) {
-                    continue;
-                }    
-                if ($this->dir_handle = opendir($base . $dir)) {
-                    while (false !== ($file = readdir($this->dir_handle))) {
-                        memory_check();
-                        if ($file=='.' || $file=='..') {
-                            continue;
-                        }
-                        if (!empty($dir)) {
-                            $full_filename = $dir . '/' . $file;
-                        } else {
-                            $full_filename = $file;
-                        }
-                        if (is_dir($base . $full_filename)) {
-                            $this->directory_stack[] = $full_filename;
-                        } else {
-                            $full_filename = str_replace("$this->path/",'',$full_filename);
-                            if (isset($this->metafiles[$full_filename])) {
-                                continue;
-                            }                        
-                            $this->metafiles[$full_filename] = get_metafiles_for_file($this->share, $dir, $file, $this->load_nok_metafiles, $this->quiet, $this->check_symlink);
-                        }
-                    }
-                    closedir($this->dir_handle);
-                    $this->directory_stack = array_unique($this->directory_stack);
-                }
-            }
-            if (count($this->metafiles) > 0) {
-                break;
-            }
-            
-        }
-        if (!$this->quiet) {
-            Log::debug('Found ' . count($this->metafiles) . ' metadata files.');
-        }
-        return $this->metafiles;
-    }
-    
-    public function valid() {
-        return count($this->metafiles) > 0;
-    }
-}
-
 class FSCKWorkLog {
     const FILE = '/usr/share/greyhole/fsck_work_log.dat';
 
@@ -331,9 +248,9 @@ class FSCKWorkLog {
         foreach ($fsck_work_log->tasks as $task) {
             if ($task->id == $task_id) {
                 $task->status = static::STATUS_COMPLETE;
-                global $fsck_report;
-                $fsck_report['end'] = time();
-                $task->report = $fsck_report;
+                $fsck_task = FsckTask::getCurrentTask();
+                $fsck_task->end_report();
+                $task->report = $fsck_task->get_fsck_report();
                 static::saveToDisk($fsck_work_log);
                 break;
             }
@@ -352,7 +269,7 @@ class FSCKWorkLog {
                 $fsck_report_body = "==========\n\n";
                 foreach ($fsck_work_log->tasks as $task) {
                     $is_last = array_search($task, $fsck_work_log->tasks) == count($fsck_work_log->tasks)-1;
-                    $fsck_report_body .= get_fsck_report($task->report, $is_last);
+                    $fsck_report_body .= FsckTask::get_fsck_report_email_body($task->report, $is_last);
                     $fsck_report_body .= "==========\n\n";
                 }
 
@@ -372,8 +289,7 @@ class FSCKWorkLog {
     }
 
     private static function getFromDisk() {
-        $fsck_work_log = unserialize(file_get_contents(static::FILE));
-        return $fsck_work_log;
+        return unserialize(file_get_contents(static::FILE));
     }
 
     private static function getNumCompletedTasks() {
@@ -421,7 +337,7 @@ class FSCKLogFile {
 
     private function shouldSendViaEmail() {
         $this->getBody();
-        global $fsck_report;
+        $fsck_report = FsckTask::getCurrentTask()->get_fsck_report();
         return (@$fsck_report['send_via_email'] === TRUE);
     }
 
@@ -430,10 +346,9 @@ class FSCKLogFile {
         if ($this->filename == 'fsck_checksums.log') {
             return file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
         } else if ($this->filename == 'fsck_files.log') {
-            global $fsck_report;
             $fsck_report = unserialize(file_get_contents($logfile));
             unlink($logfile);
-            return get_fsck_report(NULL, FALSE) . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
+            return FsckTask::get_fsck_report_email_body($fsck_report, FALSE) . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
         } else {
             return '[empty]';
         }
@@ -458,23 +373,31 @@ class FSCKLogFile {
         }
         return $this->lastEmailSentTime;
     }
-    
-    public static function loadFSCKReport($what) {
+
+    /**
+     * @param string   $what
+     * @param FsckTask $task
+     */
+    public static function loadFSCKReport($what, $task) {
         $logfile = self::PATH . '/fsck_files.log';
         if (file_exists($logfile)) {
-            global $fsck_report;
             $fsck_report = unserialize(file_get_contents($logfile));
+            $task->set_fsck_report($fsck_report);
             if ($fsck_report !== FALSE) {
                 return;
             }
             rename($logfile, "$logfile.broken");
             // $fsck_report === FALSE; let's re-initialize it!
         }
-        initialize_fsck_report($what);
+        $task->initialize_fsck_report($what);
     }
 
-    public static function saveFSCKReport($send_via_email) {
-        global $fsck_report;
+    /**
+     * @param bool     $send_via_email
+     * @param FsckTask $task
+     */
+    public static function saveFSCKReport($send_via_email, $task) {
+        $fsck_report = $task->get_fsck_report();
         $fsck_report['send_via_email'] = $send_via_email;
         $logfile = self::PATH . '/fsck_files.log';
         file_put_contents($logfile, serialize($fsck_report));
@@ -538,10 +461,21 @@ function array_contains($haystack, $needle) {
 }
 
 function string_contains($haystack, $needle) {
+    if (!is_string($haystack)) {
+        return FALSE;
+    }
     return mb_strpos($haystack, $needle) !== FALSE;
 }
 
 function string_starts_with($haystack, $needle) {
+    if (is_array($needle)) {
+        foreach ($needle as $n) {
+            if (mb_strpos($haystack, $n) === 0) {
+                return TRUE;
+            }
+        }
+        return FALSE;
+    }
     return mb_strpos($haystack, $needle) === 0;
 }
 
@@ -609,6 +543,141 @@ function json_pretty_print($json) {
         $result .= $char . $post;
     }
     return $result;
+}
+
+function gh_wild_mb_strpos($haystack, $needle) {
+    $is_wild = string_contains($needle, "*");
+    if (!$is_wild) {
+        return mb_strpos($haystack, $needle);
+    }
+    if (str_replace('*', '', $needle) == $haystack) {
+        return FALSE;
+    }
+    $needles = explode("*", $needle);
+    if ($needle[0] == '*') {
+        $first_index = 0;
+    }
+    foreach ($needles as $needle_part) {
+        if ($needle_part == '') {
+            continue;
+        }
+        $needle_index = mb_strpos($haystack, $needle_part);
+        if (!isset($first_index)) {
+            $first_index = $needle_index;
+        }
+        if ($needle_index === FALSE) {
+            return FALSE;
+        } else {
+            $found = TRUE;
+            $haystack = mb_substr($haystack, $needle_index + mb_strlen($needle_part));
+        }
+    }
+    if ($found) {
+        return $first_index;
+    }
+    return FALSE;
+}
+
+function str_replace_first($search, $replace, $subject) {
+    $firstChar = mb_strpos($subject, $search);
+    if ($firstChar !== FALSE) {
+        $beforeStr = mb_substr($subject, 0, $firstChar);
+        $afterStr = mb_substr($subject, $firstChar + mb_strlen($search));
+        return $beforeStr . $replace . $afterStr;
+    } else {
+        return $subject;
+    }
+}
+
+function normalize_utf8_characters($string) {
+    // Requires intl PHP extension (php-intl)
+    return normalizer_normalize($string);
+}
+
+function spawn_thread($action, $arguments) {
+    // Don't spawn duplicate threads
+    $num_worker_thread = (int) exec('ps ax | grep "/usr/bin/greyhole --' . $action . '" | grep "drive='. implode('" | grep "drive=', $arguments) . '" | grep -v grep | grep -v bash | wc -l');
+    if ($num_worker_thread > 0) {
+        Log::debug("Won't spawn a duplicate thread; 'greyhole --$action --drive=$arguments[0]' is already running");
+        return 1;
+    }
+
+    $cmd = "/usr/bin/greyhole --$action --drive=" . implode(' --drive=', array_map('escapeshellarg', $arguments));
+    exec("$cmd 1>/var/run/greyhole_thread.pid 2>&1 &");
+    usleep(100000); // 1/10s
+    return (int) file_get_contents('/var/run/greyhole_thread.pid');
+}
+
+function to_object($o) {
+    if (is_array($o)) {
+        return (object) $o;
+    }
+    return $o;
+}
+
+function first($array, $default=NULL) {
+    if (is_iterable($array)) {
+        foreach ($array as $el) {
+            return $el;
+        }
+    }
+    return $default;
+}
+
+function log_file_checksum($share, $full_path, $checksum) {
+    $q = "INSERT INTO checksums SET id = :id, share = :share, full_path = :full_path, checksum = :checksum ON DUPLICATE KEY UPDATE checksum = VALUES(checksum)";
+    DB::insert(
+        $q,
+        [
+            'id'        => md5(clean_dir("$share/$full_path")),
+            'share'     => $share,
+            'full_path' => $full_path,
+            'checksum'  => $checksum,
+        ]
+    );
+}
+
+function get_share_and_fullpath_from_realpath($real_path) {
+    $prefix = StoragePool::getDriveFromPath($real_path);
+    if (!$prefix) {
+        $share_options = SharesConfig::getShareOptions($real_path);
+        $lz = $share_options['landing_zone'];
+        $array = explode('/', $lz);
+        array_pop($array);
+        $prefix = implode('/', $array);
+    }
+    $share_and_fullpath = substr($real_path, strlen($prefix)+1);
+    $array = explode('/', $share_and_fullpath);
+    $share = array_shift($array);
+    $full_path = implode('/', $array);
+    return array($share, $full_path);
+}
+
+/**
+ * Return a human-readable string that indicates how long ago the specified time occurred.
+ *
+ * @param $past_time int Timestamp
+ *
+ * @return string
+ */
+function how_long_ago($past_time) {
+    $ago = '';
+    $s = time() - $past_time;
+    $m = floor($s / 60);
+    if ($m > 0) {
+        $s -= $m * 60;
+        $h = floor($m / 60);
+        if ($h > 0) {
+            $ago = $h . "h ";
+            $m -= $h * 60;
+        }
+        $ago = $ago . $m . "m ";
+    }
+    $ago = $ago . $s . "s";
+    if ($ago == '0s') {
+        return 'just now';
+    }
+    return "$ago ago";
 }
 
 ?>

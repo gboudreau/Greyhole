@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2014 Guillaume Boudreau
+Copyright 2014-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -22,14 +22,13 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 final class DB {
 
+    /** @var stdClass */
 	protected static $options; // connection options
+    /** @var PDO */
 	protected static $handle; // database handle
 
 	public static function setOptions($options) {
-        if (is_array($options)) {
-            $options = (object) $options;
-        }
-		self::$options = $options;
+		self::$options = to_object($options);
 	}
 
 	public static function connect($retry_until_successful=FALSE) {
@@ -143,11 +142,6 @@ final class DB {
         return $lastInsertedId;
     }
 
-    public static function quote($string) {
-        $escaped_string = self::$handle->quote($string);
-        return substr($escaped_string, 1, -1);
-    }
-
     public static function error() {
         return self::$options->error;
     }
@@ -170,6 +164,10 @@ final class DB {
         if ($db_version < 12) {
             DB::migrate_12_force_update_complete();
             Settings::set('db_version', 12);
+        }
+        if ($db_version < 13) {
+            DB::migrate_13_checksums();
+            Settings::set('db_version', 13);
         }
     }
 
@@ -202,7 +200,7 @@ final class DB {
         }
     }
 
-    // Migration #4 (new index for find_next_task function, used by simplify_task, and also for execute_next_task function; also remove deprecated indexes)
+    // Migration #4 (new index for find_next_task function, used by DBSpool::execute_next_task() function; also remove deprecated indexes)
     private static function migrate_4_find_next_task_index() {
         $query = "SHOW INDEX FROM tasks WHERE Key_name = 'find_next_task'";
         $row = DB::getFirst($query);
@@ -426,6 +424,11 @@ final class DB {
         DB::execute($q);
         $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`(255))";
         DB::execute($q);
+    }
+
+    private static function migrate_13_checksums() {
+        $query = "CREATE TABLE IF NOT EXISTS `checksums` (`id` char(32) NOT NULL DEFAULT '', `share` varchar(255) CHARACTER SET utf8 NOT NULL DEFAULT '', `full_path` text CHARACTER SET utf8 NOT NULL, `checksum` char(32) NOT NULL DEFAULT '', `last_checked` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(), PRIMARY KEY (`id`)) ENGINE = MYISAM DEFAULT CHARSET=ascii";
+        DB::execute($query);
     }
 
     public static function repairTables() {

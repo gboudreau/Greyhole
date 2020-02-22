@@ -21,8 +21,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 final class MigrationHelper {
 
     public static function terminologyConversion() {
-        self::convertFolders('.gh_graveyard', '.gh_metastore');
-        self::convertFolders('.gh_graveyard_backup', '.gh_metastore_backup');
+        self::convertFolders('.gh_graveyard', Metastores::METASTORE_DIR);
+        self::convertFolders('.gh_graveyard_backup', Metastores::METASTORE_BACKUP_DIR);
         self::convertFolders('.gh_attic', '.gh_trash');
         self::convertDatabase();
         self::convertStoragePoolDrivesTagFiles();
@@ -43,7 +43,7 @@ final class MigrationHelper {
         Settings::rename('graveyard_backup_directory', 'metastore_backup_directory');
         $setting = Settings::get('metastore_backup_directory', FALSE, '%graveyard%');
         if ($setting) {
-            $new_value = str_replace('/.gh_graveyard_backup', '/.gh_metastore_backup', $setting);
+            $new_value = str_replace('/.gh_graveyard_backup', '/' . Metastores::METASTORE_BACKUP_DIR, $setting);
             Settings::set('metastore_backup_directory', $new_value);
         }
 	}

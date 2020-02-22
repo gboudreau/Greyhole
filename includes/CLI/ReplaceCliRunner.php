@@ -22,7 +22,7 @@ require_once('includes/CLI/AbstractPoolDriveCliRunner.php');
 
 class ReplaceCliRunner extends AbstractPoolDriveCliRunner {
     public function run() {
-        remove_drive_definition($this->drive);
+        StoragePool::remove_drive($this->drive);
 
         Log::info("Storage pool drive $this->drive has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.");
         $this->log("Storage pool drive $this->drive has been marked replaced. The Greyhole daemon will now be restarted to allow it to use this new drive.");

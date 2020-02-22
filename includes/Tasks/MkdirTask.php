@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -18,17 +18,12 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-require_once('includes/CLI/AbstractCliRunner.php');
+class MkdirTask extends AbstractTask {
 
-class TestCliRunner extends AbstractCliRunner {
-    public function run() {
-        ConfigHelper::test();
-        DB::connect();
-        DB::repairTables();
-        MigrationHelper::convertStoragePoolDrivesTagFiles();
-        echo "Config is OK\n";
-        exit(0);
+    public function execute() {
+        // Nothing to do
     }
+
 }
 
 ?>

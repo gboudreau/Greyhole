@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -22,7 +22,7 @@ require_once('includes/CLI/AbstractCliRunner.php');
 
 class CreateMemSpoolRunner extends AbstractCliRunner {
     public function run() {
-        if (create_mem_spool() && create_mem_spool()) {
+        if (SambaSpool::create_mem_spool() && SambaSpool::create_mem_spool()) {
             $this->log("There was a problem creating the in-memory spool folder. Check your Greyhole log for details.");
         } else {
             $this->log("The in-memory spool folder is now correctly mounted and ready to be used by the Samba VFS module.");

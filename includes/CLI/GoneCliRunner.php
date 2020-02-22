@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -41,11 +41,11 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
 
     public function run() {
         // Removing this drive here will insure it won't be used for new files while we're moving files away, and that it can later be replaced.
-        remove_drive_definition($this->drive);
+        StoragePool::remove_drive($this->drive);
 
         if ($this->isGoing()) {
             file_put_contents($this->drive . "/.greyhole_used_this", "Flag to prevent Greyhole from thinking this drive disappeared for no reason...");
-            set_metastore_backup();
+            Metastores::choose_metastores_backups();
             Log::info("Storage pool drive " . $this->drive . " will be removed from the storage pool.");
             echo("Storage pool drive " . $this->drive . " will be removed from the storage pool.\n");
 
@@ -53,18 +53,17 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
             $going_drive = $this->drive;
 
             // For the fsck_file calls to be able to use the files on $going_drive if needed, to create extra copies.
-            global $options;
-            $options['find-orphans'] = TRUE;
+            $fsck_task = FsckTask::getCurrentTask(array('additional_info' => 'find-orphans'));
 
             // fsck shares with only 1 file copy to remove those from $this->drive
-            initialize_fsck_report('Shares with only 1 copy');
+            $fsck_task->initialize_fsck_report('Shares with only 1 copy');
             foreach (SharesConfig::getShares() as $share_name => $share_options) {
                 $this->log();
                 if ($share_options[CONFIG_NUM_COPIES] == 1) {
                     $this->logn("Moving file copies for share '$share_name'... Please be patient... ");
                     if (is_dir("$going_drive/$share_name")) {
-                        gh_fsck_reset_du($share_name);
-                        gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
+                        $fsck_task->gh_fsck_reset_du($share_name);
+                        $fsck_task->gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
                     }
                     $this->log("Done.");
                 } else {
@@ -133,11 +132,11 @@ class GoneCliRunner extends AbstractPoolDriveCliRunner {
             } else {
                 $file_path = trim(mb_substr($path, mb_strlen("$going_drive/$share")+1), '/');
                 $file_metafiles = array();
-                $file_copies_inodes = get_file_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
+                $file_copies_inodes = StoragePool::get_file_copies_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
                 if (count($file_copies_inodes) == 0) {
                     Log::debug("Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
                     echo ".";
-                    gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
+                    FsckTask::getCurrentTask()->gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
                 }
             }
         }

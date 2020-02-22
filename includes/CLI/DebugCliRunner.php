@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -44,17 +44,17 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         $this->log("From DB");
         $this->log("=======");
 
-        $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE full_path LIKE :filename ORDER BY id ASC";
+        $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE full_path LIKE :filename ORDER BY id";
         $debug_tasks = DB::getAll($query, array('filename' => "%$filename%"), 'id');
 
         // Renames
-        $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info LIKE :filename ORDER BY id ASC";
+        $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info LIKE :filename ORDER BY id";
         $params = array('filename' => "%$filename%");
         while (TRUE) {
             $rows = DB::getAll($query, $params);
             foreach ($rows as $row) {
                 $debug_tasks[$row->id] = $row;
-                $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info = :full_path ORDER BY id ASC";
+                $query = "SELECT id, action, share, full_path, additional_info, event_date FROM tasks_completed WHERE additional_info = :full_path ORDER BY id";
                 $params = array('full_path' => $row->full_path);
             }
 
@@ -126,7 +126,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
         $this->log();
         $this->log("Metadata store:");
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            $metastore = clean_dir("$sp_drive/.gh_metastore");
+            $metastore = clean_dir("$sp_drive/" . Metastores::METASTORE_DIR);
             if (file_exists("$metastore/$share/$full_path")) {
                 passthru("ls -l " . escapeshellarg("$metastore/$share/$full_path"));
                 $data = unserialize(file_get_contents("$metastore/$share/$full_path"));

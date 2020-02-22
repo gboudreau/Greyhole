@@ -45,39 +45,35 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
         $max_storage_pool_strlen = max(array_map('mb_strlen', Config::storagePoolDrives()));
         $cols -= $max_storage_pool_strlen + 14;
 
-        $sorted_pool_drives = sort_storage_drives_available_space();
-        $pool_drives_avail_space = array();
-        foreach ($sorted_pool_drives as $available_space => $drive) {
-            $pool_drives_avail_space[$drive] = $available_space;
-        }
+        $pool_drives_avail_space = StoragePool::get_drives_available_space();
         $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
 
         printf("\n%$max_storage_pool_strlen"."s  %s", "", "Target free space in all storage pool drives: " . bytes_to_human($target_avail_space*1024, FALSE) . "\n");
-        $num_lines+=2;
+        $num_lines += 2;
 
-        $dfs = get_free_space_in_storage_pool_drives();
         foreach (Config::storagePoolDrives() as $sp_drive) {
-            if (!isset($dfs[$sp_drive])) {
+            $df = StoragePool::get_free_space($sp_drive);
+            if (!$df) {
                 continue;
             }
 
-            $dfs[$sp_drive]['free'] -= (float) Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive);
+            $df['free'] -= (float) Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive);
 
-            $percent_free = $dfs[$sp_drive]['free'] / ($dfs[$sp_drive]['free'] + $dfs[$sp_drive]['used']);
+            $percent_free = $df['free'] / ($df['free'] + $df['used']);
             $cols_free = ceil($cols * $percent_free);
             $cols_used = $cols - abs($cols_free);
 
             $suffix = "\033[0m";
-            if ($dfs[$sp_drive]['free'] < $target_avail_space) {
-                $diff = $target_avail_space - $dfs[$sp_drive]['free'];
-                $percent_diff = $diff / ($dfs[$sp_drive]['free'] + $dfs[$sp_drive]['used']);
+            if ($df['free'] < $target_avail_space) {
+                $diff = $target_avail_space - $df['free'];
+                $percent_diff = $diff / ($df['free'] + $df['used']);
                 $cols_diff = round($cols * $percent_diff);
                 $cols_used -= $cols_diff;
                 $prefix = "\033[31m";
                 $sign = '-';
             } else {
-                $diff = $dfs[$sp_drive]['free'] - $target_avail_space;
-                $percent_diff = $diff / ($dfs[$sp_drive]['free'] + $dfs[$sp_drive]['used']);
+                $diff = $df['free'] - $target_avail_space;
+                $percent_diff = $diff / ($df['free'] + $df['used']);
                 $cols_diff = round($cols * $percent_diff);
                 $cols_free -= $cols_diff;
                 $prefix = "\033[32m";

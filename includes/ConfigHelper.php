@@ -354,24 +354,33 @@ final class ConfigHelper {
     }
 
     private static function parse_line_share_option($name, $value) {
-        if (string_starts_with($name, CONFIG_NUM_COPIES)) {
-            $share = mb_substr($name, 11, mb_strlen($name)-12);
+        if (!string_starts_with($name, [CONFIG_NUM_COPIES, CONFIG_DELETE_MOVES_TO_TRASH, CONFIG_MODIFIED_MOVES_TO_TRASH, CONFIG_DRIVE_SELECTION_GROUPS, CONFIG_DRIVE_SELECTION_ALGORITHM])) {
+            return FALSE;
+        }
+        if (!preg_match('/^(.*)\[\s*(.*)\s*]$/', $name, $matches)) {
+            error_log("Error parsing config file; can't find share name in $name");
+            return FALSE;
+        }
+
+        $name = trim($matches[1]);
+        $share = trim($matches[2]);
+
+        switch ($name) {
+        case CONFIG_NUM_COPIES:
             if (mb_stripos($value, 'max') === 0) {
                 $value = 9999;
+            } else {
+                $value = (int) $value;
             }
-            SharesConfig::set($share, CONFIG_NUM_COPIES, (int) $value);
-        } else if (string_starts_with($name, CONFIG_DELETE_MOVES_TO_TRASH)) {
-            $share = mb_substr($name, 22, mb_strlen($name)-23);
-            $value = strtolower(trim($value));
-            $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-            SharesConfig::set($share, CONFIG_DELETE_MOVES_TO_TRASH, $bool);
-        } else if (string_starts_with($name, CONFIG_MODIFIED_MOVES_TO_TRASH)) {
-            $share = mb_substr($name, 24, mb_strlen($name)-25);
-            $value = strtolower(trim($value));
-            $bool = trim($value) === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
-            SharesConfig::set($share, CONFIG_MODIFIED_MOVES_TO_TRASH, $bool);
-        } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_GROUPS)) {
-            $share = mb_substr($name, 23, mb_strlen($name)-24);
+            SharesConfig::set($share, $name, $value);
+            break;
+        case CONFIG_DELETE_MOVES_TO_TRASH:
+        case CONFIG_MODIFIED_MOVES_TO_TRASH:
+            $value = strtolower($value);
+            $bool = $value === '1' || mb_stripos($value, 'yes') !== FALSE || mb_stripos($value, 'true') !== FALSE;
+            SharesConfig::set($share, $name, $bool);
+            break;
+        case CONFIG_DRIVE_SELECTION_GROUPS:
             if (preg_match("/(.+):(.+)/", $value, $regs)) {
                 $group_name = trim($regs[1]);
                 $group_definition = array_map('trim', explode(',', $regs[2]));
@@ -379,21 +388,20 @@ final class ConfigHelper {
                 global $parsing_drive_selection_groups;
                 $parsing_drive_selection_groups = $share;
             }
-        } else if (string_starts_with($name, CONFIG_DRIVE_SELECTION_ALGORITHM)) {
-            $share = mb_substr($name, 26, mb_strlen($name)-27);
+            break;
+        case CONFIG_DRIVE_SELECTION_ALGORITHM:
             if (SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS) === FALSE) {
                 SharesConfig::set($share, CONFIG_DRIVE_SELECTION_GROUPS, Config::get(CONFIG_DRIVE_SELECTION_GROUPS));
             }
             SharesConfig::set($share, CONFIG_DRIVE_SELECTION_ALGORITHM, PoolDriveSelector::parse($value, SharesConfig::get($share, CONFIG_DRIVE_SELECTION_GROUPS)));
-        } else {
-            return FALSE;
+            break;
         }
         return TRUE;
     }
 
     private static function parse_line_hook($name, $value) {
         if (string_starts_with($name, CONFIG_HOOK)) {
-            if (!preg_match('/hook\[([^\]]+)\]/', $name, $re)) {
+            if (!preg_match('/hook\[([^]]+)]/', $name, $re)) {
                 Log::warn("Can't parse the following config line: $name; ignoring.", Log::EVENT_CODE_CONFIG_UNPARSEABLE_LINE);
                 return TRUE;
             }
@@ -428,7 +436,7 @@ final class ConfigHelper {
         foreach ($config_text as $line) {
             $line = trim($line);
             if (mb_strlen($line) == 0) { continue; }
-            if ($line[0] == '[' && preg_match('/\[([^\]]+)\]/', $line, $regs)) {
+            if ($line[0] == '[' && preg_match('/\[([^]]+)]/', $line, $regs)) {
                 $share_name = $regs[1];
             }
             if (isset($share_name) && !SharesConfig::exists($share_name) && !array_contains(self::$trash_share_names, $share_name)) {
@@ -555,6 +563,22 @@ final class ConfigHelper {
             Log::critical($error_message, $event_code);
         }
     }
+
+    public static function test() {
+        while (!ConfigHelper::parse()) {
+            // Invalid config file; either it's missing storage_pool_drive, or it contains a share that isn't in smb.conf
+            if (SystemHelper::is_amahi() && Log::actionIs(ACTION_DAEMON)) {
+                // If running on Amahi, loop until the config works.
+                // User might configure Greyhole later, and they don't want to show Greyhole 'offline' until then. Those users are easy to confuse! ;)
+                sleep(600); // 10 minutes
+            } else {
+                // Otherwise, die.
+                Log::critical("Config file parsing failed. Exiting.", Log::EVENT_CODE_CONFIG_FILE_PARSING_FAILED);
+            }
+        }
+        // Config is OK; go on!
+    }
+
 }
 
 final class Config {
@@ -686,6 +710,62 @@ final class SharesConfig {
         }
         self::$shares_config[$share] = $config;
     }
+
+    public static function getNumCopies($share) {
+        $num_copies = static::get($share, CONFIG_NUM_COPIES);
+        if (!$num_copies) {
+            Log::warn("Found a task on a share ($share) that disappeared from " . ConfigHelper::$config_file . ". Skipping.", Log::EVENT_CODE_TASK_FOR_UNKNOWN_SHARE);
+            return -1;
+        }
+        if ($num_copies < 1) {
+            $num_copies = 1;
+        }
+        $max_copies = 0;
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            if (StoragePool::is_pool_drive($sp_drive)) {
+                $max_copies++;
+            }
+        }
+        if ($num_copies > $max_copies) {
+            $num_copies = $max_copies;
+        }
+        return $num_copies;
+    }
+
+    public static function getShareOptions($full_path) {
+        $share = FALSE;
+        $landing_zone = '';
+        foreach (SharesConfig::getShares() as $share_name => $share_options) {
+            $lz = $share_options[CONFIG_LANDING_ZONE];
+            if (string_starts_with($full_path, $lz) && mb_strlen($lz) > mb_strlen($landing_zone)) {
+                $landing_zone = $lz;
+                $share = $share_options;
+            }
+        }
+        return $share;
+    }
+
+    function getShareOptionsFromDrive($full_path, $sp_drive) {
+        $landing_zone = '';
+        $share = FALSE;
+        foreach (SharesConfig::getShares() as $share_name => $share_options) {
+            $lz = $share_options[CONFIG_LANDING_ZONE];
+            $metastore = Metastores::get_metastore_from_path($full_path);
+            if ($metastore !== FALSE) {
+                if (string_starts_with($full_path, "$metastore/$share_name") && mb_strlen($lz) > mb_strlen($landing_zone)) {
+                    $landing_zone = $lz;
+                    $share = $share_options;
+                }
+            } else {
+                if (string_starts_with($full_path, "$sp_drive/$share_name") && mb_strlen($lz) > mb_strlen($landing_zone)) {
+                    $landing_zone = $lz;
+                    $share = $share_options;
+                }
+            }
+        }
+        return $share;
+    }
+
 }
 
 ?>

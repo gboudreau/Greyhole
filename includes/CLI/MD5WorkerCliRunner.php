@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -56,7 +56,7 @@ class MD5WorkerCliRunner extends AbstractCliRunner {
             $params[$key] = "$drive%";
         }
 
-        $query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND (" . implode(' OR ', $drives_clause) . ") ORDER BY id ASC LIMIT 100";
+        $query = "SELECT id, share, full_path, additional_info FROM tasks WHERE action = 'md5' AND complete = 'no' AND (" . implode(' OR ', $drives_clause) . ") ORDER BY id LIMIT 100";
 
         $last_check_time = time();
         while (TRUE) {
