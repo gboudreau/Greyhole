@@ -264,12 +264,12 @@ class CommandLineHelper {
                 $i++;
                 continue;
             }
-            if ($arg{0} != "-") {
+            if ($arg[0] != "-") {
                 $i++;
                 continue;
             }
 
-            if (!empty($argv[$i+1]) && $argv[$i+1]{0} != "-") {
+            if (!empty($argv[$i+1]) && $argv[$i+1][0] != "-") {
                 $nextArg = $argv[$i+1];
             } else {
                 $nextArg = FALSE;
@@ -320,29 +320,29 @@ class CommandLineHelper {
 
                 for ($j=1; $j < strlen($arg); $j++) {
 
-                    if (array_contains($opts_no_value, $arg{$j})) {
+                    if (array_contains($opts_no_value, $arg[$j])) {
                         // -a
-                        $options[$arg{$j}][] = FALSE;
+                        $options[$arg[$j]][] = FALSE;
                         if ($j == strlen($arg) - 1) {
                             break;
                         }
-                    } if (array_contains($opts_required_value, $arg{$j})) {
+                    } if (array_contains($opts_required_value, $arg[$j])) {
                         if ($j == strlen($arg) - 1) {
                             // -a value
-                            $options[$arg{$j}][] = $argv[$i+1];
+                            $options[$arg[$j]][] = $argv[$i+1];
                             $i++;
                         } else {
                             // -avalue
-                            $options[$arg{$j}][] = substr($arg, $j+1);
+                            $options[$arg[$j]][] = substr($arg, $j+1);
                         }
                         break;
                     } else {
                         // -a [value]
                         if ($j == strlen($arg) - 1 && $nextArg) {
-                            $options[$arg{$j}][] = $nextArg;
+                            $options[$arg[$j]][] = $nextArg;
                             $i++;
                         } else {
-                            $options[$arg{$j}][] = FALSE;
+                            $options[$arg[$j]][] = FALSE;
                         }
                     }
                 }
