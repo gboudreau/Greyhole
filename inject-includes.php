@@ -51,6 +51,9 @@ function inject_in_file($file, $level=0) {
             $new_content .= inject_in_file($matches[2], $level+1) . "\n";
         } else if (preg_match("@^\s*\/\*@", $line) && $level > 0) {
             $is_comment = TRUE;
+            if (preg_match("@\s*\*\/$@", $line)) {
+                $is_comment = FALSE;
+            }
         } else if (preg_match("@\s*\*\/$@", $line) && $level > 0) {
             $is_comment = FALSE;
         } else if (@$is_comment) {

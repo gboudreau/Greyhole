@@ -230,4 +230,5 @@ final class Log {
         }
     }
 }
+
 ?>

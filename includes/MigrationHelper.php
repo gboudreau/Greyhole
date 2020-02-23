@@ -102,4 +102,5 @@ final class MigrationHelper {
         return $drives_definitions;
 	}
 }
+
 ?>

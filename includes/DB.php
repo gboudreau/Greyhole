@@ -459,4 +459,5 @@ final class DB {
         DB::execute($query);
     }
 }
+
 ?>

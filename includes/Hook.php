@@ -196,3 +196,5 @@ class LogHook extends Hook
         );
     }
 }
+
+?>
