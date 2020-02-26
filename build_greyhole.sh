@@ -135,26 +135,27 @@ ssh ${HOST}
 
 ############################################################
 # Update local greyhole package to latest, from YUM/APT repo
-
-set -e
-if [ -x /usr/bin/yum ]; then
-	sudo yum update greyhole
-	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree /usr/bin/greyhole-php
-	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
-	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
-	sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
-	chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
-	sudo service greyhole condrestart
-elif [ -x /usr/bin/apt-get ]; then
-	sudo apt-get update && sudo apt-get install greyhole
-	sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree /usr/bin/greyhole-php
-	sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
-	sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
-	sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
-	chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
-	sudo service greyhole restart
+if [ -f /usr/bin/greyhole ]; then
+    set -e
+    if [ -x /usr/bin/yum ]; then
+        sudo yum update greyhole
+        sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree /usr/bin/greyhole-php
+        sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
+        sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
+        sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
+        chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
+        sudo service greyhole condrestart
+    elif [ -x /usr/bin/apt-get ]; then
+        sudo apt-get update && sudo apt-get install greyhole
+        sudo rm /usr/bin/greyhole /usr/bin/greyhole-dfree /usr/bin/greyhole-php
+        sudo ln -s ~/greyhole/greyhole /usr/bin/greyhole
+        sudo ln -s ~/greyhole/greyhole-dfree /usr/bin/greyhole-dfree
+        sudo ln -s ~/greyhole/greyhole-php /usr/bin/greyhole-php
+        chmod +x ~/greyhole/greyhole ~/greyhole/greyhole-dfree ~/greyhole/greyhole-php
+        sudo service greyhole restart
+    fi
+    set +e
 fi
-set +e
 
 ####################
 # Tag the git branch
