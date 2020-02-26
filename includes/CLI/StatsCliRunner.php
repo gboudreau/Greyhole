@@ -107,7 +107,13 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
                 if (empty($stat->total_space)) {
                     $this->log("                 Offline                  ");
                 } else {
-                    $this->log(sprintf('%5.0f', $stat->total_space/1024/1024) . "G - " . sprintf('%5.0f', $stat->used_space/1024/1024) . "G = " . sprintf('%5.0f', $stat->free_space/1024/1024) . "G + " . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G = " . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G");
+                    $this->log(
+                            sprintf('%5.0f', $stat->total_space/1024/1024) . "G"               //   Total
+                        . ' - ' . sprintf('%5.0f', $stat->used_space/1024/1024). "G"                 // - Used
+                        . ' = ' . sprintf('%5.0f', $stat->free_space/1024/1024) . "G"                // = Free
+                        . ' + ' . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G"                // + Trash
+                        . ' = ' . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G" // = Possible
+                    );
                 }
             }
             $this->log();

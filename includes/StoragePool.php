@@ -318,7 +318,7 @@ final class StoragePool {
         return $file_copies_inodes;
     }
 
-    public static function get_free_space($sp_drive) {
+    public static function get_free_space($for_sp_drive) {
         if (time() > static::$last_df_time + Config::get(CONFIG_DF_CACHE_TIME)) {
             $dfs = [];
             exec(ConfigHelper::$df_command, $responses);
@@ -353,10 +353,10 @@ final class StoragePool {
             static::$last_dfs = $dfs;
         }
 
-        if (empty(static::$last_dfs[$sp_drive])) {
+        if (empty(static::$last_dfs[$for_sp_drive])) {
             return FALSE;
         }
-        return static::$last_dfs[$sp_drive];
+        return static::$last_dfs[$for_sp_drive];
     }
 
     public static function choose_target_drives($filesize_kb, $include_full_drives, $share, $path, $log_prefix = '', &$is_sticky = NULL) {
