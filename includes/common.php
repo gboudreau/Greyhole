@@ -624,6 +624,12 @@ function first($array, $default=NULL) {
     return $default;
 }
 
+if (!function_exists('is_iterable')) {
+    function is_iterable($var) {
+        return is_array($var) || $var instanceof Traversable;
+    }
+}
+
 function log_file_checksum($share, $full_path, $checksum) {
     $q = "INSERT INTO checksums SET id = :id, share = :share, full_path = :full_path, checksum = :checksum ON DUPLICATE KEY UPDATE checksum = VALUES(checksum)";
     DB::insert(
