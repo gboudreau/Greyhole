@@ -27,9 +27,11 @@ final class StorageFile {
 
         $source_file = clean_dir($source_file);
 
-        $link_next = FALSE;
+        $file_copies_to_create = [];
         foreach ($metafiles as $key => $metafile) {
-            if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) { return FALSE; }
+            if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) {
+                return FALSE;
+            }
 
             if ($metafile->path == $source_file && $metafile->state == Metafile::STATE_OK && gh_filesize($metafile->path) == gh_filesize($source_file)) {
                 Log::debug("  File copy at $metafile->path is already up to date.");
@@ -58,7 +60,26 @@ final class StorageFile {
                 continue;
             }
 
-            if (!static::create_file_copy($source_file, $metafile->path)) {
+            $file_copies_to_create[$key] = $metafile;
+        }
+
+        $create_copies_in_parallel = count($file_copies_to_create) > 1 && !DBSpool::isCurrentTaskRetry();
+
+        if ($create_copies_in_parallel) {
+            // Create all file copies simultaneously
+            $copy_results = static::create_file_copies($source_file, $file_copies_to_create);
+        }
+
+        $link_next = FALSE;
+        foreach ($file_copies_to_create as $key => $metafile) {
+            if ($create_copies_in_parallel) {
+                /** @noinspection PhpUndefinedVariableInspection */
+                $it_worked = $copy_results[$key];
+            } else {
+                $it_worked = static::create_file_copy($source_file, $metafile->path);
+            }
+
+            if (!$it_worked) {
                 if ($metafile->is_linked) {
                     $metafile->is_linked = FALSE;
                     $link_next = TRUE;
@@ -96,11 +117,10 @@ final class StorageFile {
 
             if ($link_next && !$metafile->is_linked) {
                 $metafile->is_linked = TRUE;
-                $metafiles[$key] = $metafile;
             }
             $link_next = FALSE;
             if ($metafile->is_linked) {
-                Log::debug("    Creating symlink in share pointing to the above file copy.");
+                Log::debug("  Creating symlink in share pointing to $metafile->path");
                 gh_symlink($metafile->path, "$landing_zone/$path/.gh_$filename");
                 if (!file_exists("$landing_zone/$full_path") || unlink("$landing_zone/$full_path")) {
                     gh_rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
@@ -111,11 +131,97 @@ final class StorageFile {
 
             if (gh_file_exists($metafile->path, '  Copy at $real_path doesn\'t exist. Will not mark it OK!')) {
                 $metafile->state = Metafile::STATE_OK;
-                $metafiles[$key] = $metafile;
             }
+            $metafiles[$key] = $metafile;
+            if (!$create_copies_in_parallel) {
+                Metastores::save_metafiles($share, $path, $filename, $metafiles);
+            }
+        }
+        if ($create_copies_in_parallel) {
             Metastores::save_metafiles($share, $path, $filename, $metafiles);
         }
         return TRUE;
+    }
+
+    public static function create_file_copies($source_file, &$metafiles) {
+        $copy_results = [];
+
+        $copy_source = is_link($source_file) ? readlink($source_file) : $source_file;
+        $source_size = gh_filesize($copy_source);
+        $original_file_infos = StorageFile::get_file_permissions($copy_source);
+
+        $file_copies_to_create = [];
+        foreach ($metafiles as $key => $metafile) {
+            $destination_file = $metafile->path;
+            if (gh_is_file($source_file) && $source_file == $destination_file) {
+                Log::debug("  Destination $destination_file is the same as the source. Nothing to do here; this file copy is ready!");
+                $copy_results[$key] = TRUE;
+                continue;
+            }
+
+            $temp_path = static::get_temp_filename($destination_file);
+
+            $file_copies_to_create[] = $temp_path;
+        }
+
+        if (isset($source_size)) {
+            Log::debug("  Copying " . bytes_to_human($source_size, FALSE) . " file to: " . implode(', ', $file_copies_to_create));
+        } else {
+            Log::debug("  Copying file to: " . implode(', ', $file_copies_to_create));
+        }
+
+        $start_time = time();
+        if (!empty($file_copies_to_create)) {
+            $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . implode(' ' , array_map('escapeshellarg', $file_copies_to_create)) . " | md5sum";
+            //Log::debug("  Executing copy command: $copy_cmd");
+            $out = exec($copy_cmd);
+            $md5 = first(explode(' ', $out));
+            Log::debug("    Copied file MD5 = $md5");
+        }
+
+        $first = TRUE;
+        foreach ($metafiles as $key => $metafile) {
+            $destination_file = $metafile->path;
+            $temp_path = static::get_temp_filename($destination_file);
+            if (!array_contains($file_copies_to_create, $temp_path)) {
+                continue;
+            }
+
+            $it_worked = file_exists($temp_path) && file_exists($source_file) && gh_filesize($temp_path) == $source_size;
+            if (!$it_worked) {
+                // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
+                $it_worked = file_exists(normalize_utf8_characters($temp_path)) && file_exists($source_file) && gh_filesize($temp_path) == $source_size;
+                if ($it_worked) {
+                    // Bingo!
+                    $temp_path = normalize_utf8_characters($temp_path);
+                    $destination_file = normalize_utf8_characters($destination_file);
+                    $metafile->path = $destination_file;
+                    $metafiles[$key] = $metafile;
+                }
+            }
+            $copy_results[$key] = $it_worked;
+            if ($it_worked) {
+                if ($first) {
+                    if (time() - $start_time > 0) {
+                        $speed = number_format($source_size/1024/1024 / (time() - $start_time), 1);
+                        Log::debug("    Copy created at $speed MBps.");
+                    }
+                    if (!empty($md5)) {
+                        list($share, $full_path) = get_share_and_fullpath_from_realpath($copy_source);
+                        log_file_checksum($share, $full_path, $md5);
+                    }
+                    $first = FALSE;
+                }
+                gh_rename($temp_path, $destination_file);
+                static::set_file_permissions($destination_file, $original_file_infos);
+            } else {
+                Log::warn("    Failed file copy. Will mark this metadata file 'Gone'.", Log::EVENT_CODE_FILE_COPY_FAILED);
+                // Remove the failed copy, if any.
+                @unlink($temp_path);
+            }
+        }
+
+        return $copy_results;
     }
 
     public static function create_file_copy($source_file, &$destination_file) {
