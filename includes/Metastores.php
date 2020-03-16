@@ -362,7 +362,7 @@ final class Metastores {
             foreach ($metafiles as $metafile) {
                 if (StoragePool::getDriveFromPath($metafile->path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
                     gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
-                    Log::debug("    Saving metadata in " . clean_dir("$data_filepath/$filename"));
+                    //Log::debug("    Saving metadata in " . clean_dir("$data_filepath/$filename"));
                     if (is_dir("$data_filepath/$filename")) {
                         exec("rm -rf " . escapeshellarg("$data_filepath/$filename"));
                     }
