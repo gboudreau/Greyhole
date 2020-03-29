@@ -433,6 +433,9 @@ final class ConfigHelper {
         self::$df_command .= " 2>&1 | grep '%' | grep -v \"^df: .*: No such file or directory$\"";
 
         exec('testparm -s ' . escapeshellarg(self::$smb_config_file) . ' 2> /dev/null', $config_text);
+        if (empty($config_text)) {
+            Log::critical("Failed to list Samba configuration using 'testparm -s ".self::$smb_config_file."'.", Log::EVENT_CODE_CONFIG_TESTPARM_FAILED);
+        }
         foreach ($config_text as $line) {
             $line = trim($line);
             if (mb_strlen($line) == 0) { continue; }

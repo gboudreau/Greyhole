@@ -61,6 +61,7 @@ final class Log {
 
     const EVENT_CODE_ALL_DRIVES_FULL = 'all_drives_full';
     const EVENT_CODE_CONFIG_DEPRECATED_OPTION = 'config_deprecated_option';
+    const EVENT_CODE_CONFIG_TESTPARM_FAILED = 'config_testparm_failed';
     const EVENT_CODE_CONFIG_FILE_PARSING_FAILED = 'config_file_parsing_failed';
     const EVENT_CODE_CONFIG_HOOK_SCRIPT_NOT_EXECUTABLE = 'config_hook_script_not_executable';
     const EVENT_CODE_CONFIG_INCLUDE_INSECURE_PERMISSIONS = 'config_include_insecure_permissions';
@@ -210,7 +211,7 @@ final class Log {
         } else {
             $worked = FALSE;
         }
-        if (!$worked) {
+        if (!$worked || $local_log_level === self::CRITICAL) {
             error_log(trim($log_text));
         }
 
