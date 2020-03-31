@@ -27,6 +27,7 @@ require_once('includes/Tasks/RenameTask.php');
 require_once('includes/Tasks/RmdirTask.php');
 require_once('includes/Tasks/UnlinkTask.php');
 require_once('includes/Tasks/WriteTask.php');
+require_once('includes/Tasks/LinkTask.php');
 
 abstract class AbstractTask {
     public $id;
