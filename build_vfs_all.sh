@@ -20,7 +20,7 @@ if [ "$ARCH" = "i686" ]; then
     ARCH="i386"
 fi
 
-for version in 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
+for version in 4.12.0 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
 	source "${GREYHOLE_INSTALL_DIR}/build_vfs.sh" ${version}
 
 	M=`echo ${version} | awk -F'.' '{print $1}'` # major
