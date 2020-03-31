@@ -144,6 +144,7 @@ final class SambaSpool {
                     $fullpath = array_shift($line);
                     break;
                 case 'rename':
+                case 'link':
                     $fullpath = array_shift($line);
                     $fullpath_target = array_shift($line);
                     break;

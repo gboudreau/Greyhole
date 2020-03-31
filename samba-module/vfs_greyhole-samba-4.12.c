@@ -1,5 +1,5 @@
 /*
-Copyright 2009-2018 Guillaume Boudreau, Edgars Binans
+Copyright 2009-2019 Guillaume Boudreau, Edgars Binans
 
 This file is part of Greyhole.
 
@@ -32,18 +32,16 @@ static int vfs_greyhole_debug_level = DBGC_VFS;
 /* Function prototypes */
 
 static int greyhole_connect(vfs_handle_struct *handle, const char *svc, const char *user);
-static int greyhole_mkdir(vfs_handle_struct *handle, const struct smb_filename *smb_fname, mode_t mode);
-static int greyhole_rmdir(vfs_handle_struct *handle, const struct smb_filename *smb_fname);
+static int greyhole_mkdirat(vfs_handle_struct *handle, struct files_struct *dirfsp, const struct smb_filename *smb_fname, mode_t mode);
 static int greyhole_open(vfs_handle_struct *handle, struct smb_filename *fname, files_struct *fsp, int flags, mode_t mode);
-static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count);
 static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count, off_t offset);
 static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_struct *tofsp, off_t offset, size_t n);
 static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle, TALLOC_CTX *mem_ctx, struct tevent_context *ev, struct files_struct *fsp, const void *data, size_t n, off_t offset);
 static ssize_t greyhole_pwrite_recv(struct tevent_req *req, struct vfs_aio_state *vfs_aio_state);
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
-static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
-static int greyhole_link(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
-static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
+static int greyhole_renameat(vfs_handle_struct *handle, files_struct *srcfsp, const struct smb_filename *oldname, files_struct *dstfsp, const struct smb_filename *newname);
+static int greyhole_linkat(vfs_handle_struct *handle, files_struct *srcfsp, const struct smb_filename *oldname, files_struct *dstfsp, const struct smb_filename *newname, int flags);
+static int greyhole_unlinkat(vfs_handle_struct *handle, struct files_struct *dirfsp, const struct smb_filename *smb_fname, int flags);
 
 /* Save formatted string to Greyhole spool */
 
@@ -75,21 +73,20 @@ static struct vfs_fn_pointers vfs_greyhole_fns = {
 
 	/* Directory operations */
 
-	.mkdir_fn = greyhole_mkdir,
-	.rmdir_fn = greyhole_rmdir,
+	.mkdirat_fn = greyhole_mkdirat,
+	//.rmdir_fn = greyhole_rmdir, replaced with greyhole_unlinkat(.., AT_REMOVEDIR)
 
 	/* File operations */
 
 	.open_fn = greyhole_open,
-	.write_fn = greyhole_write,
 	.pwrite_fn = greyhole_pwrite,
 	.recvfile_fn = greyhole_recvfile,
 	.pwrite_send_fn = greyhole_pwrite_send,
 	.pwrite_recv_fn = greyhole_pwrite_recv,
 	.close_fn = greyhole_close,
-	.rename_fn = greyhole_rename,
-	.link_fn = greyhole_link,
-	.unlink_fn = greyhole_unlink
+	.renameat_fn = greyhole_renameat,
+	.linkat_fn = greyhole_linkat,
+	.unlinkat_fn = greyhole_unlinkat
 };
 
 #define PO10_LIMIT (INT_MAX/10)
@@ -126,30 +123,16 @@ static int greyhole_connect(vfs_handle_struct *handle, const char *svc, const ch
 	return result;
 }
 
-static int greyhole_mkdir(vfs_handle_struct *handle, const struct smb_filename *smb_fname, mode_t mode)
+static int greyhole_mkdirat(vfs_handle_struct *handle, struct files_struct *dirfsp, const struct smb_filename *smb_fname, mode_t mode)
 {
 	int result;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
-	result = SMB_VFS_NEXT_MKDIR(handle, smb_fname, mode);
+	result = SMB_VFS_NEXT_MKDIRAT(handle, dirfsp, smb_fname, mode);
 
 	if (result >= 0) {
 		gh_spoolf("mkdir\n%s\n%s\n\n",
-			lp_servicename(talloc_tos(), handle->conn->params->service),
-			smb_fname->base_name);
-	}
-
-	return result;
-}
-
-static int greyhole_rmdir(vfs_handle_struct *handle, const struct smb_filename *smb_fname)
-{
-	int result;
-
-	result = SMB_VFS_NEXT_RMDIR(handle, smb_fname);
-
-	if (result >= 0) {
-		gh_spoolf("rmdir\n%s\n%s\n\n",
-			lp_servicename(talloc_tos(), handle->conn->params->service),
+			lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
 			smb_fname->base_name);
 	}
 
@@ -159,40 +142,18 @@ static int greyhole_rmdir(vfs_handle_struct *handle, const struct smb_filename *
 static int greyhole_open(vfs_handle_struct *handle, struct smb_filename *fname, files_struct *fsp, int flags, mode_t mode)
 {
 	int result;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
 	result = SMB_VFS_NEXT_OPEN(handle, fname, fsp, flags, mode);
 
 	if (result >= 0) {
 		if ((flags & O_WRONLY) || (flags & O_RDWR)) {
 			gh_spoolf("open\n%s\n%s\n%d\n%s\n",
-				lp_servicename(talloc_tos(), handle->conn->params->service),
+				lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
 				fname->base_name,
 				result,
 				"for writing ");
 		}
-	}
-
-	return result;
-}
-
-static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, const void *data, size_t count)
-{
-	ssize_t result;
-	FILE *spoolf;
-	char filename[255];
-	struct timeval tp;
-
-	result = SMB_VFS_NEXT_WRITE(handle, fsp, data, count);
-
-	if (result >= 0) {
-		gettimeofday(&tp, (struct timezone *) NULL);
-		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
-		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
-		spoolf = fopen(filename, "wt");
-		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
-			share,
-			fsp->fh->fd);
-		fclose(spoolf);
 	}
 
 	return result;
@@ -204,12 +165,13 @@ static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, con
 	FILE *spoolf;
 	char filename[255];
 	struct timeval tp;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
 	result = SMB_VFS_NEXT_PWRITE(handle, fsp, data, count, offset);
 
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
-		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
+		char *share = lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service);
 		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
 		spoolf = fopen(filename, "wt");
 		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
@@ -227,12 +189,13 @@ static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_st
 	FILE *spoolf;
 	char filename[255];
 	struct timeval tp;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
 	result = SMB_VFS_NEXT_RECVFILE(handle, fromfd, tofsp, offset, n);
 
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
-		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
+		char *share = lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service);
 		snprintf(filename, 43 + strlen(share) + nDigits(tofsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, tofsp->fh->fd);
 		spoolf = fopen(filename, "wt");
 		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
@@ -268,6 +231,7 @@ static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle,
 	FILE *spoolf;
 	char filename[255];
 	struct timeval tp;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
 	req = tevent_req_create(mem_ctx, &state, struct greyhole_pwrite_state);
 	if (req == NULL) {
@@ -283,7 +247,7 @@ static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle,
 	tevent_req_set_callback(subreq, greyhole_pwrite_done, req);
 
 	gettimeofday(&tp, (struct timezone *) NULL);
-	char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
+	char *share = lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service);
 	snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
 	spoolf = fopen(filename, "wt");
 	fprintf(spoolf, "fwrite\n%s\n%d\n\n",
@@ -309,27 +273,30 @@ static ssize_t greyhole_pwrite_recv(struct tevent_req *req, struct vfs_aio_state
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)
 {
 	int result;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
 	result = SMB_VFS_NEXT_CLOSE(handle, fsp);
 
 	if (result >= 0) {
 		gh_spoolf("close\n%s\n%d\n\n",
-			lp_servicename(talloc_tos(), handle->conn->params->service),
+			lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
 			fsp->fh->fd);
 	}
 
 	return result;
 }
 
-static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname)
+// Ref: https://github.com/samba-team/samba/commit/4d74ed6f567832a43dbf04a868efe0f30cb53752#diff-b89f66a62fdd7038670ec2b19bba45a9
+static int greyhole_renameat(vfs_handle_struct *handle, files_struct *srcfsp, const struct smb_filename *oldname, files_struct *dstfsp, const struct smb_filename *newname)
 {
 	int result;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
-	result = SMB_VFS_NEXT_RENAME(handle, oldname, newname);
+	result = SMB_VFS_NEXT_RENAMEAT(handle, srcfsp, oldname, dstfsp, newname);
 
 	if (result >= 0) {
 		gh_spoolf("rename\n%s\n%s\n%s\n\n",
-			lp_servicename(talloc_tos(), handle->conn->params->service),
+			lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
 			oldname->base_name,
 			newname->base_name);
 	}
@@ -337,15 +304,16 @@ static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename 
 	return result;
 }
 
-static int greyhole_link(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname)
+static int greyhole_linkat(vfs_handle_struct *handle, files_struct *srcfsp, const struct smb_filename *oldname, files_struct *dstfsp, const struct smb_filename *newname, int flags)
 {
 	int result;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
-	result = SMB_VFS_NEXT_LINK(handle, oldname, newname);
+	result = SMB_VFS_NEXT_LINKAT(handle, srcfsp, oldname, dstfsp, newname, flags);
 
 	if (result >= 0) {
 		gh_spoolf("link\n%s\n%s\n%s\n\n",
-			lp_servicename(talloc_tos(), handle->conn->params->service),
+			lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
 			oldname->base_name,
 			newname->base_name);
 	}
@@ -353,23 +321,30 @@ static int greyhole_link(vfs_handle_struct *handle, const struct smb_filename *o
 	return result;
 }
 
-static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path)
+static int greyhole_unlinkat(vfs_handle_struct *handle, struct files_struct *dirfsp, const struct smb_filename *smb_fname, int flags)
 {
 	int result;
+	const struct loadparm_substitution *lp_sub = loadparm_s3_global_substitution();
 
-	result = SMB_VFS_NEXT_UNLINK(handle, path);
+	result = SMB_VFS_NEXT_UNLINKAT(handle, dirfsp, smb_fname, flags);
 
 	if (result >= 0) {
-		gh_spoolf("unlink\n%s\n%s\n\n",
-			lp_servicename(talloc_tos(), handle->conn->params->service),
-			path->base_name);
+		if (flags & AT_REMOVEDIR) {
+			gh_spoolf("rmdir\n%s\n%s\n\n",
+				lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
+				smb_fname->base_name);
+		} else {
+			gh_spoolf("unlink\n%s\n%s\n\n",
+				lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
+				smb_fname->base_name);
+		}
 	}
 
 	return result;
 }
 
-NTSTATUS vfs_greyhole_init(void);
-NTSTATUS vfs_greyhole_init(void)
+NTSTATUS vfs_greyhole_init(TALLOC_CTX *ctx);
+NTSTATUS vfs_greyhole_init(TALLOC_CTX *ctx)
 {
 	NTSTATUS ret = smb_register_vfs(SMB_VFS_INTERFACE_VERSION, "greyhole", &vfs_greyhole_fns);
 

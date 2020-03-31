@@ -40,6 +40,7 @@ static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, con
 static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_struct *tofsp, off_t offset, size_t n);
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
 static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
+static int greyhole_link(vfs_handle_struct *handle, const char *oldname, const char *newname);
 static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
 
 /* Save formatted string to Greyhole spool */
@@ -83,6 +84,7 @@ static struct vfs_fn_pointers vfs_greyhole_fns = {
 	.recvfile_fn = greyhole_recvfile,
 	.close_fn = greyhole_close,
 	.rename_fn = greyhole_rename,
+	.link_fn = greyhole_link,
 	.unlink_fn = greyhole_unlink
 };
 
@@ -264,6 +266,22 @@ static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename 
 			lp_servicename(talloc_tos(), handle->conn->params->service),
 			oldname->base_name,
 			newname->base_name);
+	}
+
+	return result;
+}
+
+static int greyhole_link(vfs_handle_struct *handle, const char *oldname, const char *newname)
+{
+	int result;
+
+	result = SMB_VFS_NEXT_LINK(handle, oldname, newname);
+
+	if (result >= 0) {
+		gh_spoolf("link\n%s\n%s\n%s\n\n",
+			lp_servicename(talloc_tos(), handle->conn->params->service),
+			oldname,
+			newname);
 	}
 
 	return result;
