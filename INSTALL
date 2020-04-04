@@ -99,8 +99,7 @@ If you know what you're doing, you should have no problem installing on any othe
    You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
 
 	Fedora: sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen
-	Ubuntu: sudo apt-get -y install build-essential python-dev libgnutls-dev
-	Debian: sudo apt-get -y install build-essential python-dev libgnutls28-dev pkg-config
+	Ubuntu/Debian: sudo apt -y install build-essential python3-dev libgnutls28-dev pkg-config
 
 	$GREYHOLE_INSTALL_DIR/build_vfs.sh current
 
