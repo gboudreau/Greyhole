@@ -142,6 +142,27 @@ final class DB {
         return $lastInsertedId;
     }
 
+    public static function acquireLock($name, $timeout = NULL) {
+        $locked = static::getFirstValue("SELECT GET_LOCK(:name, :timeout)", ['name' => $name, 'timeout' => $timeout]);
+        if ($locked) {
+            return TRUE;
+        }
+        return FALSE;
+    }
+
+    public static function releaseLock($name) {
+        $released = static::getFirstValue("SELECT RELEASE_LOCK(:name)", ['name' => $name]);
+        if (!$released && static::isLocked($name)) {
+            return FALSE;
+        }
+        return TRUE;
+    }
+
+    public static function isLocked($name) {
+        $is_lock_free = static::getFirstValue("SELECT IS_FREE_LOCK(:name)", $name);
+        return !$is_lock_free;
+    }
+
     public static function error() {
         return self::$options->error;
     }

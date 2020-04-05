@@ -40,6 +40,7 @@ require_once('includes/CLI/IoStatsCliRunner.php');
 require_once('includes/CLI/LogsCliRunner.php');
 require_once('includes/CLI/MD5WorkerCliRunner.php');
 require_once('includes/CLI/PauseCliRunner.php');
+require_once('includes/CLI/ProcessSpoolCliRunner.php');
 require_once('includes/CLI/RemoveShareCliRunner.php');
 require_once('includes/CLI/ResumeCliRunner.php');
 require_once('includes/CLI/ReplaceCliRunner.php');
@@ -89,6 +90,7 @@ class CommandLineHelper {
             new CliCommandDefinition('create-mem-spool', '',    null,          'CreateMemSpoolRunner',    null),
             new CliCommandDefinition('test-config',      '',    null,          'TestCliRunner',           null),
             new CliCommandDefinition('boot-init',        '',    null,          'BootInitCliRunner',       null),
+            new CliCommandDefinition('process-spool',    '',    null,          'ProcessSpoolCliRunner',   null),
         );
         
         $this->cliOptionsDefinitions = array(

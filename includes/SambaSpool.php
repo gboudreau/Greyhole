@@ -48,18 +48,8 @@ final class SambaSpool {
             chmod('/var/spool/greyhole/mem', 0777);
         }
 
-        // If we have enough queued tasks (90% of $max_queued_tasks), let's not parse the log at this time, and get some work done.
-        // Once we fall below that, we'll queue up to at most $max_queued_tasks new tasks, then get back to work.
-        // This will effectively 'batch' large file operations to make sure the DB doesn't become a problem because of the number of rows,
-        //   and this will allow the end-user to see real activity, other that new rows in greyhole.tasks...
-        $num_rows = DBSpool::get_num_tasks();
-        $max_queued_tasks = Config::get(CONFIG_MAX_QUEUED_TASKS);
-        $queued_tasks_limit = round($max_queued_tasks * 0.9);
-        if ($num_rows >= $queued_tasks_limit) {
-            Log::restorePreviousAction();
-            if (time() % 10 == 0) {
-                Log::debug("  More than $queued_tasks_limit tasks queued... Won't queue any more at this time.");
-            }
+        if (!DB::acquireLock(ACTION_READ_SAMBA_POOL, 5)) {
+            // Another thread is already processing the Samba Spool; we don't want multiple threads doing this in parallel!
             return;
         }
 
@@ -70,8 +60,7 @@ final class SambaSpool {
         while (TRUE) {
             $files = array();
             $last_filename = FALSE;
-            $space_left_in_queue = $max_queued_tasks - $num_rows - $new_tasks;
-            exec('find -L /var/spool/greyhole -type f -printf "%T@ %p\n" | sort -n 2> /dev/null | head -' . $space_left_in_queue, $files);
+            exec('find -L /var/spool/greyhole -type f -printf "%T@ %p\n" | sort -n 2> /dev/null | head -n 10000', $files);
             if (count($files) == 0) {
                 break;
             }
@@ -170,18 +159,9 @@ final class SambaSpool {
                     /** @noinspection PhpUndefinedVariableInspection */
                     $db_spool->insert($act, $share, @$fullpath, @$fullpath_target, @$fd);
                 }
-
-                // If we have enough queued tasks ($max_queued_tasks), let's stop parsing the log, and get some work done.
-                if ($num_rows+$new_tasks >= $max_queued_tasks) {
-                    Log::debug("  We now have more than $max_queued_tasks tasks queued... Will stop parsing for now.");
-                    break;
-                }
             }
             if ($last_filename) {
                 unlink($last_filename);
-            }
-            if ($num_rows+$new_tasks >= $max_queued_tasks) {
-                break;
             }
         }
 
@@ -196,6 +176,8 @@ final class SambaSpool {
         if ($new_tasks > 0) {
             Log::debug("Found $new_tasks new tasks in spool.");
         }
+
+        DB::releaseLock(ACTION_READ_SAMBA_POOL);
 
         Log::restorePreviousAction();
     }

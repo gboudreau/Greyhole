@@ -120,6 +120,7 @@ stop () {
 		echo
 	fi
 	[ $RETVAL -eq 0 ] && rm -f $PIDFILE
+	/usr/bin/greyhole --process-spool >/dev/null
 	return $ret
 }
 
