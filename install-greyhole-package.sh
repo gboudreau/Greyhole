@@ -27,23 +27,19 @@ _OSTYPE_detect() {
 }
 
 mysql_server_installed() {
-    rpm -q mysql-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if rpm -q mysql-server >/dev/null 2>&1; then
         return 0
     fi
     
-    rpm -q mysql-community-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if rpm -q mysql-community-server >/dev/null 2>&1; then
         return 0
     fi
     
-    rpm -q mariadb-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if rpm -q mariadb-server >/dev/null 2>&1; then
         return 0
     fi
     
-    rpm -q mariadb-galera-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if rpm -q mariadb-galera-server >/dev/null 2>&1; then
         return 0
     fi
     
@@ -51,26 +47,22 @@ mysql_server_installed() {
 }
 
 install_mysql_server() {
-    yum info mysql-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if yum info mysql-server >/dev/null 2>&1; then
         sudo yum install -y mysql-server
         return
     fi
     
-    yum info mysql-community-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if yum info mysql-community-server >/dev/null 2>&1; then
         sudo yum install -y mysql-community-server
         return
     fi
     
-    yum info mariadb-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if yum info mariadb-server >/dev/null 2>&1; then
         sudo yum install -y mariadb-server
         return
     fi
     
-    yum info mariadb-galera-server >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if yum info mariadb-galera-server >/dev/null 2>&1; then
         sudo yum install -y mariadb-galera-server
         return
     fi
@@ -83,13 +75,11 @@ install_mysql_server() {
 }
 
 php_mysql_installed() {
-    rpm -q php-mysql >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if rpm -q php-mysql >/dev/null 2>&1; then
         return 0
     fi
     
-    rpm -q php-mysqlnd >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if rpm -q php-mysqlnd >/dev/null 2>&1; then
         return 0
     fi
     
@@ -97,14 +87,12 @@ php_mysql_installed() {
 }
 
 install_php_mysql() {
-    yum info php-mysql >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if yum info php-mysql >/dev/null 2>&1; then
         sudo yum install -y php-mysql
         return
     fi
     
-    yum info php-mysqlnd >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
+    if yum info php-mysqlnd >/dev/null 2>&1; then
         sudo yum install -y php-mysqlnd
         return
     fi
@@ -122,22 +110,20 @@ if [ "$_OSTYPE" = "yum" ]; then
     sudo curl -so /etc/yum.repos.d/greyhole.repo https://www.greyhole.net/releases/rpm/greyhole.repo
     
     # Can't hard-code mysql-server dependency into the RPM, because some distributions (CentOS 7) don't offer it, and include MariaDB instead.
-    mysql_server_installed
-    if [ $? -ne 0 ]; then
+    if ! mysql_server_installed; then
         echo "Can't find mysql-server or mariadb-server installed."
         echo "Will install either one (whichever is available for your distribution)."
         install_mysql_server
     fi
     
     # Can't hard-code php-mysql dependency into the RPM, because some distributions (FC25) don't offer it, and include php-mysqlnd instead.
-    php_mysql_installed
-    if [ $? -ne 0 ]; then
+    if ! php_mysql_installed; then
         echo "Can't find php-mysql or php-mysqlnd installed."
         echo "Will install either one (whichever is available for your distribution)."
         install_php_mysql
     fi
 
-    if [ ! -f /sbin/chkconfig -a ! -f /usr/sbin/update-rc.d ]; then
+    if [ ! -f /sbin/chkconfig ] && [ ! -f /usr/sbin/update-rc.d ]; then
         echo "Installing chkconfig..."
 	    sudo yum install -y chkconfig
 	fi
@@ -146,21 +132,18 @@ if [ "$_OSTYPE" = "yum" ]; then
 	    sudo yum install -y initscripts
 	fi
 
-    sudo yum install -y greyhole
-    if [ $? -ne 0 ]; then
-        exit -2;
+    if ! sudo yum install -y greyhole; then
+        exit 2;
     fi
 elif [ "$_OSTYPE" = "apt-get" ]; then
-    apt-cache showpkg php-mbstring >/dev/null
-    if [ $? -eq 0 ]; then
+    if apt-cache showpkg php-mbstring >/dev/null; then
         apt-get -y install php-mbstring
     fi
     echo "deb https://www.greyhole.net/releases/deb stable main v0.12 v0.11" > /etc/apt/sources.list.d/greyhole.list
     curl -s https://www.greyhole.net/releases/deb/greyhole-debsig.asc | apt-key add -
     apt-get update
-    apt-get -y -o DPkg::options::=--force-confmiss install greyhole
-    if [ $? -ne 0 ]; then
-        exit -2;
+    if ! apt-get -y -o DPkg::options::=--force-confmiss install greyhole; then
+        exit 2;
     fi
 fi
 
