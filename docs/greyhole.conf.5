@@ -383,28 +383,21 @@ Default is \fB512M\fR.
 .RE
 .RE
 
-copy_method
+calculate_md5
 .PP
 .RS 4
-This defines what command-line tool is used to create file copies.
+Calculate MD5 of new/changed files, while making file copies.
 .RS 0
-Possible values: \fBcp\fR, \fBrsync\fR, \fBcustom: [command]\fR
+Default is \fByes\fR.
 .RE
-.RS 0
-cp is less CPU-intensive, and generally faster than rsync, which is still 
-available for historic reasons.
 .RE
+
+parallel_copying
+.PP
+.RS 4
+Create all file copies simultaneously, instead of sequentially.
 .RS 0
-"custom" is used to specify a custom command. Greyhole will send as
-arguments the source and destination filenames to the command after colon.
-The custom command is responsible for copying the source file to the specified
-destination while preserving the timestamp.
-.RE
-.RS 0
-See /usr/share/greyhole/greyhole-custom-cp.sh for an example.
-.RE
-.RS 0
-Default is \fBcp\fR.
+Default is \fByes\fR.
 .RE
 .RE
 

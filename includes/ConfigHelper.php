@@ -51,6 +51,8 @@ define('CONFIG_METASTORE_BACKUPS', 'metastore_backups');
 define('CONFIG_TRASH_SHARE', '===trash_share===');
 define('CONFIG_HOOK', 'hook');
 define('CONFIG_CHECK_SP_SCHEDULE', 'check_storage_pool_schedule');
+define('CONFIG_CALCULATE_MD5_DURING_COPY', 'calculate_md5');
+define('CONFIG_PARALLEL_COPYING', 'parallel_copying');
 
 function recursive_include_parser($file) {
     $regex = '/^[ \t]*include[ \t]*=[ \t]*([^#\r\n]+)/im';
@@ -106,6 +108,8 @@ final class ConfigHelper {
             CONFIG_LOG_MEMORY_USAGE,
             CONFIG_CHECK_FOR_OPEN_FILES,
             CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE,
+            CONFIG_CALCULATE_MD5_DURING_COPY,
+            CONFIG_PARALLEL_COPYING,
         ),
         'number' => array(
             CONFIG_MAX_QUEUED_TASKS,
@@ -590,6 +594,8 @@ final class Config {
         CONFIG_LOG_LEVEL                   => Log::DEBUG,
         CONFIG_DELETE_MOVES_TO_TRASH       => TRUE,
         CONFIG_LOG_MEMORY_USAGE            => FALSE,
+        CONFIG_CALCULATE_MD5_DURING_COPY   => TRUE,
+        CONFIG_PARALLEL_COPYING            => TRUE,
         CONFIG_CHECK_FOR_OPEN_FILES        => TRUE,
         CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE => FALSE,
         CONFIG_STORAGE_POOL_DRIVE          => array(),

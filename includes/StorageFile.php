@@ -63,7 +63,7 @@ final class StorageFile {
             $file_copies_to_create[$key] = $metafile;
         }
 
-        $create_copies_in_parallel = count($file_copies_to_create) > 1 && !DBSpool::isCurrentTaskRetry();
+        $create_copies_in_parallel = count($file_copies_to_create) > 1 && !DBSpool::isCurrentTaskRetry() && Config::get(CONFIG_PARALLEL_COPYING);
 
         if ($create_copies_in_parallel) {
             // Create all file copies simultaneously
@@ -172,11 +172,16 @@ final class StorageFile {
 
         $start_time = time();
         if (!empty($file_copies_to_create)) {
-            $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . implode(' ' , array_map('escapeshellarg', $file_copies_to_create)) . " | md5sum";
+            $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . implode(' ' , array_map('escapeshellarg', $file_copies_to_create));
+            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY)) {
+                $copy_cmd .= " | md5sum";
+            }
             //Log::debug("  Executing copy command: $copy_cmd");
             $out = exec($copy_cmd);
-            $md5 = first(explode(' ', $out));
-            Log::debug("    Copied file MD5 = $md5");
+            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY)) {
+                $md5 = first(explode(' ', $out));
+                Log::debug("    Copied file MD5 = $md5");
+            }
         }
 
         $first = TRUE;
@@ -263,10 +268,15 @@ final class StorageFile {
             // Wasn't renamed; need to be copied.
             $copy_source = is_link($source_file) ? readlink($source_file) : $source_file;
             $original_file_infos = StorageFile::get_file_permissions($copy_source);
-            $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . escapeshellarg($temp_path) . " | md5sum";
+            $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . escapeshellarg($temp_path);
+            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY)) {
+                $copy_cmd .= " | md5sum";
+            }
             $out = exec($copy_cmd);
-            $md5 = first(explode(' ', $out));
-            Log::debug("    Copied file MD5 = $md5");
+            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY)) {
+                $md5 = first(explode(' ', $out));
+                Log::debug("    Copied file MD5 = $md5");
+            }
         }
 
         $it_worked = file_exists($temp_path) && ($renamed || file_exists($source_file)) && gh_filesize($temp_path) == $source_size;
