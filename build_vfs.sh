@@ -68,21 +68,24 @@ B=`echo ${version} | awk -F'.' '{print $3}'` # build
 
 cd samba-${version}
 NEEDS_CONFIGURE=
-if  [[ ! -f source3/modules/vfs_greyhole.c ]]; then
+if [[ ! -f source3/modules/vfs_greyhole.c ]]; then
 	NEEDS_CONFIGURE=1
 fi
 set +e
 grep -i vfs_greyhole source3/wscript >/dev/null
-if  [[ $? -ne 0 ]]; then
+if [[ $? -ne 0 ]]; then
+	NEEDS_CONFIGURE=1
+fi
+if [[ -f .greyhole_needs_configures ]]; then
 	NEEDS_CONFIGURE=1
 fi
 set -e
 
 rm -f source3/modules/vfs_greyhole.c source3/bin/greyhole.so bin/default/source3/modules/libvfs*greyhole.so
 if [[ -f ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.${m}.c ]]; then
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.${m}.c source3/modules/vfs_greyhole.c
+  ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.${m}.c source3/modules/vfs_greyhole.c
 else
-    ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.x.c source3/modules/vfs_greyhole.c
+  ln -s ${GREYHOLE_INSTALL_DIR}/samba-module/vfs_greyhole-samba-${M}.x.c source3/modules/vfs_greyhole.c
 fi
 
 if [[ ${M} -eq 3 ]]; then
@@ -91,34 +94,49 @@ fi
 
 if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
 	echo "  Running 'configure'..."
+	touch .greyhole_needs_configures
+	set +e
 	if [[ ${M} -eq 3 ]]; then
-        ./configure >gh_vfs_build.log 2>&1 &
-        PROC_ID=$!
-    else
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.${m}.patch >/dev/null
-        CONF_OPTIONS="--enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --without-ad-dc"
-        if [[ ${m} -gt 6 ]]; then
-            CONF_OPTIONS="${CONF_OPTIONS} --disable-python"
-        fi
-        if [[ ${m} -gt 9 ]]; then
-            CONF_OPTIONS="${CONF_OPTIONS} --without-json --without-libarchive"
-        elif [[ ${m} -gt 8 ]]; then
-            CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
-        fi
-        ./configure ${CONF_OPTIONS} >gh_vfs_build.log 2>&1 &
-        PROC_ID=$!
+    ./configure >gh_vfs_build.log 2>&1 &
+    PROC_ID=$!
+  else
+    patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.${m}.patch >/dev/null
+    CONF_OPTIONS="--enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --without-ad-dc"
+    if [[ ${m} -gt 6 ]]; then
+      CONF_OPTIONS="${CONF_OPTIONS} --disable-python"
+    fi
+    if [[ ${m} -gt 9 ]]; then
+      CONF_OPTIONS="${CONF_OPTIONS} --without-json --without-libarchive"
+    elif [[ ${m} -gt 8 ]]; then
+      CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
+    fi
+    echo ./configure ${CONF_OPTIONS} > gh_vfs_build.log
+    ./configure ${CONF_OPTIONS} >>gh_vfs_build.log 2>&1 &
+    PROC_ID=$!
 	fi
 
 	while kill -0 "$PROC_ID" >/dev/null 2>&1; do
 		sleep 1
-        echo -en "\r${ceol}    Progress: "
-        echo -n "`tail -n 1 gh_vfs_build.log`"
+    echo -en "\r${ceol}    Progress: "
+    echo -n "`tail -n 1 gh_vfs_build.log`"
 	done
 	echo -en "\r${ceol}"
+	wait "$PROC_ID"
+	if [[ $? -ne 0 ]]; then
+	  echo "Configuring Samba failed."
+	  echo "Hint : install the required dependencies. See step 3 in https://raw.githubusercontent.com/gboudreau/Greyhole/master/INSTALL"
+	  echo
+	  echo "tail $(pwd)/gh_vfs_build.log :"
+	  tail gh_vfs_build.log
+	  exit 1
+  fi
+  rm -rf .greyhole_needs_configures
+
+	set -e
 
 	if [[ ${M} -eq 3 ]]; then
-        patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-${M}.${m}.patch >/dev/null
-    fi
+    patch -p1 < ${GREYHOLE_INSTALL_DIR}/samba-module/Makefile-samba-${M}.${m}.patch >/dev/null
+  fi
 fi
 
 # Patch for compiling Samba on Alpine Linux
@@ -134,8 +152,8 @@ PROC_ID=$!
 
 while kill -0 "$PROC_ID" >/dev/null 2>&1; do
 	sleep 1
-    echo -en "\r${ceol}    Progress: "
-    echo -n "`tail -n 1 gh_vfs_build.log`"
+  echo -en "\r${ceol}    Progress: "
+  echo -n "`tail -n 1 gh_vfs_build.log`"
 done
 
 echo -en "\r${ceol}"
@@ -161,16 +179,16 @@ echo "Greyhole VFS module successfully compiled into ${GREYHOLE_COMPILED_MODULE}
 
 if [[ ${create_symlink} -eq 1 ]]; then
 	echo
-    echo "Creating the required symlink in the Samba VFS library folder."
-    if [[ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]]; then
-        LIBDIR=/usr/lib/x86_64-linux-gnu
-    elif [[ -d /usr/lib64/samba/vfs ]]; then
-        LIBDIR=/usr/lib64
-    else
-        LIBDIR=/usr/lib
-    fi
-    rm -f ${LIBDIR}/samba/vfs/greyhole.so
-    ln -s ${GREYHOLE_COMPILED_MODULE} ${LIBDIR}/samba/vfs/greyhole.so
-    echo "Done."
-    echo
+  echo "Creating the required symlink in the Samba VFS library folder."
+  if [[ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]]; then
+    LIBDIR=/usr/lib/x86_64-linux-gnu
+  elif [[ -d /usr/lib64/samba/vfs ]]; then
+    LIBDIR=/usr/lib64
+  else
+    LIBDIR=/usr/lib
+  fi
+  rm -f ${LIBDIR}/samba/vfs/greyhole.so
+  ln -s ${GREYHOLE_COMPILED_MODULE} ${LIBDIR}/samba/vfs/greyhole.so
+  echo "Done."
+  echo
 fi
