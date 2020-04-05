@@ -74,8 +74,13 @@ final class StorageFile {
         foreach ($file_copies_to_create as $key => $metafile) {
             if ($create_copies_in_parallel) {
                 /** @noinspection PhpUndefinedVariableInspection */
-                $it_worked = $copy_results[$key];
+                $it_worked = (bool) @$copy_results[$key];
             } else {
+                $it_worked = FALSE;
+            }
+
+            // Create a file copy, if parallel copying failed (for this file copy), or is disabled
+            if (!$it_worked) {
                 $it_worked = static::create_file_copy($source_file, $metafile->path);
             }
 
@@ -153,10 +158,20 @@ final class StorageFile {
         $file_copies_to_create = [];
         foreach ($metafiles as $key => $metafile) {
             $destination_file = $metafile->path;
-            if (gh_is_file($source_file) && $source_file == $destination_file) {
-                Log::debug("  Destination $destination_file is the same as the source. Nothing to do here; this file copy is ready!");
-                $copy_results[$key] = TRUE;
-                continue;
+            if (gh_is_file($source_file)) {
+                if ($source_file == $destination_file) {
+                    Log::debug("  Destination $destination_file is the same as the source. Nothing to do here; this file copy is ready!");
+                    $copy_results[$key] = TRUE;
+                    continue;
+                }
+
+                $source_dev = gh_file_deviceid($source_file);
+                $target_dev = gh_file_deviceid(dirname($destination_file));
+                if ($source_dev === $target_dev && $source_dev !== FALSE && !Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
+                    Log::debug("  Destination $destination_file is on the same drive as the source. Will be moved into storage pool drive later.");
+                    $copy_results[$key] = FALSE;
+                    continue;
+                }
             }
 
             $temp_path = static::get_temp_filename($destination_file);
