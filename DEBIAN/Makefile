@@ -7,7 +7,6 @@ deb: build
 	rm greyhole-dfree
 	rm greyhole-php
 	rm greyhole-dfree.php
-	rm greyhole-custom-cp.sh
 	rm -f greyhole-mv
 	rm logrotate.greyhole
 	rm schema-mysql.sql
@@ -16,7 +15,6 @@ deb: build
 	rm greyhole.cron.weekly
 	rm greyhole.cron.daily
 	rm upstart.conf
-	rm UPGRADING
 	rm CHANGES
 	rm COPYING
 	rm INSTALL
@@ -41,7 +39,6 @@ build:
 	install -m 0755 -D -p greyhole-dfree $(DESTDIR)usr/bin
 	install -m 0755 -D -p greyhole-php $(DESTDIR)usr/bin
 	install -m 0755 -D -p greyhole-dfree.php $(DESTDIR)usr/share/greyhole/
-	install -m 0755 -D -p greyhole-custom-cp.sh $(DESTDIR)usr/share/greyhole/
 	install -m 0755 -D -p build_vfs.sh $(DESTDIR)usr/share/greyhole/
 
 	install -m 0644 -D -p schema-mysql.sql $(DESTDIR)usr/share/greyhole/

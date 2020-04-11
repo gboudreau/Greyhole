@@ -7,7 +7,6 @@ chmod 777 /var/spool/greyhole
 mkdir -p /var/cache/greyhole-dfree
 chmod 777 /var/cache/greyhole-dfree
 
-
 if [ -d /usr/lib/arm-linux-gnueabihf/samba/vfs ]; then
     SOURCE_LIBDIR="/usr/lib"
     TARGET_LIBDIR="/usr/lib/arm-linux-gnueabihf"
@@ -17,7 +16,7 @@ elif [ -d /usr/lib/x86_64-linux-gnu/samba/vfs ]; then
 elif [ -d /usr/lib/i386-linux-gnu/samba/vfs ]; then
     SOURCE_LIBDIR="/usr/lib"
     TARGET_LIBDIR="/usr/lib/i386-linux-gnu"
-elif [ "`uname -m`" = "x86_64" ]; then
+elif [ "$(uname -m)" = "x86_64" ]; then
     SOURCE_LIBDIR="/usr/lib64"
     TARGET_LIBDIR="/usr/lib64"
 
@@ -53,7 +52,7 @@ fi
 
 TARGET_SYMLINK="${TARGET_LIBDIR}/samba/vfs/greyhole.so"
 
-SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
+SMB_VERSION=$(smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}')
 if [ "${SMB_VERSION}" = "3 4" ]; then
     LIB_FILE="greyhole-samba34.so"
 elif [ "${SMB_VERSION}" = "3 5" ]; then
@@ -93,87 +92,87 @@ fi
 SOURCE_LIB="${SOURCE_LIBDIR}/greyhole/${LIB_FILE}"
 
 set +e
-ls -l "${TARGET_SYMLINK}" 2>/dev/null | grep '/usr/share/greyhole/vfs-build/' >/dev/null
-if [ $? -eq 0 ]; then
-	echo "Detected custom (locally-compiled) Greyhole VFS module at ${TARGET_SYMLINK}; will NOT overwrite it."
+# shellcheck disable=SC2010
+if ls -l "${TARGET_SYMLINK}" 2>/dev/null | grep '/usr/share/greyhole/vfs-build/' >/dev/null; then
+    echo "Detected custom (locally-compiled) Greyhole VFS module at ${TARGET_SYMLINK}; will NOT overwrite it."
 else
-	rm -f ${TARGET_SYMLINK}
-	ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
+    rm -f ${TARGET_SYMLINK}
+    ln -s ${SOURCE_LIB} ${TARGET_SYMLINK}
 fi
 set -e
 
 # Bugfix for Ubuntu / Debian that are missing symlinks in ${TARGET_LIBDIR}/samba/
-MAJOR_SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1}'`"
+MAJOR_SMB_VERSION=$(smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1}')
 if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
-	if [ -f ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ]; then
-	    if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd_base.so ]; then
-	        ln -s ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ${TARGET_LIBDIR}/samba/libsmbd_base.so
-	    fi
-	else
-	    if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so ]; then
-	        if [ -f ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ]; then
-	            ln -s ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
-	        else
-	            echo "Error: missing dependent library libsmbd-base.so.0 (libsmbd-base-samba4.so)"
-	            exit -1
-	        fi
-	    fi
+    if [ -f ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ]; then
+        if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd_base.so ]; then
+            ln -s ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ${TARGET_LIBDIR}/samba/libsmbd_base.so
+        fi
+    else
+        if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so ]; then
+            if [ -f ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ]; then
+                ln -s ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
+            else
+                echo "Error: missing dependent library libsmbd-base.so.0 (libsmbd-base-samba4.so)"
+                exit 1
+            fi
+        fi
         if [ ! -f ${TARGET_LIBDIR}/libsmbd-base-samba4.so ]; then
             ln -s ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so ${TARGET_LIBDIR}/libsmbd-base-samba4.so
         fi
-	    if [ ! -f ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ]; then
-	        if [ -f ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ]; then
-		        ln -s ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
-		    elif [ -f ${TARGET_LIBDIR}/libsamba-util.so.0 ]; then
-		        ln -s ${TARGET_LIBDIR}/libsamba-util.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
-	        else
-	            echo "Error: missing dependent library libsamba-debug.so.0 (libsamba-debug-samba4.so)"
-	            exit -1
-	        fi
-	    fi
+        if [ ! -f ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ]; then
+            if [ -f ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ]; then
+                ln -s ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
+            elif [ -f ${TARGET_LIBDIR}/libsamba-util.so.0 ]; then
+                ln -s ${TARGET_LIBDIR}/libsamba-util.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
+            else
+                echo "Error: missing dependent library libsamba-debug.so.0 (libsamba-debug-samba4.so)"
+                exit 2
+            fi
+        fi
         if [ ! -f ${TARGET_LIBDIR}/libsamba-debug-samba4.so ]; then
             ln -s ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ${TARGET_LIBDIR}/libsamba-debug-samba4.so
         fi
-	fi
+    fi
 fi
 
 if [ -d /etc/ld.so.conf.d ]; then
-	# Make sure "TARGET_LIBDIR/samba" is available for greyhole.so to find the required libs in
-	echo "${TARGET_LIBDIR}/samba" > /etc/ld.so.conf.d/greyhole.conf
-	ldconfig
+    # Make sure "TARGET_LIBDIR/samba" is available for greyhole.so to find the required libs in
+    echo "${TARGET_LIBDIR}/samba" > /etc/ld.so.conf.d/greyhole.conf
+    ldconfig
 fi
 
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
-	# cifs client workaround
-	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
-	modprobe cifs
-	echo 0 > /proc/fs/cifs/OplockEnabled
+    # cifs client workaround
+    # Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
+    modprobe cifs
+    echo 0 > /proc/fs/cifs/OplockEnabled
 fi
 if [ -f /sys/module/cifs/parameters/enable_oplocks ]; then
-	# cifs client workaround
-	# Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
-	modprobe cifs enable_oplocks=0
-	echo 0 > /sys/module/cifs/parameters/enable_oplocks
+    # cifs client workaround
+    # Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
+    modprobe cifs enable_oplocks=0
+    echo 0 > /sys/module/cifs/parameters/enable_oplocks
 fi
 
-uses_systemd=`stat -c '%N' /proc/1/exe | grep systemd | wc -l`
+uses_systemd=$(stat -c '%N' /proc/1/exe | grep systemd | wc -l)
 
 running=0
-if [ -f /sbin/start -a $uses_systemd -eq 0 ]; then
-	# Using Upstart instead of SYSV init.d
-	rm -f /etc/init.d/greyhole
-	if [ -f /etc/init/greyhole.conf ]; then
-		if [ "`status greyhole | grep running | wc -l`" = "1" ]; then
-			restart greyhole
-			running=1
-		fi
-	fi
+if [ -f /sbin/start ] && [ "$uses_systemd" -eq 0 ]; then
+    # Using Upstart instead of SYSV init.d
+    rm -f /etc/init.d/greyhole
+    if [ -f /etc/init/greyhole.conf ]; then
+        if [ "$(status greyhole | grep running | wc -l)" = "1" ]; then
+            restart greyhole
+            running=1
+        fi
+    fi
 else
-	# (SYSV) Service install & start
-	rm -f /etc/init/greyhole.conf
-	if [ -f /etc/init.d/greyhole ]; then
-		if [ -f /etc/init.d/mysql ]; then
-		    sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
+    # (SYSV) Service install & start
+    rm -f /etc/init/greyhole.conf
+    if [ -f /etc/init.d/greyhole ]; then
+        if [ -f /etc/init.d/mysql ]; then
+            sed -i 's/mysqld/mysql/' /etc/init.d/greyhole
         fi
         if [ -f /etc/init.d/smbd ]; then
             sed -i 's/smb$/smbd/' /etc/init.d/greyhole
@@ -181,24 +180,24 @@ else
             sed -i 's/smb/samba/' /etc/init.d/greyhole
         fi
     fi
-	if [ -f /sbin/chkconfig ]; then
-		/sbin/chkconfig --add greyhole
-		/sbin/chkconfig greyhole on
-	else
-		/usr/sbin/update-rc.d greyhole defaults
-	fi
-	if [ -f /etc/init.d/greyhole ]; then
-		if [ "`service greyhole stat 2> /dev/null | grep 'is running' | wc -l`" = "1" ]; then
-			service greyhole restart
-			running=1
-		fi
-	fi
+    if [ -f /sbin/chkconfig ]; then
+        /sbin/chkconfig --add greyhole
+        /sbin/chkconfig greyhole on
+    else
+        /usr/sbin/update-rc.d greyhole defaults
+    fi
+    if [ -f /etc/init.d/greyhole ]; then
+        if [ "$(service greyhole stat 2> /dev/null | grep 'is running' | wc -l)" = "1" ]; then
+            service greyhole restart
+            running=1
+        fi
+    fi
 fi
 
 if [ $running -eq 0 ]; then
-	echo "==========================================================================="
-	echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
-	echo "==========================================================================="
+    echo "==========================================================================="
+    echo "See /usr/share/greyhole/USAGE to learn how to configure and start Greyhole."
+    echo "==========================================================================="
 fi
 
 man logrotate > /dev/null 2>&1 || echo "Warning! logrotate is not installed. You should install logrotate to make sure the Greyhole logs don't fill your root partition.

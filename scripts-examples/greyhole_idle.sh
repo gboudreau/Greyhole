@@ -25,10 +25,10 @@ LOG="$3"
 echo "Received hook with event_type = ${EVENT_TYPE}, event_code = ${EVENT_CODE}" >> /tmp/gh_log.txt
 
 if [ "${EVENT_TYPE}" = "idle" ]; then
-	echo "  Greyhole is idle: ${LOG}" >> /tmp/gh_log.txt
+    echo "  Greyhole is idle: ${LOG}" >> /tmp/gh_log.txt
 elif [ "${EVENT_TYPE}" = "not_idle" ]; then
-	echo "  Greyhole is busy: ${LOG}" >> /tmp/gh_log.txt
+    echo "  Greyhole is busy: ${LOG}" >> /tmp/gh_log.txt
 else
-	echo "Warning: Unknown event received: ${EVENT_TYPE}" >> /tmp/gh_log.txt
-	exit 1
+    echo "Warning: Unknown event received: ${EVENT_TYPE}" >> /tmp/gh_log.txt
+    exit 1
 fi

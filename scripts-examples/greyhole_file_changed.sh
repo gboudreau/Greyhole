@@ -23,26 +23,26 @@ SHARE="$2"
 PATH_ON_SHARE="$3"
 
 case "${EVENT_TYPE}" in
-	create|edit)
-		FILE_SIZE=`ls -l "/mnt/samba/${SHARE}/${PATH_ON_SHARE}" | awk '{print $5}'`
-		echo "The file on share ${SHARE} at ${PATH_ON_SHARE} was ${EVENT_TYPE}-ed. File size: ${FILE_SIZE}" >> /tmp/gh_files_changed.txt
-		;;
-	rename)
-		OLD_PATH_ON_SHARE="$4"
-		FILE_SIZE=`ls -l "/mnt/samba/${SHARE}/${PATH_ON_SHARE}" | awk '{print $5}'`
-		echo "The file on share ${SHARE} at ${OLD_PATH_ON_SHARE} was renamed to ${PATH_ON_SHARE}. File size: ${FILE_SIZE}" >> /tmp/gh_files_changed.txt
-		;;
-	delete)
-		echo "The file on share ${SHARE} at ${PATH_ON_SHARE} was ${EVENT_TYPE}d." >> /tmp/gh_files_changed.txt
-		;;
-	mkdir)
-		echo "The folder on share ${SHARE} at ${PATH_ON_SHARE} was created." >> /tmp/gh_files_changed.txt
-		;;
-	rmdir)
-		echo "The folder on share ${SHARE} at ${PATH_ON_SHARE} was deleted." >> /tmp/gh_files_changed.txt
-		;;
-	*)
-		echo "Warning: Unknown event received: ${EVENT_TYPE}" >> /tmp/gh_files_changed.txt
-		exit 1
-		;;
+    create|edit)
+        FILE_SIZE=$(stat -c%s "/mnt/samba/${SHARE}/${PATH_ON_SHARE}")
+        echo "The file on share ${SHARE} at ${PATH_ON_SHARE} was ${EVENT_TYPE}-ed. File size: ${FILE_SIZE}" >> /tmp/gh_files_changed.txt
+        ;;
+    rename)
+        OLD_PATH_ON_SHARE="$4"
+        FILE_SIZE=$(stat -c%s "/mnt/samba/${SHARE}/${PATH_ON_SHARE}")
+        echo "The file on share ${SHARE} at ${OLD_PATH_ON_SHARE} was renamed to ${PATH_ON_SHARE}. File size: ${FILE_SIZE}" >> /tmp/gh_files_changed.txt
+        ;;
+    delete)
+        echo "The file on share ${SHARE} at ${PATH_ON_SHARE} was ${EVENT_TYPE}d." >> /tmp/gh_files_changed.txt
+        ;;
+    mkdir)
+        echo "The folder on share ${SHARE} at ${PATH_ON_SHARE} was created." >> /tmp/gh_files_changed.txt
+        ;;
+    rmdir)
+        echo "The folder on share ${SHARE} at ${PATH_ON_SHARE} was deleted." >> /tmp/gh_files_changed.txt
+        ;;
+    *)
+        echo "Warning: Unknown event received: ${EVENT_TYPE}" >> /tmp/gh_files_changed.txt
+        exit 1
+        ;;
 esac

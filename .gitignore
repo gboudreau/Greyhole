@@ -1,8 +1,4 @@
 .DS_Store
-announce.sh
 release/
-.github_userpwd
-.irc_password
 .idea
-.ftpconfig
 .github_token

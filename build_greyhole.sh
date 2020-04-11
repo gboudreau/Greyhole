@@ -27,22 +27,18 @@
 #   4. Install the new version locally (using apt-get or yum, depending on what's available)
 #	5. Tag the git branch
 #   6. Update the CHANGELOG on https://www.greyhole.net/releases/CHANGELOG
-#   7. Send 'New version available' notifications by email, Twitter (@GreyholeApp), Facebook (Greyhole) and IRC (#greyhole on Freenode).
 
 
 #######
 # Setup
-#   sudo easy_install twitter
 #   sudo yum -y install dpkg
-#   curl -O https://raw.github.com/dtompkins/fbcmd/master/fbcmd_update.php; sudo php fbcmd_update.php install && rm fbcmd_update.php && fbcmd
 #   echo -n 'github_api_token' > .github_token
-#   echo -n 'nickserv_password' > .irc_password
 
 
 #######
 # Usage
 
-if [ $# -lt 1 -o $# -gt 2 ]; then
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
 	echo "Usage: $0 <version> [build number]"
 	exit 1
 fi
@@ -62,9 +58,6 @@ PATH_TO_REPOS_UPDATER='www/greyhole.net'
 
 # URL of the CHANGELOG file; URL should point to $HOST:$PATH_TO_RELEASES/CHANGELOG
 CHANGELOG_URL='https://www.greyhole.net/releases/CHANGELOG'
-
-# Email address that will receive a new version notification, including the CHANGELOG
-ANNOUNCE_EMAIL='releases-announce@greyhole.net'
 
 # End of Config
 ###############
@@ -102,7 +95,7 @@ for arch in $archs; do
 	make deb
 done
 
-if [ `whoami` != "gb" ]; then
+if [ "$(whoami)" != "gb" ]; then
 	exit
 fi
 
@@ -110,13 +103,13 @@ fi
 # Transfer files to HOST:PATH_TO_RELEASES
 
 if [ "$BUILD_NUMBER" = "1" ]; then
-	scp release/greyhole*$VERSION.tar.gz ${HOST}:${PATH_TO_RELEASES}/.
+	scp release/greyhole*"$VERSION".tar.gz ${HOST}:${PATH_TO_RELEASES}/.
 fi
-scp release/*greyhole-$VERSION-*.src.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/src/.
-scp release/*greyhole-$VERSION-*.x86_64.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/x86_64/.
-scp release/*greyhole-$VERSION-*.i386.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/i386/.
-scp release/*greyhole-$VERSION-*.armv5tel.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/armv5tel/.
-scp release/greyhole-$VERSION-*.deb ${HOST}:${PATH_TO_RELEASES}/deb/.
+scp release/*greyhole-"$VERSION"-*.src.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/src/.
+scp release/*greyhole-"$VERSION"-*.x86_64.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/x86_64/.
+scp release/*greyhole-"$VERSION"-*.i386.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/i386/.
+scp release/*greyhole-"$VERSION"-*.armv5tel.rpm ${HOST}:${PATH_TO_RELEASES}/rpm/armv5tel/.
+scp release/greyhole-"$VERSION"-*.deb ${HOST}:${PATH_TO_RELEASES}/deb/.
 
 
 ##########################
@@ -161,9 +154,9 @@ fi
 # Tag the git branch
 git clone git@github.com:gboudreau/Greyhole.git /tmp/Greyhole.git
 if [ "$BUILD_NUMBER" = "1" ]; then
-	(cd /tmp/Greyhole.git; git tag $VERSION; git push --tags)
+	(cd /tmp/Greyhole.git; git tag "$VERSION"; git push --tags)
 else
-	(cd /tmp/Greyhole.git; git tag $VERSION-$BUILD_NUMBER; git push --tags)
+	(cd /tmp/Greyhole.git; git tag "$VERSION-$BUILD_NUMBER"; git push --tags)
 fi
 rm -rf /tmp/Greyhole.git
 
@@ -173,21 +166,24 @@ rm -rf /tmp/Greyhole.git
 
 if [ "$BUILD_NUMBER" = "1" ]; then
 	cd release
-		LAST_TGZ=`ls -1atr *.tar.gz | grep -v 'hda-' | grep -B 1 greyhole-$VERSION | head -1`
-		tar --wildcards -x "*/CHANGES" -f $LAST_TGZ
-		tar --wildcards -x "*/CHANGES" -f greyhole-$VERSION.tar.gz
+		# shellcheck disable=SC2010
+		LAST_TGZ=$(ls -1atr ./*.tar.gz | grep -v 'hda-' | grep -B 1 "greyhole-$VERSION" | head -1)
+		tar --wildcards -x "*/CHANGES" -f "$LAST_TGZ"
+		tar --wildcards -x "*/CHANGES" -f "greyhole-$VERSION.tar.gz"
 	
-		diff -b */CHANGES | sed -e 's/^> /- /' | grep -v '^[0-9]*a[0-9]*\,[0-9]*$' > /tmp/gh_changelog
+		diff -b ./*/CHANGES | sed -e 's/^> /- /' | grep -v '^[0-9]*a[0-9]*\,[0-9]*$' > /tmp/gh_changelog
 	
 		find . -type d -name "greyhole-*" -exec rm -rf {} \; > /dev/null 2>&1
 		find . -type d -name "hda-greyhole-*" -exec rm -rf {} \; > /dev/null 2>&1
 		
 		# Update $CHANGELOG_URL
-		echo "What's new in $VERSION" > CHANGELOG
-		echo "--------------------" >> CHANGELOG
-		cat /tmp/gh_changelog >> CHANGELOG
-		echo >> CHANGELOG
-		curl -s "${CHANGELOG_URL}" >> CHANGELOG
+		{
+		    echo "What's new in $VERSION"
+		    echo "--------------------"
+		    cat /tmp/gh_changelog
+		    echo
+		    curl -s "${CHANGELOG_URL}"
+		} > CHANGELOG
 		scp CHANGELOG ${HOST}:${PATH_TO_RELEASES}/CHANGELOG
 	cd ..
 fi
@@ -197,24 +193,11 @@ fi
 
 echo "Creating release on Github.com"
 file_to_upload="release/greyhole-$VERSION.tar.gz"
-json=`echo -n $VERSION | php -r '$version=file_get_contents("php://stdin");$changelog=trim(file_get_contents("/tmp/gh_changelog"));echo json_encode(array("tag_name"=>$version,"name"=>$version,"body"=>$changelog));'`
-curl -s -H "Authorization: token `cat .github_token`" -H "Accept: application/vnd.github.manifold-preview" -X POST -d "$json" https://api.github.com/repos/gboudreau/greyhole/releases > /tmp/response.json
-filename=`basename "$file_to_upload"`
-upload_url=`echo $filename | php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo str_replace("{?name,label}", "?name=".file_get_contents("php://stdin"), $o->upload_url);'`
-curl -s -H "Authorization: token `cat .github_token`" -H "Accept: application/vnd.github.manifold-preview" -X POST -H "Content-Type: application/x-gzip" --data-binary @"$file_to_upload" "$upload_url"
-release_url=`php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_url."\n";'`
-
-############################################
-# Send notifications to Twitter/FB/IRC/email
-
-if [ "$BUILD_NUMBER" = "1" ]; then
-	/usr/local/bin/twitter set "New version available: $VERSION - ChangeLog: http://t.co/hZheYwg"
-	/usr/local/bin/fbcmd PPOST Greyhole "New version available: $VERSION - Downloads: https://www.greyhole.net/ or just use your package manager to update." 'ChangeLog' "${CHANGELOG_URL}"
-	#./irc_notif.sh "New version available $VERSION - Changelog: https://www.greyhole.net/releases/CHANGELOG" $VERSION
-else
-	/usr/local/bin/twitter set "New packages available: $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one."
-	/usr/local/bin/fbcmd PPOST Greyhole "New packages available: $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one." 'ChangeLog' "${CHANGELOG_URL}"
-	#./irc_notif.sh "New packages available $VERSION-$BUILD_NUMBER. If you couldn't install the previous packages, try this one." $VERSION
-fi
+json=$(echo -n "$VERSION" | php -r '$version=file_get_contents("php://stdin");$changelog=trim(file_get_contents("/tmp/gh_changelog"));echo json_encode(array("tag_name"=>$version,"name"=>$version,"body"=>$changelog));')
+curl -s -H "Authorization: token $(cat .github_token)" -H "Accept: application/vnd.github.manifold-preview" -X POST -d "$json" https://api.github.com/repos/gboudreau/greyhole/releases > /tmp/response.json
+filename=$(basename "$file_to_upload")
+upload_url=$(echo "$filename" | php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo str_replace("{?name,label}", "?name=".file_get_contents("php://stdin"), $o->upload_url);')
+curl -s -H "Authorization: token $(cat .github_token)" -H "Accept: application/vnd.github.manifold-preview" -X POST -H "Content-Type: application/x-gzip" --data-binary @"$file_to_upload" "$upload_url"
+php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_url."\n";'
 
 ###

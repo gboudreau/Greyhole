@@ -25,9 +25,9 @@ LOG="$3"
 echo "Received hook with event_type = ${EVENT_TYPE}, event_code = ${EVENT_CODE}" >> /tmp/gh_log.txt
 
 if [ "${EVENT_TYPE}" = "fsck" ]; then
-	echo "  fsck completed. Report:" >> /tmp/gh_log.txt
-	echo "${LOG}" >> /tmp/gh_log.txt
+    echo "  fsck completed. Report:" >> /tmp/gh_log.txt
+    echo "${LOG}" >> /tmp/gh_log.txt
 else
-	echo "Warning: Unknown event received: ${EVENT_TYPE}" >> /tmp/gh_log.txt
-	exit 1
+    echo "Warning: Unknown event received: ${EVENT_TYPE}" >> /tmp/gh_log.txt
+    exit 1
 fi

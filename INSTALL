@@ -28,7 +28,6 @@ If you know what you're doing, you should have no problem installing on any othe
 	install -m 0755 -D -p greyhole-dfree /usr/bin
 	install -m 0755 -D -p greyhole-php /usr/bin
 	install -m 0755 -D -p greyhole-dfree.php /usr/share/greyhole
-	install -m 0755 -D -p greyhole-custom-cp.sh /usr/share/greyhole
 	install -m 0644 -D -p schema-mysql.sql /usr/share/greyhole
 	install -m 0644 -D -p greyhole.example.conf /usr/share/greyhole
 	install -m 0644 -D -p greyhole.example.conf /etc/greyhole.conf
