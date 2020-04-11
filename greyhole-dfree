@@ -5,8 +5,10 @@ CACHE_TIME=15 # in seconds
 
 if [[ "$1" == /* ]]; then
 	DIR="$1" # absolute path given, ignore working directory
-else
+elif [[ "$1" != "-h" ]]; then
 	DIR="$(pwd)/$1" # relative path given, use working directory
+else
+	DIR="$(pwd)" # no path given, use working directory
 fi
 
 TMP_FILE="$CACHE_DIR/${DIR//"/"/_}"
@@ -17,7 +19,7 @@ if [ ! -e "$CACHE_DIR" ]; then
 fi
 
 if [ ! -e "$TMP_FILE" ]; then
-	RESULT=$(/usr/share/greyhole/greyhole-dfree.php $1)
+	RESULT=$(/usr/share/greyhole/greyhole-dfree.php "$1")
 	echo "$RESULT" > "$TMP_FILE"
 else
 	MODIFIED=$(stat -c %Y "$TMP_FILE")
@@ -26,9 +28,28 @@ else
 		RESULT=$(cat "$TMP_FILE")
 	else
 		# update cache by running greyhole-dfree
-		RESULT=$(/usr/share/greyhole/greyhole-dfree.php $1)
+		RESULT=$(/usr/share/greyhole/greyhole-dfree.php "$1")
 		echo "$RESULT" > "$TMP_FILE"
 	fi
 fi
 
-echo "$RESULT"
+if [ "$1" == "-h" ] || [ "$2" == "-h" ]; then
+    what=(Total: Free:)
+    for num in $(echo "$RESULT" | tr " " "\n"); do
+        units=(KB MB GB TB)
+        i=0
+        unit=${units[i]}
+        while [ "$num" -ge 1024 ]; do
+            (( "num = $num / 1024" ))
+            (( i++ ))
+            unit=${units[i]}
+        done
+        if [[ "${what[k]}" != "" ]]; then
+            echo -n "${what[k]} ${num}${unit} "
+        fi
+        (( k++ ))
+    done
+    echo
+else
+    echo "$RESULT"
+fi

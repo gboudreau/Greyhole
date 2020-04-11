@@ -33,5 +33,13 @@ foreach (Config::storagePoolDrives() as $sp_drive) {
 	$total_free_space += $response[1];
 }
 
+// Free space available on shares is based on the num_copies option of the specified LZ
+// i.e. real free space = 1 GB, num_copies = 4 => available free space = 250 MB
+chdir($argv[1]);
+$options = SharesConfig::getShareOptions(getcwd());
+if ($options) {
+    $total_free_space /= $options['num_copies'];
+}
+
 echo "$total_space $total_free_space 1024\n";
 ?>
