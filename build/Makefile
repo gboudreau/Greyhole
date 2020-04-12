@@ -39,16 +39,16 @@ amahi-rpm: dist
 
 dist:
 	(mkdir -p release && cd release && mkdir -p $(PACKAGE)-$(VERSION))
-	rsync -a --exclude-from=.build_excluded_files.txt * release/$(PACKAGE)-$(VERSION)/
+	rsync -a --exclude-from=build/.build_excluded_files.txt * release/$(PACKAGE)-$(VERSION)/
 	
 	if [ -d /tmp/Greyhole.git ]; then (cd /tmp/Greyhole.git; git pull); else git clone git@github.com:gboudreau/Greyhole.git /tmp/Greyhole.git; fi
 	(cd /tmp/Greyhole.git; git log --pretty=oneline --reverse | cut -d ' ' -f2-  | grep -v '^Tag: ' > /tmp/Greyhole-CHANGES)
 	cp /tmp/Greyhole-CHANGES release/$(PACKAGE)-$(VERSION)/CHANGES
 
     # Inject require()'d files
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole)
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php greyhole-dfree.php)
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../inject-includes.php web-app/index.php)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../build/inject-includes.php greyhole)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../build/inject-includes.php greyhole-dfree.php)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../build/inject-includes.php web-app/index.php)
 
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Release:\(\s*\).BUILD_NUMBER\s*$$/Release:\1$(BUILD_NUMBER)/' $(PACKAGE).spec)

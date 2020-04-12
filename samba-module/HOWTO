@@ -9,26 +9,26 @@ How to build the VFS module binaries for a new Samba version.
 
 2. If needed, create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
 
-3. Add the new Samba version number in `build_vfs_all.sh @L23`
+3. Add the new Samba version number in `build/build_vfs_all.sh @L23`
 
-4. Run the build_vfs_all.sh script
+4. Run the build/build_vfs_all.sh script
 
         cd ~/git/Greyhole/
 
         SSH_HOST="gh-builder-i386"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build_vfs_all.sh ; exec bash"'
+        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build/build_vfs_all.sh ; exec bash"'
 
         SSH_HOST="gh-builder-x86_64"
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build_vfs_all.sh ; exec bash"'
+        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build/build_vfs_all.sh ; exec bash"'
 
         # ARMHF (Raspberry Pi)
         cd ~/Temp/qemu-arm
         ./boot.sh
         sleep 180
         rsync -av --exclude .git --exclude release -e "ssh -p 2223" ~/git/Greyhole/ 127.0.0.1:Greyhole
-        ssh -p 2223 -t 127.0.0.1 'screen sh -c "sudo /home/gb/Greyhole/build_vfs_all.sh ; exec bash"'
+        ssh -p 2223 -t 127.0.0.1 'screen sh -c "sudo /home/gb/Greyhole/build/build_vfs_all.sh ; exec bash"'
 
 5. Copy the resulting binaries back into your workstation:
 

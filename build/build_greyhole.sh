@@ -32,7 +32,7 @@
 #######
 # Setup
 #   sudo yum -y install dpkg
-#   echo -n 'github_api_token' > .github_token
+#   echo -n 'github_api_token' > build/.github_token
 
 
 #######
@@ -62,6 +62,7 @@ CHANGELOG_URL='https://www.greyhole.net/releases/CHANGELOG'
 # End of Config
 ###############
 
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 export VERSION=$1
 
@@ -80,12 +81,13 @@ find . -name ".AppleDouble" -delete
 ################
 # Build packages
 
+cp build/Makefile .
+
 # RPM
 archs='i386 armv5tel x86_64'
 for arch in $archs; do
 	export ARCH=$arch
 	make rpm
-	#make amahi-rpm
 done
 
 # DEB
@@ -95,9 +97,12 @@ for arch in $archs; do
 	make deb
 done
 
+rm ./Makefile
+
 if [ "$(whoami)" != "gb" ]; then
 	exit
 fi
+exit
 
 #########################################
 # Transfer files to HOST:PATH_TO_RELEASES
@@ -194,10 +199,10 @@ fi
 echo "Creating release on Github.com"
 file_to_upload="release/greyhole-$VERSION.tar.gz"
 json=$(echo -n "$VERSION" | php -r '$version=file_get_contents("php://stdin");$changelog=trim(file_get_contents("/tmp/gh_changelog"));echo json_encode(array("tag_name"=>$version,"name"=>$version,"body"=>$changelog));')
-curl -s -H "Authorization: token $(cat .github_token)" -H "Accept: application/vnd.github.manifold-preview" -X POST -d "$json" https://api.github.com/repos/gboudreau/greyhole/releases > /tmp/response.json
+curl -s -H "Authorization: token $(cat build/.github_token)" -H "Accept: application/vnd.github.manifold-preview" -X POST -d "$json" https://api.github.com/repos/gboudreau/greyhole/releases > /tmp/response.json
 filename=$(basename "$file_to_upload")
 upload_url=$(echo "$filename" | php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo str_replace("{?name,label}", "?name=".file_get_contents("php://stdin"), $o->upload_url);')
-curl -s -H "Authorization: token $(cat .github_token)" -H "Accept: application/vnd.github.manifold-preview" -X POST -H "Content-Type: application/x-gzip" --data-binary @"$file_to_upload" "$upload_url"
+curl -s -H "Authorization: token $(cat build/.github_token)" -H "Accept: application/vnd.github.manifold-preview" -X POST -H "Content-Type: application/x-gzip" --data-binary @"$file_to_upload" "$upload_url"
 php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_url."\n";'
 
 ###

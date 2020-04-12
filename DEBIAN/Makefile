@@ -1,7 +1,7 @@
 ARCH=i386
 
 deb: build
-	rm build_vfs_all.sh
+	rm build/build_vfs_all.sh
 	rm initd_script.sh
 	rm greyhole
 	rm greyhole-dfree

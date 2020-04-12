@@ -1,0 +1,7 @@
+.git/
+DEBIAN/
+release/
+build/
+Logo.psd
+README.md
+test_cases.php

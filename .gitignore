@@ -1,4 +1,4 @@
 .DS_Store
 release/
 .idea
-.github_token
+build/.github_token

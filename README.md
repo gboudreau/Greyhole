@@ -1,9 +1,17 @@
 Greyhole
 ========
 
-[![Code Climate](https://codeclimate.com/github/gboudreau/Greyhole.png)](https://codeclimate.com/github/gboudreau/Greyhole)
-
 Greyhole is an application that uses Samba to create a storage pool of all your available hard drives (whatever their size, however they're connected), and allows you to create redundant copies of the files you store, in order to prevent data loss when part of your hardware fails.
+
+Installation
+------------
+
+1. Using APT (Ubuntu, Debian) or Yum (CentOS, Fedora, RHEL):
+    
+    ```curl -Ls https://bit.ly/greyhole-package | sudo bash```
+
+2. Follow the instructions from the [USAGE](https://raw.github.com/gboudreau/Greyhole/master/USAGE) file.
+   There is also a copy of this file in `/usr/share/greyhole/USAGE`
 
 Links
 -----
@@ -12,10 +20,8 @@ Links
 * The [wiki on Github](https://github.com/gboudreau/Greyhole/wiki#get-help-or-resolve-a-problem) is filled with useful information, including a FAQ.
 * Search the [Issues on Github](https://github.com/gboudreau/Greyhole/issues?q=is%3Aissue), to see if someone else had the same problem in the past, and what the resolution/workarounds were suggested.
 
-
 Features
 --------
-
 __JBOD concatenation storage pool__
 
 Configure as many hard drives as you'd like to be included in your pool. Your storage pool size will be the sum of the free space in all the hard drives you include. Your hard drives can be internal, external (USB, e-Sata, Firewire...), or even mount of remote file systems, and you can include hard drives of any size in your pool.
