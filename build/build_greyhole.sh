@@ -205,4 +205,15 @@ upload_url=$(echo "$filename" | php -r '$o=json_decode(file_get_contents("/tmp/r
 curl -s -H "Authorization: token $(cat build/.github_token)" -H "Accept: application/vnd.github.manifold-preview" -X POST -H "Content-Type: application/x-gzip" --data-binary @"$file_to_upload" "$upload_url"
 php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_url."\n";'
 
+#########################
+# Create new Docker image
+
+echo "Creating new Docker images..."
+cd ~/docker-services/samba-greyhole/docker-build/
+sudo docker build -t "gboudreau/samba-greyhole:$VERSION" --build-arg "GREYHOLE_VERSION=$VERSION" .
+sudo docker push "gboudreau/samba-greyhole:$VERSION"
+sudo docker tag "gboudreau/samba-greyhole:$VERSION" "gboudreau/samba-greyhole:latest"
+sudo docker push "gboudreau/samba-greyhole:latest"
+echo
+
 ###
