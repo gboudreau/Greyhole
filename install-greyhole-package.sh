@@ -139,6 +139,10 @@ elif [ "$_OSTYPE" = "apt-get" ]; then
     if apt-cache showpkg php-mbstring >/dev/null; then
         apt-get -y install php-mbstring
     fi
+    if apt-cache showpkg gnupg >/dev/null; then
+        # Required for apt-key
+        apt-get -y install gnupg
+    fi
     echo "deb https://www.greyhole.net/releases/deb stable main previous before-previous" > /etc/apt/sources.list.d/greyhole.list
     curl -s https://www.greyhole.net/releases/deb/greyhole-debsig.asc | apt-key add -
     apt-get update
