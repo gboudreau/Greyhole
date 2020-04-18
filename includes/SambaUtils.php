@@ -81,6 +81,14 @@ final class SambaUtils {
         if (!$vfs_is_ok) {
             $vfs_target = "$source_libdir/greyhole/greyhole-samba$version.so";
             Log::warn("  Greyhole VFS module for Samba was missing, or the wrong version for your Samba. It will now be replaced with a symlink to $vfs_target", Log::EVENT_CODE_VFS_MODULE_WRONG);
+            if (!is_file($vfs_target)) {
+                if (!is_dir(dirname($vfs_target))) {
+                    mkdir(dirname($vfs_target));
+                }
+                $url = "https://github.com/gboudreau/Greyhole/blob/master/samba-module/bin/" . SambaUtils::samba_get_version() . "/greyhole-$arch.so";
+                Log::info("  $vfs_target is missing; will download it from $url ...");
+                file_put_contents($vfs_target, file_get_contents($url));
+            }
             if (is_file($vfs_file)) {
                 unlink($vfs_file);
             }
