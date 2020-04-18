@@ -47,37 +47,15 @@ If you know what you're doing, you should have no problem installing on any othe
 	install -m 0644 -D -p docs/greyhole.conf.5.gz /usr/share/man/man5/
 
 	# What version of Samba are you running ?
-	SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}'`"
+	SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}' | tr ' ' .`"
 	echo "You appear to be running Samba $SMB_VERSION"
 
-	# For Samba 3.4: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.4/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.4/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 3.5: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 3.6: #
-		if [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/3.6/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/3.6/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.0: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.0/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.0/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.0/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.1: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.1/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.1/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.1/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.2: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.2/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.2/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.2/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.3: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.3/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.3/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.3/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.4: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.4/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.4/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.4/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.5: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.5/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.5/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.5/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.6: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.6/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.6/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.6/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.7: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.7/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.7/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.7/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.8: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.8/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.8/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.8/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.9: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.9/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.9/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.9/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
-	# For Samba 4.10: #
-		if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs/ ]; then ln -s samba-module/bin/4.10/greyhole-x86_64.so /usr/lib/x86_64-linux-gnu/samba/vfs/greyhole.so; elif [ -x /usr/lib64/samba/vfs/ ]; then ln -s samba-module/bin/4.10/greyhole-x86_64.so /usr/lib64/samba/vfs/greyhole.so; else ln -s samba-module/bin/4.10/greyhole-i386.so /usr/lib/samba/vfs/greyhole.so; fi
+	if [ -x /usr/lib/x86_64-linux-gnu/samba/vfs/ ] || [ $(uname -m) = "x86_64" ] ; then
+		LIBDIR="/usr/lib64"
+	else
+		LIBDIR="/usr/lib"
+	fi
+	cp samba-module/bin/$SMB_VERSION/greyhole-$(uname -m).so "$LIBDIR/greyhole/greyhole-samba${SMB_VERSION//.}.so"
 
 	# Install the start script
 	# For SysVinit systems: install the initd script:
