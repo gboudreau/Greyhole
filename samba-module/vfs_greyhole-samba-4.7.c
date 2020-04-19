@@ -66,6 +66,26 @@ static void gh_spoolf(const char* format, ...)
 	fclose(spoolf);
 }
 
+void compute_md5(const char *str, char *out) {
+	MD5_CTX ctx;
+	unsigned char hash[16];
+
+	MD5Init(&ctx);
+	MD5Update(&ctx, str, strlen(str));
+	MD5Final(hash, &ctx);
+
+    for (int n = 0; n < 16; ++n) {
+        snprintf(&(out[n*2]), 3, "%02x", (unsigned int)hash[n]);
+    }
+}
+
+static const char *smb_fname_str(const struct smb_filename *smb_fname) {
+	if (smb_fname == NULL) {
+		return "";
+	}
+	return smb_fname->base_name;
+}
+
 /* VFS operations */
 
 static struct vfs_fn_pointers vfs_greyhole_fns = {
@@ -188,11 +208,19 @@ static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, cons
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
-		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
-		spoolf = fopen(filename, "wt");
-		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+		const char *fname = smb_fname_str(fsp->fsp_name);
+		char md5[33];
+		compute_md5(fname, md5);
+		snprintf(filename, 76 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+			((double) (tp.tv_sec)*1000000.0),
 			share,
-			fsp->fh->fd);
+			fsp->fh->fd,
+			md5);
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "fwrite\n%s\n%d\n%s\n\n",
+			share,
+			fsp->fh->fd,
+			fname);
 		fclose(spoolf);
 	}
 

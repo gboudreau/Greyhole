@@ -208,11 +208,19 @@ static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, cons
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
-		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
-		spoolf = fopen(filename, "wt");
-		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+		const char *fname = smb_fname_str(fsp->fsp_name);
+		char md5[33];
+		compute_md5(fname, md5);
+		snprintf(filename, 76 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+			((double) (tp.tv_sec)*1000000.0),
 			share,
-			fsp->fh->fd);
+			fsp->fh->fd,
+			md5);
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "fwrite\n%s\n%d\n%s\n\n",
+			share,
+			fsp->fh->fd,
+			fname);
 		fclose(spoolf);
 	}
 

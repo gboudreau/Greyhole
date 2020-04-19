@@ -43,7 +43,7 @@ static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle,
 static ssize_t greyhole_pwrite_recv(struct tevent_req *req, struct vfs_aio_state *vfs_aio_state);
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
 static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
-static int greyhole_link(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
+static int greyhole_link(vfs_handle_struct *handle, const char *oldname, const char *newname);
 static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
 
 /* Save formatted string to Greyhole spool */
@@ -64,6 +64,26 @@ static void gh_spoolf(const char* format, ...)
 	va_end(args);
 
 	fclose(spoolf);
+}
+
+void compute_md5(const char *str, char *out) {
+	MD5_CTX ctx;
+	unsigned char hash[16];
+
+	MD5Init(&ctx);
+	MD5Update(&ctx, str, strlen(str));
+	MD5Final(hash, &ctx);
+
+    for (int n = 0; n < 16; ++n) {
+        snprintf(&(out[n*2]), 3, "%02x", (unsigned int)hash[n]);
+    }
+}
+
+static const char *smb_fname_str(const struct smb_filename *smb_fname) {
+	if (smb_fname == NULL) {
+		return "";
+	}
+	return smb_fname->base_name;
 }
 
 /* VFS operations */
@@ -188,11 +208,19 @@ static ssize_t greyhole_write(vfs_handle_struct *handle, files_struct *fsp, cons
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
-		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
-		spoolf = fopen(filename, "wt");
-		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+		const char *fname = smb_fname_str(fsp->fsp_name);
+		char md5[33];
+		compute_md5(fname, md5);
+		snprintf(filename, 76 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+			((double) (tp.tv_sec)*1000000.0),
 			share,
-			fsp->fh->fd);
+			fsp->fh->fd,
+			md5);
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "fwrite\n%s\n%d\n%s\n\n",
+			share,
+			fsp->fh->fd,
+			fname);
 		fclose(spoolf);
 	}
 
@@ -364,7 +392,7 @@ static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename 
 	return result;
 }
 
-static int greyhole_link(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname)
+static int greyhole_link(vfs_handle_struct *handle, const char *oldname, const char *newname)
 {
 	int result;
 
@@ -373,8 +401,8 @@ static int greyhole_link(vfs_handle_struct *handle, const struct smb_filename *o
 	if (result >= 0) {
 		gh_spoolf("link\n%s\n%s\n%s\n\n",
 			lp_servicename(talloc_tos(), handle->conn->params->service),
-			oldname->base_name,
-			newname->base_name);
+			oldname,
+			newname);
 	}
 
 	return result;

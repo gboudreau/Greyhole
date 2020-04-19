@@ -23,7 +23,18 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 #include "includes.h"
 #include "system/filesys.h"
 #include "smbd/smbd.h"
-#include "../lib/crypto/md5.h"
+#include <gnutls/gnutls.h>
+#include <gnutls/crypto.h>
+#include "../lib/crypto/gnutls_helpers.h"
+
+/* Those macros are only available in GnuTLS >= 3.6.4 */
+#ifndef GNUTLS_FIPS140_SET_LAX_MODE
+#define GNUTLS_FIPS140_SET_LAX_MODE()
+#endif
+
+#ifndef GNUTLS_FIPS140_SET_STRICT_MODE
+#define GNUTLS_FIPS140_SET_STRICT_MODE()
+#endif
 
 static int vfs_greyhole_debug_level = DBGC_VFS;
 
@@ -65,17 +76,33 @@ static void gh_spoolf(const char* format, ...)
 	fclose(spoolf);
 }
 
-void compute_md5(const char *str, char *out) {
-	MD5_CTX ctx;
-	unsigned char hash[16];
+void compute_hash(const char *str, char *out) {
+	gnutls_hash_hd_t hash_hnd = NULL;
+	uint8_t digest[gnutls_hash_get_len(GNUTLS_DIG_SHA1)];
+	int rc;
 
-	MD5Init(&ctx);
-	MD5Update(&ctx, str, strlen(str));
-	MD5Final(hash, &ctx);
+	GNUTLS_FIPS140_SET_LAX_MODE();
 
-    for (int n = 0; n < 16; ++n) {
-        snprintf(&(out[n*2]), 3, "%02x", (unsigned int)hash[n]);
+	rc = gnutls_hash_init(&hash_hnd, GNUTLS_DIG_SHA1);
+	if (rc < 0) {
+		goto out;
+	}
+
+	rc = gnutls_hash(hash_hnd, str, strlen(str));
+	if (rc < 0) {
+		gnutls_hash_deinit(hash_hnd, NULL);
+		goto out;
+	}
+
+	gnutls_hash_deinit(hash_hnd, digest);
+
+    for (int n = 0; n < gnutls_hash_get_len(GNUTLS_DIG_SHA1); ++n) {
+        snprintf(&(out[n*2]), 3, "%02x", (unsigned int)digest[n]);
     }
+
+out:
+	GNUTLS_FIPS140_SET_STRICT_MODE();
+	snprintf(out, 1, "%s", "");
 }
 
 static const char *smb_fname_str(const struct smb_filename *smb_fname) {
@@ -207,9 +234,9 @@ static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, con
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 		const char *fname = smb_fname_str(fsp->fsp_name);
-		char md5[33];
-		compute_md5(fname, md5);
-		snprintf(filename, 76 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+		char md5[2*gnutls_hash_get_len(GNUTLS_DIG_SHA1)+1];
+		compute_hash(fname, md5);
+		snprintf(filename, 44 + strlen(share) + nDigits(fsp->fh->fd) + 2*gnutls_hash_get_len(GNUTLS_DIG_SHA1), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
 			((double) (tp.tv_sec)*1000000.0),
 			share,
 			fsp->fh->fd,
@@ -238,9 +265,9 @@ static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_st
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 		const char *fname = smb_fname_str(tofsp->fsp_name);
-		char md5[33];
-		compute_md5(fname, md5);
-		snprintf(filename, 76 + strlen(share) + nDigits(tofsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+		char md5[2*gnutls_hash_get_len(GNUTLS_DIG_SHA1)+1];
+		compute_hash(fname, md5);
+		snprintf(filename, 44 + strlen(share) + nDigits(tofsp->fh->fd) + 2*gnutls_hash_get_len(GNUTLS_DIG_SHA1), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
 			((double) (tp.tv_sec)*1000000.0),
 			share,
 			tofsp->fh->fd,
@@ -297,9 +324,9 @@ static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle,
 	gettimeofday(&tp, (struct timezone *) NULL);
 	char *share = lp_servicename(talloc_tos(), handle->conn->params->service);
 	const char *fname = smb_fname_str(fsp->fsp_name);
-	char md5[33];
-	compute_md5(fname, md5);
-	snprintf(filename, 76 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+	char md5[2*gnutls_hash_get_len(GNUTLS_DIG_SHA1)+1];
+	compute_hash(fname, md5);
+	snprintf(filename, 44 + strlen(share) + nDigits(fsp->fh->fd) + 2*gnutls_hash_get_len(GNUTLS_DIG_SHA1), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
 		((double) (tp.tv_sec)*1000000.0),
 		share,
 		fsp->fh->fd,
