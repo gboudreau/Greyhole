@@ -1,5 +1,5 @@
 /*
-Copyright 2009-2019 Guillaume Boudreau, Edgars Binans
+Copyright 2009-2020 Guillaume Boudreau, Edgars Binans
 
 This file is part of Greyhole.
 
@@ -23,6 +23,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 #include "includes.h"
 #include "system/filesys.h"
 #include "smbd/smbd.h"
+#include "../lib/crypto/md5.h"
 
 static int vfs_greyhole_debug_level = DBGC_VFS;
 
@@ -61,6 +62,26 @@ static void gh_spoolf(const char* format, ...)
 	va_end(args);
 
 	fclose(spoolf);
+}
+
+void compute_md5(const char *str, char *out) {
+	MD5_CTX ctx;
+	unsigned char hash[16];
+
+	MD5Init(&ctx);
+	MD5Update(&ctx, str, strlen(str));
+	MD5Final(hash, &ctx);
+
+    for (int n = 0; n < 16; ++n) {
+        snprintf(&(out[n*2]), 3, "%02x", (unsigned int)hash[n]);
+    }
+}
+
+static const char *smb_fname_str(const struct smb_filename *smb_fname) {
+	if (smb_fname == NULL) {
+		return "";
+	}
+	return smb_fname->base_name;
 }
 
 /* VFS operations */
@@ -172,11 +193,19 @@ static ssize_t greyhole_pwrite(vfs_handle_struct *handle, files_struct *fsp, con
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service);
-		snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
-		spoolf = fopen(filename, "wt");
-		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+		const char *fname = smb_fname_str(fsp->fsp_name);
+		char md5[33];
+		compute_md5(fname, md5);
+		snprintf(filename, 76 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+			((double) (tp.tv_sec)*1000000.0),
 			share,
-			fsp->fh->fd);
+			fsp->fh->fd,
+			md5);
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "fwrite\n%s\n%d\n%s\n\n",
+			share,
+			fsp->fh->fd,
+			fname);
 		fclose(spoolf);
 	}
 
@@ -196,11 +225,19 @@ static ssize_t greyhole_recvfile(vfs_handle_struct *handle, int fromfd, files_st
 	if (result >= 0) {
 		gettimeofday(&tp, (struct timezone *) NULL);
 		char *share = lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service);
-		snprintf(filename, 43 + strlen(share) + nDigits(tofsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, tofsp->fh->fd);
-		spoolf = fopen(filename, "wt");
-		fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+		const char *fname = smb_fname_str(tofsp->fsp_name);
+		char md5[33];
+		compute_md5(fname, md5);
+		snprintf(filename, 76 + strlen(share) + nDigits(tofsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+			((double) (tp.tv_sec)*1000000.0),
 			share,
-			tofsp->fh->fd);
+			tofsp->fh->fd,
+			md5);
+		spoolf = fopen(filename, "wt");
+		fprintf(spoolf, "fwrite\n%s\n%d\n%s\n\n",
+			share,
+			tofsp->fh->fd,
+            fname);
 		fclose(spoolf);
 	}
 
@@ -248,11 +285,19 @@ static struct tevent_req *greyhole_pwrite_send(struct vfs_handle_struct *handle,
 
 	gettimeofday(&tp, (struct timezone *) NULL);
 	char *share = lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service);
-	snprintf(filename, 43 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d", ((double) (tp.tv_sec)*1000000.0), share, fsp->fh->fd);
-	spoolf = fopen(filename, "wt");
-	fprintf(spoolf, "fwrite\n%s\n%d\n\n",
+	const char *fname = smb_fname_str(fsp->fsp_name);
+	char md5[33];
+	compute_md5(fname, md5);
+	snprintf(filename, 76 + strlen(share) + nDigits(fsp->fh->fd), "/var/spool/greyhole/mem/%.0f-%s-%d-%s",
+		((double) (tp.tv_sec)*1000000.0),
 		share,
-		fsp->fh->fd);
+		fsp->fh->fd,
+		md5);
+	spoolf = fopen(filename, "wt");
+	fprintf(spoolf, "fwrite\n%s\n%d\n%s\n\n",
+		share,
+		fsp->fh->fd,
+		fname);
 	fclose(spoolf);
 
 	return req;
@@ -278,9 +323,11 @@ static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)
 	result = SMB_VFS_NEXT_CLOSE(handle, fsp);
 
 	if (result >= 0) {
-		gh_spoolf("close\n%s\n%d\n\n",
-			lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
-			fsp->fh->fd);
+		const char *fname = smb_fname_str(fsp->fsp_name);
+		gh_spoolf("close\n%s\n%d\n%s\n\n",
+			lp_servicename(talloc_tos(), handle->conn->params->service),
+			fsp->fh->fd,
+			fname);
 	}
 
 	return result;

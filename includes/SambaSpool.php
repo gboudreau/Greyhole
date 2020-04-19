@@ -95,7 +95,7 @@ final class SambaSpool {
                 // Close & fwrite logs are only processed when no more duplicates are found, so we'll execute this now that a non-duplicate line was found.
                 if ($act === 'fwrite' || $act === 'close') {
                     /** @noinspection PhpUndefinedVariableInspection */
-                    $db_spool->close_task($act, $share, $fd, $close_tasks);
+                    $db_spool->close_task($act, $share, $fullpath, $close_tasks);
                 }
 
                 $line = $line_ar;
@@ -140,6 +140,8 @@ final class SambaSpool {
                 case 'fwrite':
                 case 'close':
                     $fd = array_shift($line);
+                    $fullpath = array_shift($line);
+                    Log::test("fd = $fd; fullpath = $fullpath");
                     break;
                 default:
                     $act = FALSE;
@@ -168,7 +170,7 @@ final class SambaSpool {
         // Close & fwrite logs are only processed when no more duplicates are found, so we'll execute this now that we're done parsing all spooled files.
         if ($act === 'fwrite' || $act === 'close') {
             /** @noinspection PhpUndefinedVariableInspection */
-            $db_spool->close_task($act, $share, $fd, $close_tasks);
+            $db_spool->close_task($act, $share, $fullpath, $close_tasks);
         }
         // We also need to 'execute' all close tasks, now that all fwrite have been logged
         $db_spool->close_all_tasks($close_tasks);

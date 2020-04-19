@@ -298,16 +298,16 @@ final class DBSpool {
         DB::insert($query, $params);
     }
 
-    public function close_task($act, $share, $fd, &$tasks) {
+    public function close_task($act, $share, $fullpath, &$tasks) {
         if ($act === 'fwrite') {
-            $query = "UPDATE tasks SET complete = 'written' WHERE complete = 'no' AND share = :share AND additional_info = :fd";
-            DB::execute($query, array('share' => $share, 'fd' => $fd));
+            $query = "UPDATE tasks SET complete = 'written' WHERE complete = 'no' AND share = :share AND full_path = :full_path";
+            DB::execute($query, array('share' => $share, 'full_path' => $fullpath));
         }
         if ($act === 'close') {
             if ($this->use_old_vfs) {
                 // armv5 VFS have not been recompiled to create fwrite spooled files; so for those, we process close tasks like we did before.
-                $query = "UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = :share AND additional_info = :fd";
-                DB::execute($query, array('share' => $share, 'fd' => $fd));
+                $query = "UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'no' AND share = :share AND full_path = :full_path";
+                DB::execute($query, array('share' => $share, 'full_path' => $fullpath));
             } else {
                 // We will only close tasks at the very end, to make sure all fwrite tasks have been handled.
                 // We need to do this because some fwrite spool file might apply to multiple write (open) tasks.
@@ -316,7 +316,7 @@ final class DBSpool {
                 if ($last_id) {
                     $task = (object) array(
                         'share' => $share,
-                        'fd' => $fd,
+                        'full_path' => $fullpath,
                         'last_id' => $last_id,
                     );
                     $tasks[] = $task;
@@ -328,33 +328,33 @@ final class DBSpool {
     public function close_all_tasks($tasks) {
         foreach ($tasks as $task) {
             $share = $task->share;
-            $fd = $task->fd;
+            $full_path = $task->full_path;
             $last_id = $task->last_id;
 
             // We only want to handle real writes (complete = 'written'); if complete = 'no', that means the file was open for writing, but wasn't written to; we'll ignore those.
 
-            $params = array('share' => $share, 'fd' => $fd, 'last_id' => $last_id);
+            $params = array('share' => $share, 'full_path' => $full_path, 'last_id' => $last_id);
 
-            $query = "UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'written' AND share = :share AND additional_info = :fd AND id <= :last_id";
+            $query = "UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'written' AND share = :share AND full_path = :full_path AND id <= :last_id";
             DB::execute($query, $params);
 
             // Remove write tasks that were not written to. But log them first.
-            $query = "SELECT id, full_path FROM tasks WHERE complete = 'no' AND share = :share AND additional_info = :fd AND id <= :last_id";
-            $rows = DB::getAll($query, $params);
-            foreach ($rows as $row) {
+            $query = "SELECT id FROM tasks WHERE complete = 'no' AND share = :share AND full_path = :full_path AND id <= :last_id";
+            $tasks_ids = DB::getAllValues($query, $params);
+            foreach ($tasks_ids as $tasks_id) {
                 // Maybe the file is empty?
-                $file_fullpath = get_share_landing_zone($share) . '/' . $row->full_path;
+                $file_fullpath = get_share_landing_zone($share) . '/' . $full_path;
                 $size = gh_filesize($file_fullpath);
                 if ($size == 0) {
                     $query = "UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE id = :task_id";
-                    DB::execute($query, array('task_id' => $row->id));
+                    DB::execute($query, array('task_id' => $tasks_id));
                 } else {
                     // Ignore
-                    Log::debug("File pointer to $share/$row->full_path was closed without being written to. Ignoring.");
+                    Log::debug("File pointer to $share/$full_path was closed without being written to. Ignoring.");
                 }
             }
 
-            $query = "DELETE FROM tasks WHERE complete = 'no' AND share = :share AND additional_info = :fd AND id <= :last_id";
+            $query = "DELETE FROM tasks WHERE complete = 'no' AND share = :share AND full_path = :full_path AND id <= :last_id";
             DB::execute($query, $params);
         }
     }
