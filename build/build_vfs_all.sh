@@ -23,8 +23,16 @@ if [ "$ARCH" = "i686" ]; then
 fi
 
 for version in 4.12.0 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
-    # shellcheck source=build_vfs.sh
-    source "${GREYHOLE_INSTALL_DIR}/build_vfs.sh" ${version}
+    GREYHOLE_COMPILED_MODULE="$(ls -1 "$GREYHOLE_VFS_BUILD_DIR"/samba-$version/bin/default/source3/modules/libvfs*greyhole.so)"
+    if [ -f "$GREYHOLE_COMPILED_MODULE" ]; then
+        # Already compiled in the past; just re-compile with updated source (is a symlink to $GREYHOLE_INSTALL_DIR/samba-module/*.c
+        echo "Compiling Greyhole VFS module for samba-${version}... "
+        (cd "$GREYHOLE_VFS_BUILD_DIR"/samba-$version ; sudo make -j >/dev/null)
+        echo "Greyhole VFS module successfully compiled into ${GREYHOLE_COMPILED_MODULE}"
+    else
+        # shellcheck source=build_vfs.sh
+        source "${GREYHOLE_INSTALL_DIR}/build_vfs.sh" ${version}
+    fi
 
     M=$(echo ${version} | awk -F'.' '{print $1}') # major
     m=$(echo ${version} | awk -F'.' '{print $2}') # minor
