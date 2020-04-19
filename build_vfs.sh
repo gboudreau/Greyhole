@@ -111,8 +111,9 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     elif [[ ${m} -gt 8 ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
     fi
-    echo ./configure "${CONF_OPTIONS}" > gh_vfs_build.log
-    ./configure "${CONF_OPTIONS}" >>gh_vfs_build.log 2>&1 &
+    echo "./configure ${CONF_OPTIONS}" > gh_vfs_build.log
+    # shellcheck disable=SC2086
+    ./configure ${CONF_OPTIONS} >>gh_vfs_build.log 2>&1 &
     PROC_ID=$!
 	fi
 
@@ -159,10 +160,14 @@ done
 echo -en "\r${ceol}"
 echo
 
+V=$(echo "${version}" | awk -F'.' '{print $1$2}')
+GREYHOLE_COMPILED_MODULE="$(pwd)/greyhole-samba${V}.so"
+export GREYHOLE_COMPILED_MODULE
+
 if [[ ${M} -eq 3 ]]; then
 	COMPILED_MODULE="source3/bin/greyhole.so"
 else
-	COMPILED_MODULE=$(ls -1 "$(pwd)/bin/default/source3/modules/libvfs*greyhole.so")
+	COMPILED_MODULE=$(ls -1 "$(pwd)"/bin/default/source3/modules/libvfs*greyhole.so)
 fi
 
 if [[ ! -f ${COMPILED_MODULE} ]]; then
