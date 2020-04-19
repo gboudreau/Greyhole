@@ -170,7 +170,7 @@ final class SambaSpool {
             /** @noinspection PhpUndefinedVariableInspection */
             $db_spool->close_task($act, $share, $fd, $close_tasks);
         }
-        // We also need to 'execute' all close tasks, now that we're just all fwrite have been logged
+        // We also need to 'execute' all close tasks, now that all fwrite have been logged
         $db_spool->close_all_tasks($close_tasks);
 
         if ($new_tasks > 0) {

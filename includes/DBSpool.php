@@ -350,7 +350,7 @@ final class DBSpool {
                     DB::execute($query, array('task_id' => $row->id));
                 } else {
                     // Ignore
-                    Log::debug("File pointer to $row->full_path was closed without being written to. Ignoring.");
+                    Log::debug("File pointer to $share/$row->full_path was closed without being written to. Ignoring.");
                 }
             }
 
