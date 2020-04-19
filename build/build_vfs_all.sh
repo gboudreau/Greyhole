@@ -5,7 +5,7 @@
 set -e
 
 # shellcheck disable=SC2155
-export GREYHOLE_INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export GREYHOLE_INSTALL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." >/dev/null 2>&1 && pwd )"
 # shellcheck disable=SC2155
 export GREYHOLE_VFS_BUILD_DIR=$(dirname "${GREYHOLE_INSTALL_DIR}")
 
