@@ -36,6 +36,11 @@ final class SambaUtils {
             exec("/etc/init.d/smbd restart");
         } else if (is_file('/etc/systemd/system/multi-user.target.wants/smb.service')) {
             exec("systemctl restart smb.service");
+        } else if (is_file('/usr/bin/supervisorctl')) {
+            exec("/usr/bin/supervisorctl status smbd", $out, $return);
+            if ($return === 0) {
+                exec("/usr/bin/supervisorctl restart smbd");
+            }
         } else {
             Log::critical("Couldn't find how to restart Samba. Please restart the Samba daemon manually.", Log::EVENT_CODE_SAMBA_RESTART_FAILED);
         }
