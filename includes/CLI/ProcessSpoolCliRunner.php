@@ -23,9 +23,14 @@ require_once('includes/CLI/AbstractCliRunner.php');
 class ProcessSpoolCliRunner extends AbstractCliRunner {
     public function run() {
         global $argv;
+
+        $start = time();
+
         Log::setAction(ACTION_INITIALIZE);
         Metastores::choose_metastores_backups();
-        $start = time();
+
+        Log::cleanStatusTable();
+
         while (time() - $start < 55) {
             SambaSpool::parse_samba_spool();
             if (!array_contains($argv, '--keepalive')) {

@@ -48,3 +48,11 @@ CREATE TABLE `checksums` (
 `last_checked` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
 PRIMARY KEY (`id`)
 ) ENGINE = MYISAM DEFAULT CHARSET=ascii;
+
+CREATE TABLE `status` (
+`id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+`date_time` timestamp NOT NULL DEFAULT current_timestamp(),
+`action` enum('initialize','unknown','daemon','pause','resume','fsck','balance','stats','status','logs','trash','queue','iostat','getuid','worker','symlinks','replace','for','gone','going','thaw','debug','metadata','share','check_pool','sleep','read_smb_spool','fsck_file') DEFAULT NULL,
+`log` text NOT NULL,
+UNIQUE KEY `id` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;

@@ -40,11 +40,21 @@ class StatusCliRunner extends AbstractAnonymousCliRunner {
             $this->log("Currently working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
         }
 
-        exec("tail -10 " . escapeshellarg(Config::get(CONFIG_GREYHOLE_LOG_FILE)), $last_log_lines);
+        $q = "SELECT * FROM status ORDER BY id DESC LIMIT 15";
+        $logs = array_reverse(DB::getAll($q));
+
         $this->log();
         $this->log("Recent log entries:");
-        $this->log("  " . implode("\n  ", $last_log_lines));
+        foreach ($logs as $log) {
+            $date = date("M d H:i:s", strtotime($log->date_time));
+            $log_text = sprintf("%s%s",
+                "$date $log->action: ",
+                $log->log
+            );
+            $this->log("  $log_text");
+        }
 
+        exec("tail -1 " . escapeshellarg(Config::get(CONFIG_GREYHOLE_LOG_FILE)), $last_log_lines);
         $last_log_line = $last_log_lines[count($last_log_lines)-1];
         $last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
         $raw_last_log_line = mb_substr($last_log_line, 16);

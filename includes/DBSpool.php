@@ -180,6 +180,8 @@ final class DBSpool {
 
                 Md5Task::check_md5_workers();
 
+                Log::cleanStatusTable();
+
                 // Email any unsent fsck reports found in /usr/share/greyhole/
                 foreach (array('fsck_checksums.log', 'fsck_files.log') as $log_file) {
                     $log = new FSCKLogFile($log_file);

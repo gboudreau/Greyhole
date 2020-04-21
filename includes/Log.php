@@ -172,11 +172,26 @@ final class Log {
         self::_log(self::CRITICAL, $text, $event_code);
     }
 
+    private static $last_log;
+
     private static function _log($local_log_level, $text, $event_code) {
         if (self::$action == 'test-config') {
             $greyhole_log_file = NULL;
             $use_syslog = FALSE;
+        } elseif (self::$action == ACTION_INITIALIZE && !DaemonRunner::isCurrentProcessDaemon()) {
+            return;
         } else {
+            if (DaemonRunner::isCurrentProcessDaemon() && self::$action != ACTION_READ_SAMBA_POOL) {
+                try {
+                    if ($text != static::$last_log) { // Don't log duplicates (Sleeping... for example)
+                        $q = "INSERT INTO status SET log = :log, action = :action";
+                        DB::insert($q, array('log' => $text, 'action' => empty(self::$action) ? ACTION_UNKNOWN : self::$action));
+                    }
+                    static::$last_log = $text;
+                } catch (\Exception $ex) {
+                    error_log("[Greyhole] Error logging status in database: " . $ex->getMessage());
+                }
+            }
             if ($local_log_level > self::$level) {
                 return;
             }
@@ -229,6 +244,13 @@ final class Log {
         if ($local_log_level === self::CRITICAL) {
             exit(1);
         }
+    }
+
+    public static function cleanStatusTable() {
+        $q = "SELECT MAX(id) FROM status";
+        $max_id = DB::getFirstValue($q);
+        $q = "DELETE FROM status WHERE id < :id";
+        DB::execute($q, array('id' => max(0, $max_id - 100)));
     }
 }
 

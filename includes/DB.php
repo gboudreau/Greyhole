@@ -190,6 +190,10 @@ final class DB {
             DB::migrate_13_checksums();
             Settings::set('db_version', 13);
         }
+        if ($db_version < 14) {
+            DB::migrate_14_status();
+            Settings::set('db_version', 14);
+        }
     }
 
     // Migration #1 (complete = frozen|thawed)
@@ -449,6 +453,11 @@ final class DB {
 
     private static function migrate_13_checksums() {
         $query = "CREATE TABLE IF NOT EXISTS `checksums` (`id` char(32) NOT NULL DEFAULT '', `share` varchar(255) CHARACTER SET utf8 NOT NULL DEFAULT '', `full_path` text CHARACTER SET utf8 NOT NULL, `checksum` char(32) NOT NULL DEFAULT '', `last_checked` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(), PRIMARY KEY (`id`)) ENGINE = MYISAM DEFAULT CHARSET=ascii";
+        DB::execute($query);
+    }
+
+    private static function migrate_14_status() {
+        $query = "CREATE TABLE IF NOT EXISTS `status` (`id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,`date_time` timestamp NOT NULL DEFAULT current_timestamp(),`action` enum('initialize','unknown','daemon','pause','resume','fsck','balance','stats','status','logs','trash','queue','iostat','getuid','worker','symlinks','replace','for','gone','going','thaw','debug','metadata','share','check_pool','sleep','read_smb_spool','fsck_file') DEFAULT NULL,`log` text NOT NULL,UNIQUE KEY `id` (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8";
         DB::execute($query);
     }
 

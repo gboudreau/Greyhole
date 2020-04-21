@@ -21,12 +21,19 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 class DaemonRunner extends AbstractRunner {
 
 	public static $was_idle = TRUE;
+	private static $process_is_daemon = FALSE;
+
+	public static function isCurrentProcessDaemon() {
+		return static::$process_is_daemon;
+	}
 
 	public function run() {
 		// Prevent multiple daemons from running simultaneously
 		if (self::isRunning()) {
 			die("Found an already running Greyhole daemon with PID " . self::getPID() . ".\nCan't start multiple Greyhole daemons.\nQuitting.\n");
 		}
+
+		static::$process_is_daemon = TRUE;
 
 		$log = "Greyhole (version %VERSION%) daemon started.";
 		Log::info($log);
