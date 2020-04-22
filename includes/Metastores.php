@@ -403,7 +403,7 @@ final class Metastores {
     }
 
     public static function remove_metafiles($share, $path, $filename) {
-        Log::debug("  Removing metadata files for $share" . (!empty($path) ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
+        Log::debug("  Removing metadata files for $share" . (!empty($path) && $path != '.' ? "/$path" : "") . ($filename!== null ? "/$filename" : ""));
         foreach (static::get_metafile_data_filenames($share, $path, $filename) as $f) {
             @unlink($f);
             Log::debug("    Removed metadata file at $f");
