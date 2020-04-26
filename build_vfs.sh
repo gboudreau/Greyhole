@@ -36,6 +36,15 @@ if [[ ${version} = "current" ]]; then
 	version=$(/usr/sbin/smbd --version | awk '{print $2}' | awk -F'-' '{print $1}')
 fi
 
+echo "Installing build dependencies ..."
+if command -v apt-get >/dev/null; then
+    apt-get -y install build-essential python3-dev libgnutls28-dev pkg-config || true
+fi
+if command -v yum >/dev/null; then
+    yum -y install patch gcc python-devel gnutls-devel make rpcgen || true
+fi
+echo
+
 echo "Compiling Greyhole VFS module for samba-${version}... "
 
 if [[ -z ${GREYHOLE_INSTALL_DIR} ]]; then
@@ -124,6 +133,7 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
 	done
 	echo -en "\r${ceol}"
 	if ! wait "$PROC_ID"; then
+	  echo
 	  echo "Configuring Samba failed."
 	  echo "Hint : install the required dependencies. See step 3 in https://raw.githubusercontent.com/gboudreau/Greyhole/master/INSTALL"
 	  echo
