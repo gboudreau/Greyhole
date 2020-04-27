@@ -72,7 +72,7 @@ abstract class AbstractTask {
         return FALSE;
     }
 
-    protected function has_option($option) {
+    public function has_option($option) {
         return string_contains($this->additional_info, $option);
     }
 

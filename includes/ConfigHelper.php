@@ -754,7 +754,7 @@ final class SharesConfig {
         return $share;
     }
 
-    function getShareOptionsFromDrive($full_path, $sp_drive) {
+    public static function getShareOptionsFromDrive($full_path, $sp_drive) {
         $landing_zone = '';
         $share = FALSE;
         foreach (SharesConfig::getShares() as $share_name => $share_options) {

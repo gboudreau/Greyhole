@@ -213,6 +213,210 @@ function memory_check() {
     }
 }
 
+define('FSCK_COUNT_META_FILES',           1);
+define('FSCK_COUNT_META_DIRS',            2);
+define('FSCK_COUNT_LZ_FILES',             3);
+define('FSCK_COUNT_LZ_DIRS',              4);
+define('FSCK_COUNT_ORPHANS',              5);
+define('FSCK_COUNT_SYMLINK_TARGET_MOVED', 6);
+define('FSCK_COUNT_TOO_MANY_COPIES',      7);
+define('FSCK_COUNT_MISSING_COPIES',       8);
+define('FSCK_COUNT_GONE_OK',              9);
+define('FSCK_PROBLEM_NO_COPIES_FOUND',   10);
+define('FSCK_PROBLEM_TOO_MANY_COPIES',   11);
+define('FSCK_PROBLEM_WRONG_COPY_SIZE',   12);
+define('FSCK_PROBLEM_TEMP_FILE',         13);
+
+class FSCKReport {
+    /** @var int */
+    public $start;
+    /** @var int */
+    public $end;
+    /** @var string */
+    public $what;
+    /** @var bool */
+    public $send_via_email;
+    /** @var int[] */
+    public $counts;
+    /** @var array */
+    public $found_problems;
+
+    /** @var string[] */
+    protected static $dirs = [];
+
+    public function __construct($what) {
+        $this->start          = time();
+        $this->end            = NULL;
+        $this->what           = $what;
+        $this->send_via_email = FALSE;
+
+        $this->counts = array();
+        foreach (array(FSCK_COUNT_META_FILES, FSCK_COUNT_META_DIRS, FSCK_COUNT_LZ_FILES, FSCK_COUNT_LZ_DIRS, FSCK_COUNT_ORPHANS, FSCK_COUNT_SYMLINK_TARGET_MOVED, FSCK_COUNT_TOO_MANY_COPIES, FSCK_COUNT_MISSING_COPIES, FSCK_COUNT_GONE_OK) as $name) {
+            $this->counts[$name] = 0;
+        }
+
+        $this->found_problems = array();
+        foreach (array(FSCK_PROBLEM_NO_COPIES_FOUND, FSCK_PROBLEM_TOO_MANY_COPIES, FSCK_PROBLEM_WRONG_COPY_SIZE, FSCK_PROBLEM_TEMP_FILE) as $name) {
+            $this->found_problems[$name] = array();
+        }
+    }
+
+    public function count($what) {
+        $this->counts[$what]++;
+    }
+
+    public function found_problem($what, $value = NULL, $key = NULL) {
+        if (isset($this->counts[$what])) {
+            $this->count($what);
+        } elseif (!empty($key)) {
+            $this->found_problems[$what][$key] = $value;
+        } else {
+            $this->found_problems[$what][] = $value;
+        }
+    }
+
+    /**
+     * @param bool $include_trash_size
+     *
+     * @return string
+     */
+    public function get_email_body($include_trash_size) {
+        if (empty($this->end)) {
+            $this->end = time();
+        }
+
+        $displayable_duration = duration_to_human($this->end - $this->start);
+
+        $report  = "Scanned directory: " . $this->what . "\n\n";
+        $report .= "Started:  " . date('Y-m-d H:i:s', $this->start) . "\n";
+        $report .= "Ended:    " . date('Y-m-d H:i:s', $this->end) . "\n";
+        $report .= "Duration: $displayable_duration\n\n";
+        $report .= "Landing Zone (shares):\n";
+        $report .= "  Scanned " . number_format($this->counts[FSCK_COUNT_LZ_DIRS]) . " directories\n";
+        $report .= "  Found " . number_format($this->counts[FSCK_COUNT_LZ_FILES]) . " files\n\n";
+
+        if ($this->counts[FSCK_COUNT_META_DIRS] > 0) {
+            $report .= "Metadata Store:\n";
+            $report .= "  Scanned " . number_format($this->counts[FSCK_COUNT_META_DIRS]) . " directories\n";
+            $report .= "  Found " . number_format($this->counts[FSCK_COUNT_META_FILES]) . " files\n";
+            $report .= "  Found " . number_format($this->counts[FSCK_COUNT_ORPHANS]) . " orphans\n\n";
+        }
+
+        // Errors
+        if (empty($this->found_problems[FSCK_PROBLEM_NO_COPIES_FOUND]) && empty($this->found_problems[FSCK_PROBLEM_WRONG_COPY_SIZE])) {
+            $report .= "No problems found.\n\n";
+        } else {
+            $report .= "Problems:\n";
+
+            $problems = $this->found_problems[FSCK_PROBLEM_NO_COPIES_FOUND];
+            if (!empty($problems)) {
+                $problems = array_unique($problems);
+                sort($problems);
+                $report .= "  Found " . count($problems) . " files in the metadata store for which no file copies were found.\n";
+                if (FsckTask::getCurrentTask()->has_option(OPTION_DEL_ORPHANED_METADATA)) {
+                    $report .= "    Those metadata files have been deleted, since you used the --delete-orphaned-metadata option. They will not re-appear in the future.\n";
+                } else {
+                    $report .= "    Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.\n";
+                    /** @noinspection RequiredAttributes */
+                    $report .= "    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store using \"greyhole --delete-metadata='<path>'\", where <path> is one of the value listed below.\n";
+                }
+                $report .= "  Files with no copies:\n";
+                $report .= "    " . implode("\n    ", $problems) . "\n\n";
+            }
+
+            $problems = $this->found_problems[FSCK_PROBLEM_WRONG_COPY_SIZE];
+            if (!empty($problems)) {
+                $report .= "  Found " . count($problems) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. The invalid copies have been moved into the trash.\n";
+                foreach ($problems as $real_file_path => $info_array) {
+                    $report .= "    $real_file_path is " . number_format($info_array[0]) . " bytes; should be " . number_format($info_array[1]) . " bytes.\n";
+                }
+                $report .= "\n\n";
+            }
+        }
+
+        // Warnings
+        /** @noinspection PhpStatementHasEmptyBodyInspection */
+        if ($this->counts[FSCK_COUNT_TOO_MANY_COPIES] == 0 && $this->counts[FSCK_COUNT_SYMLINK_TARGET_MOVED] == 0 && count($this->found_problems[FSCK_PROBLEM_TEMP_FILE]) == 0 && $this->counts[FSCK_COUNT_GONE_OK] == 0) {
+            // Nothing to say...
+        } else {
+            $report .= "Notices:\n";
+
+            if ($this->counts[FSCK_COUNT_TOO_MANY_COPIES] > 0) {
+                $problems = array_unique($this->found_problems[FSCK_PROBLEM_TOO_MANY_COPIES]);
+                $report .= "  Found " . $this->counts[FSCK_COUNT_TOO_MANY_COPIES] . " files for which there was too many file copies. Deleted (or moved in trash) files:\n";
+                $report .= "    " . implode("\n    ", $problems) . "\n\n";
+            }
+
+            if ($this->counts[FSCK_COUNT_SYMLINK_TARGET_MOVED] > 0) {
+                $report .= "  Found " . $this->counts[FSCK_COUNT_SYMLINK_TARGET_MOVED] . " files in the Landing Zone that were pointing to a now gone copy.
+    Those symlinks were updated to point to the new location of those file copies.\n\n";
+            }
+
+            if (count($this->found_problems[FSCK_PROBLEM_TEMP_FILE]) > 0) {
+                $problems = $this->found_problems[FSCK_PROBLEM_TEMP_FILE];
+                $report .= "  Found " . count($problems) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the trash):\n";
+                $report .= "    " . implode("\n    ", $problems) . "\n\n";
+            }
+
+            if ($this->counts[FSCK_COUNT_GONE_OK] > 0) {
+                $report .= "  Found " . $this->counts[FSCK_COUNT_GONE_OK] . " missing files that are in a storage pool drive marked Temporarily-Gone.
+  If this drive is gone for good, you should execute the following command, and remove the drive from your configuration file:
+    greyhole --gone=path
+  where path is one of:\n";
+                $report .= "    " . implode("\n    ", array_keys(StoragePool::get_gone_ok_drives())) . "\n\n";
+            }
+        }
+
+        if ($include_trash_size) {
+            $report .= "==========\n\n";
+            $report .= static::get_trash_size_report();
+        }
+
+        return $report;
+    }
+
+    /**
+     * @param FSCKReport $fsck_report
+     */
+    public function mergeReport($fsck_report) {
+        if (empty(static::$dirs)) {
+            $this->start = $fsck_report->start;
+        }
+        $this->end = @$fsck_report->end;
+
+        static::$dirs[] = $fsck_report->what;
+        $this->what = "\n  - " . implode("\n  - ", static::$dirs);
+
+        $this->send_via_email = $fsck_report->send_via_email;
+
+        foreach (array(FSCK_COUNT_META_FILES, FSCK_COUNT_META_DIRS, FSCK_COUNT_LZ_FILES, FSCK_COUNT_LZ_DIRS, FSCK_COUNT_ORPHANS, FSCK_COUNT_SYMLINK_TARGET_MOVED, FSCK_COUNT_TOO_MANY_COPIES, FSCK_COUNT_MISSING_COPIES, FSCK_COUNT_GONE_OK) as $name) {
+            $this->counts[$name] += $fsck_report->counts[$name];
+        }
+
+        foreach (array(FSCK_PROBLEM_NO_COPIES_FOUND, FSCK_PROBLEM_TOO_MANY_COPIES, FSCK_PROBLEM_WRONG_COPY_SIZE, FSCK_PROBLEM_TEMP_FILE) as $name) {
+            if (!empty($fsck_report->found_problems[$name])) {
+                $this->found_problems[$name] = array_merge($this->found_problems[$name], $fsck_report->found_problems[$name]);
+            }
+        }
+    }
+
+    public static function get_trash_size_report() {
+        $report = "Trash size:\n";
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            $trash_path = clean_dir("$sp_drive/.gh_trash");
+            if (is_dir($trash_path)) {
+                $report .= "  $trash_path = " . trim(exec("du -sh " . escapeshellarg($trash_path) . " | awk '{print $1}'"))."\n";
+            } else if (!file_exists($sp_drive)) {
+                $report .= "  $sp_drive = N/A\n";
+            } else {
+                $report .= "  $trash_path = empty\n";
+            }
+        }
+        $report .= "\n";
+        return $report;
+    }
+}
+
 class FSCKWorkLog {
     const FILE = '/usr/share/greyhole/fsck_work_log.dat';
 
@@ -249,8 +453,8 @@ class FSCKWorkLog {
             if ($task->id == $task_id) {
                 $task->status = static::STATUS_COMPLETE;
                 $fsck_task = FsckTask::getCurrentTask();
-                $fsck_task->end_report();
                 $task->report = $fsck_task->get_fsck_report();
+                $task->report->end = time();
                 static::saveToDisk($fsck_work_log);
                 break;
             }
@@ -266,11 +470,19 @@ class FSCKWorkLog {
                 // Email report for fsck
                 $subject = "[Greyhole] fsck of $fsck_work_log->dir completed on " . exec('hostname');
 
-                $fsck_report_body = "==========\n\n";
-                foreach ($fsck_work_log->tasks as $task) {
-                    $is_last = array_search($task, $fsck_work_log->tasks) == count($fsck_work_log->tasks)-1;
-                    $fsck_report_body .= FsckTask::get_fsck_report_email_body($task->report, $is_last);
-                    $fsck_report_body .= "==========\n\n";
+                if (count($fsck_work_log->tasks) == 1) {
+                    $task = first($fsck_work_log->tasks);
+                    if (empty($task->report)) {
+                        $task->report = FsckTask::getCurrentTask()->get_fsck_report();
+                    }
+                    $fsck_report_body = $task->report->get_email_body(FALSE);
+                } else {
+                    //  All shares
+                    $report = new FSCKReport(NULL);
+                    foreach ($fsck_work_log->tasks as $task) {
+                        $report->mergeReport($task->report);
+                    }
+                    $fsck_report_body = $report->get_email_body(TRUE);
                 }
 
                 if ($send_email) {
@@ -338,7 +550,7 @@ class FSCKLogFile {
     private function shouldSendViaEmail() {
         $this->getBody();
         $fsck_report = FsckTask::getCurrentTask()->get_fsck_report();
-        return (@$fsck_report['send_via_email'] === TRUE);
+        return (@$fsck_report->send_via_email === TRUE);
     }
 
     private function getBody() {
@@ -347,8 +559,9 @@ class FSCKLogFile {
             return file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
         } else if ($this->filename == 'fsck_files.log') {
             $fsck_report = unserialize(file_get_contents($logfile));
+            /** @var FSCKReport $fsck_report */
             unlink($logfile);
-            return FsckTask::get_fsck_report_email_body($fsck_report, FALSE) . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
+            return $fsck_report->get_email_body(FALSE) . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
         } else {
             return '[empty]';
         }
@@ -398,7 +611,7 @@ class FSCKLogFile {
      */
     public static function saveFSCKReport($send_via_email, $task) {
         $fsck_report = $task->get_fsck_report();
-        $fsck_report['send_via_email'] = $send_via_email;
+        $fsck_report->send_via_email = $send_via_email;
         $logfile = self::PATH . '/fsck_files.log';
         file_put_contents($logfile, serialize($fsck_report));
     }

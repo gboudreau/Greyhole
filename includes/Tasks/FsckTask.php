@@ -22,6 +22,7 @@ class FsckTask extends AbstractTask {
 
     protected static $current_task;
 
+    /** @var FSCKReport */
     private $fsck_report;
 
     public function __construct($task) {
@@ -200,7 +201,7 @@ class FsckTask extends AbstractTask {
     public function gh_fsck($path, $share, $storage_path = FALSE) {
         $path = clean_dir($path);
         Log::debug("Entering $path");
-        $this->fsck_report['landing_zone']['num_dirs']++;
+        $this->fsck_report->count(FSCK_COUNT_LZ_DIRS);
 
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (StoragePool::getDriveFromPath($path) == $sp_drive && StoragePool::is_pool_drive($sp_drive)) {
@@ -282,7 +283,7 @@ class FsckTask extends AbstractTask {
         while (($filename = readdir($handle)) !== FALSE) {
             if ($filename != '.' && $filename != '..') {
                 if (@is_dir("$root$path/$filename")) {
-                    $this->fsck_report['metastore']['num_dirs']++;
+                    $this->fsck_report->count(FSCK_COUNT_META_DIRS);
                     $this->gh_fsck_metastore($root, "$path/$filename", $share);
                 } else {
                     // Found a metafile
@@ -321,10 +322,10 @@ class FsckTask extends AbstractTask {
             }
         }
         if ($source == 'metastore') {
-            $this->fsck_report['metastore']['num_files']++;
+            $this->fsck_report->count(FSCK_COUNT_META_FILES);
         }
         if ($file_type !== FALSE) {
-            @$this->fsck_report['landing_zone']['num_files']++;
+            $this->fsck_report->count(FSCK_COUNT_LZ_FILES);
         }
         if ($file_type == 'file') {
             if($storage_path === FALSE) {
@@ -357,7 +358,7 @@ class FsckTask extends AbstractTask {
 
             // Check if this is a temporary file; if so, just delete it.
             if (StorageFile::is_temp_file($full_path)) {
-                $this->fsck_report['temp_files'][] = $full_path;
+                $this->fsck_report->found_problem(FSCK_PROBLEM_TEMP_FILE, $full_path);
                 Trash::trash_file($full_path);
                 return;
             }
@@ -365,7 +366,7 @@ class FsckTask extends AbstractTask {
             if ($storage_path !== FALSE) {
                 if ($this->has_option(OPTION_ORPHANED)) {
                     Log::info("$full_path is an orphaned file; we'll proceed to find all copies and symlink this file appropriately.");
-                    $this->fsck_report['orphaned']['num_orphans']++;
+                    $this->fsck_report->found_problem(FSCK_COUNT_ORPHANS);
                 } else {
                     Log::info("$full_path is an orphaned file, but we're not looking for orphans. For Greyhole to recognize this file, initiate a fsck with the --find-orphaned-files option.");
                     return;
@@ -437,7 +438,7 @@ class FsckTask extends AbstractTask {
                         // Let's not replace this copy yet...
                         $file_copies_inodes[$metafile->path] = $metafile->path;
                         $num_ok++;
-                        $this->fsck_report['gone_ok']++;
+                        $this->fsck_report->count(FSCK_COUNT_GONE_OK);
                     }
                 } else if (is_dir($metafile->path)) {
                     Log::debug("Found a directory that should be a file! Will try to remove it, if it's empty.");
@@ -564,7 +565,7 @@ class FsckTask extends AbstractTask {
                     } else {
                         Log::warn("  A file copy with a different file size than the original was found: $real_full_path is " . number_format($file_size) . " bytes. Original: $original_file_path is " . number_format($expected_file_size) . " bytes.", Log::EVENT_CODE_FSCK_SIZE_MISMATCH_FILE_COPY_FOUND);
                         Trash::trash_file($real_full_path);
-                        $this->fsck_report['wrong_file_size'][clean_dir($real_full_path)] = array($file_size, $expected_file_size, $original_file_path);
+                        $this->fsck_report->found_problem(FSCK_PROBLEM_WRONG_COPY_SIZE, array($file_size, $expected_file_size, $original_file_path), clean_dir($real_full_path));
                     }
                     // Will not count that copy as a valid copy!
                     unset($file_copies_inodes[$key]);
@@ -581,7 +582,7 @@ class FsckTask extends AbstractTask {
                 if (!$found_linked_metafile) {
                     // ... the old one points to a drive that was replaced
                     Log::info('  Symlink target moved. Updating symlink.');
-                    $this->fsck_report['symlink_target_moved']++;
+                    $this->fsck_report->found_problem(FSCK_COUNT_SYMLINK_TARGET_MOVED);
                 } else {
                     // ... it was missing
                     Log::info('  Symlink was missing. Creating new symlink.');
@@ -597,7 +598,7 @@ class FsckTask extends AbstractTask {
         } else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
             Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool: "' . clean_dir("$share/$file_path/$filename") . '". ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')), Log::EVENT_CODE_FSCK_NO_FILE_COPIES);
             if ($source == 'metastore' || Metastores::get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
-                $this->fsck_report['no_copies_found_files'][clean_dir("$share/$file_path/$filename")] = TRUE;
+                $this->fsck_report->found_problem(FSCK_PROBLEM_NO_COPIES_FOUND, clean_dir("$share/$file_path/$filename"));
             }
             if (is_link("$landing_zone/$file_path/$filename")) {
                 Trash::trash_file("$landing_zone/$file_path/$filename");
@@ -613,8 +614,8 @@ class FsckTask extends AbstractTask {
         } else if (count($file_copies_inodes) < $num_copies_required && $num_copies_required > 0) {
             // Create new copies
             Log::info("  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
-            if (isset($this->fsck_report['missing_copies'])) {
-                $this->fsck_report['missing_copies']++;
+            if ($this->fsck_report) {
+                $this->fsck_report->found_problem(FSCK_COUNT_MISSING_COPIES);
             }
             clearstatcache(); $filesize = gh_filesize($original_file_path);
             $file_metafiles = Metastores::create_metafiles($share, "$file_path/$filename", $num_copies_required, $filesize, $file_metafiles);
@@ -723,7 +724,7 @@ class FsckTask extends AbstractTask {
                     Log::info("  File is locked. Will not remove copies at this time. The next fsck will try to remove copies again.");
                     return;
                 }
-                $this->fsck_report['too_many_copies']++;
+                $this->fsck_report->found_problem(FSCK_COUNT_TOO_MANY_COPIES);
 
                 $local_target_drives = array_values(StoragePool::choose_target_drives(0, TRUE, $share, $file_path));
 
@@ -755,7 +756,7 @@ class FsckTask extends AbstractTask {
                                 Log::debug("    File copy is locked. Won't remove it.");
                                 continue;
                             }
-                            $this->fsck_report['too_many_files'][] = $key;
+                            $this->fsck_report->found_problem(FSCK_PROBLEM_TOO_MANY_COPIES, $key);
                             Log::debug("    Removing copy at $key");
                             unset($file_copies_inodes[gh_fileinode($key)]);
                             Trash::trash_file($key);
@@ -824,147 +825,23 @@ class FsckTask extends AbstractTask {
         gh_symlink($target, $symlink);
     }
 
+    /**
+     * @param $fsck_report FSCKReport
+     */
     public function set_fsck_report($fsck_report) {
         $this->fsck_report = $fsck_report;
     }
 
     public function initialize_fsck_report($what) {
-        $fsck_report = array();
-        $fsck_report['start'] = time();
-        $fsck_report['what'] = $what;
-        $fsck_report['metastore'] = array();
-        $fsck_report['metastore']['num_dirs'] = 0;
-        $fsck_report['metastore']['num_files'] = 0;
-        $fsck_report['orphaned']['num_orphans'] = 0;
-        $fsck_report['landing_zone'] = array();
-        $fsck_report['landing_zone']['num_dirs'] = 0;
-        $fsck_report['landing_zone']['num_files'] = 0;
-        $fsck_report['no_copies_found_files'] = array();
-        $fsck_report['symlink_target_moved'] = 0;
-        $fsck_report['too_many_copies'] = 0;
-        $fsck_report['too_many_files'] = array();
-        $fsck_report['missing_copies'] = 0;
-        $fsck_report['wrong_file_size'] = array();
-        $fsck_report['temp_files'] = array();
-        $fsck_report['gone_ok'] = 0;
-        $this->fsck_report = $fsck_report;
+        $this->fsck_report = new FSCKReport($what);
     }
 
-    public function end_report() {
-        $this->fsck_report['end'] = time();
-    }
-
+    /**
+     * @return FSCKReport
+     */
     public function get_fsck_report() {
         return $this->fsck_report;
     }
-
-    public static function get_fsck_report_email_body($fsck_report = NULL, $include_trash_size = TRUE) {
-        if (empty($fsck_report)) {
-            $fsck_report = static::getCurrentTask()->get_fsck_report();
-        }
-
-        if (empty($fsck_report['end'])) {
-            $fsck_report['end'] = time();
-        }
-
-        $displayable_duration = duration_to_human($fsck_report['end'] - $fsck_report['start']);
-
-        $report = "Scanned directory: " . $fsck_report['what'] . "
-
-Started:  " . date('Y-m-d H:i:s', $fsck_report['start']) . "
-Ended:    " . date('Y-m-d H:i:s', $fsck_report['end']) . "
-Duration: $displayable_duration
-
-Metadata Store:
-  Found " . number_format($fsck_report['metastore']['num_dirs']) . " directories
-  Found " . number_format($fsck_report['metastore']['num_files']) . " files
-
-Landing Zone (shares):
-  Found " . number_format($fsck_report['landing_zone']['num_dirs']) . " directories
-  Found " . number_format($fsck_report['landing_zone']['num_files']) . " files
-  Found " . number_format($fsck_report['orphaned']['num_orphans']) . " orphans
-";
-
-        // Errors
-        if (empty($fsck_report['no_copies_found_files']) && count($fsck_report['wrong_file_size']) == 0) {
-            $report .= "\nNo problems found.\n\n";
-        } else {
-            $report .= "\nProblems:\n";
-
-            if (!empty($fsck_report['no_copies_found_files'])) {
-                ksort($fsck_report['no_copies_found_files']);
-                $report .= "  Found " . count($fsck_report['no_copies_found_files']) . " files in the metadata store for which no file copies were found.\n";
-                if (static::getCurrentTask()->has_option(OPTION_DEL_ORPHANED_METADATA)) {
-                    $report .= "    Those metadata files have been deleted, since you used the --delete-orphaned-metadata option. They will not re-appear in the future.\n";
-                } else {
-                    $report .= "    Those files were removed from the Landing Zone. (i.e. those files are now gone!) They will re-appear in your shares if a copy re-appear and fsck is run.\n";
-                    /** @noinspection RequiredAttributes */
-                    $report .= "    If you don't want to see those files listed here each time fsck runs, delete the corresponding files from the metadata store using \"greyhole --delete-metadata='<path>'\", where <path> is one of the value listed below.\n";
-                }
-                $report .= "  Files with no copies:\n";
-                $report .= "    " . implode("\n    ", array_keys($fsck_report['no_copies_found_files'])) . "\n\n";
-            }
-
-            if (count($fsck_report['wrong_file_size']) > 0) {
-                $report .= "  Found " . count($fsck_report['wrong_file_size']) . " file copies with the wrong file size. Those files don't have the same file size as the original files available on your shares. The invalid copies have been moved into the trash.\n";
-                foreach ($fsck_report['wrong_file_size'] as $real_file_path => $info_array) {
-                    $report .= "    $real_file_path is " . number_format($info_array[0]) . " bytes; should be " . number_format($info_array[1]) . " bytes.\n";
-                }
-                $report .= "\n\n";
-            }
-        }
-
-        // Warnings
-        /** @noinspection PhpStatementHasEmptyBodyInspection */
-        if ($fsck_report['too_many_copies'] == 0 && $fsck_report['symlink_target_moved'] == 0 && count($fsck_report['temp_files']) == 0 && $fsck_report['gone_ok'] == 0) {
-            // Nothing to say...
-        } else {
-            $report .= "Notices:\n";
-
-            if ($fsck_report['too_many_copies'] > 0) {
-                $fsck_report['too_many_files'] = array_unique($fsck_report['too_many_files']);
-
-                $report .= "  Found " . $fsck_report['too_many_copies'] . " files for which there was too many file copies. Deleted (or moved in trash) files:\n";
-                $report .= "    " . implode("\n    ", $fsck_report['too_many_files']) . "\n\n";
-            }
-
-            if ($fsck_report['symlink_target_moved'] > 0) {
-                $report .= "  Found " . $fsck_report['symlink_target_moved'] . " files in the Landing Zone that were pointing to a now gone copy.
-    Those symlinks were updated to point to the new location of those file copies.\n\n";
-            }
-
-            if (count($fsck_report['temp_files']) > 0) {
-                $report .= "  Found " . count($fsck_report['temp_files']) . " temporary files, which are leftovers of interrupted Greyhole executions. The following temporary files were deleted (or moved into the trash):\n";
-                $report .= "    " . implode("\n    ", $fsck_report['temp_files']) . "\n\n";
-            }
-
-            if ($fsck_report['gone_ok'] > 0) {
-                $report .= "  Found " . $fsck_report['gone_ok'] . " missing files that are in a storage pool drive marked Temporarily-Gone.
-  If this drive is gone for good, you should execute the following command, and remove the drive from your configuration file:
-    greyhole --gone=path
-  where path is one of:\n";
-                $report .= "    " . implode("\n    ", array_keys(StoragePool::get_gone_ok_drives())) . "\n\n";
-            }
-        }
-
-        if ($include_trash_size) {
-            $report .= "==========\n\nTrash size:\n";
-            foreach (Config::storagePoolDrives() as $sp_drive) {
-                $trash_path = clean_dir("$sp_drive/.gh_trash");
-                if (is_dir($trash_path)) {
-                    $report .= "  $trash_path = " . trim(exec("du -sh " . escapeshellarg($trash_path) . " | awk '{print $1}'"))."\n";
-                } else if (!file_exists($sp_drive)) {
-                    $report .= "  $sp_drive = N/A\n";
-                } else {
-                    $report .= "  $trash_path = empty\n";
-                }
-            }
-            $report .= "\n";
-        }
-
-        return $report;
-    }
-
 }
 
 ?>
