@@ -69,6 +69,81 @@ final class SambaSpool {
                 Log::debug("Processing Samba spool...");
             }
 
+            // Sometimes, the modification timestamps of the spooled files (%T@ above) are the same!
+            // This sorting function will ensure that writes are after open and before close tasks.
+            $fct_sort_filename = function ($file1, $file2) {
+                $file1 = explode(' ', $file1);
+                $ts1 = array_shift($file1);
+                $file1 = implode(' ', $file1);
+
+                $file2 = explode(' ', $file2);
+                $ts2 = array_shift($file2);
+                $file2 = implode(' ', $file2);
+
+                if ($ts1 < $ts2) {
+                    return -1;
+                }
+                if ($ts1 > $ts2) {
+                    return 1;
+                }
+
+                $is_file1_write = string_starts_with($file1, '/var/spool/greyhole/mem/');
+                $is_file2_write = string_starts_with($file2, '/var/spool/greyhole/mem/');
+                $bfile1 = str_replace(array('/var/spool/greyhole/mem/', '/var/spool/greyhole/'), '', $file1);
+                $bfile2 = str_replace(array('/var/spool/greyhole/mem/', '/var/spool/greyhole/'), '', $file2);
+                $ts1 = explode('-', $bfile1)[0];
+                $ts2 = explode('-', $bfile2)[0];
+                $seconds1 = substr($ts1, 0, 10);
+                $seconds2 = substr($ts2, 0, 10);
+                $useconds1 = substr($ts1, -6);
+                $useconds2 = substr($ts2, -6);
+                if ($seconds1 < $seconds2) {
+                    return -1;
+                }
+                if ($seconds1 > $seconds2) {
+                    return 1;
+                }
+                if ($is_file1_write && $is_file2_write) {
+                    return 0;
+                }
+                if (!$is_file1_write && !$is_file2_write) {
+                    if ($useconds1 < $useconds2) {
+                        return -1;
+                    }
+                    return 1;
+                }
+                if ($is_file1_write && !$is_file2_write) {
+                    $written_file = $file1;
+                    $other_file = $file2;
+                } else {
+                    $other_file = $file1;
+                    $written_file = $file2;
+                }
+                $log = file_get_contents($written_file);
+                if (preg_match('/^fwrite\n[^\n]+\n\d+\n([^\n]+)\n.*/', $log, $re)) {
+                    $written_filename = $re[1];
+
+                    $log = file_get_contents($other_file);
+                    if (preg_match('/^open\n[^\n]+\n([^\n]+)\n.*/', $log, $re)) {
+                        $other_filename = $re[1];
+                        if ($other_filename != $written_filename) {
+                            return 0;
+                        }
+                        return -1; // open before write
+                    }
+                    if (preg_match('/^close\n[^\n]+\n\d+\n([^\n]+)\n.*/', $log, $re)) {
+                        $other_filename = $re[1];
+                        if ($other_filename != $written_filename) {
+                            return 0;
+                        }
+                        return 1; // close after write
+                    }
+                    return 0;
+                }
+                return 0;
+            };
+            usort($files, $fct_sort_filename);
+
             foreach ($files as $file) {
                 // Remove timestamp prefix from $file (%T@ above), to get the complete filename
                 $file = explode(' ', $file);
