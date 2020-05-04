@@ -349,7 +349,7 @@ final class DBSpool {
                 $prop = 'full_path';
                 $params[$prop] = $full_path;
             } else {
-                $prop = '';
+                $prop = 'additional_info';
                 $params[$prop] = $fd;
             }
 
