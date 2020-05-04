@@ -85,12 +85,14 @@ void compute_hash(const char *str, char *out) {
 
 	rc = gnutls_hash_init(&hash_hnd, GNUTLS_DIG_SHA1);
 	if (rc < 0) {
+		snprintf(out, 1, "%s", "");
 		goto out;
 	}
 
 	rc = gnutls_hash(hash_hnd, str, strlen(str));
 	if (rc < 0) {
 		gnutls_hash_deinit(hash_hnd, NULL);
+		snprintf(out, 1, "%s", "");
 		goto out;
 	}
 
@@ -102,7 +104,6 @@ void compute_hash(const char *str, char *out) {
 
 out:
 	GNUTLS_FIPS140_SET_STRICT_MODE();
-	snprintf(out, 1, "%s", "");
 }
 
 static const char *smb_fname_str(const struct smb_filename *smb_fname) {
