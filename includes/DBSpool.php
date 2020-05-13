@@ -297,7 +297,8 @@ final class DBSpool {
             'additional_info' => $additional_info,
             'complete' => ( $action == 'write' ? 'no' : 'yes' ),
         );
-        DB::insert($query, $params);
+        $id = DB::insert($query, $params);
+        return $id;
     }
 
     public function close_task($act, $share, $fd, $fullpath, &$tasks) {
@@ -309,8 +310,20 @@ final class DBSpool {
             $prop_value = $fd;
         }
         if ($act === 'fwrite') {
-            $query = "UPDATE tasks SET complete = 'written' WHERE complete = 'no' AND share = :share AND $prop = :$prop";
-            DB::execute($query, array('share' => $share, $prop => $prop_value));
+            if (!empty($fullpath)) {
+                $q = "SELECT * FROM tasks WHERE action = 'write' AND complete IN ('written', 'no') AND share = :share AND $prop = :$prop";
+                $opened_task = DB::getFirst($q, array('share' => $share, $prop => $prop_value));
+                if (!$opened_task) {
+                    // Writing to a file that wasn't opened-for-writing...
+                    $id = $this->insert('write', $share, $fullpath, NULL, $fd);
+                    $q = "SELECT * FROM tasks WHERE id = :id";
+                    $opened_task = DB::getFirst($q, array('id' => $id));
+                }
+            }
+            if (empty($fullpath) || $opened_task->complete == 'no') {
+                $query = "UPDATE tasks SET complete = 'written' WHERE action = 'write' AND complete = 'no' AND share = :share AND $prop = :$prop";
+                DB::execute($query, array('share' => $share, $prop => $prop_value));
+            }
         }
         if ($act === 'close') {
             if ($this->use_old_vfs) {
