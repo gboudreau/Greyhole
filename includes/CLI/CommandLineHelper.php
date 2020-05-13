@@ -38,6 +38,7 @@ require_once('includes/CLI/GoingCliRunner.php');
 require_once('includes/CLI/GoneCliRunner.php');
 require_once('includes/CLI/IoStatsCliRunner.php');
 require_once('includes/CLI/LogsCliRunner.php');
+require_once('includes/CLI/MoveCliRunner.php');
 require_once('includes/CLI/MD5WorkerCliRunner.php');
 require_once('includes/CLI/PauseCliRunner.php');
 require_once('includes/CLI/ProcessSpoolCliRunner.php');
@@ -61,36 +62,37 @@ class CommandLineHelper {
     
     function __construct() {
         $this->cliCommandsDefinitions = array(
-            new CliCommandDefinition('help',             '?',   null,          null,                      "Display this help and exit."),
-            new CliCommandDefinition('daemon',           'D',   null,          'DaemonRunner',            "Start the daemon."),
-            new CliCommandDefinition('pause',            'P',   null,          'PauseCliRunner',          "Pause the daemon."),
-            new CliCommandDefinition('resume',           'M',   null,          'ResumeCliRunner',         "Resume a paused daemon."),
-            new CliCommandDefinition('fsck',             'f',   null,          'FsckCliRunner',           "Schedule a fsck."),
-            new CliCommandDefinition('cancel-fsck',      'C',   null,          'CancelFsckCliRunner',     "Cancel any ongoing or scheduled fsck operations."),
-            new CliCommandDefinition('balance',          'l',   null,          'BalanceCliRunner',        "Balance available space on storage pool drives."),
-            new CliCommandDefinition('balance-status',   '',    null,          'BalanceStatusCliRunner',  "Verify how balanced are the storage pool drives."),
-            new CliCommandDefinition('cancel-balance',   'B',   null,          'CancelBalanceCliRunner',  "Cancel any ongoing or scheduled balance operations."),
-            new CliCommandDefinition('stats',            's',   null,          'StatsCliRunner',          "Display storage pool statistics."),
-            new CliCommandDefinition('iostat',           'i',   null,          'IoStatsCliRunner',        "I/O statistics for your storage pool drives."),
-            new CliCommandDefinition('logs',             'L',   null,          'LogsCliRunner',           "Display new greyhole.log entries as they are logged."),
-            new CliCommandDefinition('status',           'S',   null,          'StatusCliRunner',         "Display what the Greyhole daemon is currently doing."),
-            new CliCommandDefinition('view-queue',       'q',   null,          'ViewQueueCliRunner',      "Display the current work queue."),
-            new CliCommandDefinition('empty-trash',      'a',   null,          'EmptyTrashCliRunner',     "Empty the trash."),
-            new CliCommandDefinition('debug:',           'b:',  '=filename',   'DebugCliRunner',          "Debug past file operations."),
-            new CliCommandDefinition('thaw::',           't::', '[=path]',     'ThawCliRunner',           "Thaw a frozen directory. Greyhole will start working on files inside <path>. If you don't supply an option, the list of frozen directories will be displayed."),
-            new CliCommandDefinition('wait-for::',       'w::', '[=path]',     'WaitForCliRunner',        "Tell Greyhole that the missing drive at <path> will return soon, and that it shouldn't re-create additional file copies to replace it. If you don't supply an option, the available options (paths) will be displayed."),
-            new CliCommandDefinition('gone::',           'g::', '[=path]',     'GoneCliRunner',           "Tell Greyhole that the missing drive at <path> is gone for good. Greyhole will start replacing the missing file copies instantly. If you don't supply an option, the available options (paths) will be displayed."),
-            new CliCommandDefinition('going::',          'n::', '[=path]',     'GoingCliRunner',          "Tell Greyhole that you want to remove a drive. Greyhole will then make sure you don't lose any files, and that the correct number of file copies are created to replace the missing drive. If you don't supply an option, the available options (paths) will be displayed."),
-            new CliCommandDefinition('replace::',        'r::', '[=path]',     'ReplaceCliRunner',        "Tell Greyhole that you replaced the drive at <path>."),
-            new CliCommandDefinition('fix-symlinks',     'X',   null,          'FixSymlinksCliRunner',    "Try to find a good file copy to point to for all broken symlinks found on your shares."),
-            new CliCommandDefinition('delete-metadata:', 'p:',  '=path',       'DeleteMetadataCliRunner', "Delete all metadata files for <path>, which should be a share name, followed by the path to a file that is gone from your storage pool. Eg. 'Movies/HD/The Big Lebowski.mkv'"),
-            new CliCommandDefinition('remove-share:',    'U:',  '=share_name', 'RemoveShareCliRunner',    "Move the files currently inside the specified share from the storage pool into the shared folder (landing zone), effectively removing the share from Greyhole's storage pool."),
-            new CliCommandDefinition('md5-worker',       '',    null,          null,                      null),
-            new CliCommandDefinition('getuid',           'G',   null,          'GetGUIDCliRunner',        null),
-            new CliCommandDefinition('create-mem-spool', '',    null,          'CreateMemSpoolRunner',    null),
-            new CliCommandDefinition('test-config',      '',    null,          'TestCliRunner',           null),
-            new CliCommandDefinition('boot-init',        '',    null,          'BootInitCliRunner',       null),
-            new CliCommandDefinition('process-spool',    '',    null,          'ProcessSpoolCliRunner',   null),
+            new CliCommandDefinition('help',             '?',   null,             null,                           "Display this help and exit."),
+            new CliCommandDefinition('daemon',           'D',   null,             DaemonRunner::class,            "Start the daemon."),
+            new CliCommandDefinition('pause',            'P',   null,             PauseCliRunner::class,          "Pause the daemon."),
+            new CliCommandDefinition('resume',           'M',   null,             ResumeCliRunner::class,         "Resume a paused daemon."),
+            new CliCommandDefinition('fsck',             'f',   null,             FsckCliRunner::class,           "Schedule a fsck."),
+            new CliCommandDefinition('cancel-fsck',      'C',   null,             CancelFsckCliRunner::class,     "Cancel any ongoing or scheduled fsck operations."),
+            new CliCommandDefinition('balance',          'l',   null,             BalanceCliRunner::class,        "Balance available space on storage pool drives."),
+            new CliCommandDefinition('balance-status',   '',    null,             BalanceStatusCliRunner::class,  "Verify how balanced are the storage pool drives."),
+            new CliCommandDefinition('cancel-balance',   'B',   null,             CancelBalanceCliRunner::class,  "Cancel any ongoing or scheduled balance operations."),
+            new CliCommandDefinition('stats',            's',   null,             StatsCliRunner::class,          "Display storage pool statistics."),
+            new CliCommandDefinition('iostat',           'i',   null,             IoStatsCliRunner::class,        "I/O statistics for your storage pool drives."),
+            new CliCommandDefinition('logs',             'L',   null,             LogsCliRunner::class,           "Display new greyhole.log entries as they are logged."),
+            new CliCommandDefinition('status',           'S',   null,             StatusCliRunner::class,         "Display what the Greyhole daemon is currently doing."),
+            new CliCommandDefinition('view-queue',       'q',   null,             ViewQueueCliRunner::class,      "Display the current work queue."),
+            new CliCommandDefinition('empty-trash',      'a',   null,             EmptyTrashCliRunner::class,     "Empty the trash."),
+            new CliCommandDefinition('mv',               '',    ' source target', MoveCliRunner::class,           "Move a folder or file from one Greyhole share to another. Run without parameters for details."),
+            new CliCommandDefinition('debug:',           'b:',  '=filename',      DebugCliRunner::class,          "Debug past file operations."),
+            new CliCommandDefinition('thaw::',           't::', '[=path]',        ThawCliRunner::class,           "Thaw a frozen directory. Greyhole will start working on files inside <path>. If you don't supply an option, the list of frozen directories will be displayed."),
+            new CliCommandDefinition('wait-for::',       'w::', '[=path]',        WaitForCliRunner::class,        "Tell Greyhole that the missing drive at <path> will return soon, and that it shouldn't re-create additional file copies to replace it. If you don't supply an option, the available options (paths) will be displayed."),
+            new CliCommandDefinition('gone::',           'g::', '[=path]',        GoneCliRunner::class,           "Tell Greyhole that the missing drive at <path> is gone for good. Greyhole will start replacing the missing file copies instantly. If you don't supply an option, the available options (paths) will be displayed."),
+            new CliCommandDefinition('going::',          'n::', '[=path]',        GoingCliRunner::class,          "Tell Greyhole that you want to remove a drive. Greyhole will then make sure you don't lose any files, and that the correct number of file copies are created to replace the missing drive. If you don't supply an option, the available options (paths) will be displayed."),
+            new CliCommandDefinition('replace::',        'r::', '[=path]',        ReplaceCliRunner::class,        "Tell Greyhole that you replaced the drive at <path>."),
+            new CliCommandDefinition('fix-symlinks',     'X',   null,             FixSymlinksCliRunner::class,    "Try to find a good file copy to point to for all broken symlinks found on your shares."),
+            new CliCommandDefinition('delete-metadata:', 'p:',  '=path',          DeleteMetadataCliRunner::class, "Delete all metadata files for <path>, which should be a share name, followed by the path to a file that is gone from your storage pool. Eg. 'Movies/HD/The Big Lebowski.mkv'"),
+            new CliCommandDefinition('remove-share:',    'U:',  '=share_name',    RemoveShareCliRunner::class,    "Move the files currently inside the specified share from the storage pool into the shared folder (landing zone), effectively removing the share from Greyhole's storage pool."),
+            new CliCommandDefinition('md5-worker',       '',    null,             null,                           null),
+            new CliCommandDefinition('getuid',           'G',   null,             GetGUIDCliRunner::class,        null),
+            new CliCommandDefinition('create-mem-spool', '',    null,             CreateMemSpoolRunner::class,    null),
+            new CliCommandDefinition('test-config',      '',    null,             TestCliRunner::class,           null),
+            new CliCommandDefinition('boot-init',        '',    null,             BootInitCliRunner::class,       null),
+            new CliCommandDefinition('process-spool',    '',    null,             ProcessSpoolCliRunner::class,   null),
         );
         
         $this->cliOptionsDefinitions = array(

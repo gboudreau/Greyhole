@@ -15,7 +15,7 @@ Greyhole daemon, and thus control your Greyhole storage pool.
 .SH ACTIONS
 .TP
 \-?, \-\-help
-Display this help and exit.
+Display help and exit.
 .TP
 \-D, \-\-daemon
 Start the daemon.
@@ -34,6 +34,9 @@ Cancel any ongoing or scheduled fsck operations.
 .TP
 \-l, \-\-balance
 Balance available space on storage pool drives.
+.TP
+\-\-balance\-status
+Verify how balanced are the storage pool drives.
 .TP
 \-C, \-\-cancel\-balance
 Cancel any ongoing or scheduled balance operations.
@@ -55,6 +58,10 @@ Display the current work queue.
 .TP
 \-a, \-\-empty\-trash
 Empty the trash.
+.TP
+\-\-mv source target
+Move a folder or file from one Greyhole share to another.
+Run without parameters for details.
 .TP
 \-b, \-\-debug=filename
 Debug past file operations.

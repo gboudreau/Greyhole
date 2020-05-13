@@ -5,7 +5,7 @@ Homepage: https://www.greyhole.net
 Package: greyhole
 Version: 0.9.3-1
 Architecture: i386
-Depends: libc6 (>= 2.4), samba (>= 3.4.3), samba-common, samba-common-bin, lsof, rsync, sysstat, mysql-server | mysql-server-5.5 | mysql-server-5.6 | mysql-server-5.7 | mysql-community-server | mariadb-server | mariadb-server-5.5 | mariadb-server-5.6 | mariadb-server-10.1, php5-cli (>= 5) | php-cli (>= 5), php-pear, php5-intl | php-intl, php5-mysql | php5-mysqlnd | php-mysql | php-mysqlnd
+Depends: libc6 (>= 2.4), samba (>= 3.4.3), samba-common, samba-common-bin, lsof, rsync, sysstat, mysql-server | mysql-server-5.5 | mysql-server-5.6 | mysql-server-5.7 | mysql-community-server | mariadb-server | mariadb-server-5.5 | mariadb-server-5.6 | mariadb-server-10.1, php5-cli (>= 5.5) | php-cli (>= 5.5), php-pear, php5-intl | php-intl, php5-mysql | php5-mysqlnd | php-mysql | php-mysqlnd
 Description: Drive pooling technology for Samba
  Allows you to create a storage pool, accessible from
  Samba shares, that offers data redundancy and JBOD concatenation.

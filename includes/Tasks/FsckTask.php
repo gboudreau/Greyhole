@@ -785,7 +785,7 @@ class FsckTask extends AbstractTask {
                 $found_linked_metafile = FALSE;
                 foreach ($file_metafiles as $key => $metafile) {
                     if ($metafile->is_linked) {
-                        $found_linked_metafile = TRUE;
+                        $found_linked_metafile = ( @readlink("$landing_zone/$file_path/$filename") == $metafile->path );
                         break;
                     }
                 }

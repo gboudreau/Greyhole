@@ -49,6 +49,7 @@ define('ACTION_CHECK_POOL', 'check_pool');
 define('ACTION_SLEEP', 'sleep');
 define('ACTION_READ_SAMBA_POOL', 'read_smb_spool');
 define('ACTION_FSCK_FILE', 'fsck_file');
+define('ACTION_MOVE', 'move');
 
 final class Log {
     const PERF     = 9;

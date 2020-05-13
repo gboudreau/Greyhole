@@ -683,13 +683,25 @@ function string_contains($haystack, $needle) {
 function string_starts_with($haystack, $needle) {
     if (is_array($needle)) {
         foreach ($needle as $n) {
-            if (mb_strpos($haystack, $n) === 0) {
+            if (string_starts_with($haystack, $n)) {
                 return TRUE;
             }
         }
         return FALSE;
     }
     return mb_strpos($haystack, $needle) === 0;
+}
+
+function string_ends_with($haystack, $needle) {
+    if (is_array($needle)) {
+        foreach ($needle as $n) {
+            if (string_ends_with($haystack, $n)) {
+                return TRUE;
+            }
+        }
+        return FALSE;
+    }
+    return ( substr(strtolower($haystack), -strlen($needle)) == strtolower($needle) );
 }
 
 function json_pretty_print($json) {
