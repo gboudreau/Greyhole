@@ -25,13 +25,13 @@ class IoStatsCliRunner extends AbstractAnonymousCliRunner {
         $devices_drives = array();
         foreach (Config::storagePoolDrives() as $sp_drive) {
             $device = exec("df " . escapeshellarg($sp_drive) . " 2>/dev/null | awk '{print \$1}'");
-            $device = preg_replace('@/dev/(sd[a-z])[0-9]+@', '\1', $device);
+            $device = preg_replace('@/dev/(sd[a-z])[0-9]?@', '\1', $device);
             $devices_drives[$device] = $sp_drive;
         }
 
         while (TRUE) {
             unset($result);
-            exec("iostat -p ALL -k 10 2 | grep '^sd[a-z] ' | awk '{print \$1,\$3,\$4}'", $result);
+            exec("iostat -p ALL -k 5 2 | grep '^sd[a-z] ' | awk '{print \$1,\$3,\$4}'", $result);
             $iostat = array();
             foreach ($result as $line) {
                 $info = explode(' ', $line);
@@ -45,11 +45,11 @@ class IoStatsCliRunner extends AbstractAnonymousCliRunner {
                 $drive = $devices_drives[$device];
                 $iostat[$drive] = (int) round($read_kBps + $write_kBps);
             }
-            #ksort($iostat); // Let keep the order in which the drives were mounted
+            ksort($iostat);
+            $this->log("--- [" . date('H:m:s') . "]");
             foreach ($iostat as $drive => $io_kBps) {
                 $this->log(sprintf("$drive: %7s kBps", $io_kBps));
             }
-            $this->log("---");
         }
     }
 }
