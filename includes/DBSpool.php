@@ -314,8 +314,10 @@ final class DBSpool {
                 $q = "SELECT * FROM tasks WHERE action = 'write' AND complete IN ('written', 'no') AND share = :share AND $prop = :$prop";
                 $opened_task = DB::getFirst($q, array('share' => $share, $prop => $prop_value));
                 if (!$opened_task) {
-                    // Writing to a file that wasn't opened-for-writing...
+                    // Writing to a file that wasn't opened-for-writing... Log this as a write, complete=yes task
                     $id = $this->insert('write', $share, $fullpath, NULL, $fd);
+                    $q = "UPDATE tasks SET complete = 'yes' WHERE id = :id";
+                    DB::execute($q, array('id' => $id));
                     $q = "SELECT * FROM tasks WHERE id = :id";
                     $opened_task = DB::getFirst($q, array('id' => $id));
                 }
