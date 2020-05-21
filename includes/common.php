@@ -447,6 +447,31 @@ class FSCKWorkLog {
         }
     }
 
+    public static function getHumanReadableReport() {
+        $fsck_work_log = static::getFromDisk();
+
+        if (count($fsck_work_log->tasks) == 1) {
+            $task = first($fsck_work_log->tasks);
+            if (empty($task->report)) {
+                $task->report = FsckTask::getCurrentTask()->get_fsck_report();
+            }
+            if (!empty($task->report)) {
+                $fsck_report_body = $task->report->get_email_body(FALSE);
+            } else {
+                $fsck_report_body = "No fsck report available.\n\n";
+            }
+        } else {
+            //  All shares
+            $report = new FSCKReport(NULL);
+            foreach ($fsck_work_log->tasks as $task) {
+                $report->mergeReport($task->report);
+            }
+            $fsck_report_body = $report->get_email_body(TRUE);
+        }
+
+        return $fsck_report_body;
+    }
+
     public static function taskCompleted($task_id, $send_email) {
         $fsck_work_log = static::getFromDisk();
         foreach ($fsck_work_log->tasks as $task) {
@@ -470,20 +495,7 @@ class FSCKWorkLog {
                 // Email report for fsck
                 $subject = "[Greyhole] fsck of $fsck_work_log->dir completed on " . exec('hostname');
 
-                if (count($fsck_work_log->tasks) == 1) {
-                    $task = first($fsck_work_log->tasks);
-                    if (empty($task->report)) {
-                        $task->report = FsckTask::getCurrentTask()->get_fsck_report();
-                    }
-                    $fsck_report_body = $task->report->get_email_body(FALSE);
-                } else {
-                    //  All shares
-                    $report = new FSCKReport(NULL);
-                    foreach ($fsck_work_log->tasks as $task) {
-                        $report->mergeReport($task->report);
-                    }
-                    $fsck_report_body = $report->get_email_body(TRUE);
-                }
+                $fsck_report_body = static::getHumanReadableReport();
 
                 if ($send_email) {
                     $email_to = Config::get(CONFIG_EMAIL_TO);

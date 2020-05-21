@@ -41,6 +41,7 @@ require_once('includes/CLI/LogsCliRunner.php');
 require_once('includes/CLI/MoveCliRunner.php');
 require_once('includes/CLI/MD5WorkerCliRunner.php');
 require_once('includes/CLI/PauseCliRunner.php');
+require_once('includes/CLI/PrintFsckCliRunner.php');
 require_once('includes/CLI/ProcessSpoolCliRunner.php');
 require_once('includes/CLI/RemoveShareCliRunner.php');
 require_once('includes/CLI/ResumeCliRunner.php');
@@ -68,6 +69,7 @@ class CommandLineHelper {
             new CliCommandDefinition('resume',           'M',   null,             ResumeCliRunner::class,         "Resume a paused daemon."),
             new CliCommandDefinition('fsck',             'f',   null,             FsckCliRunner::class,           "Schedule a fsck."),
             new CliCommandDefinition('cancel-fsck',      'C',   null,             CancelFsckCliRunner::class,     "Cancel any ongoing or scheduled fsck operations."),
+            new CliCommandDefinition('print-fsck',       'F',   null,             PrintFsckCliRunner::class,      "Print the fsck report for the last completed fsck task. This will print the same content that is sent by email when the --email-report option is used."),
             new CliCommandDefinition('balance',          'l',   null,             BalanceCliRunner::class,        "Balance available space on storage pool drives."),
             new CliCommandDefinition('balance-status',   '',    null,             BalanceStatusCliRunner::class,  "Verify how balanced are the storage pool drives."),
             new CliCommandDefinition('cancel-balance',   'B',   null,             CancelBalanceCliRunner::class,  "Cancel any ongoing or scheduled balance operations."),
