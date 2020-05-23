@@ -23,15 +23,17 @@ class PoolDriveSelector {
     var $selection_algorithm;
     var $drives;
     var $is_forced;
+    var $group_name;
 
     var $sorted_target_drives;
     var $last_resort_sorted_target_drives;
 
-    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_forced) {
+    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_forced, $group_name) {
         $this->num_drives_per_draft = $num_drives_per_draft;
         $this->selection_algorithm = $selection_algorithm;
         $this->drives = $drives;
         $this->is_forced = $is_forced;
+        $this->group_name = $group_name;
     }
 
     public function isForced() {
@@ -97,7 +99,7 @@ class PoolDriveSelector {
     static function parse($config_string, $drive_selection_groups) {
         $ds = array();
         if ($config_string == 'least_used_space' || $config_string == 'most_available_space') {
-            $ds[] = new PoolDriveSelector(count(Config::storagePoolDrives()), $config_string, Config::storagePoolDrives(), FALSE);
+            $ds[] = new PoolDriveSelector(count(Config::storagePoolDrives()), $config_string, Config::storagePoolDrives(), FALSE, 'all');
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(least_used_space|most_available_space)/i', $config_string, $regs)) {
@@ -116,7 +118,7 @@ class PoolDriveSelector {
             if (stripos(trim($num_drives), 'all') === 0 || $num_drives > count($drive_selection_groups[$group_name])) {
                 $num_drives = count($drive_selection_groups[$group_name]);
             }
-            $ds[] = new PoolDriveSelector($num_drives, $selection_algorithm, $drive_selection_groups[$group_name], TRUE);
+            $ds[] = new PoolDriveSelector($num_drives, $selection_algorithm, $drive_selection_groups[$group_name], TRUE, $group_name);
         }
         return $ds;
     }

@@ -606,7 +606,7 @@ You probably want to do something about this!
         return $drives;
     }
 
-    function get_drives_available_space() {
+    public static function get_drives_available_space() {
         $sorted_target_drives = [];
         foreach (Config::storagePoolDrives() as $sp_drive) {
             $df = StoragePool::get_free_space($sp_drive);
