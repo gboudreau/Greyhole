@@ -155,6 +155,12 @@ class MoveCliRunner extends AbstractCliRunner {
             unlink($metafile);
         }
 
+        // Remove (possibly) empty folders in metastores
+        foreach ($metafiles as $metafile) {
+            //echo "[DEBUG] rmdir: " . dirname($metafile) . "\n";
+            @rmdir(dirname($metafile));
+        }
+
         // Create new metafiles
         $fsck_task = new FsckTask(array('additional_info' => OPTION_ORPHANED));
         foreach ($sp_drives_affected as $sp_drive) {
