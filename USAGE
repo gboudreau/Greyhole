@@ -24,7 +24,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	Edit /etc/samba/smb.conf
 	Change or add the following values in the [global] section (making sure this section is above all shares definition):
 
-		unix extensions = no
+		unix extensions = no # Or use 'allow insecure wide links = yes', if you want/need to keep unix extensions enabled
 		wide links = yes
 
 	For each of your shares, add a 'dfree command' and 'vfs objects' lines, as seen below.
