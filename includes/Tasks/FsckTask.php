@@ -195,14 +195,15 @@ class FsckTask extends AbstractTask {
             $params['full_path'] = "$full_path";
             $query = "SELECT depth, size FROM du_stats WHERE share = :share AND full_path = :full_path";
             $infos = DB::getFirst($query, $params);
-
-            $parts = explode('/', $full_path);
-            array_pop($parts);
-            for ($i=$infos->depth-1; $i>0; $i--) {
-                $path = implode('/', $parts);
-                $q = "UPDATE du_stats SET size = size - :size WHERE share = :share AND full_path = :full_path";
-                DB::execute($q, ['size' => $infos->size, 'share' => $share, 'full_path' => $path]);
+            if ($infos) {
+                $parts = explode('/', $full_path);
                 array_pop($parts);
+                for ($i=$infos->depth-1; $i>0; $i--) {
+                    $path = implode('/', $parts);
+                    $q = "UPDATE du_stats SET size = size - :size WHERE share = :share AND full_path = :full_path";
+                    DB::execute($q, ['size' => $infos->size, 'share' => $share, 'full_path' => $path]);
+                    array_pop($parts);
+                }
             }
 
             $query = "DELETE FROM du_stats WHERE share = :share AND full_path LIKE :full_path";
