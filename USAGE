@@ -73,9 +73,13 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	Ubuntu (15+): service greyhole start
 	Debian: service greyhole start
 
-
 Check for errors, or check what the Greyhole service is working on, in the Greyhole log: greyhole --logs
 
+6. If you'd like Greyhole to check your file copies, to make sure they all have the same checksum (as they should),
+   you'll need to manually (or using cron) schedule a fsck using the --checksums option.
+   As this can be quite time-consuming, it is not enabled by default in the Greyhole crontab.
+   Example cron job (first Sunday of every month, at 1am):
+   0 1 1-7 * *  [ "$(date '+\%u')" = "7" ] && greyhole --fsck --email-report --checksums
 
 If you use any application that needs to use files on your shares, you'll need to mount the shares locally, and point your applications to those mounts.
 You should never work on the files in your storage pool directories, or the symlinks in your shared directories.

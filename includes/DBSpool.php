@@ -419,6 +419,9 @@ final class DBSpool {
         if (empty($task_ids)) {
             return;
         }
+        if (is_string($task_ids)) {
+            $task_ids = explode(',', $task_ids);
+        }
         if (is_array($task_ids)) {
             foreach ($this->next_tasks as $k => $task) {
                 if (array_contains($task_ids, $task->id)) {

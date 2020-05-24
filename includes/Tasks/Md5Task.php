@@ -92,31 +92,72 @@ class Md5Task extends AbstractTask {
                 $latest_file_copy = $file_copies[count($file_copies)-1];
                 $file_copies = array_unique($file_copies);
                 sort($file_copies);
-                $files = implode(', ', $file_copies);
 
-                // Automatically fix this if:
-                // - there's only 2 different MD5s for all file copies (i.e. one for all other files copies, and one for this file copy)
-                // - the current MD5 is only for one file copy (we assume this copy is in error, not the others)
-                // - that file copy isn't used as the share symlink target
-                $original_file_path = clean_dir(readlink(get_share_landing_zone($task->share) . "/" . $task->full_path));
-                if (count($md5s) == 2 && count($file_copies) == 1 && $latest_file_copy != $original_file_path) {
-                    // Find the original file (the file copy pointed to by the symlink on the LZ) MD5
-                    $original_md5 = 'Unknown';
-                    foreach ($md5s as $this_md5 => $fcs) {
-                        foreach ($fcs as $file_copy) {
-                            if ($file_copy == $original_file_path) {
-                                $original_md5 = $this_md5;
+                $should_be_fixed = FALSE;
+
+                // We can fix the issue if we have the correct MD5 in the DB, and no pending write/rename for this file are queued
+                $id = md5(clean_dir("$task->share/$task->full_path"));
+                $q = "SELECT checksum FROM checksums WHERE id = :id";
+                $original_md5 = DB::getFirstValue($q, array('id' => $id));
+                if (!empty($original_md5) && $md5 != $original_md5) {
+                    $q = "SELECT 1 FROM tasks WHERE share = :share AND full_path = :full_path AND action = 'write' LIMIT 1";
+                    $queued_task = (bool) DB::getFirstValue($q, array('share' => $task->share, 'full_path' => $task->full_path));
+                    if (!$queued_task) {
+                        $q = "SELECT 1 FROM tasks WHERE share = :share AND additional_info = :full_path AND action = 'rename' LIMIT 1";
+                        $queued_task = (bool) DB::getFirstValue($q, array('share' => $task->share, 'full_path' => $task->full_path));
+                    }
+                    $should_be_fixed = !$queued_task;
+
+                    if ($should_be_fixed) {
+                        // Do we have a file copy with the right checksum?
+                        unset($original_file_path);
+                        foreach ($md5s as $_md5 => $_file_copies) {
+                            if ($_md5 == $original_md5) {
+                                $original_file_path = $_file_copies[count($_file_copies)-1];
                                 break;
                             }
                         }
+                        if (!isset($original_file_path)) {
+                            $should_be_fixed = FALSE;
+                        } else {
+                            // If LZ symlink points to this broken file, update the symlink to point to the good file copy
+                            $lz_file_path = get_share_landing_zone($task->share) . "/" . $task->full_path;
+                            if (clean_dir(readlink($lz_file_path)) == $latest_file_copy) {
+                                unlink($lz_file_path);
+                                symlink($original_file_path, $lz_file_path);
+                            }
+                        }
                     }
-                    if ($original_md5 == 'Unknown') {
-                        Log::error("  The MD5 checksum of the original file ($original_file_path) was NOT calculated. Why?", Log::EVENT_CODE_FSCK_MD5_MISMATCH);
-                        Log::info("  Calculating MD5 for original file copy at $original_file_path ...");
-                        $original_md5 = md5_file($original_file_path);
-                        Log::debug("    MD5 = $original_md5");
-                    }
+                }
 
+                if (!$should_be_fixed) {
+                    // Automatically fix this if:
+                    // - there's only 2 different MD5s for all file copies (i.e. one for all other files copies, and one for this file copy)
+                    // - the current MD5 is only for one file copy (we assume this copy is in error, not the others)
+                    // - that file copy isn't used as the share symlink target
+                    $original_file_path = clean_dir(readlink(get_share_landing_zone($task->share) . "/" . $task->full_path));
+                    $should_be_fixed = ( count($md5s) == 2 && count($file_copies) == 1 && $latest_file_copy != $original_file_path );
+                    if ($should_be_fixed) {
+                        // Find the original file (the file copy pointed to by the symlink on the LZ) MD5
+                        $original_md5 = 'Unknown';
+                        foreach ($md5s as $this_md5 => $fcs) {
+                            foreach ($fcs as $file_copy) {
+                                if ($file_copy == $original_file_path) {
+                                    $original_md5 = $this_md5;
+                                    break;
+                                }
+                            }
+                        }
+                        if ($original_md5 == 'Unknown') {
+                            Log::error("  The MD5 checksum of the original file ($original_file_path) was NOT calculated. Why?", Log::EVENT_CODE_FSCK_MD5_MISMATCH);
+                            Log::info("  Calculating MD5 for original file copy at $original_file_path ...");
+                            $original_md5 = md5_file($original_file_path);
+                            Log::debug("    MD5 = $original_md5");
+                        }
+                    }
+                }
+
+                if ($should_be_fixed) {
                     Log::warn("  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5. This copy will be deleted, and replaced with a new copy from $original_file_path", Log::EVENT_CODE_FSCK_MD5_MISMATCH);
                     Trash::trash_file($latest_file_copy);
 
@@ -152,12 +193,26 @@ class Md5Task extends AbstractTask {
                     Log::debug("    MD5 = $md5");
                     if ($md5 == $original_md5) {
                         log_file_checksum($task->share, $task->full_path, $md5);
-                        Log::debug("  All copies have the same MD5 checksum: $md5");
+                        Log::debug("  This file copy now has the correct MD5 checksum: $md5");
                         DBSpool::getInstance()->delete_tasks($complete_tasks->ids);
+
+                        // Re-queue this file's copies, to ensure they are all ok now
+                        foreach (Metastores::get_metafiles($task->share, $path, $filename, TRUE) as $metafile_block) {
+                            foreach ($metafile_block as $metafile) {
+                                if ($metafile->state != Metafile::STATE_OK) { continue; }
+                                $inode_number = @gh_fileinode($metafile->path);
+                                if ($inode_number !== FALSE) {
+                                    // Let's calculate this file's MD5 checksum to validate that all copies are valid.
+                                    Md5Task::queue($task->share, $task->full_path, $metafile->path);
+                                }
+                            }
+                        }
+
                         return;
                     }
                 }
 
+                $files = implode(', ', $file_copies);
                 $logs[] = "  [$md5] => $files";
             }
             $logs[] = "Some of the above files appear to be unreadable.";
