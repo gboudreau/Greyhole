@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -23,7 +23,6 @@ require_once('includes/CLI/AbstractAnonymousCliRunner.php');
 class LogsCliRunner extends AbstractAnonymousCliRunner {
     public function run() {
         $greyhole_log_file = Config::get(CONFIG_GREYHOLE_LOG_FILE);
-        $greyhole_error_log_file = Config::get(CONFIG_GREYHOLE_ERROR_LOG_FILE);
         if (strtolower($greyhole_log_file) == 'syslog') {
             if (gh_is_file('/var/log/syslog')) {
                 passthru("tail -F -n 1 /var/log/syslog | grep --line-buffered Greyhole");
@@ -33,12 +32,6 @@ class LogsCliRunner extends AbstractAnonymousCliRunner {
         } else {
             $files = escapeshellarg($greyhole_log_file);
             passthru("tail -n 1 $files");
-            if (!empty($greyhole_error_log_file)) {
-                if (!file_exists($greyhole_error_log_file)) {
-                    file_put_contents($greyhole_error_log_file, '');
-                }
-                $files = escapeshellarg($greyhole_error_log_file) . " " . $files;
-            }
             passthru("tail -qF -n 0 $files");
         }
     }
