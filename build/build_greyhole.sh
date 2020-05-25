@@ -102,7 +102,6 @@ rm ./Makefile
 if [ "$(whoami)" != "gb" ]; then
 	exit
 fi
-exit
 
 #########################################
 # Transfer files to HOST:PATH_TO_RELEASES
