@@ -59,7 +59,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	Debian: service mysql start
 		
 	# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
-	mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS greyhole; GRANT ALL ON greyhole.* TO greyhole_user@localhost IDENTIFIED BY '89y63jdwe';"
+	mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS greyhole; CREATE USER IF NOT EXISTS greyhole_user@localhost IDENTIFIED BY '89y63jdwe'; GRANT ALL ON greyhole.* TO greyhole_user@localhost;"
 	mysql -u greyhole_user -p89y63jdwe greyhole < /usr/share/greyhole/schema-mysql.sql
 
 4. Customize the Greyhole configuration file, /etc/greyhole.conf, as needed.
