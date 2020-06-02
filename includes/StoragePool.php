@@ -334,6 +334,8 @@ final class StoragePool {
                     continue;
                 }
                 $target_drive = '';
+                unset($target_freespace);
+                unset($target_usedspace);
                 for ($i=0; $i<count($responses); $i++) {
                     $used_space = $responses[$i][0];
                     $free_space = $responses[$i][1];
@@ -342,6 +344,21 @@ final class StoragePool {
                         $target_drive = $mount;
                         $target_freespace = $free_space;
                         $target_usedspace = $used_space;
+                    }
+                }
+                if (empty($target_drive)) {
+                    // This can happen if multiple mounts exist for this drive, and the first one appearing in the output of 'df' is NOT the one for the storage pool
+                    // In Docker, when using -v to mount a storage pool drive, and another folder in that storage pool drive:
+                    // eg. docker run ... -v /mnt/hdd5/backups:/backups -v /mnt/hdd5:/mnt/hdd5 ...
+                    // For this, 'df -k /mnt/hdd5' will actually return '/dev/sdX ... ... ... ...% /backups'
+                    unset($responses);
+                    exec('df -k ' . $sp_drive, $responses);
+                    foreach ($responses as $line) {
+                        if (preg_match("@\s+[0-9]+\s+([0-9]+)\s+([0-9]+)\s+[0-9]+%\s+(.+)$@", $line, $regs)) {
+                            $responses_arr[] = array((float) $regs[1], (float) $regs[2], $sp_drive);
+                            $target_freespace = (float) $regs[2];
+                            $target_usedspace = (float) $regs[1];
+                        }
                     }
                 }
                 /** @noinspection PhpUndefinedVariableInspection */
