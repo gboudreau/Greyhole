@@ -569,7 +569,7 @@ class FSCKLogFile {
         $logfile = "$this->path/$this->filename";
         if ($this->filename == 'fsck_checksums.log') {
             return file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
-        } else if ($this->filename == 'fsck_files.log') {
+        } else if ($this->filename == 'fsck_files.log' && file_exists($logfile)) {
             $fsck_report = unserialize(file_get_contents($logfile));
             /** @var FSCKReport $fsck_report */
             unlink($logfile);
