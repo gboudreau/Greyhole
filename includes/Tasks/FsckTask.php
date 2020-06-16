@@ -335,6 +335,10 @@ class FsckTask extends AbstractTask {
                 $filename = normalize_utf8_characters($filename);
             }
         }
+        if (empty($this->fsck_report)) {
+            // Not needed, but might cause a crash if NULL, so let's create one!
+            $this->fsck_report = new FSCKReport('tmp');
+        }
         if ($source == 'metastore') {
             $this->fsck_report->count(FSCK_COUNT_META_FILES);
         }
