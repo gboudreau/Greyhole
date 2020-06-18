@@ -1,7 +1,7 @@
 #!/usr/bin/greyhole-php
 <?php
 /*
-Copyright 2009-2014 Guillaume Boudreau
+Copyright 2009-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -19,7 +19,9 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-include('includes/common.php');
+require_once('includes/common.php');
+require_once('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
+require_once('includes/DaemonRunner.php');
 ConfigHelper::parse();
 
 $total_space = 0;
