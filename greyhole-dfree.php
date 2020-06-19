@@ -40,7 +40,7 @@ foreach (Config::storagePoolDrives() as $sp_drive) {
 chdir($argv[1]);
 $options = SharesConfig::getShareOptions(getcwd());
 if ($options) {
-    $total_free_space /= $options['num_copies'];
+    $total_free_space = (int) round($total_free_space / $options['num_copies']);
 }
 
 echo "$total_space $total_free_space 1024\n";
