@@ -80,17 +80,31 @@ final class SambaSpool {
                 $ts2 = array_shift($file2);
                 $file2 = implode(' ', $file2);
 
-                if ($ts1 < $ts2) {
+
+                list($ts1p1, $ts1p2) = explode('.', $ts1);
+                list($ts2p1, $ts2p2) = explode('.', $ts2);
+                $ts1p1 = (int) $ts1p1;
+                $ts1p2 = (int) $ts1p2;
+                $ts2p1 = (int) $ts2p1;
+                $ts2p2 = (int) $ts2p2;
+
+                if ($ts1p1 < $ts2p1) {
                     return -1;
                 }
-                if ($ts1 > $ts2) {
+                if ($ts1p1 > $ts2p1) {
+                    return 1;
+                }
+                if ($ts1p2 < $ts2p2) {
+                    return -1;
+                }
+                if ($ts1p2 > $ts2p2) {
                     return 1;
                 }
 
                 $is_file1_write = string_starts_with($file1, '/var/spool/greyhole/mem/');
                 $is_file2_write = string_starts_with($file2, '/var/spool/greyhole/mem/');
-                $bfile1 = str_replace(array('/var/spool/greyhole/mem/', '/var/spool/greyhole/'), '', $file1);
-                $bfile2 = str_replace(array('/var/spool/greyhole/mem/', '/var/spool/greyhole/'), '', $file2);
+                $bfile1 = basename($file1);
+                $bfile2 = basename($file2);
                 $ts1 = explode('-', $bfile1)[0];
                 $ts2 = explode('-', $bfile2)[0];
                 $seconds1 = substr($ts1, 0, 10);
@@ -113,32 +127,16 @@ final class SambaSpool {
                     return 1;
                 }
                 if ($is_file1_write && !$is_file2_write) {
-                    $written_file = $file1;
                     $other_file = $file2;
                 } else {
                     $other_file = $file1;
-                    $written_file = $file2;
                 }
-                $log = file_get_contents($written_file);
-                if (preg_match('/^fwrite\n[^\n]+\n\d+\n([^\n]+)\n.*/', $log, $re)) {
-                    $written_filename = $re[1];
-
-                    $log = file_get_contents($other_file);
-                    if (preg_match('/^open\n[^\n]+\n([^\n]+)\n.*/', $log, $re)) {
-                        $other_filename = $re[1];
-                        if ($other_filename != $written_filename) {
-                            return 0;
-                        }
-                        return -1; // open before write
-                    }
-                    if (preg_match('/^close\n[^\n]+\n\d+\n([^\n]+)\n.*/', $log, $re)) {
-                        $other_filename = $re[1];
-                        if ($other_filename != $written_filename) {
-                            return 0;
-                        }
-                        return 1; // close after write
-                    }
-                    return 0;
+                $log = file_get_contents($other_file);
+                if (string_starts_with($log, 'open')) {
+                    return -1; // open before write
+                }
+                if (string_starts_with($log, 'close')) {
+                    return 1; // close after write
                 }
                 return 0;
             };
