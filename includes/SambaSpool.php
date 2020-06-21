@@ -133,10 +133,10 @@ final class SambaSpool {
                 }
                 $log = file_get_contents($other_file);
                 if (string_starts_with($log, 'open')) {
-                    return -1; // open before write
+                    return $is_file1_write ? 1 : -1; // open before write
                 }
                 if (string_starts_with($log, 'close')) {
-                    return 1; // close after write
+                    return $is_file1_write ? -1 : 1; // close after write
                 }
                 return 0;
             };
