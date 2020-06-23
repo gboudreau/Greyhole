@@ -84,14 +84,14 @@ find . -name ".AppleDouble" -delete
 cp build/Makefile .
 
 # RPM
-archs='i386 armv5tel x86_64'
+archs='x86_64 i386 armv5tel'
 for arch in $archs; do
 	export ARCH=$arch
 	make rpm
 done
 
 # DEB
-archs='i386 amd64 armhf'
+archs='amd64 i386 arm64 armhf'
 for arch in $archs; do
 	export ARCH=$arch
 	make deb

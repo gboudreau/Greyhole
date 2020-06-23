@@ -196,6 +196,8 @@ if [[ ${create_symlink} -eq 1 ]]; then
     LIBDIR=/usr/lib/x86_64-linux-gnu
   elif [[ -d /usr/lib64/samba/vfs ]]; then
     LIBDIR=/usr/lib64
+  elif [[ -d /usr/lib/aarch64-linux-gnu/samba/vfs/ ]]; then
+		LIBDIR=/usr/lib/aarch64-linux-gnu
   else
     LIBDIR=/usr/lib
   fi

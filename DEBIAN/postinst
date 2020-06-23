@@ -24,6 +24,9 @@ elif [ "$(uname -m)" = "x86_64" ]; then
     if [ -d /usr/lib/samba/vfs/ ]; then
         TARGET_LIBDIR="/usr/lib"
     fi
+elif [ -d /usr/lib/aarch64-linux-gnu ]; then
+    SOURCE_LIBDIR="/usr/lib/aarch64-linux-gnu"
+    TARGET_LIBDIR="/usr/lib/aarch64-linux-gnu"
 else
     SOURCE_LIBDIR="/usr/lib"
     TARGET_LIBDIR="/usr/lib"
@@ -40,6 +43,9 @@ if [ ! -d ${TARGET_LIBDIR}/samba/vfs/ ]; then
     elif [ -d /usr/lib/i386-linux-gnu ]; then
         SOURCE_LIBDIR="/usr/lib"
         TARGET_LIBDIR="/usr/lib/i386-linux-gnu"
+    elif [ -d /usr/lib/aarch64-linux-gnu ]; then
+        SOURCE_LIBDIR="/usr/lib/aarch64-linux-gnu"
+        TARGET_LIBDIR="/usr/lib/aarch64-linux-gnu"
     else
         SOURCE_LIBDIR="/usr/lib"
         TARGET_LIBDIR="/usr/lib"

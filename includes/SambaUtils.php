@@ -52,7 +52,7 @@ final class SambaUtils {
         // Samba version
         $version = str_replace('.', '', SambaUtils::samba_get_version());
 
-        // CPU architecture (x86_64 or i386 or armv6l or armv5*)
+        // CPU architecture (x86_64 or i386 or armv6l or armv5* or aarch64)
         $arch = exec('uname -m');
 
         // Find VFS symlink
@@ -67,6 +67,9 @@ final class SambaUtils {
             if (file_exists('/usr/lib/samba/vfs')) {
                 $target_libdir = '/usr/lib';
             }
+        } else if (file_exists('/usr/lib/aarch64-linux-gnu/samba/vfs')) {
+            $source_libdir = '/usr/lib/aarch64-linux-gnu';
+            $target_libdir = '/usr/lib/aarch64-linux-gnu';
         } else {
             $source_libdir = '/usr/lib';
             $target_libdir = '/usr/lib';

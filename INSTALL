@@ -50,11 +50,14 @@ If you know what you're doing, you should have no problem installing on any othe
 	SMB_VERSION="`smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1,$2}' | tr ' ' .`"
 	echo "You appear to be running Samba $SMB_VERSION"
 
-	if [ -x /usr/lib/x86_64-linux-gnu/samba/vfs/ ] || [ $(uname -m) = "x86_64" ] ; then
+	if [ -d /usr/lib/x86_64-linux-gnu/samba/vfs ] || [ $(uname -m) = "x86_64" ] ; then
 		LIBDIR="/usr/lib64"
-	else
+	elif [ -d /usr/lib/aarch64-linux-gnu ] ; then
+      	LIBDIR="/usr/lib/aarch64-linux-gnu"
+    else
 		LIBDIR="/usr/lib"
 	fi
+	mkdir "$LIBDIR/greyhole"
 	cp samba-module/bin/$SMB_VERSION/greyhole-$(uname -m).so "$LIBDIR/greyhole/greyhole-samba${SMB_VERSION//.}.so"
 
 	# Install the start script
