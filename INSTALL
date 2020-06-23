@@ -12,11 +12,15 @@ If you know what you're doing, you should have no problem installing on any othe
 1. Install the required applications: PHP 7+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
 	Fedora: yum -y install mysql-server php php-mysql php-mbstring php-intl samba samba-common php-pear rsync lsof
-	Ubuntu: apt-get -y install mysql-server php-cli php-mysql php-mysqlnd php-mbstring php-intl samba samba-common samba-common-bin php-pear rsync lsof sysstat
+	Ubuntu: apt-get -y install mysql-server php-cli php-mysql php-mysqlnd php-mbstring php-intl samba samba-common samba-common-bin samba-vfs-modules php-pear rsync lsof sysstat
+
+	Note: you might need to install mariadb-server, if mysql-server is not available. Those two are equivalent.
+	Note 2: samba-vfs-modules might not be needed, but if it is available in your repo, it is required.
 
 2. Install Greyhole (as root):
 
-	Get the latest Source Install TGZ from https://github.com/gboudreau/Greyhole/releases
+	Download the latest "greyhole-[VERSION].tar.gz" file from https://github.com/gboudreau/Greyhole/releases
+	(Don't use the "Source Code" files.)
 
 	tar zxf greyhole-*.tar.gz && rm -f greyhole-*.tar.gz
 	cd greyhole-*
@@ -42,6 +46,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	install -m 0755 -D -p scripts-examples/greyhole_notify_error.sh /usr/share/greyhole/scripts-examples
 	install -m 0755 -D -p scripts-examples/greyhole_send_fsck_report.sh /usr/share/greyhole/scripts-examples
 	install -m 0644 -D -p USAGE /usr/share/greyhole
+	install -m 0755 -D -p build_vfs.sh /usr/share/greyhole
 	install -m 0644 -D -p docs/greyhole.1.gz /usr/share/man/man1/
 	install -m 0644 -D -p docs/greyhole-dfree.1.gz /usr/share/man/man1/
 	install -m 0644 -D -p docs/greyhole.conf.5.gz /usr/share/man/man5/
@@ -76,7 +81,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	Debian: service samba restart
 
 3. For Samba 4.12 and later: The greyhole.so files packaged with Greyhole won't work on your system.
-   You'll need to compile your own VFS module. You'll just need to compile vfs_greyhole.c, and install it.
+   You'll need to compile your own VFS module.
 
 	Fedora: sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen
 	Ubuntu/Debian: sudo apt -y install build-essential python3-dev libgnutls28-dev pkg-config
