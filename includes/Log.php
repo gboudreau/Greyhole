@@ -180,6 +180,9 @@ final class Log {
             $greyhole_log_file = NULL;
             $use_syslog = FALSE;
         } elseif (self::$action == ACTION_INITIALIZE && !DaemonRunner::isCurrentProcessDaemon()) {
+            if ($local_log_level === self::CRITICAL) {
+                exit(1);
+            }
             return;
         } else {
             if (DaemonRunner::isCurrentProcessDaemon() && self::$action != ACTION_READ_SAMBA_POOL) {
