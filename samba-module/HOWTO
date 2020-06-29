@@ -23,12 +23,9 @@ How to build the VFS module binaries for a new Samba version.
         rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
         ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build/build_vfs_all.sh ; exec bash"'
 
-        # ARMHF (Raspberry Pi)
-        cd ~/Temp/qemu-arm
-        ./boot.sh
-        sleep 180
-        rsync -av --exclude .git --exclude release -e "ssh -p 2223" ~/git/Greyhole/ 127.0.0.1:Greyhole
-        ssh -p 2223 -t 127.0.0.1 'screen sh -c "sudo /home/gb/Greyhole/build/build_vfs_all.sh ; exec bash"'
+        SSH_HOST="gh-builder-arm64"
+        rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
+        ssh -t $SSH_HOST 'screen sh -c "sudo /home/pi/Greyhole/build/build_vfs_all.sh ; exec bash"'
 
 5. Copy the resulting binaries back into your workstation:
 
@@ -40,7 +37,8 @@ How to build the VFS module binaries for a new Samba version.
         SSH_HOST="gh-builder-x86_64"
         rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
-        rsync -av -e "ssh -p 2223" 127.0.0.1:Greyhole/samba-module/bin/ .
+        SSH_HOST="gh-builder-arm64"
+        rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
 6. Edit `INSTALL`
     - Change latest version of Samba supported in point 3 (near L98).

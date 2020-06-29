@@ -18,12 +18,17 @@ fi
 if [ "$ARCH" = "armv6l" ]; then
     ARCH="armhf"
 fi
+if [ "$ARCH" = "aarch64" ]; then
+    ARCH="arm64"
+fi
 if [ "$ARCH" = "i686" ]; then
     ARCH="i386"
 fi
 
 for version in 4.12.0 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
-    GREYHOLE_COMPILED_MODULE="$(ls -1 "$GREYHOLE_VFS_BUILD_DIR"/samba-$version/bin/default/source3/modules/libvfs*greyhole.so)"
+    set +e
+    GREYHOLE_COMPILED_MODULE="$(ls -1 "$GREYHOLE_VFS_BUILD_DIR"/samba-$version/bin/default/source3/modules/libvfs*greyhole.so 2>/dev/null)"
+    set -e
     if [ -f "$GREYHOLE_COMPILED_MODULE" ]; then
         # Already compiled in the past; just re-compile with updated source (is a symlink to $GREYHOLE_INSTALL_DIR/samba-module/*.c
         echo "Compiling Greyhole VFS module for samba-${version}... "

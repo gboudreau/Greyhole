@@ -36,12 +36,23 @@ if [[ ${version} = "current" ]]; then
 	version=$(/usr/sbin/smbd --version | awk '{print $2}' | awk -F'-' '{print $1}')
 fi
 
+M=$(echo "${version}" | awk -F'.' '{print $1}') # major
+m=$(echo "${version}" | awk -F'.' '{print $2}') # minor
+# shellcheck disable=SC2034
+B=$(echo "${version}" | awk -F'.' '{print $3}') # build
+
 echo "Installing build dependencies ..."
 if command -v apt-get >/dev/null; then
     apt-get -y install build-essential python3-dev libgnutls28-dev pkg-config || true
 fi
 if command -v yum >/dev/null; then
     yum -y install patch gcc python-devel gnutls-devel make rpcgen || true
+fi
+if [ $M -ge 4 ] && [ $m -ge 12 ]; then
+    echo "Installing Parse::Yapp::Driver perl module ..."
+    # shellcheck disable=SC2034
+    PERL_MM_USE_DEFAULT=1
+    cpan Parse::Yapp::Driver
 fi
 echo
 
@@ -70,11 +81,6 @@ if [[ ! -d samba-${version} ]]; then
 	echo "  Downloading Samba source code... "
 	curl -LOs "http://samba.org/samba/ftp/stable/samba-${version}.tar.gz" && tar zxf "samba-${version}.tar.gz" && rm -f "samba-${version}.tar.gz"
 fi
-
-M=$(echo "${version}" | awk -F'.' '{print $1}') # major
-m=$(echo "${version}" | awk -F'.' '{print $2}') # minor
-# shellcheck disable=SC2034
-B=$(echo "${version}" | awk -F'.' '{print $3}') # build
 
 cd "samba-${version}"
 NEEDS_CONFIGURE=
