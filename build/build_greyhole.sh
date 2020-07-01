@@ -77,6 +77,9 @@ find . -name "._*" -delete
 find . -name ".DS_Store" -delete
 find . -name ".AppleDouble" -delete
 
+set -e
+git pull
+set +e
 
 ################
 # Build packages
