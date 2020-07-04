@@ -194,6 +194,10 @@ final class DB {
             DB::migrate_14_status();
             Settings::set('db_version', 14);
         }
+        if ($db_version < 15) {
+            DB::migrate_15_status_myisam();
+            Settings::set('db_version', 15);
+        }
     }
 
     // Migration #1 (complete = frozen|thawed)
@@ -457,7 +461,12 @@ final class DB {
     }
 
     private static function migrate_14_status() {
-        $query = "CREATE TABLE IF NOT EXISTS `status` (`id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,`date_time` timestamp NOT NULL DEFAULT current_timestamp(),`action` enum('initialize','unknown','daemon','pause','resume','fsck','balance','stats','status','logs','trash','queue','iostat','getuid','worker','symlinks','replace','for','gone','going','thaw','debug','metadata','share','check_pool','sleep','read_smb_spool','fsck_file') DEFAULT NULL,`log` text NOT NULL,UNIQUE KEY `id` (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8";
+        $query = "CREATE TABLE IF NOT EXISTS `status` (`id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,`date_time` timestamp NOT NULL DEFAULT current_timestamp(),`action` enum('initialize','unknown','daemon','pause','resume','fsck','balance','stats','status','logs','trash','queue','iostat','getuid','worker','symlinks','replace','for','gone','going','thaw','debug','metadata','share','check_pool','sleep','read_smb_spool','fsck_file') DEFAULT NULL,`log` text NOT NULL,UNIQUE KEY `id` (`id`)) ENGINE=MYISAM DEFAULT CHARSET=utf8";
+        DB::execute($query);
+    }
+
+    private static function migrate_15_status_myisam() {
+        $query = "ALTER TABLE `status` ENGINE = MYISAM";
         DB::execute($query);
     }
 
