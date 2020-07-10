@@ -44,6 +44,7 @@ require_once('includes/CLI/PauseCliRunner.php');
 require_once('includes/CLI/PrintFsckCliRunner.php');
 require_once('includes/CLI/ProcessSpoolCliRunner.php');
 require_once('includes/CLI/RemoveShareCliRunner.php');
+require_once('includes/CLI/RemoveCliRunner.php');
 require_once('includes/CLI/ResumeCliRunner.php');
 require_once('includes/CLI/ReplaceCliRunner.php');
 require_once('includes/CLI/StatsCliRunner.php');
@@ -83,8 +84,9 @@ class CommandLineHelper {
             new CliCommandDefinition('debug:',           'b:',  '=filename',      DebugCliRunner::class,          "Debug past file operations."),
             new CliCommandDefinition('thaw::',           't::', '[=path]',        ThawCliRunner::class,           "Thaw a frozen directory. Greyhole will start working on files inside <path>. If you don't supply an option, the list of frozen directories will be displayed."),
             new CliCommandDefinition('wait-for::',       'w::', '[=path]',        WaitForCliRunner::class,        "Tell Greyhole that the missing drive at <path> will return soon, and that it shouldn't re-create additional file copies to replace it. If you don't supply an option, the available options (paths) will be displayed."),
-            new CliCommandDefinition('gone::',           'g::', '[=path]',        GoneCliRunner::class,           "Tell Greyhole that the missing drive at <path> is gone for good. Greyhole will start replacing the missing file copies instantly. If you don't supply an option, the available options (paths) will be displayed."),
-            new CliCommandDefinition('going::',          'n::', '[=path]',        GoingCliRunner::class,          "Tell Greyhole that you want to remove a drive. Greyhole will then make sure you don't lose any files, and that the correct number of file copies are created to replace the missing drive. If you don't supply an option, the available options (paths) will be displayed."),
+            new CliCommandDefinition('gone::',           '',    null,             GoneCliRunner::class,           null),
+            new CliCommandDefinition('going::',          '',    null,             GoingCliRunner::class,          null),
+            new CliCommandDefinition('remove::',         'R::', '[=path]',        RemoveCliRunner::class,         "Tell Greyhole that you want to remove a drive. Greyhole will then make sure you don't lose any files, and that the correct number of file copies are created to replace the missing drive. If you don't supply an option, the available options (paths) will be displayed."),
             new CliCommandDefinition('replace::',        'r::', '[=path]',        ReplaceCliRunner::class,        "Tell Greyhole that you replaced the drive at <path>."),
             new CliCommandDefinition('fix-symlinks',     'X',   null,             FixSymlinksCliRunner::class,    "Try to find a good file copy to point to for all broken symlinks found on your shares."),
             new CliCommandDefinition('delete-metadata:', 'p:',  '=path',          DeleteMetadataCliRunner::class, "Delete all metadata files for <path>, which should be a share name, followed by the path to a file that is gone from your storage pool. Eg. 'Movies/HD/The Big Lebowski.mkv'"),

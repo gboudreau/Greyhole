@@ -361,7 +361,7 @@ class FSCKReport {
             if ($this->counts[FSCK_COUNT_GONE_OK] > 0) {
                 $report .= "  Found " . $this->counts[FSCK_COUNT_GONE_OK] . " missing files that are in a storage pool drive marked Temporarily-Gone.
   If this drive is gone for good, you should execute the following command, and remove the drive from your configuration file:
-    greyhole --gone=path
+    greyhole --remove=path
   where path is one of:\n";
                 $report .= "    " . implode("\n    ", array_keys(StoragePool::get_gone_ok_drives())) . "\n\n";
             }

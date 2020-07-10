@@ -81,22 +81,16 @@ and that it shouldn't re\-create additional file copies to
 replace it. If you don't supply an option, the available options 
 (paths) will be displayed.
 .TP
-\-g, \-\-gone[=path]
-Tell Greyhole that the missing drive at <path> is gone for good. 
-Greyhole will start replacing the missing file copies instantly. 
-If you don't supply an option, the available options (paths) 
-will be displayed.
-.TP
-\-n, \-\-going[=path]
+\-n, \-\-remove[=path]
 Tell Greyhole that you want to remove a drive. Greyhole will
 then make sure you don't lose any files, and that the correct
-number of file copies are created to replace the missing drive. 
-If you don't supply an option, the available options (paths) 
+number of file copies are created to replace the missing drive.
+If you don't supply an option, the available options (paths)
 will be displayed.
 .TP
 \-r, \-\-replace[=path]
 Tell Greyhole that you replaced the drive at <path>. This is not 
-necessary if you used \-\-gone or \-\-going to remove the drive.
+necessary if you used \-\-remove to remove the drive.
 .TP
 \-X, \-\-fix-symlinks
 Try to find a good file copy to point to for all broken
@@ -164,7 +158,7 @@ your shares.
 .TP
 Remove a drive from your pool, to later replace it:
 .B greyhole
-\-\-going=/mnt/hdd4/gh
+\-\-remove=/mnt/hdd4/gh
 .PP
 .TP
 Monitor the Greyhole daemon by looking at the log entries:
