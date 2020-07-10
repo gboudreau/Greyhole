@@ -25,6 +25,7 @@ require_once('includes/Tasks/Md5Task.php');
 require_once('includes/Tasks/MkdirTask.php');
 require_once('includes/Tasks/RenameTask.php');
 require_once('includes/Tasks/RemoveTask.php');
+require_once('includes/Tasks/RemoveShareTask.php');
 require_once('includes/Tasks/RmdirTask.php');
 require_once('includes/Tasks/UnlinkTask.php');
 require_once('includes/Tasks/WriteTask.php');
@@ -46,7 +47,7 @@ abstract class AbstractTask {
      */
     public static function instantiate($task) {
         $task = to_object($task);
-        $class_name = str_replace(' ', '', ucwords(str_replace('_', ' ', $task->action))) . 'Task';
+        $class_name = str_replace(' ', '', ucwords(str_replace(['_', '-'], ' ', $task->action))) . 'Task';
         return new $class_name($task);
     }
 

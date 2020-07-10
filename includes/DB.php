@@ -198,6 +198,10 @@ final class DB {
             DB::migrate_15_status_myisam();
             Settings::set('db_version', 15);
         }
+        if ($db_version < 16) {
+            DB::migrate_16_larger_action();
+            Settings::set('db_version', 16);
+        }
     }
 
     // Migration #1 (complete = frozen|thawed)
@@ -467,6 +471,13 @@ final class DB {
 
     private static function migrate_15_status_myisam() {
         $query = "ALTER TABLE `status` ENGINE = MYISAM";
+        DB::execute($query);
+    }
+
+    private static function migrate_16_larger_action() {
+        $query = "ALTER TABLE `tasks` CHANGE `action` `action` varchar(12) CHARACTER SET ascii NOT NULL DEFAULT ''";
+        DB::execute($query);
+        $query = "ALTER TABLE `tasks_completed` CHANGE `action` `action` varchar(12) CHARACTER SET ascii NOT NULL DEFAULT ''";
         DB::execute($query);
     }
 

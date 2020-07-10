@@ -6,11 +6,11 @@ PRIMARY KEY (`name`)
 
 INSERT INTO `settings` (`name`, `value`) VALUES ('last_read_log_smbd_line', '0');
 INSERT INTO `settings` (`name`, `value`) VALUES ('last_OOS_notification', '0');
-INSERT INTO `settings` (`name`, `value`) VALUES ('db_version', '13');
+INSERT INTO `settings` (`name`, `value`) VALUES ('db_version', '16');
 
 CREATE TABLE `tasks` (
 `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-`action` VARCHAR(10) CHARACTER SET ascii NOT NULL,
+`action` VARCHAR(12) CHARACTER SET ascii NOT NULL,
 `share` VARCHAR(255) NOT NULL,
 `full_path` VARCHAR(255) NULL,
 `additional_info` VARCHAR(255) NULL,
@@ -24,7 +24,7 @@ KEY `md5_checker` (`action`,`share`(64),`full_path`,`complete`)
 
 CREATE TABLE `tasks_completed` (
 `id` BIGINT UNSIGNED NOT NULL,
-`action` VARCHAR(10) CHARACTER SET ascii NOT NULL,
+`action` VARCHAR(12) CHARACTER SET ascii NOT NULL,
 `share` VARCHAR(255) NOT NULL,
 `full_path` VARCHAR(255) NULL,
 `additional_info` VARCHAR(255) NULL,

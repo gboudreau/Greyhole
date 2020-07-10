@@ -48,7 +48,7 @@ class RemoveShareCliRunner extends AbstractCliRunner {
         $this->log("Will remove '$this->share' share from the Greyhole storage pool, by moving all the data files inside this share to it's landing zone: $landing_zone");
 
         // df the landing zone, to see how much free space it has
-        $free_space = 1024 * exec("df -k --total " . escapeshellarg($landing_zone) . " | awk '/^total/{print $4}'");
+        $free_space = 1024 * exec("df -k " . escapeshellarg($landing_zone) . " | tail -1 | awk '{print $4}'");
 
         // du the files to see if there's room in the landing zone
         $this->log("  Finding how much space is needed, and if you have enough... Please wait...");
@@ -57,7 +57,6 @@ class RemoveShareCliRunner extends AbstractCliRunner {
         $this->log("    Free space: " . bytes_to_human($free_space, FALSE));
 
         // Adjust the landing zone free space, if some file copies are already on that drive
-        $storage_pool_drives_to_unwind = array();
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (!file_exists("$sp_drive/$this->share")) {
                 #echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
@@ -67,11 +66,7 @@ class RemoveShareCliRunner extends AbstractCliRunner {
                 $more_free_space = 1024 * exec("du -sk " . escapeshellarg("$sp_drive/$this->share") . " | awk '{print $1}'");
                 $free_space += $more_free_space;
                 $this->log("      + " . bytes_to_human($more_free_space, FALSE) . " (file copies already on $sp_drive) = " . bytes_to_human($free_space, FALSE) . " (Total available space)");
-
-                // We also need to make sure this drive is 'unwind' first, to make sure it will have enough free space to receive all the file copies.
-                array_unshift($storage_pool_drives_to_unwind, $sp_drive);
-            } else {
-                array_push($storage_pool_drives_to_unwind, $sp_drive);
+                break;
             }
         }
 
@@ -79,31 +74,19 @@ class RemoveShareCliRunner extends AbstractCliRunner {
             $this->log("Not enough free space available in $landing_zone. Aborting.");
             $this->finish(1);
         }
-        $this->log("  OK! Let's do this.");
+        $this->log("OK! Let's do this.");
 
-        // Remove the symlinks from the landing zone
-        $this->log("  Deleting symlinks from landing zone... Please wait...");
-        exec("find " . escapeshellarg($landing_zone) . " -type l -delete");
-        $this->log("    Done.");
+        $query = "INSERT INTO tasks SET action = :action, share = :share, complete = 'yes'";
+        $params = array(
+            'action'    => ACTION_REMOVE_SHARE,
+            'share'     => $this->share,
+        );
+        DB::insert($query, $params);
 
-        // Copy the data files from the storage pool into the landing zone
-        $num_files_total = 0;
-        foreach ($storage_pool_drives_to_unwind as $sp_drive) {
-            unset($result);
-            $this->log("  Moving files from $sp_drive/$this->share into $landing_zone... Please wait...");
-            exec("rsync -rlptgoDuvW --remove-source-files " . escapeshellarg("$sp_drive/$this->share/") . " " . escapeshellarg('/' . trim($landing_zone, '/')), $result);
-            $num_files = count($result)-5;
-            if ($num_files < 0) {
-                $num_files = 0;
-            }
-            $num_files_total += $num_files;
-            exec("find " . escapeshellarg("$sp_drive/$this->share/") . " -type d -delete");
-            $this->log("    Done. Copied $num_files files.");
-        }
-        $this->log("All done. Copied $num_files_total files.\nYou should now remove the Greyhole options from the [$this->share] share in your smb.conf.");
-
-        ConfigHelper::removeShare($this->share);
-        $this->restart_service();
+        $this->log();
+        $this->log("Removal of share '$this->share' has been scheduled. It will start after all currently pending tasks have been completed.");
+        $this->log("You will receive an email notification once it completes.");
+        $this->log("You can also tail the Greyhole log to follow this operation.");
     }
 }
 
