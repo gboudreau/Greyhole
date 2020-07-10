@@ -36,7 +36,7 @@ define('ACTION_IOSTAT', 'iostat');
 define('ACTION_GETUID', 'getuid');
 define('ACTION_MD5_WORKER', 'md5-worker');
 define('ACTION_FIX_SYMLINKS', 'fix-symlinks');
-define('ACTION_REPLACE', 'replace');
+define('ACTION_REPLACE', 'replaced');
 define('ACTION_WAIT_FOR', 'wait-for');
 define('ACTION_REMOVE', 'remove');
 define('ACTION_THAW', 'thaw');

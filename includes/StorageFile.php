@@ -45,7 +45,7 @@ final class StorageFile {
 
             $root_path = str_replace(clean_dir("/$share/$full_path"), '', $metafile->path);
             if (!StoragePool::is_pool_drive($root_path)) {
-                Log::warn("  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.", Log::EVENT_CODE_STORAGE_POOL_DRIVE_UUID_CHANGED);
+                Log::warn("  Warning! It seems the partition UUID of $root_path changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replaced'. Because of that, Greyhole will NOT use this drive at this time.", Log::EVENT_CODE_STORAGE_POOL_DRIVE_UUID_CHANGED);
                 $metafile->state = Metafile::STATE_GONE;
                 $metafiles[$key] = $metafile;
                 continue;

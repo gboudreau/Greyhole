@@ -74,7 +74,7 @@ final class MigrationHelper {
                 unlink("$sp_drive/.greyhole_uses_this");
             }
             if ($drives_definitions[$sp_drive] != $drive_uuid) {
-                Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replace'. Because of that, Greyhole will NOT use this drive at this time.", Log::EVENT_CODE_STORAGE_POOL_DRIVE_UUID_CHANGED);
+                Log::warn("Warning! It seems the partition UUID of $sp_drive changed. This probably means this mount is currently unmounted, or that you replaced this drive and didn't use 'greyhole --replaced'. Because of that, Greyhole will NOT use this drive at this time.", Log::EVENT_CODE_STORAGE_POOL_DRIVE_UUID_CHANGED);
             }
         }
         foreach ($drives_definitions as $sp_drive => $uuid) {
