@@ -213,7 +213,7 @@ final class DBSpool {
             Log::debug("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
             Log::debug("  This directory is frozen. Will postpone this task until it is thawed.");
             $this->postpone_task($task->id, 'frozen');
-            $this->archive_task($task->id);
+            static::archive_task($task->id);
         }
 
         if (array_contains($this->sleep_before_task, $task->id)) {
@@ -240,7 +240,7 @@ final class DBSpool {
 
         if ($task->complete == 'written') {
             if ($task->should_ignore_file()) {
-                $this->archive_task($task->id);
+                static::archive_task($task->id);
                 return;
             }
 
@@ -283,7 +283,7 @@ final class DBSpool {
             $this->sleep_before_task = array();
         }
 
-        $this->archive_task($task->id);
+        static::archive_task($task->id);
     }
 
     public function insert($action, $share, $full_path, $additional_info, $fd) {
@@ -392,7 +392,7 @@ final class DBSpool {
         }
     }
 
-    private function archive_task($task_id) {
+    public static function archive_task($task_id) {
         $query = "INSERT INTO tasks_completed SELECT * FROM tasks WHERE id = :task_id";
         $worked = DB::insert($query, array('task_id' => $task_id));
         if (!$worked) {

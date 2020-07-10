@@ -131,13 +131,16 @@ final class ConfigHelper {
     );
 
     public static function removeShare($share) {
-        exec("/bin/sed -i 's/^.*num_copies\[".$share."\].*$//' " . escapeshellarg(self::$config_file));
+        $conf_file = escapeshellarg(self::$config_file);
+        $tmp_file = escapeshellarg(self::$config_file . '.tmp');
+        exec("/bin/sed 's/^.*num_copies\[".$share."\].*$//' $conf_file >$tmp_file && cat $tmp_file >$conf_file");
     }
 
     public static function removeStoragePoolDrive($sp_drive) {
         $escaped_drive = str_replace('/', '\/', $sp_drive);
-        exec("/bin/sed -i 's/^.*storage_pool_directory.*$escaped_drive.*$//' " . escapeshellarg(self::$config_file)); // Deprecated notation
-        exec("/bin/sed -i 's/^.*storage_pool_drive.*$escaped_drive.*$//' " . escapeshellarg(self::$config_file));
+        $conf_file = escapeshellarg(self::$config_file);
+        $tmp_file = escapeshellarg(self::$config_file . '.tmp');
+        exec("/bin/sed 's/^.*storage_pool_drive.*$escaped_drive.*$//' $conf_file >$tmp_file && cat $tmp_file >$conf_file");
     }
 
     public static function randomStoragePoolDrive() {

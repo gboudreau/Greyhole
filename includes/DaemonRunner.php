@@ -98,6 +98,23 @@ class DaemonRunner extends AbstractRunner {
 		// The daemon should never finish; it will be killed by the init script.
 		// Not that it can reach finish() anyway, since it's in an infinite while(TRUE) loop in run()... :)
 	}
+
+	public static function restart_service() {
+		if (is_file('/etc/init.d/greyhole')) {
+			exec("/etc/init.d/greyhole condrestart");
+			return TRUE;
+		} else if (is_file('/etc/init/greyhole.conf')) {
+			exec("/sbin/restart greyhole");
+			return TRUE;
+		} else if (is_file('/usr/bin/supervisorctl')) {
+			exec("/usr/bin/supervisorctl status greyhole", $out, $return);
+			if ($return === 0) {
+				exec("/usr/bin/supervisorctl restart greyhole");
+				return TRUE;
+			}
+		}
+		return FALSE;
+	}
 }
 
 ?>
