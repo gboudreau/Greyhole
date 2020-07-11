@@ -369,7 +369,7 @@ final class Metastores {
                     $worked = @file_put_contents("$data_filepath/$filename", serialize($metafiles));
                     if ($worked === FALSE) {
                         // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
-                        $worked = file_put_contents(normalize_utf8_characters("$data_filepath/$filename"), serialize($metafiles));
+                        $worked = @file_put_contents(normalize_utf8_characters("$data_filepath/$filename"), serialize($metafiles));
                         if ($worked !== FALSE) {
                             // Bingo!
                             $data_filepath = normalize_utf8_characters($data_filepath);
