@@ -57,6 +57,10 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
                     continue;
                 }
             }
+            
+            if (count($pool_drives_avail_space) == 0) {
+                continue;
+            }
 
             $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
 
