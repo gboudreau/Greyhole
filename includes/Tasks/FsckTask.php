@@ -317,7 +317,7 @@ class FsckTask extends AbstractTask {
         closedir($handle);
     }
 
-    public function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_path = FALSE) {
+    public function gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_path = FALSE, $num_retries = 1) {
         $landing_zone = get_share_landing_zone($share);
         if($storage_path === FALSE) {
             $file_path = trim(mb_substr($path, mb_strlen($landing_zone)+1), '/');
@@ -689,7 +689,26 @@ class FsckTask extends AbstractTask {
                     }
 
                     if ($metafile->state == Metafile::STATE_PENDING) {
-                        if (StorageFile::create_file_copy($original_file_path, $metafile->path)) {
+
+                        $expected_md5 = NULL;
+                        if ($this->has_option(OPTION_VALIDATE_COPIES) && $num_retries <= 3) {
+                            $q = "SELECT checksum FROM checksums WHERE share = :share AND full_path = :full_path";
+                            $expected_md5 = DB::getFirstValue($q, ['share' => $share, 'full_path' => "$file_path/$filename"]);
+                            if (!$expected_md5) {
+                                if (empty($file_path)) {
+                                    $q = "SELECT checksum FROM checksums WHERE share = :share AND full_path = :full_path";
+                                    $expected_md5 = DB::getFirstValue($q, ['share' => $share, 'full_path' => $filename]);
+                                }
+                                if (!$expected_md5) {
+                                    Log::debug("    MD5 not found in 'checksum' table ($share/$file_path/$filename). Will calculate it from the source file.");
+                                    $output = exec("md5sum " . escapeshellarg($original_file_path));
+                                    $output = explode(' ', $output);
+                                    $expected_md5 = $output[0];
+                                }
+                            }
+                        }
+
+                        if (StorageFile::create_file_copy($original_file_path, $metafile->path, $expected_md5, $error)) {
                             $metafile->state = Metafile::STATE_OK;
                             $num_copies_current++;
                         } else {
@@ -702,7 +721,7 @@ class FsckTask extends AbstractTask {
                     }
                 }
                 if ($original_file_path == $metafile->path || $metafile->is_linked) {
-                    if (!empty($going_drive) && StoragePool::getDriveFromPath($original_file_path) == $going_drive) {
+                    if (!empty($going_drive) && StoragePool::getDriveFromPath($metafile->path) == $going_drive) {
                         $metafile->is_linked = FALSE;
                         $metafile->state = Metafile::STATE_GONE;
                         $file_metafiles[$key] = $metafile;
@@ -815,6 +834,16 @@ class FsckTask extends AbstractTask {
                         Md5Task::queue($share, clean_dir("$file_path/$filename"), $metafile->path);
                     }
                 }
+            }
+        }
+
+        if (!empty($error) && string_contains($error, 'MD5 mismatch')) {
+            // Retry 3 times, then just create a file copy even if the MD5 is wrong (maybe the checksum in the DB was wrong, for some reason)
+            if ($num_retries <= 3) {
+                if ($num_retries == 3) {
+                    $this->fsck_report->found_problem(FSCK_PROBLEM_WRONG_MD5, $error, $original_file_path);
+                }
+                $this->gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_path, $num_retries+1);
             }
         }
     }

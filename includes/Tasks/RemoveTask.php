@@ -38,16 +38,15 @@ class RemoveTask extends AbstractTask {
             file_put_contents($this->drive . "/.greyhole_used_this", "Flag to prevent Greyhole from thinking this drive disappeared for no reason...");
             Metastores::choose_metastores_backups();
             Log::info("Storage pool drive " . $this->drive . " will be removed from the storage pool.");
-            echo("Storage pool drive " . $this->drive . " will be removed from the storage pool.\n");
+            $this->log("Storage pool drive " . $this->drive . " will be removed from the storage pool.\n");
 
             global $going_drive; // Used in StoragePool::is_pool_drive()
             $going_drive = $this->drive;
 
             // For the fsck_file calls to be able to use the files on $going_drive if needed, to create extra copies.
-            $fsck_task = FsckTask::getCurrentTask(array('additional_info' => 'find-orphans'));
+            $fsck_task = FsckTask::getCurrentTask(array('additional_info' => OPTION_ORPHANED . '|' . OPTION_DU . '|' . OPTION_VALIDATE_COPIES));
 
             // fsck shares with only 1 file copy to remove those from $this->drive
-            $fsck_task->initialize_fsck_report('Shares with only 1 copy');
             foreach (SharesConfig::getShares() as $share_name => $share_options) {
                 if (!is_dir("$going_drive/$share_name")) {
                     $this->log("Share '$share_name' not found on $going_drive... Skipping.");
@@ -57,8 +56,16 @@ class RemoveTask extends AbstractTask {
                 if ($share_options[CONFIG_NUM_COPIES] == 1) {
                     $this->log("Moving file copies for share '$share_name'... Please be patient... ");
                     if (is_dir("$going_drive/$share_name")) {
+                        $fsck_task->initialize_fsck_report("Removing drive $going_drive; share with only 1 copy: $share_name");
                         $fsck_task->gh_fsck_reset_du($share_name);
                         $fsck_task->gh_fsck($share_options[CONFIG_LANDING_ZONE], $share_name);
+
+                        $errors = @$fsck_task->get_fsck_report()->found_problems[FSCK_PROBLEM_WRONG_MD5];
+                        if (is_array($errors)) {
+                            foreach ($errors as $file_path => $error) {
+                                $this->log("  Failed to create copy of $file_path: $error");
+                            }
+                        }
                     }
                     $this->log("  Done.");
                 } else {
@@ -144,7 +151,7 @@ class RemoveTask extends AbstractTask {
                 $file_copies_inodes = StoragePool::get_file_copies_inodes($share, $file_path, $filename, $file_metafiles, TRUE);
                 if (count($file_copies_inodes) == 0) {
                     Log::debug("Found a file, $full_path, that has no other copies on other drives. Removing $going_drive would make that file disappear! Will create extra copies now.");
-                    echo ".";
+                    //echo ".";
                     FsckTask::getCurrentTask()->gh_fsck_file($path, $filename, $file_type, 'landing_zone', $share, $going_drive);
                 }
             }

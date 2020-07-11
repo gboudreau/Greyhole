@@ -244,7 +244,7 @@ final class StorageFile {
         return $copy_results;
     }
 
-    public static function create_file_copy($source_file, &$destination_file) {
+    public static function create_file_copy($source_file, &$destination_file, $expected_md5 = NULL, &$error = NULL) {
         if (gh_is_file($source_file) && $source_file == $destination_file) {
             Log::debug("  Destination $destination_file is the same as the source. Nothing to do here; this file copy is ready!");
             return TRUE;
@@ -284,13 +284,23 @@ final class StorageFile {
             $copy_source = is_link($source_file) ? readlink($source_file) : $source_file;
             $original_file_infos = StorageFile::get_file_permissions($copy_source);
             $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . escapeshellarg($temp_path);
-            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY)) {
+            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY) || !empty($expected_md5)) {
                 $copy_cmd .= " | md5sum";
             }
             $out = exec($copy_cmd);
-            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY)) {
+            if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY) || !empty($expected_md5)) {
                 $md5 = first(explode(' ', $out));
                 Log::debug("    Copied file MD5 = $md5");
+
+                if (!empty($expected_md5)) {
+                    if ($md5 != $expected_md5) {
+                        Log::warn("    MD5 mismatch (expected $expected_md5). Failed file copy. Will mark this metadata file 'Gone'.", Log::EVENT_CODE_FILE_COPY_FAILED);
+                        $error = "MD5 mismatch: expected $expected_md5, got $md5";
+                        return FALSE;
+                    } else {
+                        Log::debug("    MD5 match expected value.");
+                    }
+                }
             }
         }
 
@@ -318,7 +328,14 @@ final class StorageFile {
                 log_file_checksum($share, $full_path, $md5);
             }
         } else {
-            Log::warn("    Failed file copy. Will mark this metadata file 'Gone'.", Log::EVENT_CODE_FILE_COPY_FAILED);
+            if (!file_exists($temp_path)) {
+                $error = "target file $temp_path doesn't exists";
+            } elseif (gh_filesize($temp_path) != $source_size) {
+                $error = "target filesize " . gh_filesize($temp_path) ." != source filesize $source_size";
+            } else {
+                $error = '?';
+            }
+            @Log::warn("    Failed file copy (failed check: $error). Will mark this metadata file 'Gone'.", Log::EVENT_CODE_FILE_COPY_FAILED);
             if ($renamed) {
                 // Do NOT delete $temp_path if the file was renamed... Just move it back!
                 gh_rename($temp_path, $source_file);

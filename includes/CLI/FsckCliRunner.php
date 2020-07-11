@@ -27,6 +27,7 @@ define('OPTION_SKIP_METASTORE','skip-metastore');
 define('OPTION_ORPHANED','orphaned');
 define('OPTION_DU','du');
 define('OPTION_DEL_ORPHANED_METADATA','del-orphaned-metadata');
+define('OPTION_VALIDATE_COPIES','validate-copies-created');
 
 class FsckCliRunner extends AbstractCliRunner {
     private $dir = '';

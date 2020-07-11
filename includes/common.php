@@ -226,6 +226,7 @@ define('FSCK_PROBLEM_NO_COPIES_FOUND',   10);
 define('FSCK_PROBLEM_TOO_MANY_COPIES',   11);
 define('FSCK_PROBLEM_WRONG_COPY_SIZE',   12);
 define('FSCK_PROBLEM_TEMP_FILE',         13);
+define('FSCK_PROBLEM_WRONG_MD5',         14);
 
 class FSCKReport {
     /** @var int */
