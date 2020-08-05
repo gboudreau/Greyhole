@@ -156,13 +156,35 @@ final class Metastores {
         return $volume_metastores;
     }
 
-    public static function get_metafile_data_filenames($share, $path, $filename, $how_many=NULL) {
+    /**
+     * @param string $share
+     * @param string $path
+     * @param string $filename
+     * @param bool   $first_only
+     *
+     * @return string[]
+     */
+    public static function get_metafile_data_filenames($share, $path, $filename, $first_only=FALSE) {
         $filenames = array();
+
+        if ($first_only) {
+            $share_file = get_share_landing_zone($share) . "/$path/$filename";
+            if (is_link($share_file)) {
+                $target = readlink($share_file);
+                $first_metastore = str_replace(clean_dir("/$share/$path/$filename"), "", $target);
+                $f = clean_dir("$first_metastore/" . static::METASTORE_DIR . "/$share/$path/$filename");
+                if (is_file($f)) {
+                    $filenames[] = $f;
+                    return $filenames;
+                }
+            }
+        }
+
         foreach (static::get_metastores() as $metastore) {
             $f = clean_dir("$metastore/$share/$path/$filename");
             if (is_file($f)) {
                 $filenames[] = $f;
-                if (!empty($how_many) && count($filenames) == $how_many) {
+                if ($first_only) {
                     return $filenames;
                 }
             }
@@ -170,8 +192,15 @@ final class Metastores {
         return $filenames;
     }
 
+    /**
+     * @param string $share
+     * @param string $path
+     * @param string $filename
+     *
+     * @return string|false
+     */
     public static function get_metafile_data_filename($share, $path, $filename) {
-        $filenames = static::get_metafile_data_filenames($share, $path, $filename, 1);
+        $filenames = static::get_metafile_data_filenames($share, $path, $filename, TRUE);
         return first($filenames, FALSE);
     }
 
