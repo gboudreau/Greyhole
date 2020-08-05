@@ -207,15 +207,6 @@ final class DBSpool {
         $task = AbstractTask::instantiate($task);
         $this->current_task = $task;
 
-        # Postpone tasks in frozen directories until a --thaw command is received
-        if ($task->shouldBeFrozen()) {
-            Log::setAction($task->action);
-            Log::debug("Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : ''));
-            Log::debug("  This directory is frozen. Will postpone this task until it is thawed.");
-            $this->postpone_task($task->id, 'frozen');
-            static::archive_task($task->id);
-        }
-
         if (array_contains($this->sleep_before_task, $task->id)) {
             Log::setAction(ACTION_SLEEP);
             $log = "Only locked files operations pending... Sleeping.";
@@ -233,10 +224,6 @@ final class DBSpool {
         Log::setAction($task->action);
         $log = "Now working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> $task->share/$task->additional_info" : '');
         Log::info($log);
-        if (DaemonRunner::$was_idle) {
-            LogHook::trigger(LogHook::EVENT_TYPE_NOT_IDLE, Log::EVENT_CODE_IDLE_NOT, $log);
-            DaemonRunner::$was_idle = FALSE;
-        }
 
         if ($task->complete == 'written') {
             if ($task->should_ignore_file()) {
@@ -272,6 +259,19 @@ final class DBSpool {
         if (!empty($this->locked_shares) && array_contains(array_keys($this->locked_shares), $task->share)) {
             Log::info("  Share is locked because another file operation is waiting for a file handle to be released. Skipping.");
             return;
+        }
+
+        # Postpone tasks in frozen directories until a --thaw command is received
+        if ($task->shouldBeFrozen()) {
+            Log::debug("  This directory is frozen. Will postpone this task until it is thawed.");
+            $this->postpone_task($task->id, 'frozen');
+            static::archive_task($task->id);
+            return;
+        }
+
+        if (DaemonRunner::$was_idle) {
+            LogHook::trigger(LogHook::EVENT_TYPE_NOT_IDLE, Log::EVENT_CODE_IDLE_NOT, $log);
+            DaemonRunner::$was_idle = FALSE;
         }
 
         $result = $task->execute();
