@@ -19,6 +19,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 include('includes/common.php');
+include('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
+include('includes/DaemonRunner.php');
 
 ConfigHelper::parse();
 DB::connect();
