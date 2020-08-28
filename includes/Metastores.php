@@ -403,6 +403,8 @@ final class Metastores {
                             // Bingo!
                             $data_filepath = normalize_utf8_characters($data_filepath);
                             $filename = normalize_utf8_characters($filename);
+                        } else {
+                            Log::warn("  Failed to save metadata file in $data_filepath/$filename", Log::EVENT_CODE_NO_METADATA_SAVED);
                         }
                     }
                     $has_metafile = TRUE;
@@ -425,8 +427,11 @@ final class Metastores {
                 }
                 $data_filepath = "$metastore_backup_drive/$share/$path";
                 Log::debug("    Saving backup metadata file in $data_filepath/$filename");
-                gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path");
-                file_put_contents("$data_filepath/$filename", serialize($metafiles));
+                if (gh_mkdir($data_filepath, get_share_landing_zone($share) . "/$path")) {
+                    if (!@file_put_contents("$data_filepath/$filename", serialize($metafiles))) {
+                        Log::warn("  Failed to save backup metadata file in $data_filepath/$filename", Log::EVENT_CODE_NO_METADATA_SAVED);
+                    }
+                }
             }
         }
     }
