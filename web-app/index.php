@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+chdir(__DIR__ . '/..');
 include('includes/common.php');
 include('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
 include('includes/DaemonRunner.php');
