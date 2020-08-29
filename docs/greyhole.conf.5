@@ -40,15 +40,15 @@ The (MySQL) database to use for the Greyhole tasks queue & settings.
 .PP
 You will need to specify a \fBdb_host\fR (normally localhost), \fBdb_user\fR, \fBdb_pass\fR and \fBdb_name\fR. The user and database should already exist, per the USAGE instructions.
 .PP
-Example: db_host	= localhost\fR
+Example: \fIdb_host\fR = \fIlocalhost\fR
 .RS 9
-\fIdb_user	= greyhole_user\fR
+\fIdb_user\fR = \fIgreyhole_user\fR
 .RE
 .RS 9
-\fIdb_pass	= 89y63jdwe\fR
+\fIdb_pass\fR = \fI89y63jdwe\fR
 .RE
 .RS 9
-\fIdb_name	= greyhole\fR
+\fIdb_name\fR = \fIgreyhole\fR
 .RE
 .RE
 
@@ -62,9 +62,9 @@ To send emails to a remote mail server, you'll need to make sure you can send em
 Default is \fBroot\fR.
 .RE
 .PP
-Examples: \fIemail_to = you@gmail.com\fR
+Examples: \fIemail_to\fR = \fIyou@gmail.com\fR
 .RS 10
-\fIemail_to = root\fR
+\fIemail_to\fR = \fIroot\fR
 .RE
 .RE
 
@@ -91,9 +91,9 @@ You can specify \fBsyslog\fR to have the daemon log using (r)syslogd instead of 
 Default is \fB/var/log/greyhole.log\fR.
 .RE
 .PP
-Examples: \fIgreyhole_log_file = /var/log/greyhole.log\fR
+Examples: \fIgreyhole_log_file\fR = \fI/var/log/greyhole.log\fR
 .RS 10
-\fIgreyhole_log_file = syslog\fR
+\fIgreyhole_log_file\fR = \fIsyslog\fR
 .RE
 .RE
 
@@ -151,7 +151,7 @@ The syntax for the value is:
 \fIpath\fR, min_free: \fI##\fRgb
 .RE
 .PP
-Example: \fIstorage_pool_drive = /mnt/hdd0/gh, min_free: 10gb\fR
+Example: \fIstorage_pool_drive\fR = \fI/mnt/hdd0/gh, min_free: 10gb\fR
 .RE
 
 allow_multiple_sp_per_device
@@ -176,12 +176,12 @@ If you change one of those, you should run fsck manually, or wait for the daily 
 You can use the special keyword \fBmax\fR to have copies of those files on all your drives.
 .RE
 .PP
-Examples: \fInum_copies[RecordedTV] = 1\fR
+Examples: \fInum_copies[RecordedTV]\fR = \fI1\fR
 .RS 10
-\fInum_copies[Music]	   = 2\fR
+\fInum_copies[Music]\fR	   = \fI2\fR
 .RE
 .RS 10
-\fInum_copies[Photos]	   = max\fR
+\fInum_copies[Photos]\fR	   = \fImax\fR
 .RE
 .RE
 
@@ -202,7 +202,7 @@ If you ommit any storage pool drive from your groups, this drive will NOT be use
 .PP
 See \fIhttps://github.com/gboudreau/Greyhole/wiki/SuggestedStorageSelectionAlgorithmUsage\fR on how we suggest you use this feature.
 .PP
-Examples: \fIdrive_selection_groups = OK: /mnt/hdd0/gh, /mnt/hdd2/gh\fR
+Examples: \fIdrive_selection_groups\fR = \fIOK: /mnt/hdd0/gh, /mnt/hdd2/gh\fR
 .RS 35
 \fINEW: /mnt/hdd1/gh\fR
 .RE
@@ -216,7 +216,7 @@ Examples: \fIdrive_selection_groups = OK: /mnt/hdd0/gh, /mnt/hdd2/gh\fR
 You can also define drive_selection_groups for specific shares:
 .PP
 .RS 3
-\fIdrive_selection_groups[Photos] = SATA: /mnt/hdd0/gh\fR
+\fIdrive_selection_groups[Photos]\fR = \fISATA: /mnt/hdd0/gh\fR
 .RE
 .RS 36
 \fIIDE: /mnt/hdd1/gh, /mnt/hdd2/gh\fR
@@ -229,17 +229,16 @@ You can also define drive_selection_groups for specific shares:
 drive_selection_algorithm
 .PP
 .RS 4
-Available algorithms: most_available_space, random, forced
+Available algorithms: most_available_space, least_used_space, forced
 .TP
-\fBmost_available_space\fR: use the drives with the most available space 
-first, so that available space on all drives should become and stay balanced.
+\fBmost_available_space\fR: use the drives with the most available space first, so that available space on all drives should become and stay balanced.
 .TP
-\fBrandom\fR: use a random drive with available space
+\fBleast_used_space\fR: use the drives with the least used space first, so that used space on all drives should become and stay balanced.
 .TP
 \fBforced\fR: use the drive_selection_groups you defined previously. The syntax for using \fBforced\fR is:
 .PP
 .RS 4
-\fIforced\fR (\fI#\fRx\fIgroup_name\fR[, \fI#\fRx\fIgroup_name\fR[, ...]]) [\fImost_available_space\fR|\fIrandom\fR]
+\fIforced\fR (\fI#\fRx\fIgroup_name\fR[, \fI#\fRx\fIgroup_name\fR[, ...]]) [\fImost_available_space\fR|\fIleast_used_space\fR]
 .RE
 .PP
 Use the \fBforced\fR keyword, then list the groups you want to use, in order, and 
@@ -248,17 +247,17 @@ that group before using the next group.
 Use the \fBall\fR keyword to indicate you want Greyhole to use all drives 
 from a specific group before starting to use drives from the next group.
 You'll need to indicate how Greyhole should pick drives within a group by 
-ending your line with either \fBmost_available_space\fR or \fBrandom\fR.
+ending your line with either \fBmost_available_space\fR or \fBleast_used_space\fR.
 .PP
 Examples: \fIdrive_selection_algorithm = forced (1xOK, 1xNEW, 1xBROKEN, 1xREMOTE) most_available_space\fR
 .PP
 You can also define drive_selection_algorithm for specific shares:
 .PP
 .RS 4
-\fIdrive_selection_algorithm[Videos] = random\fR
+\fIdrive_selection_algorithm[Videos]\fR = \fImost_available_space\fR
 .RE
 .RS 4
-\fIdrive_selection_algorithm[Photos] = forced (all SATA, 1xIDE, 1xUSB) random\fR
+\fIdrive_selection_algorithm[Photos]\fR = \fIforced (all SATA, 1xIDE, 1xUSB) least_used_space\fR
 .RE
 .RE
 
@@ -286,12 +285,12 @@ be use to hold your files together.
 Note that if you already have files in the specified directory, you'll need to use 
 \fB--balance\fR to move the file copies together.
 .PP
-Example: \fIsticky_files = Videos/Movies/Kids/\fR
+Example: \fIsticky_files\fR = \fIVideos/Movies/Kids/\fR
 .RS 11
-\fIstick_into = /mnt/hdd1/gh\fR
+\fIstick_into\fR = \fI/mnt/hdd1/gh\fR
 .RE
 .RS 11
-\fIstick_into = /mnt/hdd5/gh\fR
+\fIstick_into\fR = \fI/mnt/hdd5/gh\fR
 .RE
 .RE
 
@@ -321,9 +320,9 @@ preference.
 Default is \fByes\fR.
 .RE
 .PP
-Examples: \fIdelete_moves_to_trash = yes\fR
+Examples: \fIdelete_moves_to_trash\fR = \fIyes\fR
 .RS 10
-\fIdelete_moves_to_trash[CrashPlan] = no\fR
+\fIdelete_moves_to_trash[CrashPlan]\fR = \fIno\fR
 .RE
 .RE
 
@@ -339,9 +338,9 @@ instead of having Greyhole process them as soon as they change.
 Each frozen_directory line should start with the name of a share, followed 
 by a optional directory inside that share.
 .PP
-Examples: \fIfrozen_directory = Data/mysql\fR
+Examples: \fIfrozen_directory\fR = \fIData/mysql\fR
 .RS 10
-\fIfrozen_directory = VirtualMachines\fR
+\fIfrozen_directory\fR = \fIVirtualMachines\fR
 .RE
 .RE
 
@@ -401,9 +400,9 @@ Otherwise, the file will be included literally, as though typed in place.
 .RS 0
 An included config file can contain other include parameters, thus allowing recursive inclusions.
 .PP
-Examples: \fIinclude = /etc/greyhole.d/storage_drives\fR
+Examples: \fIinclude\fR = \fI/etc/greyhole.d/storage_drives\fR
 .RS 10
-\fIinclude = /etc/greyhole.d/greyhole_shares.sh\fR
+\fIinclude\fR = \fI/etc/greyhole.d/greyhole_shares.sh\fR
 .RE
 .RE
 .RE
@@ -494,15 +493,15 @@ Look here for the list of possible codes: \fIhttps://github.com/gboudreau/Greyho
 - \fBlog\fR: user-readable log (might contain LF characters)
 .RE
 .PP
-Examples: \fIhook[create|edit|rename|delete|mkdir|rmdir] = /usr/share/greyhole/scripts-examples/greyhole_file_changed.sh\fR
+Examples: \fIhook[create|edit|rename|delete|mkdir|rmdir]\fR = \fI/usr/share/greyhole/scripts-examples/greyhole_file_changed.sh\fR
 .RS 10
-\fIhook[warning|error|critical]                = /usr/share/greyhole/scripts-examples/greyhole_notify_error.sh\fR
+\fIhook[warning|error|critical]\fR                = \fI/usr/share/greyhole/scripts-examples/greyhole_notify_error.sh\fR
 .RE
 .RS 10
-\fIhook[fsck]                                  = /usr/share/greyhole/scripts-examples/greyhole_send_fsck_report.sh\fR
+\fIhook[fsck]\fR                                  = \fI/usr/share/greyhole/scripts-examples/greyhole_send_fsck_report.sh\fR
 .RE
 .RS 10
-\fIhook[idle|not_idle]                         = /usr/share/greyhole/scripts-examples/greyhole_idle.sh\fR
+\fIhook[idle|not_idle]\fR                         = \fI/usr/share/greyhole/scripts-examples/greyhole_idle.sh\fR
 .RE
 .RE
 
