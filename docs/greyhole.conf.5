@@ -20,9 +20,6 @@ The values following the equals sign in parameters are all either a string (no q
 .SH PARAMETERS
 	
 .RS 0
-db_engine
-.RE
-.RS 0
 db_host
 .RE
 .RS 0
@@ -34,22 +31,16 @@ db_pass
 .RS 0
 db_name
 .RE
-.RS 0
-db_path
-.RE
 .PP
 .RS 4
-The database to use for the Greyhole tasks queue & settings. Available engines: \fBmysql\fR
+The (MySQL) database to use for the Greyhole tasks queue & settings.
 .RS 0
 \fINo defaults\fR.
 .RE
 .PP
-When using \fBmysql\fR, you will need to specify a \fBdb_host\fR (normally localhost), \fBdb_user\fR, \fBdb_pass\fR and \fBdb_name\fR. The user and database should already exist, per the USAGE instructions.
+You will need to specify a \fBdb_host\fR (normally localhost), \fBdb_user\fR, \fBdb_pass\fR and \fBdb_name\fR. The user and database should already exist, per the USAGE instructions.
 .PP
-Example: \fIdb_engine = mysql\fR
-.RS 9
-\fIdb_host	= localhost\fR
-.RE
+Example: db_host	= localhost\fR
 .RS 9
 \fIdb_user	= greyhole_user\fR
 .RE
