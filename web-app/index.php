@@ -100,11 +100,7 @@ $stats = StatsCliRunner::get_stats();
             <thead>
                 <tr>
                 <th>Path</th>
-                <th>Total</th>
-                <th>Used</th>
-                <th>Free</th>
-                <th>Trash</th>
-                <th>Possible</th>
+                <th>Size</th>
                 <th>Min. free space</th>
             </tr>
             </thead>
@@ -112,16 +108,16 @@ $stats = StatsCliRunner::get_stats();
                 <?php foreach ($stats as $sp_drive => $stat) : ?>
                     <?php if ($sp_drive == 'Total') continue; ?>
                     <tr>
-                        <td><?php phe($sp_drive) ?></td>
-                        <?php if (empty($stat->total_space)) : ?>
-                            <td colspan="5">Offline</td>
-                        <?php else : ?>
-                            <td><?php echo bytes_to_human($stat->total_space*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->used_space*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->free_space*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->trash_size*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->potential_available_space*1024) ?></td>
-                        <?php endif; ?>
+                        <td>
+                            <?php phe($sp_drive) ?>
+                        </td>
+                        <td>
+                            <?php if (empty($stat->total_space)) : ?>
+                                Offline
+                            <?php else : ?>
+                                <?php echo bytes_to_human($stat->total_space*1024, TRUE, TRUE) ?>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[$sp_drive]", 'type' => 'kbytes'], Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive)) ?>
                         </td>
@@ -129,6 +125,9 @@ $stats = StatsCliRunner::get_stats();
                 <?php endforeach; ?>
             </tbody>
         </table>
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#modal-storage-pool-drive">
+            Add Drive to Storage Pool
+        </button>
     </div>
     <div class="col-sm-12 col-lg-6">
         <div class="chart-container">
@@ -142,8 +141,30 @@ $stats = StatsCliRunner::get_stats();
         </script>
     </div>
 </div>
+<div id="modal-storage-pool-drive" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Drive to Storage Pool</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-1">Path</div>
+                <?php echo get_config_html(['name' => CONFIG_STORAGE_POOL_DRIVE, 'type' => 'string', 'help' => "Specify the absolute path to an empty folder on a new drive.", 'placeholder' => "ex. /mnt/hdd3/gh", 'onchange' => FALSE]) ?>
+                <div class="mb-1">Min. free space</div>
+                <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[__new__]", 'type' => 'kbytes', 'help' => "Specify how much free space you want to reserve on each drive. This is a soft limit that will be ignored if the all the necessary hard drives are below their minimum.", 'onchange' => FALSE], 10*1024*1024) ?>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="addStoragePoolDrive(this)">Add</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-<h2>Samba Shares</h2>
+<h2 class="mt-8">Samba Shares</h2>
 <?php
 $possible_values_num_copies = [];
 for ($i=1; $i<count(Config::storagePoolDrives()); $i++) {
@@ -187,8 +208,13 @@ global $configs;
 include 'web-app/config_definitions.inc.php';
 ?>
 <script>
-    let last_known_config_hash = <?php echo json_encode(get_config_hash()) ?>;
     let dark_mode_enabled = <?php echo json_encode($_COOKIE['darkmode'] === '1') ?>;
+    let last_known_config_hash = <?php echo json_encode(Settings::get('last_known_config_hash')) ?>;
+    defer(function(){
+        if (<?php echo json_encode(get_config_hash()) ?> !== last_known_config_hash) {
+            $('#needs-daemon-restart').show();
+        }
+    });
 </script>
 <ul class="nav nav-tabs" id="myTab" role="tablist">
     <?php foreach ($configs as $i => $config) : ?>

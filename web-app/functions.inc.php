@@ -8,12 +8,6 @@ function phe($string) {
     echo he($string);
 }
 
-function get_config_hash() {
-    exec("cat " . escapeshellarg(ConfigHelper::$config_file) . " | grep -v '^\s*#' | grep -v '^\s*$'", $output);
-    $output = array_map('trim', $output);
-    return md5(implode("\n", $output));
-}
-
 function get_config_html($config, $current_value = NULL, $fixed_width_label = TRUE) {
     $config = (object) $config;
     $html = '';
@@ -51,6 +45,8 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         $html .= he("$config->prefix ") . '</div><div class="col-auto">';
     }
 
+    $help = !empty($config->help) ? 'aria-describedby="help_' . he($field_id) . '"' : '';
+
     if ($current_value === NULL) {
         if (isset($config->current_value)) {
             $current_value = $config->current_value;
@@ -59,16 +55,21 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
     }
 
+    $onchange = 'onchange="config_value_changed(this)"';
+    if ($config->onchange === FALSE) {
+        $onchange = '';
+    }
+
     if ($config->type == 'string') {
-        $html .= '<input class="form-contro ' . (!empty($config->class) ? $config->class : '') . 'l" type="text" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" onchange="config_value_changed(this)" style="min-width: 300px;" />';
+        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . 'l" type="text" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" ' . $onchange . ' style="min-width: 300px;" ' . $help . ' placeholder="' . (!empty($config->placeholder) ? he($config->placeholder) : '') . '" />';
     }
     elseif ($config->type == 'multi-string') {
-        $html .= '<textarea class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '"onchange="config_value_changed(this)" style="width: 300px; height: 150px">';
+        $html .= '<textarea class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' style="width: 300px; height: 150px" ' . $help . '>';
         $html .= implode("\n", $current_value);
         $html .= '</textarea>';
     }
     elseif ($config->type == 'integer') {
-        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" onchange="config_value_changed(this)" />';
+        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" ' . $onchange . ' ' . $help . ' />';
     }
     elseif ($config->type == 'select' || $config->type == 'toggles') {
         if (!array_contains(array_keys($config->possible_values), $current_value)) {
@@ -79,12 +80,12 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
             foreach ($config->possible_values as $v => $d) {
                 $selected = $v == $current_value;
                 $html .= '<label class="btn btn-outline-primary ' . ($selected ? 'active' : '') . '">';
-                $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="' . he($v) . '" autocomplete="off" onchange="config_value_changed(this)" ' . ($selected ? 'checked' : '') . '>' . he($d);
+                $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="' . he($v) . '" autocomplete="off" ' . $onchange . ' ' . ($selected ? 'checked' : '') . ' ' . $help . '>' . he($d);
                 $html .= '</label>';
             }
             $html .= '</div>';
         } else {
-            $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)">';
+            $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' ' . $help . '>';
             foreach ($config->possible_values as $v => $d) {
                 $selected = '';
                 if ($v == $current_value) {
@@ -96,7 +97,7 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
     }
     elseif ($config->type == 'sp_drives') {
-        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)" multiple>';
+        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' multiple ' . $help . '>';
         $config->possible_values = Config::storagePoolDrives();
         foreach ($config->possible_values as $v) {
             $selected = '';
@@ -110,10 +111,10 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     elseif ($config->type == 'bool') {
         $html .= '<div class="btn-group btn-group-toggle" data-toggle="buttons">';
         $html .= '<label class="btn btn-outline-primary ' . ($current_value ? 'active' : '') . '">';
-        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="yes" autocomplete="off" onchange="config_value_changed(this)" ' . ($current_value ? 'checked' : '') . '>Yes';
+        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="yes" autocomplete="off" ' . $onchange . ' ' . ($current_value ? 'checked' : '') . ' ' . $help . '>Yes';
         $html .= '</label>';
         $html .= '<label class="btn btn-outline-primary ' . (!$current_value ? 'active' : '') . '">';
-        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="no" autocomplete="off" onchange="config_value_changed(this)" ' . (!$current_value ? 'checked' : '') . '>No';
+        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="no" autocomplete="off" ' . $onchange . ' ' . (!$current_value ? 'checked' : '') . '>No';
         $html .= '</label>';
         $html .= '</div>';
     }
@@ -123,10 +124,10 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
         $current_value = bytes_to_human($current_value, FALSE);
         $numeric_value = (float) $current_value;
-        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" min="0" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)" value="' . he($numeric_value) .'" style="max-width: 90px">';
+        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" min="0" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' value="' . he($numeric_value) .'" style="max-width: 90px" ' . $help . '>';
         $html .= '</div>';
         $html .= '<div class="col-auto">';
-        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" name="' . he($config->name) . '_suffix" onchange="config_value_changed(this)">';
+        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" name="' . he($config->name) . '_suffix" ' . $onchange . '>';
         foreach (['gb' => 'GiB', 'mb' => 'MiB', 'kb' => 'KiB'] as $v => $d) {
             $selected = '';
             if (string_ends_with($current_value, $v)) {
@@ -138,15 +139,19 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
             $html .= '<option value="' . he($v) . '" ' . $selected . '>' . he($d) . '</option>';
         }
         $html .= '</select>';
-
     }
 
     if (!empty($config->suffix)) {
         $html .=  '</div><div class="col-auto">' . he(" $config->suffix");
     }
     $html .= '</div>';
+
     if (@$config->glue != 'next') {
         $html .= '</div>';
+    }
+
+    if (!empty($config->help)) {
+        $html .= '<div style="margin-top: -8px; margin-bottom: 15px"><small id="help_' . he($field_id) . '" class="form-text text-muted">' . he($config->help) . '</small></div>';
     }
 
     return $html . ' ';

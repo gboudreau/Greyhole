@@ -150,23 +150,23 @@ function get_debug_bt() {
     return $bt;
 }
 
-function bytes_to_human($bytes, $html=TRUE) {
+function bytes_to_human($bytes, $html=TRUE, $iso_units=FALSE) {
     $units = 'B';
     if (abs($bytes) > 1024) {
         $bytes /= 1024;
-        $units = 'KB';
+        $units = $iso_units ? 'KiB' : 'KB';
     }
     if (abs($bytes) > 1024) {
         $bytes /= 1024;
-        $units = 'MB';
+        $units = $iso_units ? 'MiB' : 'MB';
     }
     if (abs($bytes) > 1024) {
         $bytes /= 1024;
-        $units = 'GB';
+        $units = $iso_units ? 'GiB' : 'GB';
     }
     if (abs($bytes) > 1024) {
         $bytes /= 1024;
-        $units = 'TB';
+        $units = $iso_units ? 'TiB' : 'TB';
     }
     $decimals = (abs($bytes) > 100 ? 0 : (abs($bytes) > 10 ? 1 : 2));
     if ($html) {
@@ -929,6 +929,12 @@ function to_array($el) {
         return $el;
     }
     return [$el];
+}
+
+function get_config_hash() {
+    exec("cat " . escapeshellarg(ConfigHelper::$config_file) . " | grep -v '^\s*#' | grep -v '^\s*$'", $output);
+    $output = array_map('trim', $output);
+    return md5(implode("\n", $output));
 }
 
 ?>

@@ -28,8 +28,12 @@ setlocale(LC_CTYPE, "en_US.UTF-8");
 
 if ($_SERVER['REQUEST_URI'] == '/ajax/config/') {
     header('Content-Type: text/json; charset=utf8');
-    ConfigCliRunner::change_config($_POST['name'], $_POST['value'], NULL);
-    echo json_encode(['result' => 'success', 'config_hash' => get_config_hash()]);
+    ConfigCliRunner::change_config($_POST['name'], $_POST['value'], NULL, $error);
+    if (!empty($error)) {
+        echo json_encode(['result' => 'error', 'message' => "Error: $error"]);
+    } else {
+        echo json_encode(['result' => 'success', 'config_hash' => get_config_hash()]);
+    }
     exit();
 }
 
@@ -37,6 +41,8 @@ if ($_SERVER['REQUEST_URI'] == '/ajax/daemon/' && $_POST['action'] == 'restart')
     header('Content-Type: text/json; charset=utf8');
     if (DaemonRunner::restart_service()) {
         echo json_encode(['result' => 'success', 'config_hash' => get_config_hash()]);
+    } else {
+        echo json_encode(['result' => 'error', 'message' => "Error: was not able to identify how to restart daemon. Please do so manually."]);
     }
     exit();
 }

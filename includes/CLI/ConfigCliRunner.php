@@ -40,7 +40,7 @@ class ConfigCliRunner extends AbstractCliRunner {
         }
     }
 
-    public static function change_config($name, $value, $log_fct) {
+    public static function change_config($name, $value, $log_fct, &$error = NULL) {
         if (empty($log_fct)) {
             $log_fct = function($log) { error_log($log); };
         }
@@ -131,6 +131,17 @@ class ConfigCliRunner extends AbstractCliRunner {
         $content = file_get_contents(ConfigHelper::$config_file);
         if (empty($line_number)) {
             // Couldn't find a line to replace; will append to the file
+
+            if ($name == "storage_pool_drive") {
+                // Do some basic checks, before allowing a new Storage Pool drive to be added
+                // @TODO Add more checks, like making sure this new folder is not on the same drive as another existing sp_drive (unless CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE = yes)
+                // @TODO Create the folder ourselves here, if the parent exists
+                if (!is_dir($sp_drive)) {
+                    $error = "Specified path '$sp_drive' does not exist.";
+                }
+                return;
+            }
+
             $log_fct("Will append to " . ConfigHelper::$config_file . ':');
             $content .= "\n$name = $value\n";
         } else {

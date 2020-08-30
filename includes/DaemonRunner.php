@@ -72,6 +72,9 @@ class DaemonRunner extends AbstractRunner {
 		// Creates a GUID (if one doesn't exist); will be used to uniquely identify this Greyhole install, when reporting anonymous usage to greyhole.net
         GetGUIDCliRunner::setUniqID();
 
+        // Calculate the config file hash, and save it in DB, to be able to know if the daemon is in sync with the current greyhole.conf
+		Settings::set('last_known_config_hash', get_config_hash());
+
 		// Terminology changed (attic > trash, graveyard > metadata store, tombstones > metadata files); this requires filesystem & database changes.
         MigrationHelper::terminologyConversion();
 

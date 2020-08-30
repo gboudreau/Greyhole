@@ -113,22 +113,22 @@ function bytes_to_human(bytes) {
     let units = 'B';
     if (Math.abs(bytes) > 1024) {
         bytes /= 1024;
-        units = 'KB';
+        units = 'KiB';
     }
     if (Math.abs(bytes) > 1024) {
         bytes /= 1024;
-        units = 'MB';
+        units = 'MiB';
     }
     if (Math.abs(bytes) > 1024) {
         bytes /= 1024;
-        units = 'GB';
+        units = 'GiB';
     }
     if (Math.abs(bytes) > 1024) {
         bytes /= 1024;
-        units = 'TB';
+        units = 'TiB';
     }
     let decimals = (Math.abs(bytes) > 100 ? 0 : (Math.abs(bytes) > 10 ? 1 : 2));
-    return parseFloat(bytes).toFixed(decimals) + units;
+    return parseFloat(bytes).toFixed(decimals) + ' ' + units;
 }
 
 function drawPieChartStorage(ctx, stats) {
@@ -275,5 +275,21 @@ function drawPieChartDiskUsage(ctx, du_stats) {
 function toggleDarkMode() {
     dark_mode_enabled = !dark_mode_enabled;
     document.cookie = "darkmode=" + (dark_mode_enabled ? '1' : '0') + "; expires=Thu, 1 Sep 2050 12:00:00 UTC";
+    window.location.href = window.location.href;
+}
+
+function addStoragePoolDrive(button) {
+    let $modal = $(button).closest('.modal');
+    let sp_drive = $modal.find('[name=storage_pool_drive]').val();
+
+    $modal.find('input, select').each(function(index, el) {
+        $(el).attr('name', $(el).attr('name').replace('__new__', sp_drive));
+    });
+
+    // This will save all values
+    config_value_changed($modal.find('select'));
+
+    // @TODO Do necessary checks, report errors before closing modal
+
     window.location.href = window.location.href;
 }
