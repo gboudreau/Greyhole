@@ -24,16 +24,18 @@ class PoolDriveSelector {
     var $drives;
     var $is_forced;
     var $group_name;
+    var $num_drives_config;
 
     var $sorted_target_drives;
     var $last_resort_sorted_target_drives;
 
-    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_forced, $group_name) {
+    function __construct($num_drives_per_draft, $selection_algorithm, $drives, $is_forced, $group_name, $num_drives_config) {
         $this->num_drives_per_draft = $num_drives_per_draft;
         $this->selection_algorithm = $selection_algorithm;
         $this->drives = $drives;
         $this->is_forced = $is_forced;
         $this->group_name = $group_name;
+        $this->num_drives_config = $num_drives_config;
     }
 
     public function isForced() {
@@ -99,7 +101,7 @@ class PoolDriveSelector {
     static function parse($config_string, $drive_selection_groups) {
         $ds = array();
         if ($config_string == 'least_used_space' || $config_string == 'most_available_space') {
-            $ds[] = new PoolDriveSelector(count(Config::storagePoolDrives()), $config_string, Config::storagePoolDrives(), FALSE, 'all');
+            $ds[] = new PoolDriveSelector(count(Config::storagePoolDrives()), $config_string, Config::storagePoolDrives(), FALSE, 'all', 'all');
             return $ds;
         }
         if (!preg_match('/forced ?\((.+)\) ?(least_used_space|most_available_space)/i', $config_string, $regs)) {
@@ -109,16 +111,18 @@ class PoolDriveSelector {
         $groups = array_map('trim', explode(',', $regs[1]));
         foreach ($groups as $group) {
             $group = explode(' ', preg_replace('/^([0-9]+)x/', '\\1 ', $group));
-            $num_drives = trim($group[0]);
+            $num_drives_config = trim($group[0]);
             $group_name = trim($group[1]);
             if (!isset($drive_selection_groups[$group_name])) {
                 //Log::warn("Warning: drive selection group named '$group_name' is undefined.");
                 continue;
             }
-            if (stripos(trim($num_drives), 'all') === 0 || $num_drives > count($drive_selection_groups[$group_name])) {
+            if (stripos($num_drives_config, 'all') === 0 || $num_drives_config > count($drive_selection_groups[$group_name])) {
                 $num_drives = count($drive_selection_groups[$group_name]);
+            } else {
+                $num_drives = $num_drives_config;
             }
-            $ds[] = new PoolDriveSelector($num_drives, $selection_algorithm, $drive_selection_groups[$group_name], TRUE, $group_name);
+            $ds[] = new PoolDriveSelector($num_drives, $selection_algorithm, $drive_selection_groups[$group_name], TRUE, $group_name, $num_drives_config);
         }
         return $ds;
     }

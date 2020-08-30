@@ -18,6 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+define('CONFIG_DAEMON_NICENESS', 'daemon_niceness');
 define('CONFIG_LOG_LEVEL', 'log_level');
 define('CONFIG_DELETE_MOVES_TO_TRASH', 'delete_moves_to_trash');
 define('CONFIG_MODIFIED_MOVES_TO_TRASH', 'modified_moves_to_trash');
@@ -168,7 +169,7 @@ final class ConfigHelper {
                 if (strlen($value) == 0 || $value[0] == '#') {
                     continue;
                 }
-                if (preg_match("/(.+):(.+)/", $value, $regs)) {
+                if (preg_match("/(.+):(.*)/", $value, $regs)) {
                     $group_name = trim($regs[1]);
                     $drives = array_map('trim', explode(',', $regs[2]));
                     if (is_string($parsing_drive_selection_groups)) {
@@ -276,6 +277,7 @@ final class ConfigHelper {
     private static function parse_line_log($name, $value) {
         if ($name == CONFIG_LOG_LEVEL) {
             self::assert(defined("Log::$value"), "Invalid value for log_level: '$value'", Log::EVENT_CODE_CONFIG_INVALID_VALUE);
+            Config::set(CONFIG_LOG_LEVEL . "_raw", $value);
             Config::set(CONFIG_LOG_LEVEL, constant("Log::$value"));
             return TRUE;
         }
