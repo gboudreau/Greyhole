@@ -46,10 +46,43 @@ function config_value_changed(el) {
 
     console.log(name + " = " + new_value);
 
-    // @TODO Save the new value!
+    $.ajax({
+        type: 'POST',
+        url: '/ajax/config/',
+        data: 'name=' + encodeURIComponent(name) + '&value=' + encodeURIComponent(new_value),
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'New value saved').tooltip({trigger: 'manual'}).tooltip('show');
+                setTimeout(function() { $el.tooltip('hide'); }, 2*1000);
 
-    $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'New value saved').tooltip({trigger: 'manual'}).tooltip('show');
-    setTimeout(function() { $el.tooltip('hide'); }, 2*1000);
+                if (data.config_hash === last_known_config_hash) {
+                    $('#needs-daemon-restart').hide();
+                } else {
+                    $('#needs-daemon-restart').show();
+                }
+            }
+        },
+    });
+}
+
+function restartDaemon(button) {
+    let $button = $(button);
+    $button.text('Restarting...').prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: '/ajax/daemon/',
+        data: 'action=restart',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                last_known_config_hash = data.config_hash;
+                $button.text('Restarted').toggleClass('btn-primary').toggleClass('btn-success');
+                setTimeout(function() {
+                    $('#needs-daemon-restart').hide();
+                    $button.text('Restart').prop('disabled', false).toggleClass('btn-primary').toggleClass('btn-success');
+                }, 3*1000);
+            }
+        },
+    });
 }
 
 function get_forced_groups_config() {

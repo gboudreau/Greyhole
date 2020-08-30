@@ -1,3 +1,8 @@
+:root {
+    --white: white;
+    --grey: grey;
+}
+
 .chart-container {
     position: relative;
     width:95vw;
@@ -9,4 +14,21 @@
         max-width: 700px;
         padding-right: 45px;
     }
+}
+
+#footer-padding {
+    height: 150px;
+}
+
+#needs-daemon-restart {
+    background: var(--white);
+    max-width: 350px;
+    padding: 1em;
+    border: 1px solid var(--grey);
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    -moz-box-shadow:    2px 2px 5px 1px var(--grey);
+    -webkit-box-shadow: 2px 2px 5px 1px var(--grey);
+    box-shadow:         2px 2px 5px 1px var(--grey);
 }

@@ -924,4 +924,11 @@ function how_long_ago($past_time) {
     return "$ago ago";
 }
 
+function to_array($el) {
+    if (is_array($el)) {
+        return $el;
+    }
+    return [$el];
+}
+
 ?>

@@ -8,6 +8,12 @@ function phe($string) {
     echo he($string);
 }
 
+function get_config_hash() {
+    exec("cat " . escapeshellarg(ConfigHelper::$config_file) . " | grep -v '^\s*#' | grep -v '^\s*$'", $output);
+    $output = array_map('trim', $output);
+    return md5(implode("\n", $output));
+}
+
 function get_config_html($config, $current_value = NULL, $fixed_width_label = TRUE) {
     $config = (object) $config;
     $html = '';

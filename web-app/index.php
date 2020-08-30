@@ -108,7 +108,6 @@ $possible_values_num_copies['max'] = 'Max';
                     <?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'display_name' => "Number of file copies", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options['num_copies'] == count(Config::storagePoolDrives()) ? 'max' : $share_options['num_copies'] , FALSE) ?>
                 </li>
             <?php endforeach; ?>
-            <li>@todo show other Samba shares (not defined in greyhole.conf)?</li>
         </ul>
     </div>
     <div class="col-sm-12 col-lg-6">
@@ -134,7 +133,9 @@ $possible_values_num_copies['max'] = 'Max';
 global $configs;
 include 'web-app/config_definitions.inc.php';
 ?>
-
+<script>
+    let last_known_config_hash = <?php echo json_encode(get_config_hash()) ?>;
+</script>
 <ul class="nav nav-tabs" id="myTab" role="tablist">
     <?php foreach ($configs as $i => $config) : ?>
         <li class="nav-item">
@@ -149,7 +150,12 @@ include 'web-app/config_definitions.inc.php';
         </div>
     <?php endforeach; ?>
 </div>
-<div id="footer-padding" style="height: 150px">&nbsp;</div>
+<div id="footer-padding"></div>
+
+<div id="needs-daemon-restart" class="text-center" style="display:none">
+    You will need to restart the Greyhole daemon for your changes to be effective.<br/>
+    <button class="btn btn-primary mt-3 mx-auto" onclick="restartDaemon(this)">Restart</button>
+</div>
 
 </div>
 
