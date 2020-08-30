@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2013-2014 Guillaume Boudreau
+Copyright 2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -18,141 +18,143 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-chdir(__DIR__ . '/..');
-include('includes/common.php');
-include('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
-include('includes/DaemonRunner.php');
-
-ConfigHelper::parse();
-DB::connect();
-
-header('Content-Type: text/html; charset=utf8');
-setlocale(LC_CTYPE, "en_US.UTF-8");
-
-if (isset($_REQUEST['level'])) {
-    $level_min = (int) $_REQUEST['level'];
-} else {
-    $level_min = 1;
-}
-$level_max = $level_min+1;
-
-if (isset($_REQUEST['path'])) {
-    $path = $_REQUEST['path'];
-} else {
-    $path = '/';
-}
-
-$p = explode('/', trim($path, '/'));
-$share = array_shift($p);
-$full_path = implode('/', $p);
-              
-if ($level_min > 1) {
-	$query = "SELECT size FROM du_stats WHERE depth = :depth AND share = :share AND full_path = :full_path";
-    $params = array(
-		'depth' => $level_min - 1,
-		'share' => $share,
-		'full_path' => $full_path
-	);
-    $total_bytes = (float) DB::getFirstValue($query, $params);
-}
-
-if ($level_min > 1) {
-	$query = "SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = :depth AND share = :share AND full_path LIKE :full_path";
-    $params = array(
-		'depth' => $level_min,
-		'share' => $share,
-		'full_path' => empty($full_path) ? '%' : "$full_path/%"
-	);
-} else {
-	$query = "SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = :depth";
-    $params = array(
-		'depth' => $level_min
-	);
-}
-$rows = DB::getAll($query, $params);
-
-$total_bytes_subfolders = 0;
-$results_rows = array();
-foreach ($rows as $row) {
-	$results_rows[] = $row;
-    if ($row->depth == $level_min) {
-        $total_bytes_subfolders += (float) $row->size;
-    }
-}
-if ($level_min == 1) {
-    $total_bytes = $total_bytes_subfolders;
-}
-$total_bytes_files = $total_bytes - $total_bytes_subfolders;
-
-function escape($string) {
-    return str_replace("'", "\\'", $string);
-}
+include(__DIR__ . '/init.inc.php');
 ?>
-<html>
-  <head>
-    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-    <script type="text/javascript">
-      google.load("visualization", "1", {packages:["treemap"]});
-      google.setOnLoadCallback(drawChart);
-      function drawChart() {
-        // Create and populate the data table.
-        var data = google.visualization.arrayToDataTable([
-          ['Path', 'Parent', 'Size (bytes)', 'Color'],
-          ['<?php echo escape($path) ?>', null, <?php echo $total_bytes ?>, <?php echo $total_bytes ?>],
-          ['Files', '<?php echo escape($path) ?>', <?php echo $total_bytes_files ?>, <?php echo $total_bytes_files ?>],
-          <?php
-          foreach ($results_rows as $row) {
-              $bytes = (float) $row->size;
-              $parent = dirname($row->file_path);
-              if ($row->file_path[strlen($row->file_path)-1] == '/') {
-                  $row->file_path = substr($row->file_path, 0, strlen($row->file_path)-1);
-              }
-              $row->file_path = substr($row->file_path, strlen($parent));
-              echo "['" . escape($row->file_path) . "','".escape($parent)."',$bytes,$bytes],\n";
-          }
-          ?>
-        ]);
-        var text_data = [
-            {text: '<?php echo escape($path) ?> (<?php echo escape(bytes_to_human($total_bytes, FALSE)) ?>)', path: '<?php echo escape($path) ?>'},
-            {text: 'Files (<?php echo escape(bytes_to_human($total_bytes_files, FALSE)) ?>)', path: 'Files'},
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js" integrity="sha256-R4pqcOYV8lt7snxMQO/HSbVCFRPMdrhAFMH+vr9giYI=" crossorigin="anonymous"></script>
+    <script src="scripts.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <title>Greyhole Admin</title>
+</head>
+<body>
+
+<div class="container-fluid">
+
+<h2>Storage Pool Drives</h2>
+
+<?php
+$stats = StatsCliRunner::get_stats();
+?>
+
+<div class="row">
+    <div class="col-sm-12 col-lg-6">
+        <table cellspacing="0" cellpadding="6">
+            <thead>
+                <tr>
+                <th>Path</th>
+                <th>Total</th>
+                <th>Used</th>
+                <th>Free</th>
+                <th>Trash</th>
+                <th>Possible</th>
+                <th>Min. free space</th>
+            </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($stats as $sp_drive => $stat) : ?>
+                    <?php if ($sp_drive == 'Total') continue; ?>
+                    <tr>
+                        <td><?php phe($sp_drive) ?></td>
+                        <?php if (empty($stat->total_space)) : ?>
+                            <td colspan="5">Offline</td>
+                        <?php else : ?>
+                            <td><?php echo bytes_to_human($stat->total_space*1024) ?></td>
+                            <td><?php echo bytes_to_human($stat->used_space*1024) ?></td>
+                            <td><?php echo bytes_to_human($stat->free_space*1024) ?></td>
+                            <td><?php echo bytes_to_human($stat->trash_size*1024) ?></td>
+                            <td><?php echo bytes_to_human($stat->potential_available_space*1024) ?></td>
+                        <?php endif; ?>
+                        <td>
+                            <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[$sp_drive]", 'type' => 'kbytes'], Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive)) ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <div class="col-sm-12 col-lg-6">
+        <div class="chart-container">
+            <canvas id="chart_storage_pool" width="200" height="200"></canvas>
+        </div>
+        <script>
+            defer(function(){
+                let ctx = document.getElementById('chart_storage_pool').getContext('2d');
+                drawPieChartStorage(ctx, <?php echo json_encode($stats) ?>);
+            });
+        </script>
+    </div>
+</div>
+
+<h2 class="mt-4">Samba Shares</h2>
+<?php
+$possible_values_num_copies = [];
+for ($i=1; $i<count(Config::storagePoolDrives()); $i++) {
+    $possible_values_num_copies[(string) $i] = $i;
+}
+$possible_values_num_copies['max'] = 'Max';
+?>
+<div class="row">
+    <div class="col-sm-12 col-lg-6">
+        <ul>
+            <?php foreach (SharesConfig::getShares() as $share_name => $share_options) : ?>
+                <li>
+                    <strong><?php phe($share_name) ?></strong><br/>
+                    Landing zone: <code><?php phe($share_options['landing_zone']) ?></code><br/>
+                    <?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'display_name' => "Number of file copies", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options['num_copies'] == count(Config::storagePoolDrives()) ? 'max' : $share_options['num_copies'] , FALSE) ?>
+                </li>
+            <?php endforeach; ?>
+            <li>@todo show other Samba shares (not defined in greyhole.conf)?</li>
+        </ul>
+    </div>
+    <div class="col-sm-12 col-lg-6">
         <?php
-        foreach ($results_rows as $row) {
-            $bytes = (float) $row->size;
-            echo "{text:'" . escape($row->file_path) . " (".escape(bytes_to_human($bytes, FALSE)).")', path: '" . escape($row->file_path) . "'},\n";
-        }
+        $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
+        $rows = DB::getAll($q);
         ?>
-        ];
+        <div class="chart-container">
+            <canvas id="chart_shares_usage" width="200" height="200"></canvas>
+        </div>
+        <script>
+            defer(function(){
+                let ctx = document.getElementById('chart_shares_usage').getContext('2d');
+                drawPieChartDiskUsage(ctx, <?php echo json_encode($rows) ?>);
+            });
+        </script>
+    </div>
+</div>
 
-        // Create and draw the visualization.
-        var tree = new google.visualization.TreeMap(document.getElementById('chart_div'));
-        tree.draw(data, {
-          headerHeight: 15,
-          fontColor: 'black'});
-                              
-        google.visualization.events.addListener(tree, 'onmouseover', function(ev) {
-            $('mouseover_text').innerHTML = text_data[ev.row].text;
-        });
-        google.visualization.events.addListener(tree, 'select', function(ev) {
-            if (text_data[tree.getSelection()[0].row].path == '<?php echo escape($path) ?>') {
-                if (<?php echo ($level_min) ?> > 1) {
-                    window.location.href='<?php echo $_SERVER['SCRIPT_NAME'] ?>?path=' + encodeURIComponent('<?php echo escape(dirname($path)) ?>') + '&level=<?php echo ($level_min-1) ?>';
-                }
-            } else if (text_data[tree.getSelection()[0].row].path != 'Files') {
-                $('chart_div').innerHTML = 'Loading...';
-                window.location.href='<?php echo $_SERVER['SCRIPT_NAME'] ?>?path=' + encodeURIComponent('<?php echo escape($path) ?>' + text_data[tree.getSelection()[0].row].path) + '&level=<?php echo ($level_min+1) ?>';
-                return false;
-            }
-        });
-      }
-      function $(el) {
-        return document.getElementById(el);
-      }
-    </script>
-  </head>
+<h2 class="mt-4">Greyhole Config</h2>
 
-  <body style="font-family: Verdana, Arial">
-    <center><small>Click a rectangle to dig deeper. Click the grey rectangle to go back up.</small></center><br/>
-    <div id="chart_div" style="width: 100%; height: 90%;"></div>
-    <div id="mouseover_text"></div>
-  </body>
+<?php
+global $configs;
+include 'web-app/config_definitions.inc.php';
+?>
+
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+    <?php foreach ($configs as $i => $config) : ?>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $i == 0 ? 'active' : '' ?>" id="id<?php echo md5($config->name) ?>-tab" data-toggle="tab" href="#id<?php echo md5($config->name) ?>" role="tab" aria-controls="id<?php echo md5($config->name) ?>" aria-selected="true"><?php phe($config->name) ?></a>
+        </li>
+    <?php endforeach; ?>
+</ul>
+<div class="tab-content" id="myTabContent">
+    <?php foreach ($configs as $i => $config) : ?>
+        <div class="tab-pane fade show <?php echo $i == 0 ? 'active' : '' ?>" id="id<?php echo md5($config->name) ?>" role="tabpanel" aria-labelledby="id<?php echo md5($config->name) ?>-tab">
+            <?php echo get_config_html($config) ?>
+        </div>
+    <?php endforeach; ?>
+</div>
+<div id="footer-padding" style="height: 150px">&nbsp;</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+</body>
 </html>

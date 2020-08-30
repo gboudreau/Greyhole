@@ -1,578 +1,12 @@
 <?php
-/*
-Copyright 2013-2014 Guillaume Boudreau
 
-This file is part of Greyhole.
-
-Greyhole is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-Greyhole is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-chdir(__DIR__ . '/../..');
-
-if (!empty($_GET['path'])) {
-    include('web-app/index.php');
-    exit();
+function he($string) {
+    return htmlentities($string, ENT_QUOTES|ENT_HTML401);
 }
-include('includes/common.php');
-include('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
-include('includes/DaemonRunner.php');
-
-error_reporting(E_ALL);
-restore_error_handler();
-
-ConfigHelper::parse();
-DB::connect();
-
-header('Content-Type: text/html; charset=utf8');
-setlocale(LC_CTYPE, "en_US.UTF-8");
 
 function phe($string) {
     echo he($string);
 }
-function he($string) {
-    return htmlentities($string, ENT_QUOTES|ENT_HTML401);
-}
-?>
-
-<!doctype html>
-<html lang="en">
-<head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js" integrity="sha256-R4pqcOYV8lt7snxMQO/HSbVCFRPMdrhAFMH+vr9giYI=" crossorigin="anonymous"></script>
-    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-
-    <title>Greyhole Admin</title>
-</head>
-<body>
-
-<div class="container-fluid">
-
-<h2>Storage Pool Drives</h2>
-
-<div class="row">
-    <div class="col-sm-12 col-lg-6">
-        <table cellspacing="0" cellpadding="6">
-            <thead>
-                <tr>
-                <th>Path</th>
-                <th>Total</th>
-                <th>Used</th>
-                <th>Free</th>
-                <th>Trash</th>
-                <th>Possible</th>
-                <th>Min. free space</th>
-            </tr>
-            </thead>
-            <tbody>
-                <?php
-                $stats = StatsCliRunner::get_stats();
-                $dataset_used = [];
-                $dataset_trash = [];
-                $dataset_free = [];
-                foreach ($stats as $sp_drive => $stat) {
-                    if ($sp_drive == 'Total') {
-                        continue;
-                    }
-                    $dataset_used[] = $stat->used_space;
-                    $dataset_trash[] = $stat->trash_size;
-                    $dataset_free[] = $stat->free_space;
-                }
-                $drives = array_keys($stats);
-                $dataset = array_merge($dataset_used, $dataset_trash, $dataset_free);
-                ?>
-                <?php foreach ($stats as $sp_drive => $stat) : ?>
-                    <?php if ($sp_drive == 'Total') continue; ?>
-                    <tr>
-                        <td><?php phe($sp_drive) ?></td>
-                        <?php if (empty($stat->total_space)) : ?>
-                            <td colspan="5">Offline</td>
-                        <?php else : ?>
-                            <td><?php echo bytes_to_human($stat->total_space*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->used_space*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->free_space*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->trash_size*1024) ?></td>
-                            <td><?php echo bytes_to_human($stat->potential_available_space*1024) ?></td>
-                        <?php endif; ?>
-                        <td>
-                            <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[$sp_drive]", 'type' => 'kbytes'], Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive)) ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <div class="col-sm-12 col-lg-6">
-        <?php $stat = $stats['Total']; ?>
-        <div class="chart-container">
-            <canvas id="chart_storage_pool" width="200" height="200"></canvas>
-        </div>
-        <script>
-            window.chartColors = {
-                red: 'rgba(222, 66, 91, 1)',
-                orange: 'rgba(255, 159, 64, 1)',
-                yellow: 'rgba(255, 236, 152, 1)',
-                green: 'rgba(72, 143, 49, 1)',
-                blue: 'rgba(54, 162, 235, 1)',
-                purple: 'rgba(153, 102, 255, 1)',
-                grey: 'rgba(201, 203, 207, 1)',
-            };
-            window.chartColorsSemi = {
-                red: 'rgba(222, 66, 91, 0.6)',
-                orange: 'rgba(255, 159, 64, 0.6)',
-                yellow: 'rgba(255, 236, 152, 0.6)',
-                green: 'rgba(72, 143, 49, 0.6)',
-                blue: 'rgba(54, 162, 235, 0.6)',
-                purple: 'rgba(153, 102, 255, 0.6)',
-                grey: 'rgba(201, 203, 207, 0.6)',
-            };
-            var total = <?php echo json_encode($stat->used_space + $stat->trash_size + $stat->free_space) ?>;
-            var ctx = document.getElementById('chart_storage_pool').getContext('2d');
-            new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    datasets: [
-                        {
-                            // "Sum" dataset needs to appear first, for Leged to appear correctly
-                            weight: 0,
-                            data: <?php echo json_encode([$stat->used_space, $stat->trash_size, $stat->free_space]) ?>,
-                            backgroundColor: [
-                                window.chartColors.red,
-                                window.chartColors.yellow,
-                                window.chartColors.green
-                            ],
-                            labels: [
-                                'Used: <?php echo bytes_to_human($stat->used_space*1024, FALSE) ?>',
-                                'Trash: <?php echo bytes_to_human($stat->trash_size*1024, FALSE) ?>',
-                                'Free: <?php echo bytes_to_human($stat->free_space*1024, FALSE) ?>'
-                            ],
-                        },
-                        {
-                            weight: 50,
-                            data: <?php echo json_encode($dataset) ?>,
-                            backgroundColor: [
-                                <?php
-                                foreach ($dataset_used as $t) {
-                                    echo "window.chartColorsSemi.red,";
-                                }
-                                foreach ($dataset_trash as $t) {
-                                    echo "window.chartColorsSemi.yellow,";
-                                }
-                                foreach ($dataset_free as $t) {
-                                    echo "window.chartColorsSemi.green,";
-                                }
-                                ?>
-                            ],
-                            labels: [
-                                <?php
-                                foreach ($dataset_used as $i => $v) {
-                                    echo json_encode($drives[$i] . " Used: " . bytes_to_human($v*1024, FALSE)) . ",";
-                                }
-                                foreach ($dataset_trash as $i => $v) {
-                                    echo json_encode($drives[$i] . " Trash: " . bytes_to_human($v*1024, FALSE)) . ",";
-                                }
-                                foreach ($dataset_free as $i => $v) {
-                                    echo json_encode($drives[$i] . " Free: " . bytes_to_human($v*1024, FALSE)) . ",";
-                                }
-                                ?>
-                            ]
-                        },
-                        {
-                            weight: 50,
-                            data: <?php echo json_encode([$stat->used_space, $stat->trash_size, $stat->free_space]) ?>,
-                            backgroundColor: [
-                                window.chartColors.red,
-                                window.chartColors.yellow,
-                                window.chartColors.green
-                            ],
-                            labels: [
-                                'Used: <?php echo bytes_to_human($stat->used_space*1024, FALSE) ?>',
-                                'Trash: <?php echo bytes_to_human($stat->trash_size*1024, FALSE) ?>',
-                                'Free: <?php echo bytes_to_human($stat->free_space*1024, FALSE) ?>'
-                            ],
-                        },
-                    ],
-                    labels: [
-                        'Used: <?php echo bytes_to_human($stat->used_space*1024, FALSE) ?>',
-                        'Trash: <?php echo bytes_to_human($stat->trash_size*1024, FALSE) ?>',
-                        'Free: <?php echo bytes_to_human($stat->free_space*1024, FALSE) ?>'
-                    ]
-                },
-                options: {
-                    cutoutPercentage: 20,
-                    responsive: true,
-                    responsiveAnimationDuration: 400,
-                    legend: {
-                        position: 'right',
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var label = data.datasets[tooltipItem.datasetIndex].labels[tooltipItem.index] || '';
-                                if (label) {
-                                    label += ' = ';
-                                }
-                                let value = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
-                                var percentage = Math.round(value/total*100);
-                                label += percentage + "%";
-                                return label;
-                            }
-                        }
-                    }
-                }
-            });
-        </script>
-    </div>
-</div>
-
-<h2>Samba Shares</h2>
-<?php
-$possible_values_num_copies = [];
-for ($i=1; $i<count(Config::storagePoolDrives()); $i++) {
-    $possible_values_num_copies[(string) $i] = $i;
-}
-$possible_values_num_copies['max'] = 'Max';
-?>
-<div class="row">
-    <div class="col-sm-12 col-lg-6">
-        <ul>
-            <?php foreach (SharesConfig::getShares() as $share_name => $share_options) : ?>
-                <li>
-                    <strong><?php phe($share_name) ?></strong><br/>
-                    Landing zone: <code><?php phe($share_options['landing_zone']) ?></code><br/>
-                    <?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'display_name' => "Number of file copies", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options['num_copies'] == count(Config::storagePoolDrives()) ? 'max' : $share_options['num_copies'] , FALSE) ?>
-                </li>
-            <?php endforeach; ?>
-            <li>@todo show other Samba shares (not defined in greyhole.conf)?</li>
-        </ul>
-    </div>
-    <div class="col-sm-12 col-lg-6">
-        <?php
-        $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
-        $rows = DB::getAll($q);
-
-        $dataset = [];
-        $labels = [];
-        $colors = [];
-        $avail_colors = ['#003f5c','#58508d','#bc5090','#ff6361','#ffa600'];
-        foreach ($rows as $i => $row) {
-            $dataset[] = (float) $row->size;
-            $labels[] = "$row->file_path: " . bytes_to_human($row->size, FALSE);
-            $colors[] = $avail_colors[$i % count($avail_colors)];
-        }
-        ?>
-        <style>
-            .chart-container {
-                position: relative;
-                width:95vw;
-            }
-            @media (min-width: 992px) {
-                .chart-container {
-                    width:50vw;
-                    max-width: 700px;
-                    padding-right: 45px;
-                }
-            }
-        </style>
-        <div class="chart-container">
-            <canvas id="chart_shares_usage" width="200" height="200"></canvas>
-        </div>
-        <script>
-            var ctx = document.getElementById('chart_shares_usage').getContext('2d');
-            new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    datasets: [
-                        {
-                            data: <?php echo json_encode($dataset) ?>,
-                            backgroundColor: [
-                                <?php
-                                foreach ($colors as $c) {
-                                    echo "'$c',";
-                                }
-                                ?>
-                            ],
-                        },
-                    ],
-                    labels: <?php echo json_encode($labels) ?>
-                },
-                options: {
-                    cutoutPercentage: 20,
-                    responsive: true,
-                    responsiveAnimationDuration: 400,
-                    legend: {
-                        position: 'right',
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: function(tooltipItem, data) {
-                                var label = data.labels[tooltipItem.index] || '';
-                                return label;
-                            }
-                        }
-                    }
-                }
-            });
-        </script>
-    </div>
-</div>
-
-<h2>Greyhole Config</h2>
-
-<?php
-$configs = [
-    [
-        'name' => 'Database connexion',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_DB_HOST,
-                'display_name' => "Host (hostname or IP address)",
-                'type' => 'string',
-            ],
-            [
-                'name' => CONFIG_DB_USER,
-                'display_name' => "Username",
-                'type' => 'string',
-            ],
-            [
-                'name' => CONFIG_DB_PASS,
-                'display_name' => "Password",
-                'type' => 'string',
-            ],
-            [
-                'name' => CONFIG_DB_NAME,
-                'display_name' => "Database (name)",
-                'type' => 'string',
-            ],
-        ],
-    ],
-    [
-        'name' => 'Notifications',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_EMAIL_TO,
-                'display_name' => "Send notification emails to",
-                'type' => 'string',
-            ],
-        ]
-    ],
-    [
-        'name' => 'Logging',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_GREYHOLE_LOG_FILE,
-                'display_name' => "Log File",
-                'type' => 'string',
-            ],
-            [
-                'name' => CONFIG_GREYHOLE_ERROR_LOG_FILE,
-                'display_name' => "Error Log File (optional)",
-                'type' => 'string',
-            ],
-            [
-                'name' => CONFIG_LOG_LEVEL,
-                'display_name' => "Log Level",
-                'type' => 'toggles',
-                'possible_values' => ['DEBUG' => 'DEBUG', 'INFO' => 'INFO', 'WARN' => 'WARN', 'ERROR' => 'ERROR'],
-            ],
-            [
-                'name' => CONFIG_LOG_MEMORY_USAGE,
-                'display_name' => "Log memory usage?",
-                'type' => 'bool',
-            ],
-        ]
-    ],
-    [
-        'name' => 'Server',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_TIMEZONE,
-                'display_name' => "Timezone",
-                'type' => 'timezone',
-            ],
-        ]
-    ],
-    [
-        'name' => 'Copying',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_CALCULATE_MD5_DURING_COPY,
-                'display_name' => "Calculate (MD5) hash during copy?",
-                'type' => 'bool',
-            ],
-            [
-                'name' => CONFIG_PARALLEL_COPYING,
-                'display_name' => "Create all file copies in parallel?",
-                'type' => 'bool',
-            ],
-        ]
-    ],
-    [
-        'name' => 'Trash',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_DELETE_MOVES_TO_TRASH,
-                'display_name' => "Move to trash deleted files?",
-                'type' => 'bool',
-            ],
-            [
-                'name' => CONFIG_MODIFIED_MOVES_TO_TRASH,
-                'display_name' => "Move to trash old versions of modified files?",
-                'type' => 'bool',
-            ],
-        ]
-    ],
-    [
-        'name' => 'Advanced',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_DAEMON_NICENESS,
-                'display_name' => "Greyhole Daemon Niceness",
-                'type' => 'toggles',
-                'possible_values' => ['19' => '19 (most nice)', '15' => '15', '10' => '10', '5' => '5', '1' => '1', '0' => '0', '-1' => '-1', '-5' => '-5', '-10' => '-10', '-15' => '-15', '-19' => '-19 (least nice)'],
-            ],
-            [
-                'name' => CONFIG_CHECK_FOR_OPEN_FILES,
-                'display_name' => "Check for open files?",
-                'type' => 'bool',
-            ],
-            [
-                'name' => CONFIG_DF_CACHE_TIME,
-                'display_name' => "Cache time for `df`",
-                'suffix' => "seconds",
-                'type' => 'integer',
-            ],
-            [
-                'name' => CONFIG_MEMORY_LIMIT,
-                'display_name' => "Memory limit",
-                'type' => 'bytes',
-                'shorthand' => TRUE,
-            ],
-            [
-                'name' => CONFIG_EXECUTED_TASKS_RETENTION,
-                'display_name' => "Past (executed) tasks retention",
-                'suffix' => "days",
-                'type' => 'integer',
-            ],
-            [
-                'name' => CONFIG_CHECK_SP_SCHEDULE,
-                'display_name' => "Schedule for Storage Pool Drives checks (format: *:mi or hh:mi)",
-                'type' => 'string',
-            ],
-        ]
-    ],
-    [
-        'name' => 'Ignored...',
-        'type' => 'group',
-        'values' => [
-            [
-                'name' => CONFIG_IGNORED_FILES,
-                'display_name' => "...files",
-                'type' => 'multi-string',
-            ],
-            [
-                'name' => CONFIG_IGNORED_FOLDERS,
-                'display_name' => "...folders",
-                'type' => 'multi-string',
-            ],
-        ]
-    ],
-];
-
-$drive_selection = (object) [
-    'name' => 'Drive Selection',
-    'type' => 'group',
-    'values' => [],
-];
-$possible_values_group_names = ['' => ''];
-foreach (Config::get(CONFIG_DRIVE_SELECTION_GROUPS) as $name => $g) {
-    $drive_selection->values[] = [
-        'display_name' => "Group \"$name\"",
-        'name' => CONFIG_DRIVE_SELECTION_GROUPS . "[$name]",
-        'type' => 'sp_drives',
-        'current_value' => $g,
-    ];
-    $possible_values_group_names[$name] = $name;
-}
-
-$is_forced = FALSE;
-$ds_groups = Config::get(CONFIG_DRIVE_SELECTION_ALGORITHM);
-foreach ($ds_groups as $ds_group) {
-    if ($ds_group->is_forced) {
-        $is_forced = TRUE;
-    }
-}
-
-$drive_selection->values[] = [
-    'display_name' => "Drive Selection Algorithm",
-    'name' => CONFIG_DRIVE_SELECTION_ALGORITHM,
-    'type' => 'toggles',
-    'possible_values' => ['most_available_space' => 'Most available space (equal free space)', 'least_used_space' => "Least used space (equal used space)"],
-    'current_value' => first($ds_groups)->selection_algorithm,
-];
-
-$drive_selection->values[] = [
-    'display_name' => "Use (force) groups?",
-    'name' => CONFIG_DRIVE_SELECTION_ALGORITHM . "_forced",
-    'type' => 'bool',
-    'current_value' => $is_forced ? 'yes' : 'no',
-];
-
-$possible_values_num_drives = [];
-$possible_values_num_drives[''] = '0';
-for ($i=1; $i<=count(Config::storagePoolDrives()); $i++) {
-    $possible_values_num_drives[(string) $i] = $i;
-}
-$possible_values_num_drives['all'] = 'All';
-
-if ($is_forced) {
-    for ($i=0; $i<count($possible_values_group_names); $i++) {
-        $prefix = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'][$i];
-        $drive_selection->values[] = [
-            'display_name' => "$prefix",
-            'name' => CONFIG_DRIVE_SELECTION_ALGORITHM . "_forced[0][num]",
-            'type' => 'select',
-            'possible_values' => $possible_values_num_drives,
-            'current_value' => !empty($ds_groups[$i]) ? $ds_groups[$i]->num_drives_config : '',
-            'glue' => 'next',
-            'prefix' => 'pick',
-            'suffix' => 'drive(s) from group',
-        ];
-        $drive_selection->values[] = [
-            'glue' => 'previous',
-            'name' => CONFIG_DRIVE_SELECTION_ALGORITHM . "_forced[0][group]",
-            'type' => 'select',
-            'possible_values' => $possible_values_group_names,
-            'current_value' => !empty($ds_groups[$i]) ? $ds_groups[$i]->group_name : '',
-        ];
-    }
-}
-
-$configs[] = $drive_selection;
-
-$configs = array_map(function($el) { return (object) $el; }, $configs);
 
 function get_config_html($config, $current_value = NULL, $fixed_width_label = TRUE) {
     $config = (object) $config;
@@ -621,15 +55,15 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     }
 
     if ($config->type == 'string') {
-        $html .= '<input class="form-control" type="text" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" onchange="config_value_changed(this)" style="min-width: 300px;" />';
+        $html .= '<input class="form-contro ' . (!empty($config->class) ? $config->class : '') . 'l" type="text" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" onchange="config_value_changed(this)" style="min-width: 300px;" />';
     }
     elseif ($config->type == 'multi-string') {
-        $html .= '<textarea class="form-control" id="' . he($field_id) . '" name="' . he($config->name) . '"onchange="config_value_changed(this)" style="width: 300px; height: 150px">';
+        $html .= '<textarea class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '"onchange="config_value_changed(this)" style="width: 300px; height: 150px">';
         $html .= implode("\n", $current_value);
         $html .= '</textarea>';
     }
     elseif ($config->type == 'integer') {
-        $html .= '<input class="form-control" type="number" step="1" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" onchange="config_value_changed(this)" />';
+        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" onchange="config_value_changed(this)" />';
     }
     elseif ($config->type == 'select' || $config->type == 'toggles') {
         if (!array_contains(array_keys($config->possible_values), $current_value)) {
@@ -640,12 +74,12 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
             foreach ($config->possible_values as $v => $d) {
                 $selected = $v == $current_value;
                 $html .= '<label class="btn btn-outline-primary ' . ($selected ? 'active' : '') . '">';
-                $html .= '<input type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="' . he($v) . '" autocomplete="off" onchange="config_value_changed(this)" ' . ($selected ? 'checked' : '') . '>' . he($d);
+                $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="' . he($v) . '" autocomplete="off" onchange="config_value_changed(this)" ' . ($selected ? 'checked' : '') . '>' . he($d);
                 $html .= '</label>';
             }
             $html .= '</div>';
         } else {
-            $html .= '<select class="form-control" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)">';
+            $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)">';
             foreach ($config->possible_values as $v => $d) {
                 $selected = '';
                 if ($v == $current_value) {
@@ -657,7 +91,7 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
     }
     elseif ($config->type == 'sp_drives') {
-        $html .= '<select class="form-control" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)" multiple>';
+        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)" multiple>';
         $config->possible_values = Config::storagePoolDrives();
         foreach ($config->possible_values as $v) {
             $selected = '';
@@ -671,10 +105,10 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     elseif ($config->type == 'bool') {
         $html .= '<div class="btn-group btn-group-toggle" data-toggle="buttons">';
         $html .= '<label class="btn btn-outline-primary ' . ($current_value ? 'active' : '') . '">';
-        $html .= '<input type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="yes" autocomplete="off" onchange="config_value_changed(this)" ' . ($current_value ? 'checked' : '') . '>Yes';
+        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="yes" autocomplete="off" onchange="config_value_changed(this)" ' . ($current_value ? 'checked' : '') . '>Yes';
         $html .= '</label>';
         $html .= '<label class="btn btn-outline-primary ' . (!$current_value ? 'active' : '') . '">';
-        $html .= '<input type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="no" autocomplete="off" onchange="config_value_changed(this)" ' . (!$current_value ? 'checked' : '') . '>No';
+        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="no" autocomplete="off" onchange="config_value_changed(this)" ' . (!$current_value ? 'checked' : '') . '>No';
         $html .= '</label>';
         $html .= '</div>';
     }
@@ -684,10 +118,10 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
         $current_value = bytes_to_human($current_value, FALSE);
         $numeric_value = (float) $current_value;
-        $html .= '<input class="form-control" type="number" step="1" min="0" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)" value="' . he($numeric_value) .'" style="max-width: 90px">';
+        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" min="0" id="' . he($field_id) . '" name="' . he($config->name) . '" onchange="config_value_changed(this)" value="' . he($numeric_value) .'" style="max-width: 90px">';
         $html .= '</div>';
         $html .= '<div class="col-auto">';
-        $html .= '<select class="form-control" name="' . he($config->name) . '_suffix" onchange="config_value_changed(this)">';
+        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" name="' . he($config->name) . '_suffix" onchange="config_value_changed(this)">';
         foreach (['gb' => 'GiB', 'mb' => 'MiB', 'kb' => 'KiB'] as $v => $d) {
             $selected = '';
             if (string_ends_with($current_value, $v)) {
@@ -712,36 +146,3 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
 
     return $html . ' ';
 }
-?>
-
-<ul class="nav nav-tabs" id="myTab" role="tablist">
-    <?php foreach ($configs as $i => $config) : ?>
-        <li class="nav-item">
-            <a class="nav-link <?php echo $i == 0 ? 'active' : '' ?>" id="id<?php echo md5($config->name) ?>-tab" data-toggle="tab" href="#id<?php echo md5($config->name) ?>" role="tab" aria-controls="id<?php echo md5($config->name) ?>" aria-selected="true"><?php phe($config->name) ?></a>
-        </li>
-    <?php endforeach; ?>
-</ul>
-<div class="tab-content" id="myTabContent">
-    <?php foreach ($configs as $i => $config) : ?>
-        <div class="tab-pane fade show <?php echo $i == 0 ? 'active' : '' ?>" id="id<?php echo md5($config->name) ?>" role="tabpanel" aria-labelledby="id<?php echo md5($config->name) ?>-tab">
-            <?php echo get_config_html($config) ?>
-        </div>
-    <?php endforeach; ?>
-</div>
-<div id="footer-padding" style="height: 150px">&nbsp;</div>
-
-<script>
-    function config_value_changed(el) {
-        let name = $(el).attr('name');
-        let new_value = $(el).val();
-        console.log(name + " = " + new_value);
-    }
-</script>
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
-</body>
-</html>
