@@ -215,7 +215,7 @@ for ($i=1; $i<count(Config::storagePoolDrives()); $i++) {
 $possible_values_num_drives['all'] = 'All';
 
 if ($is_forced) {
-    for ($i=0; $i<count($possible_values_group_names); $i++) {
+    for ($i=0; $i<min(count(Config::storagePoolDrives()), 10); $i++) {
         $prefix = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'][$i];
         $drive_selection->values[] = [
             'display_name' => "$prefix",

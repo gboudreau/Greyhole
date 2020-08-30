@@ -18,8 +18,7 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     $config = (object) $config;
     $html = '';
     if ($config->type == 'group') {
-        $html .= "<div class='input_group'>";
-        $html .= "<h4>" . he($config->name) . '</h4>';
+        $html .= "<div class='input_group mt-4'>";
         foreach ($config->values as $config) {
             $html .= get_config_html($config);
         }

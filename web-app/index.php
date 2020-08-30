@@ -166,8 +166,7 @@ $possible_values_num_copies['max'] = 'Max';
     <div class="col-sm-12 col-lg-6">
         <?php
         $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
-        //$rows = DB::getAll($q);
-        $rows = [];
+        $rows = DB::getAll($q);
         ?>
         <div class="chart-container">
             <canvas id="chart_shares_usage" width="200" height="200"></canvas>
