@@ -35,7 +35,7 @@ include(__DIR__ . '/init.inc.php');
     <link rel="stylesheet" href="styles.css">
     <title>Greyhole Admin Web UI</title>
 </head>
-<body>
+<body class="<?php if ($_COOKIE['darkmode'] === '1') echo "dark"; ?>">
 
 <div class="container-fluid">
 
@@ -88,28 +88,38 @@ foreach (StatusCliRunner::get_recent_status_entries() as $log) {
     on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?>
 </div>
 
-<h2 class="mt-8">Storage Pool Drives</h2>
+<h2 class="mt-8">Storage Pool</h2>
 
-<?php
-$stats = StatsCliRunner::get_stats();
-?>
-
+<?php $stats = StatsCliRunner::get_stats() ?>
 <div class="row">
-    <div class="col-sm-12 col-lg-6">
-        <table cellspacing="0" cellpadding="6">
+    <div class="col col-sm-12 col-lg-6">
+        <table id="table-sp-drives" cellspacing="0" cellpadding="6">
             <thead>
                 <tr>
                 <th>Path</th>
-                <th>Size</th>
                 <th>Min. free space</th>
+                    <th>Size</th>
+                <th>Usage</th>
             </tr>
             </thead>
             <tbody>
+                <?php
+                $max = 0;
+                foreach ($stats as $sp_drive => $stat) {
+                    if ($sp_drive == 'Total') continue;
+                    if ($stat->total_space > $max) {
+                        $max = $stat->total_space;
+                    }
+                }
+                ?>
                 <?php foreach ($stats as $sp_drive => $stat) : ?>
                     <?php if ($sp_drive == 'Total') continue; ?>
                     <tr>
                         <td>
                             <?php phe($sp_drive) ?>
+                        </td>
+                        <td>
+                            <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[$sp_drive]", 'type' => 'kbytes'], Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive)) ?>
                         </td>
                         <td>
                             <?php if (empty($stat->total_space)) : ?>
@@ -118,18 +128,22 @@ $stats = StatsCliRunner::get_stats();
                                 <?php echo bytes_to_human($stat->total_space*1024, TRUE, TRUE) ?>
                             <?php endif; ?>
                         </td>
-                        <td>
-                            <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[$sp_drive]", 'type' => 'kbytes'], Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive)) ?>
+                        <td class="sp-bar-td">
+                            <?php if (!empty($stat->total_space)) : ?>
+                                <div class="sp-bar used" data-width="<?php echo (($stat->used_space - $stat->trash_size)/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Used: " . bytes_to_human(($stat->used_space - $stat->trash_size)*1024, FALSE, TRUE)) ?>">
+                                </div><div class="sp-bar trash" data-width="<?php echo ($stat->trash_size/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Trash: " . bytes_to_human($stat->trash_size*1024, FALSE, TRUE)) ?>">
+                                </div><div class="sp-bar free" data-width="<?php echo ($stat->free_space/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Free: " . bytes_to_human($stat->free_space*1024, FALSE, TRUE)) ?>"></div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
-        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#modal-storage-pool-drive">
+        <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-storage-pool-drive">
             Add Drive to Storage Pool
         </button>
     </div>
-    <div class="col-sm-12 col-lg-6">
+    <div class="col col-sm-12 col-lg-6">
         <div class="chart-container">
             <canvas id="chart_storage_pool" width="200" height="200"></canvas>
         </div>
@@ -173,18 +187,27 @@ for ($i=1; $i<count(Config::storagePoolDrives()); $i++) {
 $possible_values_num_copies['max'] = 'Max';
 ?>
 <div class="row">
-    <div class="col-sm-12 col-lg-6">
-        <ul>
+    <div class="col col-sm-12 col-lg-6">
+        <table id="table-sp-drives" cellspacing="0" cellpadding="6">
+            <thead>
+            <tr>
+                <th>Share</th>
+                <th>Landing zone</th>
+                <th>Number of file copies</th>
+            </tr>
+            </thead>
+            <tbody>
             <?php foreach (SharesConfig::getShares() as $share_name => $share_options) : ?>
-                <li>
-                    <strong><?php phe($share_name) ?></strong><br/>
-                    Landing zone: <code><?php phe($share_options['landing_zone']) ?></code><br/>
-                    <?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'display_name' => "Number of file copies", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options['num_copies'] == count(Config::storagePoolDrives()) ? 'max' : $share_options['num_copies'] , FALSE) ?>
-                </li>
+                <tr>
+                    <td><?php phe($share_name) ?></td>
+                    <td><code><?php phe($share_options['landing_zone']) ?></code></td>
+                    <td><?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options['num_copies'] == count(Config::storagePoolDrives()) ? 'max' : $share_options['num_copies'] , FALSE) ?></td>
+                </tr>
             <?php endforeach; ?>
-        </ul>
+            </tbody>
+        </table>
     </div>
-    <div class="col-sm-12 col-lg-6">
+    <div class="col col-sm-12 col-lg-6">
         <?php
         $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
         $rows = DB::getAll($q);

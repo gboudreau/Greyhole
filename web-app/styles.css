@@ -32,3 +32,25 @@
 .mt-8, .my-8 {
     margin-top: 3rem !important;
 }
+
+.sp-bar-td {
+    line-height: 0.5;
+}
+.sp-bar {
+    display: inline-block;
+    height: 37px;
+    margin-right: 1px;
+}
+.sp-bar.used {
+    background-color: rgba(222, 66, 91, 1);
+}
+.sp-bar.trash {
+    background-color: rgba(255, 236, 152, 1);
+}
+.sp-bar.free {
+    background-color: rgba(72, 143, 49, 1);
+}
+
+td .form-group {
+    margin-bottom: 0;
+}

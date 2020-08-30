@@ -25,7 +25,28 @@ function defer(method) {
     }
 }
 
-function config_value_changed(el) {
+defer(function() {
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+    });
+
+    resizeSPDrivesUsageGraphs();
+    $(window).resize(function() {
+        resizeSPDrivesUsageGraphs();
+    });
+});
+
+function resizeSPDrivesUsageGraphs() {
+    var $table = $('#table-sp-drives');
+    let total_width = $table.closest('.col').width() - 30;
+    let width_left = total_width - $table.find('td:nth-child(1)').width() - $table.find('td:nth-child(2)').width() - $table.find('td:nth-child(3)').width() - 3*12;
+    $('.sp-bar').each(function(i, el) {
+        width = $(el).data('width') * width_left;
+        $(el).css('width', width + 'px');
+    });
+}
+
+function config_value_changed(el, success) {
     let $el = $(el);
     let name = $el.attr('name');
     let new_value = $el.val();
@@ -60,6 +81,15 @@ function config_value_changed(el) {
                 } else {
                     $('#needs-daemon-restart').show();
                 }
+                if (typeof success !== 'undefined') {
+                    success();
+                }
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
             }
         },
     });
@@ -80,6 +110,13 @@ function restartDaemon(button) {
                     $('#needs-daemon-restart').hide();
                     $button.text('Restart').prop('disabled', false).toggleClass('btn-primary').toggleClass('btn-success');
                 }, 3*1000);
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+                $button.text('Restart').prop('disabled', false);
             }
         },
     });
@@ -142,7 +179,7 @@ function drawPieChartStorage(ctx, stats) {
             continue;
         }
         drives.push(sp_drive);
-        dataset_used.push(stat.used_space);
+        dataset_used.push(stat.used_space - stat.trash_size);
         dataset_trash.push(stat.trash_size);
         dataset_free.push(stat.free_space);
     }
@@ -212,6 +249,7 @@ function drawPieChartStorage(ctx, stats) {
             responsiveAnimationDuration: 400,
             legend: {
                 position: 'right',
+                labels: { fontColor: dark_mode_enabled ? 'white' : '#666' },
             },
             tooltips: {
                 callbacks: {
@@ -260,6 +298,7 @@ function drawPieChartDiskUsage(ctx, du_stats) {
             responsiveAnimationDuration: 400,
             legend: {
                 position: 'right',
+                labels: { fontColor: dark_mode_enabled ? 'white' : '#666' },
             },
             tooltips: {
                 callbacks: {
@@ -286,10 +325,9 @@ function addStoragePoolDrive(button) {
         $(el).attr('name', $(el).attr('name').replace('__new__', sp_drive));
     });
 
-    // This will save all values
-    config_value_changed($modal.find('select'));
-
-    // @TODO Do necessary checks, report errors before closing modal
-
-    window.location.href = window.location.href;
+    // This will save all values as a single line: "storage_pool_drive = /mnt/hdd1/gh, min_free: 10gb"
+    config_value_changed($modal.find('select'), function() {
+        // Success
+        window.location.href = window.location.href;
+    });
 }
