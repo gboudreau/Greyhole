@@ -46,6 +46,48 @@ include(__DIR__ . '/init.inc.php');
     <btn class="btn btn-secondary btn-<?php echo ($_COOKIE['darkmode'] === '1') ? 'light' : 'dark' ?>" onclick="toggleDarkMode()"><?php echo ($_COOKIE['darkmode'] === '1') ? 'Light' : 'Dark' ?> mode</btn>
 </nav>
 
+<h2 class="mt-8">Status</h2>
+
+<?php $num_dproc = StatusCliRunner::get_num_daemon_proc() ?>
+<?php if ($num_dproc == 0) : ?>
+    <div class="alert alert-danger" role="alert">
+        Greyhole daemon is currently stopped.
+    </div>
+<?php else : ?>
+    <div class="alert alert-success" role="alert">
+        Greyhole daemon is currently running:
+        <?php
+        $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE);
+        if (empty($tasks)) {
+            echo "idling.";
+        } else {
+            $task = array_shift($tasks);
+            phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
+        }
+        ?>
+    </div>
+<?php endif; ?>
+
+<h4>Recent log entries</h4>
+<code>
+<?php
+foreach (StatusCliRunner::get_recent_status_entries() as $log) {
+    $date = date("M d H:i:s", strtotime($log->date_time));
+    $log_text = sprintf("%s%s",
+        "$date $log->action: ",
+        $log->log
+    );
+    echo "  " . he($log_text) . "<br/>";
+}
+?>
+</code>
+
+<div class="alert alert-primary mt-3" role="alert">
+    <?php list($last_action, $last_action_time) = StatusCliRunner::get_last_action() ?>
+    Last logged action: <strong><?php phe($last_action) ?></strong>,
+    on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?>
+</div>
+
 <h2 class="mt-8">Storage Pool Drives</h2>
 
 <?php
@@ -124,7 +166,8 @@ $possible_values_num_copies['max'] = 'Max';
     <div class="col-sm-12 col-lg-6">
         <?php
         $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
-        $rows = DB::getAll($q);
+        //$rows = DB::getAll($q);
+        $rows = [];
         ?>
         <div class="chart-container">
             <canvas id="chart_shares_usage" width="200" height="200"></canvas>
