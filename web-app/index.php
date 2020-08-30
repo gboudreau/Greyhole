@@ -25,17 +25,28 @@ include(__DIR__ . '/init.inc.php');
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <?php if ($_COOKIE['darkmode'] === '1') : ?>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/darkly/bootstrap.min.css" integrity="sha384-nNK9n28pDUDDgIiIqZ/MiyO3F4/9vsMtReZK39klb/MtkZI3/LtjSjlmyVPS3KdN" crossorigin="anonymous">
+    <?php else : ?>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <?php endif; ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js" integrity="sha256-R4pqcOYV8lt7snxMQO/HSbVCFRPMdrhAFMH+vr9giYI=" crossorigin="anonymous"></script>
     <script src="scripts.js"></script>
     <link rel="stylesheet" href="styles.css">
-    <title>Greyhole Admin</title>
+    <title>Greyhole Admin Web UI</title>
 </head>
 <body>
 
 <div class="container-fluid">
 
-<h2>Storage Pool Drives</h2>
+<nav class="navbar navbar-dark bg-primary">
+    <h1 class="navbar-brand">
+        Greyhole Admin Web UI
+    </h1>
+    <btn class="btn btn-secondary btn-<?php echo ($_COOKIE['darkmode'] === '1') ? 'light' : 'dark' ?>" onclick="toggleDarkMode()"><?php echo ($_COOKIE['darkmode'] === '1') ? 'Light' : 'Dark' ?> mode</btn>
+</nav>
+
+<h2 class="mt-8">Storage Pool Drives</h2>
 
 <?php
 $stats = StatsCliRunner::get_stats();
@@ -90,7 +101,7 @@ $stats = StatsCliRunner::get_stats();
     </div>
 </div>
 
-<h2 class="mt-4">Samba Shares</h2>
+<h2>Samba Shares</h2>
 <?php
 $possible_values_num_copies = [];
 for ($i=1; $i<count(Config::storagePoolDrives()); $i++) {
@@ -127,7 +138,7 @@ $possible_values_num_copies['max'] = 'Max';
     </div>
 </div>
 
-<h2 class="mt-4">Greyhole Config</h2>
+<h2 class="mt-8">Greyhole Config</h2>
 
 <?php
 global $configs;
@@ -135,6 +146,7 @@ include 'web-app/config_definitions.inc.php';
 ?>
 <script>
     let last_known_config_hash = <?php echo json_encode(get_config_hash()) ?>;
+    let dark_mode_enabled = <?php echo json_encode($_COOKIE['darkmode'] === '1') ?>;
 </script>
 <ul class="nav nav-tabs" id="myTab" role="tablist">
     <?php foreach ($configs as $i => $config) : ?>

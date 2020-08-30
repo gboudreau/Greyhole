@@ -271,3 +271,9 @@ function drawPieChartDiskUsage(ctx, du_stats) {
         }
     });
 }
+
+function toggleDarkMode() {
+    dark_mode_enabled = !dark_mode_enabled;
+    document.cookie = "darkmode=" + (dark_mode_enabled ? '1' : '0') + "; expires=Thu, 1 Sep 2050 12:00:00 UTC";
+    window.location.href = window.location.href;
+}
