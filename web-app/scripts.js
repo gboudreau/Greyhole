@@ -331,3 +331,34 @@ function addStoragePoolDrive(button) {
         location.reload();
     });
 }
+
+function addSambaUser(button) {
+    let $button = $(button);
+    let $modal = $button.closest('.modal');
+    let username = $modal.find('[name=samba_username]').val();
+    let password = $modal.find('[name=samba_password]').val();
+
+    let button_original_text = $button.text();
+    $button.text('Creating...').prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=samba',
+        data: 'action=add_user&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                $button.text('User Created').toggleClass('btn-primary').toggleClass('btn-success');
+                setTimeout(function() {
+                    $button.text('Reloading page...');
+                    location.reload();
+                }, 3*1000);
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+                $button.text(button_original_text).prop('disabled', false);
+            }
+        },
+    });
+}

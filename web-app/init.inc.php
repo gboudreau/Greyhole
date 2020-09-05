@@ -34,6 +34,9 @@ if (!empty($_GET['ajax'])) {
 
     switch($_GET['ajax']) {
     case 'config':
+        if (string_starts_with($_POST['name'], 'smb.conf')) {
+            $_POST['name'] = str_replace('_', ' ', $_POST['name']);
+        }
         ConfigCliRunner::change_config($_POST['name'], $_POST['value'], NULL, $error);
         if (!empty($error)) {
             echo json_encode(['result' => 'error', 'message' => "Error: $error"]);
@@ -44,6 +47,30 @@ if (!empty($_GET['ajax'])) {
         if ($_POST['action'] == 'restart') {
             if (!DaemonRunner::restart_service()) {
                 echo json_encode(['result' => 'error', 'message' => "Error: was not able to identify how to restart daemon. Please do so manually."]);
+                exit();
+            }
+        }
+        break;
+    case 'samba':
+        if ($_POST['action'] == 'add_user') {
+            $username = trim($_POST['username']);
+            $password = $_POST['password'];
+            if (empty($username) || empty($password)) {
+                echo json_encode(['result' => 'error', 'message' => "Error: Username and password can't be empty."]);
+                exit();
+            }
+            exec("id " . escapeshellarg($username) . " >/dev/null 2>&1", $tmp, $return_var);
+            if ($return_var) {
+                echo json_encode(['result' => 'error', 'message' => "Error: UNIX user doesn't not exist.\nYou can only create Samba users for existing UNIX users."]);
+                exit();
+            }
+            $cmd = "(echo " . escapeshellarg($password) . "; echo " . escapeshellarg($password) . ") | /usr/bin/smbpasswd -a -s " . escapeshellarg($username) . " 2>&1 | grep -v 'WARNING: '";
+            exec($cmd, $output);
+            error_log("Result of 'smbpasswd -a $username': " . implode("\n", $output));
+            if (!empty($output)) {
+                $error = implode("\n", $output);
+                echo json_encode(['result' => 'error', 'message' => $error]);
+                exit();
             }
         }
         break;

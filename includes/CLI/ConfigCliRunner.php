@@ -45,6 +45,18 @@ class ConfigCliRunner extends AbstractCliRunner {
             $log_fct = function($log) { error_log($log); };
         }
 
+        $config_file = ConfigHelper::$config_file;
+
+        if (string_starts_with($name, 'smb.conf:')) {
+            $config_file = ConfigHelper::$smb_config_file;
+            if (!preg_match('/smb.conf:\[(.+)](.+)$/', $name, $re)) {
+                $error = "Invalid format for option name: $name";
+                return;
+            }
+            $section = $re[1];
+            $name = $re[2];
+        }
+
         if ($name == 'ignored_folders' || $name == 'ignored_files') {
             // Those require special handling
 
@@ -103,7 +115,10 @@ class ConfigCliRunner extends AbstractCliRunner {
         }
 
         // Find the correct line to replace
-        exec("cat " . escapeshellarg(ConfigHelper::$config_file) . " | grep -n -v '^\s*#' | grep -v '^[0-9]*:\s*$'", $output);
+        exec("cat " . escapeshellarg($config_file) . " | grep -n -v '^\s*[#;]' | grep -v '^[0-9]*:\s*$'", $output);
+        if (!empty($section)) {
+            $output = static::filter_lines_for_section($output, $section);
+        }
         foreach ($output as $line) {
             $equal_optional = '';
             if (array_contains(to_array($name), '')) {
@@ -111,24 +126,28 @@ class ConfigCliRunner extends AbstractCliRunner {
             }
             if (preg_match('/(\d+):\s*(.+)\s*='.$equal_optional.'\s*(.*)$/U', $line, $re) && array_contains(to_array($name), trim($re[2])) && (empty($needs_match) || preg_match($needs_match, $line))) {
                 $line_number = $re[1];
-                $log_fct("Will overwrite line $line_number in " . ConfigHelper::$config_file . ':');
+                $log_fct("Will overwrite line $line_number in " . $config_file . ':');
                 break;
             }
         }
         if (empty($line_number)) {
             // Maybe a line exists, but is commented out
-            exec("cat " . escapeshellarg(ConfigHelper::$config_file) . " | grep -n '^\s*#' | grep -v '^[0-9]*:\s*$'", $output);
+            unset($output);
+            exec("cat " . escapeshellarg($config_file) . " | grep -n '^\s*[#;]' | grep -v '^[0-9]*:\s*$'", $output);
+            if (!empty($section)) {
+                $output = static::filter_lines_for_section($output, $section);
+            }
             foreach ($output as $line) {
                 if (preg_match('/(\d+):#\s+(.+)\s*=\s*(.*)$/U', $line, $re) && array_contains(to_array($name), trim($re[2])) && (empty($needs_match) || preg_match($needs_match, $line))) {
                     $line_number = $re[1];
-                    $log_fct("Will overwrite line $line_number in " . ConfigHelper::$config_file . ':');
+                    $log_fct("Will overwrite line $line_number in " . $config_file . ':');
                     break;
                 }
             }
         }
 
         $name = first(to_array($name));
-        $content = file_get_contents(ConfigHelper::$config_file);
+        $content = file_get_contents($config_file);
         if (empty($line_number)) {
             // Couldn't find a line to replace; will append to the file
 
@@ -142,14 +161,17 @@ class ConfigCliRunner extends AbstractCliRunner {
                 return;
             }
 
-            $log_fct("Will append to " . ConfigHelper::$config_file . ':');
+            $log_fct("Will append to " . $config_file . ':');
+            if (!empty($section)) {
+                $content .= "\n[$section]";
+            }
             $content .= "\n$name = $value\n";
         } else {
             // Replacing the identified line with the new line
             $content = explode("\n", $content);
             $before = $content[$line_number-1];
             // Remove comment, if present
-            if ($before[0] == '#') {
+            if ($before[0] == '#' || $before[0] == ';') {
                 $before[0] = ' ';
             }
             // Keep prefix (white space)
@@ -161,9 +183,25 @@ class ConfigCliRunner extends AbstractCliRunner {
             $content[$line_number-1] = $after;
             $content = implode("\n", $content);
         }
-        file_put_contents(ConfigHelper::$config_file, $content);
+        file_put_contents($config_file, $content);
 
         $log_fct("$name = $value");
+    }
+
+    private static function filter_lines_for_section($lines, $section) {
+        // Filter to keep only the correct [section]
+        $found_section = FALSE;
+        foreach ($lines as $i => $line) {
+            if (preg_match('/\[(.+)]/', $line, $re)) {
+                $found_section = ( trim($re[1]) == $section );
+                unset($lines[$i]);
+                continue;
+            }
+            if (!$found_section) {
+                unset($lines[$i]);
+            }
+        }
+        return array_values($lines);
     }
 }
 

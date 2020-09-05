@@ -249,6 +249,63 @@ $possible_values_num_copies['max'] = 'Max';
     </div>
 </div>
 
+<h2 class="mt-8">Samba Config</h2>
+<ul class="nav nav-tabs" id="myTabsSamba" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link active" id="id-smb-general-tab" data-toggle="tab" href="#id-smb-general" role="tab" aria-controls="id-smb-general" aria-selected="true">Greyhole-required options</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" id="id-smb-users-tab" data-toggle="tab" href="#id-smb-users" role="tab" aria-controls="id-smb-users" aria-selected="true">Users</a>
+    </li>
+</ul>
+<div class="tab-content" id="myTabContentSamba">
+    <div class="tab-pane fade show active" id="id-smb-general" role="tabpanel" aria-labelledby="id-smb-general-tab">
+        <div class='input_group mt-4'>
+            <?php
+            $wide_links = exec("/usr/bin/testparm -sl --parameter-name='wide links' 2>/dev/null");
+            $unix_extensions = exec("/usr/bin/testparm -sl --parameter-name='unix extensions' 2>/dev/null");
+            $allow_insecure_wide_links = exec("/usr/bin/testparm -sl --parameter-name='allow insecure wide links' 2>/dev/null");
+            ?>
+            <?php echo get_config_html(['name' => 'smb.conf:[global]wide_links', 'display_name' => 'Wide links', 'type' => 'bool', 'help' => "Wide links needs to be enabled, or you won't be able to access your files on your Greyhole-enabled Samba shares."], $wide_links == 'Yes') ?>
+            <?php echo get_config_html(['name' => 'smb.conf:[global]unix_extensions', 'display_name' => 'Unix Extensions', 'type' => 'bool', 'help' => "Either you disable Unix Extensions, or enable Allow Insecure Wide Links below."], $unix_extensions == 'Yes') ?>
+            <?php echo get_config_html(['name' => 'smb.conf:[global]allow_insecure_wide_links', 'display_name' => 'Allow Insecure Wide Links', 'type' => 'bool'], $allow_insecure_wide_links == 'Yes') ?>
+        </div>
+    </div>
+    <div class="tab-pane fade show" id="id-smb-users" role="tabpanel" aria-labelledby="id-smb-users-tab">
+        <div class='input_group mt-4'>
+            <?php
+            exec("/usr/bin/pdbedit -L | grep -v WARNING | grep -v 4294967295", $samba_users);
+            ?>
+            <?php echo get_config_html(['name' => 'samba_users', 'display_name' => 'Existing Samba users', 'type' => 'multi-string', 'onchange' => FALSE], $samba_users) ?>
+            <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-add-samba-user">
+                Add Samba User
+            </button>
+        </div>
+    </div>
+</div>
+<div id="modal-add-samba-user" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Samba User</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-1">Username</div>
+                <?php echo get_config_html(['name' => 'samba_username', 'type' => 'string', 'onchange' => FALSE], '') ?>
+                <div class="mb-1">Password</div>
+                <?php echo get_config_html(['name' => 'samba_password', 'type' => 'string', 'onchange' => FALSE], '') ?>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="addSambaUser(this)">Create User</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <h2 class="mt-8">Greyhole Config</h2>
 
 <!--suppress UnreachableCodeJS, BadExpressionStatementJS -->
@@ -266,14 +323,14 @@ $possible_values_num_copies['max'] = 'Max';
 global $configs;
 include 'web-app/config_definitions.inc.php';
 ?>
-<ul class="nav nav-tabs" id="myTab" role="tablist">
+<ul class="nav nav-tabs" id="myTabGreyhole" role="tablist">
     <?php foreach ($configs as $i => $config) : ?>
         <li class="nav-item">
             <a class="nav-link <?php echo $i == 0 ? 'active' : '' ?>" id="id<?php echo md5($config->name) ?>-tab" data-toggle="tab" href="#id<?php echo md5($config->name) ?>" role="tab" aria-controls="id<?php echo md5($config->name) ?>" aria-selected="true"><?php phe($config->name) ?></a>
         </li>
     <?php endforeach; ?>
 </ul>
-<div class="tab-content" id="myTabContent">
+<div class="tab-content" id="myTabContentGreyhole">
     <?php foreach ($configs as $i => $config) : ?>
         <div class="tab-pane fade show <?php echo $i == 0 ? 'active' : '' ?>" id="id<?php echo md5($config->name) ?>" role="tabpanel" aria-labelledby="id<?php echo md5($config->name) ?>-tab">
             <?php echo get_config_html($config) ?>

@@ -58,6 +58,8 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     $onchange = 'onchange="config_value_changed(this)"';
     if (@$config->onchange === FALSE) {
         $onchange = '';
+    } elseif (!empty($config->onchange) && is_string($config->onchange)) {
+        $onchange = 'onchange="' . he($config->onchange) . '"';
     }
 
     if ($config->type == 'string') {
