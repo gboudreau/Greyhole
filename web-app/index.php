@@ -201,11 +201,36 @@ foreach (SharesConfig::getShares() as $share_name => $share_options) {
     }
 }
 
-$possible_values_num_copies = [];
+$possible_values_num_copies = ['0' => 'Disabled'];
 for ($i=1; $i<=$max; $i++) {
     $possible_values_num_copies[(string) $i] = $i;
 }
 $possible_values_num_copies['max'] = 'Max';
+
+unset($output);
+exec("/usr/bin/testparm -sl 2>/dev/null | grep '\[' | grep -vi '\[global]'", $output);
+$all_samba_shares = [];
+foreach ($output as $line) {
+    if (preg_match('/\s*\[(.+)]\s*$/', $line, $re)) {
+        $share_name = $re[1];
+        if (array_contains(ConfigHelper::$trash_share_names, $share_name)) {
+            $share_options = SharesConfig::getConfigForShare(CONFIG_TRASH_SHARE);
+            $share_options['is_trash'] = TRUE;
+        } else {
+            $share_options = SharesConfig::getConfigForShare($share_name);
+        }
+        if (empty($share_options)) {
+            $share_options['landing_zone'] = exec("/usr/bin/testparm -sl --parameter-name='path' --section-name=" . escapeshellarg($share_name) . " 2>/dev/null");
+            $share_options[CONFIG_NUM_COPIES . '_raw'] = '0';
+        }
+        $share_options['vfs_objects'] = exec("/usr/bin/testparm -sl --parameter-name='vfs objects' --section-name=" . escapeshellarg($share_name) . " 2>/dev/null");
+        if (empty($share_options['landing_zone'])) {
+            continue;
+        }
+        $all_samba_shares[$share_name] = $share_options;
+    }
+}
+natksort($all_samba_shares);
 ?>
 <div class="row">
     <div class="col col-sm-12 col-lg-6">
@@ -214,15 +239,34 @@ $possible_values_num_copies['max'] = 'Max';
             <tr>
                 <th>Share</th>
                 <th>Landing zone</th>
+                <th>Greyhole-enabled?</th>
                 <th>Number of file copies</th>
             </tr>
             </thead>
             <tbody>
-            <?php foreach (SharesConfig::getShares() as $share_name => $share_options) : ?>
+            <?php foreach ($all_samba_shares as $share_name => $share_options) : ?>
                 <tr>
                     <td><?php phe($share_name) ?></td>
                     <td><code><?php phe($share_options['landing_zone']) ?></code></td>
-                    <td><?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options[CONFIG_NUM_COPIES . '_raw'] , FALSE) ?></td>
+                    <td class="centered">
+                        <?php
+                        if (@$share_options['is_trash']) {
+                            echo '<a href="https://github.com/gboudreau/Greyhole/wiki/AboutTrash" target="_blank">Greyhole Trash</a>';
+                        } else {
+                            echo get_config_html(['name' => "gh_enabled[$share_name]", 'type' => 'bool', 'onchange' => 'toggleSambaShareGreyholeEnabled(this)', 'data' => ['sharename' => $share_name]], @$share_options[CONFIG_NUM_COPIES . '_raw'] !== '0', FALSE);
+                        }
+                        ?>
+                    </td>
+                    <td class="centered">
+                        <?php
+                        if (@$share_options['is_trash']) {
+                            echo 'N/A';
+                        } else {
+                            echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options[CONFIG_NUM_COPIES . '_raw'], FALSE);
+                        }
+                        ?>
+                        <input type="hidden" name="vfs_objects[<?php phe($share_name) ?>]" value="<?php phe($share_options['vfs_objects']) ?>" />
+                    </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -312,9 +356,27 @@ $possible_values_num_copies['max'] = 'Max';
 <script>
     let dark_mode_enabled = <?php echo json_encode($is_dark_mode) ?>;
     let last_known_config_hash = <?php echo json_encode(DB::isConnected() ? Settings::get('last_known_config_hash') : get_config_hash()) ?>;
+    <?php
+    if (DB::isConnected()) {
+        $hash = Settings::get('last_known_config_hash_samba=' . SambaUtils::get_smbd_pid());
+    }
+    if (empty($hash)) {
+        $hash = get_config_hash_samba();
+        if (DB::isConnected()) {
+            // First time we see this PID for Samba; remember the config hash to know when a restart is needed
+            $q = "DELETE FROM settings WHERE name LIKE 'last_known_config_hash_samba=%'";
+            DB::execute($q);
+            Settings::set('last_known_config_hash_samba=' . SambaUtils::get_smbd_pid(), $hash);
+        }
+    }
+    ?>
+    let last_known_config_hash_samba = <?php echo json_encode($hash) ?>;
     defer(function() {
         if (<?php echo json_encode(get_config_hash()) ?> !== last_known_config_hash) {
             $('#needs-daemon-restart').show();
+        }
+        if (<?php echo json_encode(get_config_hash_samba()) ?> !== last_known_config_hash_samba) {
+            $('#needs-samba-restart').show();
         }
     });
 </script>
@@ -339,9 +401,15 @@ include 'web-app/config_definitions.inc.php';
 </div>
 <div id="footer-padding"></div>
 
-<div id="needs-daemon-restart" class="text-center" style="display:none">
-    You will need to restart the Greyhole daemon for your changes to be effective.<br/>
-    <button class="btn btn-primary mt-3 mx-auto" onclick="restartDaemon(this)">Restart</button>
+<div id="needs-restart-container">
+    <div id="needs-samba-restart" class="text-center" style="display:none">
+        You will need to restart the Samba daemon for your changes to be effective.<br/>
+        <button class="btn btn-primary mt-3 mx-auto" onclick="restartSamba(this)">Restart</button>
+    </div>
+    <div id="needs-daemon-restart" class="text-center" style="display:none">
+        You will need to restart the Greyhole daemon for your changes to be effective.<br/>
+        <button class="btn btn-primary mt-3 mx-auto" onclick="restartDaemon(this)">Restart</button>
+    </div>
 </div>
 
 </div>

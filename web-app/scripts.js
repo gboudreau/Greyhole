@@ -46,6 +46,44 @@ function resizeSPDrivesUsageGraphs() {
     });
 }
 
+function toggleSambaShareGreyholeEnabled(el) {
+    let $el = $(el);
+    let name = $el.attr('name');
+    let value = $el.val();
+    let share_name = $el.data('sharename')
+
+    let num_copies_field_name = name.replace('gh_enabled', 'num_copies');
+    let $num_copies_field = $('[name="' + num_copies_field_name + '"]');
+
+    let vfs_objects_field_name = name.replace('gh_enabled', 'vfs_objects');
+    let $vfs_objects_field_name = $('[name="' + vfs_objects_field_name + '"]');
+    let vfs_objects = $vfs_objects_field_name.val();
+
+    let dfree_command;
+    if (value === 'yes') {
+        $num_copies_field.val('1');
+        if (vfs_objects.indexOf('greyhole') < 0) {
+            vfs_objects = (vfs_objects + " greyhole").trim();
+            $vfs_objects_field_name.val(vfs_objects);
+        }
+        dfree_command = '/usr/bin/greyhole-dfree';
+    } else {
+        $num_copies_field.val('0');
+        vfs_objects = vfs_objects.replace('greyhole', '').replace('  ', ' ').trim();
+        $vfs_objects_field_name.val(vfs_objects);
+        if (vfs_objects === '') {
+            vfs_objects = '___REMOVE___';
+        }
+        dfree_command = '___REMOVE___';
+    }
+
+    ajax_value_changed($el, 'smb.conf:[' + share_name + ']dfree_command', dfree_command, function () {
+        ajax_value_changed(null, 'smb.conf:[' + share_name + ']vfs_objects', vfs_objects, function () {
+            config_value_changed($num_copies_field);
+        });
+    });
+}
+
 function config_value_changed(el, success) {
     let $el = $(el);
     let name = $el.attr('name');
@@ -65,21 +103,31 @@ function config_value_changed(el, success) {
         new_value = get_forced_groups_config();
     }
 
-    console.log(name + " = " + new_value);
+    ajax_value_changed($el, name, new_value, success);
+}
 
+function ajax_value_changed($el, name, value, success) {
+    console.log(name + " = " + value);
     $.ajax({
         type: 'POST',
         url: './?ajax=config',
-        data: 'name=' + encodeURIComponent(name) + '&value=' + encodeURIComponent(new_value),
+        data: 'name=' + encodeURIComponent(name) + '&value=' + encodeURIComponent(value),
         success: function(data, textStatus, jqXHR) {
             if (data.result === 'success') {
-                $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'New value saved').tooltip({trigger: 'manual'}).tooltip('show');
-                setTimeout(function() { $el.tooltip('hide'); }, 2*1000);
+                if ($el) {
+                    $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'New value saved').tooltip({trigger: 'manual'}).tooltip('show');
+                    setTimeout(function() { $el.tooltip('hide'); }, 2*1000);
+                }
 
                 if (data.config_hash === last_known_config_hash) {
                     $('#needs-daemon-restart').hide();
                 } else {
                     $('#needs-daemon-restart').show();
+                }
+                if (data.config_hash_samba === last_known_config_hash_samba) {
+                    $('#needs-samba-restart').hide();
+                } else {
+                    $('#needs-samba-restart').show();
                 }
                 if (typeof success !== 'undefined') {
                     success();
@@ -108,6 +156,33 @@ function restartDaemon(button) {
                 $button.text('Restarted').toggleClass('btn-primary').toggleClass('btn-success');
                 setTimeout(function() {
                     $('#needs-daemon-restart').hide();
+                    $button.text('Restart').prop('disabled', false).toggleClass('btn-primary').toggleClass('btn-success');
+                }, 3*1000);
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+                $button.text('Restart').prop('disabled', false);
+            }
+        },
+    });
+}
+
+function restartSamba(button) {
+    let $button = $(button);
+    $button.text('Restarting...').prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=samba',
+        data: 'action=restart',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                last_known_config_hash_samba = data.config_hash_samba;
+                $button.text('Restarted').toggleClass('btn-primary').toggleClass('btn-success');
+                setTimeout(function() {
+                    $('#needs-samba-restart').hide();
                     $button.text('Restart').prop('disabled', false).toggleClass('btn-primary').toggleClass('btn-success');
                 }, 3*1000);
             } else {

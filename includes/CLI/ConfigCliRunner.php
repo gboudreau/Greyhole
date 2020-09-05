@@ -57,6 +57,10 @@ class ConfigCliRunner extends AbstractCliRunner {
             $name = $re[2];
         }
 
+        if (string_starts_with($name, 'num_copies') && empty($value)) {
+            $value = '___REMOVE___';
+        }
+
         if ($name == 'ignored_folders' || $name == 'ignored_files') {
             // Those require special handling
 
@@ -133,12 +137,12 @@ class ConfigCliRunner extends AbstractCliRunner {
         if (empty($line_number)) {
             // Maybe a line exists, but is commented out
             unset($output);
-            exec("cat " . escapeshellarg($config_file) . " | grep -n '^\s*[#;]' | grep -v '^[0-9]*:\s*$'", $output);
+            exec("cat " . escapeshellarg($config_file) . " | egrep -n '^\s*[#;]|^\s*\[' | grep -v '^[0-9]*:\s*$'", $output);
             if (!empty($section)) {
                 $output = static::filter_lines_for_section($output, $section);
             }
             foreach ($output as $line) {
-                if (preg_match('/(\d+):#\s+(.+)\s*=\s*(.*)$/U', $line, $re) && array_contains(to_array($name), trim($re[2])) && (empty($needs_match) || preg_match($needs_match, $line))) {
+                if (preg_match('/(\d+):[#;]\s*(.+)\s*=\s*(.*)$/U', $line, $re) && array_contains(to_array($name), trim($re[2])) && (empty($needs_match) || preg_match($needs_match, $line))) {
                     $line_number = $re[1];
                     $log_fct("Will overwrite line $line_number in " . $config_file . ':');
                     break;
@@ -165,22 +169,32 @@ class ConfigCliRunner extends AbstractCliRunner {
             if (!empty($section)) {
                 $content .= "\n[$section]";
             }
-            $content .= "\n$name = $value\n";
+            $prefix = '';
+            if ($value === '___REMOVE___') {
+                $prefix = "#";
+            }
+            $content .= "\n$prefix$name = $value\n";
         } else {
             // Replacing the identified line with the new line
             $content = explode("\n", $content);
             $before = $content[$line_number-1];
             // Remove comment, if present
-            if ($before[0] == '#' || $before[0] == ';') {
-                $before[0] = ' ';
+            if ($value === '___REMOVE___') {
+                if ($before[0] != '#' && $before[0] != ';') {
+                    $content[$line_number - 1] = "#$before";
+                }
+            } else {
+                if ($before[0] == '#' || $before[0] == ';') {
+                    $before[0] = ' ';
+                }
+                // Keep prefix (white space)
+                $prefix = '';
+                if (preg_match('/^(\s*)/', $before, $re)) {
+                    $prefix = $re[1];
+                }
+                $after = "$prefix$name = $value";
+                $content[$line_number-1] = $after;
             }
-            // Keep prefix (white space)
-            $prefix = '';
-            if (preg_match('/^(\s*)/', $before, $re)) {
-                $prefix = $re[1];
-            }
-            $after = "$prefix$name = $value";
-            $content[$line_number-1] = $after;
             $content = implode("\n", $content);
         }
         file_put_contents($config_file, $content);

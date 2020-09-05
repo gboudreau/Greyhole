@@ -45,8 +45,6 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         $html .= he("$config->prefix ") . '</div><div class="col-auto">';
     }
 
-    $help = !empty($config->help) ? 'aria-describedby="help_' . he($field_id) . '"' : '';
-
     if ($current_value === NULL) {
         if (isset($config->current_value)) {
             $current_value = $config->current_value;
@@ -55,23 +53,50 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
     }
 
-    $onchange = 'onchange="config_value_changed(this)"';
-    if (@$config->onchange === FALSE) {
-        $onchange = '';
-    } elseif (!empty($config->onchange) && is_string($config->onchange)) {
-        $onchange = 'onchange="' . he($config->onchange) . '"';
+    $input_tag = new InputTag();
+
+    if (!empty($config->help)) {
+        $input_tag->attr('aria-describedby', "help_$field_id");
     }
 
+    if (!empty($config->onchange) && is_string($config->onchange)) {
+        $input_tag->attr('onchange', $config->onchange);
+    } elseif (@$config->onchange !== FALSE) {
+        $input_tag->attr('onchange', 'config_value_changed(this)');
+    }
+
+    if (@is_array($config->data)) {
+        foreach ($config->data as $name => $value) {
+            $input_tag->attr("data-$name", $value);
+        }
+    }
+
+    if (!empty($config->placeholder)) {
+        $input_tag->attr('placeholder', $config->placeholder);
+    }
+
+    if (empty($config->class)) {
+        $config->class = '';
+    }
+
+    $input_tag->attr('id', $field_id)
+        ->attr('name', $config->name)
+        ->attr('class', trim("form-control $config->class"));
+
     if ($config->type == 'string') {
-        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . 'l" type="text" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" ' . $onchange . ' style="min-width: 300px;" ' . $help . ' placeholder="' . (!empty($config->placeholder) ? he($config->placeholder) : '') . '" />';
+        if (empty($config->width)) {
+            $config->width = 300;
+        }
+        $html .= $input_tag->textInput($current_value, $config->width)->getHTML();
     }
     elseif ($config->type == 'multi-string') {
-        $html .= '<textarea class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' style="width: 300px; height: 150px" ' . $help . '>';
-        $html .= implode("\n", $current_value);
-        $html .= '</textarea>';
+        if (empty($config->width)) {
+            $config->width = 300;
+        }
+        $html .= $input_tag->textareaInput(implode("\n", $current_value), $config->width)->getHTML();
     }
     elseif ($config->type == 'integer') {
-        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" id="' . he($field_id) . '" name="' . he($config->name) . '" value="' . he($current_value) . '" ' . $onchange . ' ' . $help . ' />';
+        $html .= $input_tag->numberInput($current_value, 1)->getHTML();
     }
     elseif ($config->type == 'select' || $config->type == 'toggles') {
         if (!array_contains(array_keys($config->possible_values), $current_value)) {
@@ -80,44 +105,39 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         if ($config->type == 'toggles') {
             $html .= '<div class="btn-group btn-group-toggle" data-toggle="buttons">';
             foreach ($config->possible_values as $v => $d) {
-                $selected = $v == $current_value;
-                $html .= '<label class="btn btn-outline-primary ' . ($selected ? 'active' : '') . '">';
-                $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="' . he($v) . '" autocomplete="off" ' . $onchange . ' ' . ($selected ? 'checked' : '') . ' ' . $help . '>' . he($d);
-                $html .= '</label>';
+                $checked = ( $v == $current_value );
+                $html .= "<label class='btn btn-outline-primary " . ($checked ? 'active' : '') . "'>" . $input_tag->radioInput($v, $checked)->getHTML() . he($d) . "</label>";
             }
             $html .= '</div>';
         } else {
-            $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' ' . $help . '>';
+            $options_html = '';
             foreach ($config->possible_values as $v => $d) {
                 $selected = '';
                 if ($v == $current_value) {
                     $selected = "selected";
                 }
-                $html .= '<option value="' . he($v) . '" ' . $selected . '>' . he($d) . '</option>';
+                $options_html .= '<option value="' . he($v) . '" ' . $selected . '>' . he($d) . '</option>';
             }
-            $html .= '</select>';
+            $html .= $input_tag->selectInput($options_html)->getHTML();
         }
     }
     elseif ($config->type == 'sp_drives') {
-        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' multiple ' . $help . '>';
+        $options_html = '';
         $config->possible_values = Config::storagePoolDrives();
         foreach ($config->possible_values as $v) {
             $selected = '';
             if (array_contains($current_value, $v)) {
                 $selected = "selected";
             }
-            $html .= '<option value="' . he($v) . '" ' . $selected . '>' . he($v) . '</option>';
+            $options_html .= '<option value="' . he($v) . '" ' . $selected . '>' . he($v) . '</option>';
         }
-        $html .= '</select>';
+        $input_tag->attr('multiple', 'multiple');
+        $html .= $input_tag->selectInput($options_html)->getHTML();
     }
     elseif ($config->type == 'bool') {
         $html .= '<div class="btn-group btn-group-toggle" data-toggle="buttons">';
-        $html .= '<label class="btn btn-outline-primary ' . ($current_value ? 'active' : '') . '">';
-        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="yes" autocomplete="off" ' . $onchange . ' ' . ($current_value ? 'checked' : '') . ' ' . $help . '>Yes';
-        $html .= '</label>';
-        $html .= '<label class="btn btn-outline-primary ' . (!$current_value ? 'active' : '') . '">';
-        $html .= '<input class="' . (!empty($config->class) ? $config->class : '') . '" type="radio" name="' . he($config->name) . '" id="' . he($field_id) . '" value="no" autocomplete="off" ' . $onchange . ' ' . (!$current_value ? 'checked' : '') . '>No';
-        $html .= '</label>';
+        $html .= "    <label class='btn btn-outline-primary " . ($current_value ? 'active' : '') . "'>" . $input_tag->radioInput('yes', $current_value)->getHTML() . "Yes" . "</label>";
+        $html .= "    <label class='btn btn-outline-primary " . (!$current_value ? 'active' : '') . "'>" . $input_tag->radioInput('no', !$current_value)->getHTML() . "No" . "</label>";
         $html .= '</div>';
     }
     elseif ($config->type == 'bytes' || $config->type == 'kbytes') {
@@ -126,10 +146,13 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
         $current_value = bytes_to_human($current_value, FALSE);
         $numeric_value = (float) $current_value;
-        $html .= '<input class="form-control ' . (!empty($config->class) ? $config->class : '') . '" type="number" step="1" min="0" id="' . he($field_id) . '" name="' . he($config->name) . '" ' . $onchange . ' value="' . he($numeric_value) .'" style="max-width: 90px" ' . $help . '>';
+
+        $html .= $input_tag->numberInput($numeric_value, 1, 0)->attr('style', "max-width: 90px")->getHTML();
+
         $html .= '</div>';
         $html .= '<div class="col-auto">';
-        $html .= '<select class="form-control ' . (!empty($config->class) ? $config->class : '') . '" name="' . he($config->name) . '_suffix" ' . $onchange . '>';
+
+        $options_html = '';
         foreach (['gb' => 'GiB', 'mb' => 'MiB', 'kb' => 'KiB'] as $v => $d) {
             $selected = '';
             if (string_ends_with($current_value, $v)) {
@@ -138,9 +161,10 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
             if (@$config->shorthand) {
                 $v = strtoupper($v[0]);
             }
-            $html .= '<option value="' . he($v) . '" ' . $selected . '>' . he($d) . '</option>';
+            $options_html .= '<option value="' . he($v) . '" ' . $selected . '>' . he($d) . '</option>';
         }
-        $html .= '</select>';
+        $input_tag->attr('name', "{$config->name}_suffix");
+        $html .= $input_tag->selectInput($options_html)->getHTML();
     }
 
     if (!empty($config->suffix)) {
@@ -157,4 +181,115 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     }
 
     return $html . ' ';
+}
+
+function natksort(&$array) {
+    $keys = array_keys($array);
+    natcasesort($keys);
+    foreach ($keys as $k) {
+        $new_array[$k] = $array[$k];
+    }
+    $array = $new_array;
+    return true;
+}
+
+function last($array) {
+    if (empty($array)) {
+        return FALSE;
+    }
+    return array_pop($array);
+}
+
+class InputTag {
+    private $tag_name;
+    private $content;
+    private $attributes = [];
+
+    public function radioInput($value, $checked) {
+        $this->name('input')
+            ->attr('type', 'radio')
+            ->attr('autocomplete', 'off')
+            ->attr('value', $value);
+        if ($checked) {
+            $this->attr('checked', 'checked');
+        } else {
+            $this->removeAttr('checked');
+        }
+        return $this;
+    }
+
+    public function textInput($value, $width) {
+        $this->name('input')
+            ->attr('type', 'text')
+            ->attr('value', $value)
+            ->attr('style', "min-width: {$width}px;");
+        return $this;
+    }
+
+    public function textareaInput($value, $width) {
+        $this->name('textarea')
+            ->attr('style', "width: {$width}px; height: 150px;")
+            ->text($value);
+        return $this;
+    }
+
+    public function selectInput($options_html) {
+        $this->name('select')
+            ->html($options_html);
+        return $this;
+    }
+
+    public function numberInput($value, $step, $min = NULL) {
+        $this->name('input')
+            ->attr('type', 'number')
+            ->attr('value', $value)
+            ->attr('step', $step);
+        if ($min !== NULL) {
+            $this->attr('min', $min);
+        }
+        return $this;
+    }
+
+    public function name($name) {
+        $this->tag_name = $name;
+        return $this;
+    }
+
+    public function text($content) {
+        $this->content = he($content);
+        return $this;
+    }
+
+    public function html($content) {
+        $this->content = $content;
+        return $this;
+    }
+
+    public function attr($name, $value) {
+        $this->attributes[$name] = $value;
+        return $this;
+    }
+
+    public function removeAttr($name) {
+        unset($this->attributes[$name]);
+        return $this;
+    }
+
+    public function getHTML() {
+        $html = "<$this->tag_name ";
+        foreach ($this->attributes as $name => $value) {
+            $html .= he($name) . "='" . he($value) . "' ";
+        }
+        if (!empty($this->content)) {
+            $html .= '>';
+            $html .= $this->content;
+        }
+        if ($this->tag_name == 'input') {
+            $html .= ' />' . "\n";
+        }
+        if (!empty($this->content)) {
+            $html .= "</$this->tag_name>" . "\n";
+        }
+        return $html;
+    }
 }

@@ -24,6 +24,14 @@ final class SambaUtils {
         return str_replace(' ', '.', exec('/usr/sbin/smbd --version | awk \'{print $2}\' | awk -F\'-\' \'{print $1}\' | awk -F\'.\' \'{print $1,$2}\''));
     }
 
+    public static function get_smbd_pid() {
+        $response = exec("/usr/bin/smbcontrol smbd ping");
+        if (preg_match('/from pid (\d+)/', $response, $re)) {
+            return (int) $re[1];
+        }
+        return FALSE;
+    }
+
     public static function samba_restart() {
         Log::info("The Samba daemon will now restart...");
         if (is_file('/etc/init/smbd.conf')) {
@@ -42,8 +50,9 @@ final class SambaUtils {
                 exec("/usr/bin/supervisorctl restart smbd");
             }
         } else {
-            Log::critical("Couldn't find how to restart Samba. Please restart the Samba daemon manually.", Log::EVENT_CODE_SAMBA_RESTART_FAILED);
+            return FALSE;
         }
+        return TRUE;
     }
 
     public static function samba_check_vfs() {
@@ -104,7 +113,9 @@ final class SambaUtils {
                 mkdir(dirname($vfs_file));
             }
             gh_symlink($vfs_target, $vfs_file);
-            SambaUtils::samba_restart();
+            if (!static::samba_restart()) {
+                Log::critical("Couldn't find how to restart Samba. Please restart the Samba daemon manually.", Log::EVENT_CODE_SAMBA_RESTART_FAILED);
+            }
         }
 
         // Bugfix for Ubuntu 14 (Trusty) that is missing libsmbd_base.so, which is used to compile the VFS

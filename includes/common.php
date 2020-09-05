@@ -937,4 +937,10 @@ function get_config_hash() {
     return md5(implode("\n", $output));
 }
 
+function get_config_hash_samba() {
+    exec("/usr/bin/testparm -ls 2>/dev/null", $output);
+    $output = array_map('trim', $output);
+    return md5(implode("\n", $output));
+}
+
 ?>

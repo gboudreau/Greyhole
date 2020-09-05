@@ -52,6 +52,12 @@ if (!empty($_GET['ajax'])) {
         }
         break;
     case 'samba':
+        if ($_POST['action'] == 'restart') {
+            if (!SambaUtils::samba_restart()) {
+                echo json_encode(['result' => 'error', 'message' => "Error: was not able to identify how to restart Samba. Please do so manually."]);
+                exit();
+            }
+        }
         if ($_POST['action'] == 'add_user') {
             $username = trim($_POST['username']);
             $password = $_POST['password'];
@@ -76,7 +82,7 @@ if (!empty($_GET['ajax'])) {
         break;
     }
 
-    echo json_encode(['result' => 'success', 'config_hash' => get_config_hash()]);
+    echo json_encode(['result' => 'success', 'config_hash' => get_config_hash(), 'config_hash_samba' => get_config_hash_samba()]);
     exit();
 }
 

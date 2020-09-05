@@ -15,15 +15,19 @@
     height: 150px;
 }
 
-#needs-daemon-restart {
+#needs-restart-container {
+    position: fixed;
+    top: 0;
+    right: 10px;
+    max-width: 350px;
+}
+
+#needs-daemon-restart, #needs-samba-restart {
+    margin-top: 1em;
     color: var(--dark);
     background-color: var(--light);
-    max-width: 350px;
     padding: 1em;
     border: 1px solid var(--dark);
-    position: fixed;
-    top: 10px;
-    right: 10px;
     -moz-box-shadow:    2px 2px 5px 1px var(--dark);
     -webkit-box-shadow: 2px 2px 5px 1px var(--dark);
     box-shadow:         2px 2px 5px 1px var(--dark);
@@ -62,4 +66,11 @@ table {
 
 th, td {
     padding: 6px;
+}
+
+td.centered {
+    text-align: center;
+}
+td.centered .row {
+    display: inline-block;
 }
