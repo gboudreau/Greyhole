@@ -19,13 +19,15 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 include(__DIR__ . '/init.inc.php');
+
+$is_dark_mode = ($_COOKIE['darkmode'] === '1');
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <?php if ($_COOKIE['darkmode'] === '1') : ?>
+    <?php if ($is_dark_mode) : ?>
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/darkly/bootstrap.min.css" integrity="sha384-nNK9n28pDUDDgIiIqZ/MiyO3F4/9vsMtReZK39klb/MtkZI3/LtjSjlmyVPS3KdN" crossorigin="anonymous">
     <?php else : ?>
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
@@ -33,9 +35,10 @@ include(__DIR__ . '/init.inc.php');
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js" integrity="sha256-R4pqcOYV8lt7snxMQO/HSbVCFRPMdrhAFMH+vr9giYI=" crossorigin="anonymous"></script>
     <script src="scripts.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <link rel="shortcut icon" type="image/png" href="favicon.png" sizes="64x64">
     <title>Greyhole Admin Web UI</title>
 </head>
-<body class="<?php if ($_COOKIE['darkmode'] === '1') echo "dark"; ?>">
+<body class="<?php if ($is_dark_mode) echo "dark"; ?>">
 
 <div class="container-fluid">
 
@@ -43,7 +46,7 @@ include(__DIR__ . '/init.inc.php');
     <h1 class="navbar-brand">
         Greyhole Admin Web UI
     </h1>
-    <btn class="btn btn-secondary btn-<?php echo ($_COOKIE['darkmode'] === '1') ? 'light' : 'dark' ?>" onclick="toggleDarkMode()"><?php echo ($_COOKIE['darkmode'] === '1') ? 'Light' : 'Dark' ?> mode</btn>
+    <button class="btn btn-secondary btn-<?php echo ($is_dark_mode) ? 'light' : 'dark' ?>" onclick="toggleDarkMode()"><?php echo ($is_dark_mode) ? 'Light' : 'Dark' ?> mode</button>
 </nav>
 
 <h2 class="mt-8">Status</h2>
@@ -57,12 +60,16 @@ include(__DIR__ . '/init.inc.php');
     <div class="alert alert-success" role="alert">
         Greyhole daemon is currently running:
         <?php
-        $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE);
-        if (empty($tasks)) {
-            echo "idling.";
+        if (DB::isConnected()) {
+            $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE);
+            if (empty($tasks)) {
+                echo "idling.";
+            } else {
+                $task = array_shift($tasks);
+                phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
+            }
         } else {
-            $task = array_shift($tasks);
-            phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
+            echo " (Warning: Can't connect to database to load current task.)";
         }
         ?>
     </div>
@@ -71,13 +78,17 @@ include(__DIR__ . '/init.inc.php');
 <h4>Recent log entries</h4>
 <code>
 <?php
-foreach (StatusCliRunner::get_recent_status_entries() as $log) {
-    $date = date("M d H:i:s", strtotime($log->date_time));
-    $log_text = sprintf("%s%s",
-        "$date $log->action: ",
-        $log->log
-    );
-    echo "  " . he($log_text) . "<br/>";
+if (DB::isConnected()) {
+    foreach (StatusCliRunner::get_recent_status_entries() as $log) {
+        $date = date("M d H:i:s", strtotime($log->date_time));
+        $log_text = sprintf("%s%s",
+            "$date $log->action: ",
+            $log->log
+        );
+        echo "  " . he($log_text) . "<br/>";
+    }
+} else {
+    echo " (Warning: Can't connect to database to load log entries.)";
 }
 ?>
 </code>
@@ -93,7 +104,7 @@ foreach (StatusCliRunner::get_recent_status_entries() as $log) {
 <?php $stats = StatsCliRunner::get_stats() ?>
 <div class="row">
     <div class="col col-sm-12 col-lg-6">
-        <table id="table-sp-drives" cellspacing="0" cellpadding="6">
+        <table id="table-sp-drives">
             <thead>
                 <tr>
                 <th>Path</th>
@@ -166,7 +177,7 @@ foreach (StatusCliRunner::get_recent_status_entries() as $log) {
             </div>
             <div class="modal-body">
                 <div class="mb-1">Path</div>
-                <?php echo get_config_html(['name' => CONFIG_STORAGE_POOL_DRIVE, 'type' => 'string', 'help' => "Specify the absolute path to an empty folder on a new drive.", 'placeholder' => "ex. /mnt/hdd3/gh", 'onchange' => FALSE]) ?>
+                <?php echo get_config_html(['name' => CONFIG_STORAGE_POOL_DRIVE, 'type' => 'string', 'help' => "Specify the absolute path to an empty folder on a new drive.", 'placeholder' => "ex. /mnt/hdd3/gh", 'onchange' => FALSE], '') ?>
                 <div class="mb-1">Min. free space</div>
                 <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[__new__]", 'type' => 'kbytes', 'help' => "Specify how much free space you want to reserve on each drive. This is a soft limit that will be ignored if the all the necessary hard drives are below their minimum.", 'onchange' => FALSE], 10*1024*1024) ?>
             </div>
@@ -180,15 +191,25 @@ foreach (StatusCliRunner::get_recent_status_entries() as $log) {
 
 <h2 class="mt-8">Samba Shares</h2>
 <?php
+$max = count(Config::storagePoolDrives());
+foreach (SharesConfig::getShares() as $share_name => $share_options) {
+    if ($share_options[CONFIG_NUM_COPIES] > $max) {
+        $max = $share_options[CONFIG_NUM_COPIES];
+    }
+    if (is_numeric($share_options[CONFIG_NUM_COPIES . '_raw']) && $share_options[CONFIG_NUM_COPIES . '_raw'] > $max) {
+        $max = $share_options[CONFIG_NUM_COPIES . '_raw'];
+    }
+}
+
 $possible_values_num_copies = [];
-for ($i=1; $i<count(Config::storagePoolDrives()); $i++) {
+for ($i=1; $i<=$max; $i++) {
     $possible_values_num_copies[(string) $i] = $i;
 }
 $possible_values_num_copies['max'] = 'Max';
 ?>
 <div class="row">
     <div class="col col-sm-12 col-lg-6">
-        <table id="table-sp-drives" cellspacing="0" cellpadding="6">
+        <table id="table-shares">
             <thead>
             <tr>
                 <th>Share</th>
@@ -201,44 +222,50 @@ $possible_values_num_copies['max'] = 'Max';
                 <tr>
                     <td><?php phe($share_name) ?></td>
                     <td><code><?php phe($share_options['landing_zone']) ?></code></td>
-                    <td><?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options['num_copies'] == count(Config::storagePoolDrives()) ? 'max' : $share_options['num_copies'] , FALSE) ?></td>
+                    <td><?php echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options[CONFIG_NUM_COPIES . '_raw'] , FALSE) ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
     </div>
     <div class="col col-sm-12 col-lg-6">
-        <?php
-        $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
-        $rows = DB::getAll($q);
-        ?>
-        <div class="chart-container">
-            <canvas id="chart_shares_usage" width="200" height="200"></canvas>
-        </div>
-        <script>
-            defer(function(){
-                let ctx = document.getElementById('chart_shares_usage').getContext('2d');
-                drawPieChartDiskUsage(ctx, <?php echo json_encode($rows) ?>);
-            });
-        </script>
+        <?php if (DB::isConnected()) : ?>
+            <?php
+            $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
+            $rows = DB::getAll($q);
+            ?>
+            <div class="chart-container">
+                <canvas id="chart_shares_usage" width="200" height="200"></canvas>
+            </div>
+            <script>
+                defer(function(){
+                    let ctx = document.getElementById('chart_shares_usage').getContext('2d');
+                    drawPieChartDiskUsage(ctx, <?php echo json_encode($rows) ?>);
+                });
+            </script>
+        <?php else : ?>
+            (Warning: Can't connect to database to load disk usage statistics.)
+        <?php endif; ?>
     </div>
 </div>
 
 <h2 class="mt-8">Greyhole Config</h2>
 
-<?php
-global $configs;
-include 'web-app/config_definitions.inc.php';
-?>
+<!--suppress UnreachableCodeJS, BadExpressionStatementJS -->
 <script>
-    let dark_mode_enabled = <?php echo json_encode($_COOKIE['darkmode'] === '1') ?>;
-    let last_known_config_hash = <?php echo json_encode(Settings::get('last_known_config_hash')) ?>;
-    defer(function(){
+    let dark_mode_enabled = <?php echo json_encode($is_dark_mode) ?>;
+    let last_known_config_hash = <?php echo json_encode(DB::isConnected() ? Settings::get('last_known_config_hash') : get_config_hash()) ?>;
+    defer(function() {
         if (<?php echo json_encode(get_config_hash()) ?> !== last_known_config_hash) {
             $('#needs-daemon-restart').show();
         }
     });
 </script>
+
+<?php
+global $configs;
+include 'web-app/config_definitions.inc.php';
+?>
 <ul class="nav nav-tabs" id="myTab" role="tablist">
     <?php foreach ($configs as $i => $config) : ?>
         <li class="nav-item">

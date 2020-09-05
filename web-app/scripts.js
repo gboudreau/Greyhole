@@ -69,7 +69,7 @@ function config_value_changed(el, success) {
 
     $.ajax({
         type: 'POST',
-        url: '/ajax/config/',
+        url: './?ajax=config',
         data: 'name=' + encodeURIComponent(name) + '&value=' + encodeURIComponent(new_value),
         success: function(data, textStatus, jqXHR) {
             if (data.result === 'success') {
@@ -100,7 +100,7 @@ function restartDaemon(button) {
     $button.text('Restarting...').prop('disabled', true);
     $.ajax({
         type: 'POST',
-        url: '/ajax/daemon/',
+        url: './?ajax=daemon',
         data: 'action=restart',
         success: function(data, textStatus, jqXHR) {
             if (data.result === 'success') {
@@ -314,7 +314,7 @@ function drawPieChartDiskUsage(ctx, du_stats) {
 function toggleDarkMode() {
     dark_mode_enabled = !dark_mode_enabled;
     document.cookie = "darkmode=" + (dark_mode_enabled ? '1' : '0') + "; expires=Thu, 1 Sep 2050 12:00:00 UTC";
-    window.location.href = window.location.href;
+    location.reload();
 }
 
 function addStoragePoolDrive(button) {
@@ -325,9 +325,9 @@ function addStoragePoolDrive(button) {
         $(el).attr('name', $(el).attr('name').replace('__new__', sp_drive));
     });
 
-    // This will save all values as a single line: "storage_pool_drive = /mnt/hdd1/gh, min_free: 10gb"
+    // This will save all values as a single line: "storage_pool_drive = /mnt/hddX/gh, min_free: 10gb"
     config_value_changed($modal.find('select'), function() {
         // Success
-        window.location.href = window.location.href;
+        location.reload();
     });
 }

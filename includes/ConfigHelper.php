@@ -376,6 +376,7 @@ final class ConfigHelper {
 
         switch ($name) {
         case CONFIG_NUM_COPIES:
+            SharesConfig::set($share, $name . '_raw', $value);
             if (mb_stripos($value, 'max') === 0) {
                 $value = 9999;
             } else {
