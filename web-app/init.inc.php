@@ -79,6 +79,23 @@ if (!empty($_GET['ajax'])) {
                 exit();
             }
         }
+        if ($_POST['action'] == 'add_share') {
+            $name = trim($_POST['name']);
+            $path = $_POST['path'];
+            $options = $_POST['options'];
+            if (empty($name) || empty($path)) {
+                echo json_encode(['result' => 'error', 'message' => "Error: Share name and path can't be empty."]);
+                exit();
+            }
+            ConfigCliRunner::change_config("smb.conf:[$name]path", $path . "\n" . $options, NULL, $error);
+            if (preg_match('@dfree command\s*=\s*/usr/bin/greyhole-dfree@', $options)) {
+                // Greyhole is enabled; add num_copies to greyhole.conf
+                ConfigCliRunner::change_config("num_copies[$name]", 1, NULL, $error);
+            }
+            if (!is_dir($path)) {
+                mkdir($path, 0777, TRUE);
+            }
+        }
         break;
     }
 

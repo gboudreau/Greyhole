@@ -200,6 +200,56 @@ function last($array) {
     return array_pop($array);
 }
 
+function get_new_share_defaults($all_samba_shares) {
+    // Default path for new share: find the most-used path in existing shares
+    $prefixes = [];
+    $prefix_shares = [];
+    $options = [];
+    foreach ($all_samba_shares as $share_name => $share_options) {
+        if (@$share_options['is_trash'] || empty($share_options[CONFIG_NUM_COPIES . '_raw'])) {
+            continue;
+        }
+        $prefix = dirname($share_options['landing_zone']);
+        if (empty($prefix_shares[$prefix])) {
+            $prefix_shares[$prefix] = $share_name;
+        }
+        @$prefixes[$prefix]++;
+    }
+    // Find the most-used prefix
+    asort($prefixes);
+    $prefix = last(array_keys($prefixes));
+    if ($prefix) {
+        $default_path = $prefix . '/...';
+
+        // Default share options: copy the options of the first share we found that uses path = $prefix/...
+        $share_name = $prefix_shares[$prefix];
+        exec("/usr/bin/testparm -ls --section-name=" . escapeshellarg($share_name), $options);
+    } else {
+        $default_path = NULL;
+    }
+
+    foreach ($options as $i => $option) {
+        if (preg_match('/path\s*=/i', $option) || preg_match('/comment\s*=/i', $option) || preg_match('/\[' . $share_name . ']/i', $option)) {
+            unset($options[$i]);
+            continue;
+        }
+        if (preg_match('/dfree command\s*=/i', $option)) {
+            $option = "dfree command = /usr/bin/greyhole-dfree";
+        }
+        if (preg_match('/vfs objects\s*=\s*(.*)$/Ui', $option, $re)) {
+            $re[1] = str_replace('  ', ' ', str_replace('greyhole', '', $re[1]));
+            $option = "vfs objects = greyhole $re[1]";
+        }
+        $options[$i] = trim($option);
+    }
+    $options = array_values($options);
+    if (empty($options)) {
+        // Defaults when no share exist
+        $options = explode("\n", "vfs objects = greyhole\ndfree command = /usr/bin/greyhole-dfree\nguest ok = No\nread only = No\navailable = Yes\nbrowseable = Yes\nwritable = Yes\nprintable = No\ncreate mask = 0770\ndirectory mask = 0770");
+    }
+    return [$default_path, $options];
+}
+
 class InputTag {
     private $tag_name;
     private $content;

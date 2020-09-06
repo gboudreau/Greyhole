@@ -271,6 +271,9 @@ natksort($all_samba_shares);
             <?php endforeach; ?>
             </tbody>
         </table>
+        <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-add-samba-share">
+            Add Samba Share
+        </button>
     </div>
     <div class="col col-sm-12 col-lg-6">
         <?php if (DB::isConnected()) : ?>
@@ -290,6 +293,31 @@ natksort($all_samba_shares);
         <?php else : ?>
             (Warning: Can't connect to database to load disk usage statistics.)
         <?php endif; ?>
+    </div>
+</div>
+<div id="modal-add-samba-share" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Samba Share</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <?php list($default_path, $options) = get_new_share_defaults($all_samba_shares); ?>
+                <div class="mb-1">Share Name</div>
+                <?php echo get_config_html(['name' => 'samba_share_name', 'type' => 'string', 'onchange' => 'updateSambaSharePath(this)', 'placeholder' => "eg. Videos", 'width' => 460], '', FALSE) ?>
+                <div class="mb-1">Path (Landing zone)</div>
+                <?php echo get_config_html(['name' => 'samba_share_path', 'type' => 'string', 'onchange' => FALSE, 'width' => 460, 'placeholder' => '/path/to/your/share'], $default_path, FALSE) ?>
+                <div class="mb-1">Additional Options</div>
+                <?php echo get_config_html(['name' => 'samba_share_options', 'type' => 'multi-string', 'onchange' => FALSE, 'width' => 460], $options, FALSE) ?>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="addSambaShare(this)">Create Share</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
     </div>
 </div>
 

@@ -437,3 +437,42 @@ function addSambaUser(button) {
         },
     });
 }
+
+function updateSambaSharePath(el) {
+    let share_name = $(el).val();
+    let $el_path = $('[name=samba_share_path]');
+    let path = $el_path.val().replace('...', share_name);
+    $el_path.val(path);
+}
+
+function addSambaShare(button) {
+    let $button = $(button);
+    let $modal = $button.closest('.modal');
+    let share_name = $modal.find('[name=samba_share_name]').val();
+    let share_path = $modal.find('[name=samba_share_path]').val();
+    let share_options = $modal.find('[name=samba_share_options]').val();
+
+    let button_original_text = $button.text();
+    $button.text('Creating...').prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=samba',
+        data: 'action=add_share&name=' + encodeURIComponent(share_name) + '&path=' + encodeURIComponent(share_path) + '&options=' + encodeURIComponent(share_options),
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                $button.text('Share Created').toggleClass('btn-primary').toggleClass('btn-success');
+                setTimeout(function() {
+                    $button.text('Reloading page...');
+                    location.reload();
+                }, 3*1000);
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+                $button.text(button_original_text).prop('disabled', false);
+            }
+        },
+    });
+}
