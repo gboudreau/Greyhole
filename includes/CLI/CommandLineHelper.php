@@ -114,7 +114,7 @@ class CommandLineHelper {
             'find-orphaned-files'      => new CliOptionDefinition('find-orphaned-files',      'o',  null,    "Scan for files with no metadata in the storage pool drives. This will allow you to include existing files on a drive in your storage pool without having to copy them manually."),
             'checksums'                => new CliOptionDefinition('checksums',                'k',  null,    "Read ALL files in your storage pool, and check that file copies are identical. This will identify any problem you might have with your file-systems.\nNOTE: this can take a LONG time to complete, since it will read everything from all your drives!"),
             'delete-orphaned-metadata' => new CliOptionDefinition('delete-orphaned-metadata', 'm',  null,    "When fsck find metadata files with no file copies, delete those metadata files. If the file copies re-appear later, you'll need to run fsck with --find-orphaned-files to have them reappear in your shares."),
-            'disk-usage-report'        => new CliOptionDefinition('disk-usage-report',        'u',  null,    null),
+            'disk-usage-report'        => new CliOptionDefinition('disk-usage-report',        'u',  null,    "Calculate the disk usage of scanned folders."),
             'drive'                    => new CliOptionDefinition('drive:',                   'R:', '=path', null),
         );
     }

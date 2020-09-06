@@ -39,7 +39,7 @@ final class DB {
 	}
 
 	public static function connect($retry_until_successful=FALSE, $throw_exception_on_error=FALSE, $timeout = 10) {
-        $connect_string = 'mysql:host=' . self::$options->host . ';dbname=' . self::$options->name;
+        $connect_string = 'mysql:host=' . self::$options->host . ';dbname=' . self::$options->name . ';charset=utf8mb4';
 
         try {
             self::$handle = @new PDO($connect_string, self::$options->user, self::$options->pass, array(PDO::ATTR_TIMEOUT => $timeout, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
