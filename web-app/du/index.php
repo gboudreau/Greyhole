@@ -89,20 +89,18 @@ if ($total_bytes_files > 0) {
     <script src="../scripts.js"></script>
     <link rel="stylesheet" href="../styles.css">
     <link rel="shortcut icon" type="image/png" href="../favicon.png" sizes="64x64">
-    <title>Shares Disk Usage - <?php phe($level_min > 1 ? "$path - " : "") ?>Greyhole Admin Web UI</title>
+    <title>Shares Disk Usage - <?php phe($level_min > 1 ? "$path - " : "") ?>Greyhole Admin</title>
 </head>
-<body class="<?php if ($is_dark_mode) echo "dark"; ?>">
+<body class="<?php if ($is_dark_mode) echo "dark" ?>">
 
 <div class="container-fluid">
-
-    <nav class="navbar navbar-dark bg-primary">
-        <h1 class="navbar-brand">
-            <a href="../">&lt; Back to Greyhole Admin Web UI</a>
-        </h1>
-        <button class="btn btn-secondary btn-<?php echo ($is_dark_mode) ? 'light' : 'dark' ?>" onclick="toggleDarkMode()"><?php echo ($is_dark_mode) ? 'Light' : 'Dark' ?> mode</button>
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark">
+        <div class="navbar-brand">
+            <a href="../">&lt; Back to Greyhole Admin</a>
+        </div>
     </nav>
 
-    <h2 class="mt-8">
+    <h2 class="mt-8 mb-4">
         Shares Disk Usage
         <?php
         if ($level_min > 1) {
@@ -150,7 +148,7 @@ if ($total_bytes_files > 0) {
             }
         }
         ?>
-        <table id="table-sp-drives" data-min-value="<?php echo $min ?>" data-max-value="<?php echo $max ?>">
+        <table id="table-sp-drives" class="mt-4" data-min-value="<?php echo $min ?>" data-max-value="<?php echo $max ?>">
             <thead>
             <tr>
                 <th>Path</th>
@@ -162,13 +160,21 @@ if ($total_bytes_files > 0) {
             <?php foreach ($rows as $row) : ?>
                 <tr>
                     <td>
-                        <a href="./?level=<?php echo $row->depth+1 ?>&path=<?php echo urlencode($row->file_path) ?>"><?php phe(basename($row->file_path)) ?></a>
+                        <?php if ($row->file_path == 'Files') : ?>
+                            Files
+                        <?php else : ?>
+                            <a href="./?level=<?php echo $row->depth+1 ?>&path=<?php echo urlencode($row->file_path) ?>"><?php phe(basename($row->file_path)) ?></a>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <?php echo bytes_to_human($row->size, TRUE, TRUE) ?>
                     </td>
                     <td class="sp-bar-td">
-                        <a onclick="location.href='./?level=<?php echo $row->depth+1 ?>&path=<?php echo urlencode($row->file_path) ?>'" class="sp-bar treemap used" data-value="<?php echo $row->size ?>" data-width="<?php echo ($row->size/$max) ?>"></a>
+                        <?php if ($row->file_path == 'Files') : ?>
+                            <div class="sp-bar treemap used nolink" data-value="<?php echo $row->size ?>" data-width="<?php echo ($row->size/$max) ?>"></div>
+                        <?php else : ?>
+                            <a onclick="location.href='./?level=<?php echo $row->depth+1 ?>&path=<?php echo urlencode($row->file_path) ?>'" class="sp-bar treemap used" data-value="<?php echo $row->size ?>" data-width="<?php echo ($row->size/$max) ?>"></a>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -176,6 +182,8 @@ if ($total_bytes_files > 0) {
         </table>
     </div>
 </div>
+
+<div id="footer-padding"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>

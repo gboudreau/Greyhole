@@ -1,3 +1,4 @@
+
 window.chartColors = {
     red: 'rgba(222, 66, 91, 1)',
     orange: 'rgba(255, 159, 64, 1)',
@@ -324,6 +325,7 @@ function drawPieChartStorage(ctx, stats) {
             labels: labels_summary
         },
         options: {
+            maintainAspectRatio: false,
             cutoutPercentage: 20,
             responsive: true,
             responsiveAnimationDuration: 400,

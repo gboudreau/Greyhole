@@ -1,3 +1,4 @@
+
 .chart-container {
     position: relative;
     width:95vw;
@@ -19,14 +20,15 @@
 
 @media (min-width: 992px) {
     .chart-container {
-        width:50vw;
-        max-width: 700px;
+        width: 50vw;
+        height: 38vw;
+        max-width: 800px;
         padding-right: 45px;
     }
 }
 
 #footer-padding {
-    height: 150px;
+    height: 4em;
 }
 
 #needs-restart-container {
@@ -34,6 +36,7 @@
     top: 0;
     right: 10px;
     max-width: 350px;
+    z-index: 2;
 }
 
 #needs-daemon-restart, #needs-samba-restart {
@@ -68,7 +71,7 @@
 .sp-bar.free {
     background-color: rgba(72, 143, 49, 1);
 }
-.sp-bar.treemap {
+.sp-bar.treemap:not(.nolink) {
     cursor: pointer;
 }
 
