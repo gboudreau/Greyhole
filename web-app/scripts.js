@@ -43,6 +43,11 @@ function resizeSPDrivesUsageGraphs() {
     $('.sp-bar').each(function(i, el) {
         width = $(el).data('width') * width_left;
         $(el).css('width', width + 'px');
+        if ($(el).hasClass('treemap')) {
+            let $table = $(el).closest('table');
+            let color = getTreemapColor($(el).data('value'), $table.data('min-value'), $table.data('max-value'));
+            $(el).css('background-color', color);
+        }
     });
 }
 
@@ -348,12 +353,22 @@ function drawPieChartDiskUsage(ctx, du_stats) {
     let dataset = [];
     let labels = [];
     let colors = [];
+    let paths = [];
     let avail_colors = ['#003f5c','#58508d','#bc5090','#ff6361','#ffa600'];
     for (let i in du_stats) {
         let row = du_stats[i];
         dataset.push(parseFloat(row.size));
-        labels.push(row.file_path + ": " + bytes_to_human(row.size));
+        paths.push(row.file_path + ':' + row.depth);
         colors.push(avail_colors[i % avail_colors.length]);
+        let file_path = row.file_path;
+        labels.push(file_path.split('/').pop() + ": " + bytes_to_human(row.size));
+    }
+
+    function selectAtIndex(index) {
+        let path = paths[index].split(':');
+        let next_level = parseInt(path[1]) + 1;
+        path = path[0];
+        location.href = './du/?level=' + next_level + '&path=' + encodeURIComponent('/' + path);
     }
 
     new Chart(ctx, {
@@ -374,6 +389,9 @@ function drawPieChartDiskUsage(ctx, du_stats) {
             legend: {
                 position: 'right',
                 labels: { fontColor: dark_mode_enabled ? 'white' : '#666' },
+                onClick: function (e, legendItem) {
+                    selectAtIndex(legendItem.index);
+                },
             },
             tooltips: {
                 callbacks: {
@@ -381,6 +399,131 @@ function drawPieChartDiskUsage(ctx, du_stats) {
                         return data.labels[tooltipItem.index];
                     }
                 }
+            },
+            onClick: function (e, elements) {
+                if (elements.length === 0) {
+                    return;
+                }
+                selectAtIndex(elements[0]._index);
+            }
+        }
+    });
+}
+
+function getTreemapColor(value, min, max) {
+    value = parseInt(value);
+    min = parseInt(min);
+    max = parseInt(max);
+
+    let largest, smallest;
+    if (dark_mode_enabled) {
+        largest = [72, 143, 49];
+        smallest = [222, 66, 91];
+    } else {
+        largest = [72, 143, 49];
+        smallest = [222, 66, 91];
+    }
+    let middle = [235, 235, 235];
+
+    let range = max - min;
+    if (range === 0) {
+        range = value;
+    } else {
+        value -= min;
+    }
+    let where = value / range;
+    let from, to;
+    if (where > 0.5) {
+        where = 2 * (where - 0.5);
+        from = middle;
+        to = largest;
+    } else {
+        where = 2 * where;
+        from = smallest;
+        to = middle;
+    }
+    let r = from[0] + (to[0] - from[0]) * where;
+    let g = from[1] + (to[1] - from[1]) * where;
+    let b = from[2] + (to[2] - from[2]) * where;
+    return 'rgb(' + Math.round(r) + ', ' + Math.round(g) + ',' + Math.round(b) + ')';
+}
+
+function drawTreeMapDiskUsage(ctx, du_stats) {
+    let dataset = [];
+    let paths = [];
+    let max = 0, min = null;
+
+    du_stats.sort(function (a, b) {
+        return (a.size === b.size ? 0 : ( a.size > b.size ? -1 : 1));
+    });
+
+    for (let i in du_stats) {
+        let row = du_stats[i];
+        row.human_size = bytes_to_human(row.size);
+        row.label = row.file_path.split('/').pop();
+        row.full_label = row.label + " = " + row.human_size;
+        paths.push(row.file_path + ':' + row.depth);
+        dataset.push(row);
+        if (row.size > max) {
+            max = row.size;
+        }
+        if (min === null || row.size < min) {
+            min = row.size;
+        }
+    }
+
+    function selectAtIndex(index) {
+        let path = paths[index].split(':');
+        let next_level = parseInt(path[1]) + 1;
+        path = path[0];
+        if (path === 'Files') {
+            return;
+        }
+        location.href = './?level=' + next_level + '&path=' + encodeURIComponent(path);
+    }
+
+    new Chart(ctx, {
+        type: 'treemap',
+        data: {
+            datasets: [
+                {
+                    tree: dataset,
+                    key: 'size',
+                    groups: ['full_label'],
+                    backgroundColor: function(ctx) {
+                        return getTreemapColor(dataset[ctx.dataIndex].size, min, max);
+                    },
+                    fontColor: 'black',
+                    fontFamily: 'OpenSans',
+                    fontSize: 14,
+                    spacing: 0.1,
+                    borderWidth: 2,
+                    borderColor: "rgba(180,180,180, 0.15)"
+                },
+            ],
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            responsiveAnimationDuration: 400,
+            legend: {
+                display: false,
+            },
+            tooltips: {
+                callbacks: {
+                    title: function (item, data) {
+                        return dataset[item[0].index].label;
+                    },
+                    label: function (item, data) {
+                        return dataset[item.index].human_size;
+                    }
+                }
+            },
+            onClick: function (e, elements) {
+                if (elements.length === 0) {
+                    return;
+                }
+                selectAtIndex(elements[0]._index);
             }
         }
     });
@@ -388,7 +531,7 @@ function drawPieChartDiskUsage(ctx, du_stats) {
 
 function toggleDarkMode() {
     dark_mode_enabled = !dark_mode_enabled;
-    document.cookie = "darkmode=" + (dark_mode_enabled ? '1' : '0') + "; expires=Thu, 1 Sep 2050 12:00:00 UTC";
+    document.cookie = "darkmode=" + (dark_mode_enabled ? '1' : '0') + "; path=/; expires=Thu, 1 Sep 2050 12:00:00 UTC";
     location.reload();
 }
 

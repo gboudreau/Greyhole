@@ -3,6 +3,20 @@
     width:95vw;
 }
 
+.treemap_container {
+    width: 90vw;
+    height: 80vh;
+    margin: 0 auto;
+}
+
+.treemap_container canvas, #chart_shares_usage {
+    cursor: pointer;
+}
+
+.navbar-brand a {
+    color: white;
+}
+
 @media (min-width: 992px) {
     .chart-container {
         width:50vw;
@@ -53,6 +67,9 @@
 }
 .sp-bar.free {
     background-color: rgba(72, 143, 49, 1);
+}
+.sp-bar.treemap {
+    cursor: pointer;
 }
 
 td .form-group {

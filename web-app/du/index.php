@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2013-2014 Guillaume Boudreau
+Copyright 2013-2020 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -18,16 +18,7 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-chdir(__DIR__ . '/..');
-include('includes/common.php');
-include('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
-include('includes/DaemonRunner.php');
-
-ConfigHelper::parse();
-DB::connect();
-
-header('Content-Type: text/html; charset=utf8');
-setlocale(LC_CTYPE, "en_US.UTF-8");
+include(__DIR__ . '/../init.inc.php');
 
 if (isset($_REQUEST['level'])) {
     $level_min = (int) $_REQUEST['level'];
@@ -42,117 +33,152 @@ if (isset($_REQUEST['path'])) {
     $path = '/';
 }
 
-$p = explode('/', trim($path, '/'));
-$share = array_shift($p);
-$full_path = implode('/', $p);
-              
 if ($level_min > 1) {
-	$query = "SELECT size FROM du_stats WHERE depth = :depth AND share = :share AND full_path = :full_path";
-    $params = array(
-		'depth' => $level_min - 1,
-		'share' => $share,
-		'full_path' => $full_path
-	);
-    $total_bytes = (float) DB::getFirstValue($query, $params);
-}
+    $p = explode('/', trim($path, '/'));
+    $share = array_shift($p);
+    $full_path = implode('/', $p);
 
-if ($level_min > 1) {
-	$query = "SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = :depth AND share = :share AND full_path LIKE :full_path";
+    $query = "SELECT size FROM du_stats WHERE depth = :depth AND share = :share AND full_path = :full_path";
     $params = array(
+        'depth' => $level_min - 1,
+        'share' => $share,
+        'full_path' => $full_path
+    );
+    $total_bytes = (float) DB::getFirstValue($query, $params);
+
+    $query = "SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = :depth AND share = :share AND full_path LIKE :full_path ORDER BY size DESC";
+    $params = [
 		'depth' => $level_min,
 		'share' => $share,
 		'full_path' => empty($full_path) ? '%' : "$full_path/%"
-	);
+    ];
 } else {
-	$query = "SELECT size, depth, CONCAT('/', share, '/', full_path) AS file_path FROM du_stats WHERE depth = :depth";
-    $params = array(
-		'depth' => $level_min
-	);
+	$query = "SELECT size, depth, CONCAT('/', share) AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
+    $params = [];
 }
 $rows = DB::getAll($query, $params);
 
 $total_bytes_subfolders = 0;
-$results_rows = array();
 foreach ($rows as $row) {
-	$results_rows[] = $row;
+    $row->depth = (int) $row->depth;
+    $row->size = (float) $row->size;
     if ($row->depth == $level_min) {
-        $total_bytes_subfolders += (float) $row->size;
+        $total_bytes_subfolders += $row->size;
     }
 }
 if ($level_min == 1) {
     $total_bytes = $total_bytes_subfolders;
 }
 $total_bytes_files = $total_bytes - $total_bytes_subfolders;
-
-function escape($string) {
-    return str_replace("'", "\\'", $string);
+if ($total_bytes_files > 0) {
+    $rows[] = (object) ['size' => $total_bytes_files, 'depth' => $level_min, 'file_path' => 'Files'];
 }
 ?>
-<html>
-  <head>
-    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
-    <script type="text/javascript">
-      google.load("visualization", "1", {packages:["treemap"]});
-      google.setOnLoadCallback(drawChart);
-      function drawChart() {
-        // Create and populate the data table.
-        var data = google.visualization.arrayToDataTable([
-          ['Path', 'Parent', 'Size (bytes)', 'Color'],
-          ['<?php echo escape($path) ?>', null, <?php echo $total_bytes ?>, <?php echo $total_bytes ?>],
-          ['Files', '<?php echo escape($path) ?>', <?php echo $total_bytes_files ?>, <?php echo $total_bytes_files ?>],
-          <?php
-          foreach ($results_rows as $row) {
-              $bytes = (float) $row->size;
-              $parent = dirname($row->file_path);
-              if ($row->file_path[strlen($row->file_path)-1] == '/') {
-                  $row->file_path = substr($row->file_path, 0, strlen($row->file_path)-1);
-              }
-              $row->file_path = substr($row->file_path, strlen($parent));
-              echo "['" . escape($row->file_path) . "','".escape($parent)."',$bytes,$bytes],\n";
-          }
-          ?>
-        ]);
-        var text_data = [
-            {text: '<?php echo escape($path) ?> (<?php echo escape(bytes_to_human($total_bytes, FALSE)) ?>)', path: '<?php echo escape($path) ?>'},
-            {text: 'Files (<?php echo escape(bytes_to_human($total_bytes_files, FALSE)) ?>)', path: 'Files'},
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <?php if ($is_dark_mode) : ?>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootswatch/4.5.2/darkly/bootstrap.min.css" integrity="sha384-nNK9n28pDUDDgIiIqZ/MiyO3F4/9vsMtReZK39klb/MtkZI3/LtjSjlmyVPS3KdN" crossorigin="anonymous">
+    <?php else : ?>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+    <?php endif; ?>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js" integrity="sha256-R4pqcOYV8lt7snxMQO/HSbVCFRPMdrhAFMH+vr9giYI=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@0.2.3/dist/chartjs-chart-treemap.min.js" integrity="sha256-K09i+g2CdFo3xmqlfWpy7c6f0yeyu5Qgj+9eL0XvOdU=" crossorigin="anonymous"></script>
+    <script src="../scripts.js"></script>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="shortcut icon" type="image/png" href="../favicon.png" sizes="64x64">
+    <title>Shares Disk Usage - <?php phe($level_min > 1 ? "$path - " : "") ?>Greyhole Admin Web UI</title>
+</head>
+<body class="<?php if ($is_dark_mode) echo "dark"; ?>">
+
+<div class="container-fluid">
+
+    <nav class="navbar navbar-dark bg-primary">
+        <h1 class="navbar-brand">
+            <a href="../">&lt; Back to Greyhole Admin Web UI</a>
+        </h1>
+        <button class="btn btn-secondary btn-<?php echo ($is_dark_mode) ? 'light' : 'dark' ?>" onclick="toggleDarkMode()"><?php echo ($is_dark_mode) ? 'Light' : 'Dark' ?> mode</button>
+    </nav>
+
+    <h2 class="mt-8">
+        Shares Disk Usage
         <?php
-        foreach ($results_rows as $row) {
-            $bytes = (float) $row->size;
-            echo "{text:'" . escape($row->file_path) . " (".escape(bytes_to_human($bytes, FALSE)).")', path: '" . escape($row->file_path) . "'},\n";
+        if ($level_min > 1) {
+            $paths = explode('/', $path);
+            $this_folder = array_pop($paths);
+            $level = 1;
+            $pp = '';
+            foreach ($paths as $p) {
+                $pp = "$pp/$p";
+                if ($pp == '/') {
+                    $pp = '';
+                    $p = 'root';
+                    echo " -";
+                } else {
+                    echo "/";
+                }
+                echo " <a href='./?level=$level&path=" . urlencode($pp) . "'>" . he($p) . "</a> ";
+                $level++;
+            }
+            phe("/ $this_folder");
         }
         ?>
-        ];
-
-        // Create and draw the visualization.
-        var tree = new google.visualization.TreeMap(document.getElementById('chart_div'));
-        tree.draw(data, {
-          headerHeight: 15,
-          fontColor: 'black'});
-                              
-        google.visualization.events.addListener(tree, 'onmouseover', function(ev) {
-            $('mouseover_text').innerHTML = text_data[ev.row].text;
+        - <?php echo bytes_to_human($total_bytes, TRUE, TRUE) ?>
+    </h2>
+    <div class="treemap_container">
+        <canvas id="treemap_shares_usage" width="200" height="200"></canvas>
+    </div>
+    <script>
+        let dark_mode_enabled = <?php echo json_encode($is_dark_mode) ?>;
+        defer(function() {
+            let ctx = document.getElementById('treemap_shares_usage').getContext('2d');
+            drawTreeMapDiskUsage(ctx, <?php echo json_encode($rows) ?>);
         });
-        google.visualization.events.addListener(tree, 'select', function(ev) {
-            if (text_data[tree.getSelection()[0].row].path == '<?php echo escape($path) ?>') {
-                if (<?php echo ($level_min) ?> > 1) {
-                    window.location.href='<?php echo $_SERVER['SCRIPT_NAME'] ?>?path=' + encodeURIComponent('<?php echo escape(dirname($path)) ?>') + '&level=<?php echo ($level_min-1) ?>';
-                }
-            } else if (text_data[tree.getSelection()[0].row].path != 'Files') {
-                $('chart_div').innerHTML = 'Loading...';
-                window.location.href='<?php echo $_SERVER['SCRIPT_NAME'] ?>?path=' + encodeURIComponent('<?php echo escape($path) ?>' + text_data[tree.getSelection()[0].row].path) + '&level=<?php echo ($level_min+1) ?>';
-                return false;
-            }
-        });
-      }
-      function $(el) {
-        return document.getElementById(el);
-      }
     </script>
-  </head>
 
-  <body style="font-family: Verdana, Arial">
-    <center><small>Click a rectangle to dig deeper. Click the grey rectangle to go back up.</small></center><br/>
-    <div id="chart_div" style="width: 100%; height: 90%;"></div>
-    <div id="mouseover_text"></div>
-  </body>
+    <div class="col">
+        <?php
+        $max = 0; $min = NULL;
+        foreach ($rows as $row) {
+            if ($row->size > $max) {
+                $max = $row->size;
+            }
+            if ($min === NULL || $row->size < $min) {
+                $min = $row->size;
+            }
+        }
+        ?>
+        <table id="table-sp-drives" data-min-value="<?php echo $min ?>" data-max-value="<?php echo $max ?>">
+            <thead>
+            <tr>
+                <th>Path</th>
+                <th>Size</th>
+                <th>Usage</th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($rows as $row) : ?>
+                <tr>
+                    <td>
+                        <a href="./?level=<?php echo $row->depth+1 ?>&path=<?php echo urlencode($row->file_path) ?>"><?php phe(basename($row->file_path)) ?></a>
+                    </td>
+                    <td>
+                        <?php echo bytes_to_human($row->size, TRUE, TRUE) ?>
+                    </td>
+                    <td class="sp-bar-td">
+                        <a onclick="location.href='./?level=<?php echo $row->depth+1 ?>&path=<?php echo urlencode($row->file_path) ?>'" class="sp-bar treemap used" data-value="<?php echo $row->size ?>" data-width="<?php echo ($row->size/$max) ?>"></a>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+</body>
 </html>

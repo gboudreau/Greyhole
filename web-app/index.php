@@ -19,8 +19,6 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 include(__DIR__ . '/init.inc.php');
-
-$is_dark_mode = ($_COOKIE['darkmode'] === '1');
 ?>
 <!doctype html>
 <html lang="en">

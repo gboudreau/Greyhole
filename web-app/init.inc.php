@@ -14,6 +14,12 @@ if (php_sapi_name() == 'cli-server') {
         readfile('web-app' . $_SERVER['REQUEST_URI']);
         exit();
     }
+
+    if (strpos($_SERVER['REQUEST_URI'], '/du/') === 0 && !defined('DU')) {
+        define('DU', TRUE);
+        include 'web-app/du/index.php';
+        exit();
+    }
 }
 
 include('includes/common.php');
@@ -111,3 +117,5 @@ try {
 }
 
 header('Content-Type: text/html; charset=utf8');
+
+$is_dark_mode = ($_COOKIE['darkmode'] === '1');
