@@ -6,7 +6,7 @@ Greyhole is an application that uses Samba to create a storage pool of all your 
 Installation
 ------------
 
-1. Using APT (Ubuntu, Debian) or Yum (CentOS, Fedora, RHEL):
+1. Using `apt` (Ubuntu, Debian) or `yum` (CentOS, Fedora, RHEL):
     
     ```curl -Ls https://bit.ly/greyhole-package | sudo bash```
 
