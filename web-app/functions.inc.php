@@ -101,6 +101,14 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         ->attr('name', $config->name)
         ->attr('class', trim("form-control $config->class"));
 
+
+    if ($config->type == 'button') {
+        $input_tag->name('a')->attr('href', $config->href)->attr('class', 'btn btn-danger')->text($config->value);
+        if (!empty($config->target)) {
+            $input_tag->attr('target', $config->target);
+        }
+        $html .= $input_tag->getHTML();
+    }
     if ($config->type == 'string') {
         if (empty($config->width)) {
             $config->width = 300;

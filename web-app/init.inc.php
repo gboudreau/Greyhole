@@ -53,6 +53,13 @@ restore_error_handler();
 
 setlocale(LC_CTYPE, "en_US.UTF-8");
 
+ConfigHelper::parse();
+try {
+    DB::connect(FALSE, TRUE, 2);
+} catch (Exception $ex) {
+    error_log($ex->getMessage());
+}
+
 if (!empty($_GET['ajax'])) {
     header('Content-Type: text/json; charset=utf8');
 
@@ -74,6 +81,16 @@ if (!empty($_GET['ajax'])) {
                 exit();
             }
         }
+        break;
+    case 'donate':
+        $guid = GetGUIDCliRunner::setUniqID();
+        $response = trim(file_get_contents("https://www.greyhole.net/license/submit/?guid=" . urlencode($guid) . "&email=" . urlencode($_POST['email'])));
+        $success = $response === '1';
+        if (!$success) {
+            echo json_encode(['result' => 'error', 'message' => "Error: failed to submit donation email. Please email support@greyhole.net for help."]);
+            exit();
+        }
+        Settings::set('registered_email', $_POST['email']);
         break;
     case 'samba':
         if ($_POST['action'] == 'restart') {
@@ -125,13 +142,6 @@ if (!empty($_GET['ajax'])) {
 
     echo json_encode(['result' => 'success', 'config_hash' => get_config_hash(), 'config_hash_samba' => get_config_hash_samba()]);
     exit();
-}
-
-ConfigHelper::parse();
-try {
-    DB::connect(FALSE, TRUE, 2);
-} catch (Exception $ex) {
-    error_log($ex->getMessage());
 }
 
 header('Content-Type: text/html; charset=utf8');

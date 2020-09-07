@@ -689,3 +689,32 @@ function selectInitialTab(name, replace) {
     }
     changedTab(el, true, replace);
 }
+
+function donate() {
+    $('#id_6e63d8ace53681936423edd454569328_tab').tab('show');
+    $('#id_794df3791a8c800841516007427a2aa3_tab').tab('show');
+}
+
+function donationComplete(el) {
+    let $el = $(el);
+    let email = $el.val();
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=donate',
+        data: 'email=' + encodeURIComponent(email),
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                if ($el) {
+                    $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'Thank you!').tooltip({trigger: 'manual'}).tooltip('show');
+                    setTimeout(function() { $el.tooltip('hide'); location.reload(); }, 3*1000);
+                }
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+        },
+    });
+}
