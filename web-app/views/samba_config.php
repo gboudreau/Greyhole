@@ -17,20 +17,30 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+$configs = [
+    'smb-general' => 'Greyhole-required options',
+    'smb-users' => 'Users',
+];
 ?>
 
 <h2 class="mt-8">Samba Config</h2>
 
-<ul class="nav nav-tabs" id="myTabsSamba" role="tablist">
-    <li class="nav-item">
-        <a class="nav-link active" id="id-smb-general-tab" data-toggle="tab" href="#id-smb-general" role="tab" aria-controls="id-smb-general" aria-selected="true">Greyhole-required options</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" id="id-smb-users-tab" data-toggle="tab" href="#id-smb-users" role="tab" aria-controls="id-smb-users" aria-selected="false">Users</a>
-    </li>
+<ul class="nav nav-tabs" id="myTabsSamba" role="tablist" data-name="pagesmb">
+    <?php $first = empty($_GET['pagesmb']); foreach ($configs as $id => $name) : $active = $first || @$_GET['pagesmb'] == 'id_' . $id . '_tab'; if ($active) $selected_tab = $id; ?>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active ? 'active' : '' ?>"
+               id="id_<?php echo $id ?>_tab"
+               data-toggle="tab"
+               href="#id_<?php echo $id ?>"
+               role="tab"
+               aria-controls="id_<?php echo $id ?>"
+               aria-selected="<?php echo $active ? 'true' : 'false' ?>"><?php phe($name) ?></a>
+        </li>
+    <?php $first = FALSE; endforeach; ?>
 </ul>
 <div class="tab-content" id="myTabContentSamba">
-    <div class="tab-pane fade show active" id="id-smb-general" role="tabpanel" aria-labelledby="id-smb-general-tab">
+    <div class="tab-pane fade <?php if ($selected_tab == 'smb-general') echo 'show active' ?>" id="id_smb-general" role="tabpanel" aria-labelledby="id-smb-general-tab">
         <div class='input_group mt-4'>
             <?php
             $wide_links = exec("/usr/bin/testparm -sl --parameter-name='wide links' 2>/dev/null");
@@ -42,7 +52,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
             <?php echo get_config_html(['name' => 'smb.conf:[global]allow_insecure_wide_links', 'display_name' => 'Allow Insecure Wide Links', 'type' => 'bool'], $allow_insecure_wide_links == 'Yes') ?>
         </div>
     </div>
-    <div class="tab-pane fade" id="id-smb-users" role="tabpanel" aria-labelledby="id-smb-users-tab">
+    <div class="tab-pane fade <?php if ($selected_tab == 'smb-users') echo 'show active' ?>" id="id_smb-users" role="tabpanel" aria-labelledby="id-smb-users-tab">
         <div class='input_group mt-4'>
             <?php
             exec("/usr/bin/pdbedit -L | grep -v WARNING | grep -v 4294967295", $samba_users);

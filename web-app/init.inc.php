@@ -41,7 +41,7 @@ if (php_sapi_name() == 'cli-server') {
 }
 
 include('includes/common.php');
-include('includes/CLI/CommandLineHelper.php'); // Command line helper (abstract classes, command line definitions & parsing, Runners, etc.)
+include('includes/CLI/CommandLineHelper.php');
 include('includes/DaemonRunner.php');
 
 include('web-app/functions.inc.php');

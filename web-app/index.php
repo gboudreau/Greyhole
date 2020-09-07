@@ -73,15 +73,16 @@ if (empty($last_known_config_hash_samba)) {
         </button>
 
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="nav navbar-nav mr-auto">
-                <?php $first = TRUE; foreach ($tabs as $name => $view) : ?>
+            <ul class="nav navbar-nav mr-auto" data-name="page">
+                <?php $first = empty($_GET['page']); foreach ($tabs as $name => $view) : $active = $first || @$_GET['page'] == 'id_' . md5($name) . '_tab'; if ($active) $selected_page_tab = $name; ?>
                     <li class="nav-item">
-                        <a class="nav-link <?php echo $first ? 'active' : '' ?>"
+                        <a class="nav-link <?php echo $active ? 'active' : '' ?>"
                            id="id_<?php echo md5($name) ?>_tab"
-                           data-toggle="tab" href="#id_<?php echo md5($name) ?>"
+                           data-toggle="tab"
+                           href="#id_<?php echo md5($name) ?>"
+                           role="tab"
                            aria-controls="id_<?php echo md5($name) ?>"
-                           aria-selected="<?php echo $first ? 'true' : 'false' ?>"
-                            <?php echo $name == 'Storage pool' ? 'onclick="setTimeout(resizeSPDrivesUsageGraphs, 250)"' : '' ?>><?php phe($name) ?></a>
+                           aria-selected="<?php echo $first ? 'true' : 'false' ?>"><?php phe($name) ?></a>
                     </li>
                 <?php $first = FALSE; endforeach; ?>
             </ul>
@@ -94,11 +95,11 @@ if (empty($last_known_config_hash_samba)) {
     </nav>
 
     <div class="tab-content">
-        <?php $first = TRUE; foreach ($tabs as $name => $view) : ?>
-            <div class="tab-pane fade <?php echo $first ? 'show active' : '' ?>" id="id_<?php echo md5($name) ?>" role="tabpanel" aria-labelledby="id_<?php echo md5($name) ?>_tab">
+        <?php foreach ($tabs as $name => $view) : ?>
+            <div class="tab-pane fade <?php echo $name == $selected_page_tab ? 'show active' : '' ?>" id="id_<?php echo md5($name) ?>" role="tabpanel" aria-labelledby="id_<?php echo md5($name) ?>_tab">
                 <?php include "web-app/views/$view" ?>
             </div>
-        <?php $first = FALSE; endforeach; ?>
+        <?php endforeach; ?>
     </div>
 
     <div id="footer-padding"></div>
@@ -126,6 +127,25 @@ if (empty($last_known_config_hash_samba)) {
             if (<?php echo json_encode(get_config_hash_samba()) ?> !== last_known_config_hash_samba) {
                 $('#needs-samba-restart').show();
             }
+
+            selectInitialTab('page');
+            selectInitialTab('pagesmb');
+            selectInitialTab('pagegh', true);
+
+            $('.nav .nav-link').on('shown.bs.tab', function (evt) {
+                changedTab(evt.target);
+            });
+
+            $(window).on('popstate', function (evt) {
+                for (let selected_tab of evt.originalEvent.state.selected_tabs) {
+                    skip_changed_tab_event = true;
+                    $('#' + selected_tab).tab('show');
+                }
+            });
+
+            $(window).resize(function() {
+                resizeSPDrivesUsageGraphs();
+            });
         });
     </script>
 </div>

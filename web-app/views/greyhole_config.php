@@ -25,16 +25,22 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 global $configs;
 include 'web-app/config_definitions.inc.php';
 ?>
-<ul class="nav nav-tabs" id="myTabGreyhole" role="tablist">
-    <?php foreach ($configs as $i => $config) : ?>
+<ul class="nav nav-tabs" id="myTabGreyhole" role="tablist" data-name="pagegh">
+    <?php $first = empty($_GET['pagegh']); foreach ($configs as $i => $config) : $active = $first || @$_GET['pagegh'] == 'id_' . md5($config->name) . '_tab'; if ($active) $selected_tab = $i; ?>
         <li class="nav-item">
-            <a class="nav-link <?php echo $i == 0 ? 'active' : '' ?>" id="id<?php echo md5($config->name) ?>-tab" data-toggle="tab" href="#id<?php echo md5($config->name) ?>" role="tab" aria-controls="id<?php echo md5($config->name) ?>" aria-selected="<?php echo $i == 0 ? 'true' : 'false' ?>"><?php phe($config->name) ?></a>
+            <a class="nav-link <?php echo $active ? 'active' : '' ?>"
+               id="id_<?php echo md5($config->name) ?>_tab"
+               data-toggle="tab"
+               href="#id_<?php echo md5($config->name) ?>"
+               role="tab"
+               aria-controls="id_<?php echo md5($config->name) ?>"
+               aria-selected="<?php echo $active ? 'true' : 'false' ?>"><?php phe($config->name) ?></a>
         </li>
-    <?php endforeach; ?>
+    <?php $first = FALSE; endforeach; ?>
 </ul>
 <div class="tab-content" id="myTabContentGreyhole">
     <?php foreach ($configs as $i => $config) : ?>
-        <div class="tab-pane fade <?php echo $i == 0 ? 'show active' : '' ?>" id="id<?php echo md5($config->name) ?>" role="tabpanel" aria-labelledby="id<?php echo md5($config->name) ?>-tab">
+        <div class="tab-pane fade <?php if ($i == $selected_tab) echo 'show active' ?>" id="id_<?php echo md5($config->name) ?>" role="tabpanel" aria-labelledby="id_<?php echo md5($config->name) ?>_tab">
             <?php echo get_config_html($config) ?>
         </div>
     <?php endforeach; ?>

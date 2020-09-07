@@ -96,7 +96,7 @@ if ($total_bytes_files > 0) {
 <div class="container-fluid">
     <nav class="navbar navbar-expand-md navbar-dark bg-dark">
         <div class="navbar-brand">
-            <a href="../">&lt; Back to Greyhole Admin</a>
+            <a href="<?php phe(!empty($_COOKIE['back_to_url']) ? $_COOKIE['back_to_url'] : '../') ?>">&lt; Back to Greyhole Admin</a>
         </div>
     </nav>
 

@@ -20,7 +20,9 @@ window.chartColorsSemi = {
 
 function defer(method) {
     if (window.jQuery) {
-        method();
+        $(function () {
+            method();
+        });
     } else {
         setTimeout(function() { defer(method) }, 50);
     }
@@ -29,11 +31,6 @@ function defer(method) {
 defer(function() {
     $(function () {
         $('[data-toggle="tooltip"]').tooltip();
-    });
-
-    resizeSPDrivesUsageGraphs();
-    $(window).resize(function() {
-        resizeSPDrivesUsageGraphs();
     });
 });
 
@@ -113,7 +110,7 @@ function config_value_changed(el, success) {
 }
 
 function ajax_value_changed($el, name, value, success) {
-    console.log(name + " = " + value);
+    // console.log(name + " = " + value);
     $.ajax({
         type: 'POST',
         url: './?ajax=config',
@@ -370,6 +367,7 @@ function drawPieChartDiskUsage(ctx, du_stats) {
         let path = paths[index].split(':');
         let next_level = parseInt(path[1]) + 1;
         path = path[0];
+        document.cookie = "back_to_url=" + location.href + "; path=/; expires=Thu, 1 Sep 2050 12:00:00 UTC";
         location.href = './du/?level=' + next_level + '&path=' + encodeURIComponent('/' + path);
     }
 
@@ -620,4 +618,74 @@ function addSambaShare(button) {
             }
         },
     });
+}
+
+function getPageTitle() {
+    let page_title = ['Greyhole Admin'];
+
+    [$active_page_link, $sub_page_active_link] = getActiveLinks();
+
+    let page_name = $active_page_link.text();
+    page_title.push(page_name);
+
+    if ($sub_page_active_link.length) {
+        let subpage_name = $sub_page_active_link.text();
+        page_title.push(subpage_name);
+    }
+
+    return page_title.join(' | ');
+}
+
+function getActiveLinks() {
+    let $active_page_link = $('.nav[data-name=page] .nav-link.active');
+    let $visible_content = $($active_page_link.attr('href'));
+    let $sub_page_active_link = $visible_content.find('.nav .nav-link.active');
+    return [$active_page_link, $sub_page_active_link];
+}
+
+var skip_changed_tab_event = false;
+function changedTab(el, first, replace) {
+    if (skip_changed_tab_event) {
+        skip_changed_tab_event = false;
+        return;
+    }
+
+    $(el).blur();
+
+    resizeSPDrivesUsageGraphs();
+
+    [$active_page_link, $sub_page_active_link] = getActiveLinks();
+
+    let selected_tab = $active_page_link.attr('id');
+    let selected_tabs = [selected_tab];
+    let url = './?page=' + encodeURIComponent($active_page_link.attr('id'));
+    if ($sub_page_active_link.length) {
+        let param_name = $sub_page_active_link.closest('.nav').data('name');
+        url += '&' + param_name + '=' + encodeURIComponent($sub_page_active_link.attr('id'));
+        selected_tabs.push($sub_page_active_link.attr('id'));
+    }
+
+    if (!first) {
+        history.pushState({selected_tabs: selected_tabs}, null, url);
+    }
+
+    let title = getPageTitle();
+    if (document.title !== title) {
+        document.title = title;
+    }
+    if (replace) {
+        history.replaceState({selected_tabs: selected_tabs}, null, url);
+    }
+}
+
+function selectInitialTab(name, replace) {
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    let el;
+    if (urlParams.get(name) === null) {
+        el = $('.nav[data-name="' + name + '"] .nav-link:first')[0];
+    } else {
+        el = $('#' + urlParams.get(name))[[0]];
+    }
+    changedTab(el, true, replace);
 }
