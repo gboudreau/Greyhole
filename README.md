@@ -10,7 +10,7 @@ Installation
     
     ```curl -Ls https://bit.ly/greyhole-package | sudo bash```
 
-2. Follow the instructions from the [USAGE](https://raw.github.com/gboudreau/Greyhole/master/USAGE) file.
+2. Follow the instructions from the [USAGE](https://github.com/gboudreau/Greyhole/blob/master/USAGE) file.
    There is also a copy of this file in `/usr/share/greyhole/USAGE`
 
 Links
