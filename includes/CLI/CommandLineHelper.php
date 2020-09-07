@@ -27,6 +27,7 @@ require_once('includes/CLI/BalanceStatusCliRunner.php');
 require_once('includes/CLI/BootInitCliRunner.php');
 require_once('includes/CLI/CancelBalanceCliRunner.php');
 require_once('includes/CLI/CancelFsckCliRunner.php');
+require_once('includes/CLI/ConfigCliRunner.php');
 require_once('includes/CLI/CreateMemSpoolRunner.php');
 require_once('includes/CLI/DebugCliRunner.php');
 require_once('includes/CLI/DeleteMetadataCliRunner.php');
@@ -91,6 +92,8 @@ class CommandLineHelper {
             new CliCommandDefinition('fix-symlinks',     'X',   null,             FixSymlinksCliRunner::class,    "Try to find a good file copy to point to for all broken symlinks found on your shares."),
             new CliCommandDefinition('delete-metadata:', 'p:',  '=path',          DeleteMetadataCliRunner::class, "Delete all metadata files for <path>, which should be a share name, followed by the path to a file that is gone from your storage pool. Eg. 'Movies/HD/The Big Lebowski.mkv'"),
             new CliCommandDefinition('remove-share:',    'U:',  '=share_name',    RemoveShareCliRunner::class,    "Move the files currently inside the specified share from the storage pool into the shared folder (landing zone), effectively removing the share from Greyhole's storage pool."),
+            new CliCommandDefinition('config',           '',    ' name',          ConfigCliRunner::class,         "Get a config from greyhole.conf; outputs JSON"),
+            new CliCommandDefinition('config',           '',    ' name value',    ConfigCliRunner::class,         "Change a config in greyhole.conf"),
             new CliCommandDefinition('md5-worker',       '',    null,             null,                           null),
             new CliCommandDefinition('getuid',           'G',   null,             GetGUIDCliRunner::class,        null),
             new CliCommandDefinition('create-mem-spool', '',    null,             CreateMemSpoolRunner::class,    null),
@@ -111,7 +114,7 @@ class CommandLineHelper {
             'find-orphaned-files'      => new CliOptionDefinition('find-orphaned-files',      'o',  null,    "Scan for files with no metadata in the storage pool drives. This will allow you to include existing files on a drive in your storage pool without having to copy them manually."),
             'checksums'                => new CliOptionDefinition('checksums',                'k',  null,    "Read ALL files in your storage pool, and check that file copies are identical. This will identify any problem you might have with your file-systems.\nNOTE: this can take a LONG time to complete, since it will read everything from all your drives!"),
             'delete-orphaned-metadata' => new CliOptionDefinition('delete-orphaned-metadata', 'm',  null,    "When fsck find metadata files with no file copies, delete those metadata files. If the file copies re-appear later, you'll need to run fsck with --find-orphaned-files to have them reappear in your shares."),
-            'disk-usage-report'        => new CliOptionDefinition('disk-usage-report',        'u',  null,    null),
+            'disk-usage-report'        => new CliOptionDefinition('disk-usage-report',        'u',  null,    "Calculate the disk usage of scanned folders."),
             'drive'                    => new CliOptionDefinition('drive:',                   'R:', '=path', null),
         );
     }
@@ -167,7 +170,9 @@ class CommandLineHelper {
                 // Those will be tested in TestCliRunner
                 ConfigHelper::test();
                 $retry_until_successful = ( $this->actionCmd->getLongOpt() == 'boot-init' );
-                DB::connect($retry_until_successful);
+                if ($this->actionCmd->getLongOpt() != 'config') {
+                    DB::connect($retry_until_successful);
+                }
             }
 
             if (!isset($cliRunner)) {

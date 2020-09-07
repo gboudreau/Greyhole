@@ -27,22 +27,33 @@ final class DB {
     /** @var PDO */
 	protected static $handle; // database handle
 
+    /**
+     * @return bool
+     */
+    public static function isConnected() {
+        return (bool) self::$handle;
+    }
+
 	public static function setOptions($options) {
 		self::$options = to_object($options);
 	}
 
-	public static function connect($retry_until_successful=FALSE) {
-        $connect_string = 'mysql:host=' . self::$options->host . ';dbname=' . self::$options->name;
+	public static function connect($retry_until_successful=FALSE, $throw_exception_on_error=FALSE, $timeout = 10) {
+        $connect_string = 'mysql:host=' . self::$options->host . ';dbname=' . self::$options->name . ';charset=utf8mb4';
 
         try {
-            self::$handle = @new PDO($connect_string, self::$options->user, self::$options->pass, array(PDO::ATTR_TIMEOUT => 10, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
+            self::$handle = @new PDO($connect_string, self::$options->user, self::$options->pass, array(PDO::ATTR_TIMEOUT => $timeout, PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION));
         } catch (PDOException $ex) {
             if ($retry_until_successful) {
                 sleep(2);
                 return DB::connect(TRUE);
             }
-            echo "ERROR: Can't connect to database: " . $ex->getMessage() . "\n";
-            Log::critical("Can't connect to database: " . $ex->getMessage(), Log::EVENT_CODE_DB_CONNECT_FAILED);
+            if ($throw_exception_on_error) {
+                throw new Exception("Can't connect to database: " . $ex->getMessage(), $ex->getCode(), $ex);
+            } else {
+                echo "ERROR: Can't connect to database: " . $ex->getMessage() . "\n";
+                Log::critical("Can't connect to database: " . $ex->getMessage(), Log::EVENT_CODE_DB_CONNECT_FAILED);
+            }
         }
 
         if (self::$handle) {

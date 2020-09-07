@@ -30,6 +30,39 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
 
         $max_drive_strlen = max(array_map('mb_strlen', Config::storagePoolDrives())) + 1;
 
+        $stats = static::get_stats();
+
+        if (isset($this->options['json'])) {
+            echo json_encode($stats);
+        } else {
+            $this->log();
+            $this->log("Greyhole Statistics");
+            $this->log("===================");
+            $this->log();
+            $this->log("Storage Pool");
+            $this->log(sprintf("%$max_drive_strlen"."s    Total -   Used =   Free +  Trash = Possible", ''));
+            foreach ($stats as $sp_drive => $stat) {
+                if ($sp_drive == 'Total') {
+                    $this->log(sprintf("  %-$max_drive_strlen"."s ==========================================", ""));
+                }
+                $this->logn(sprintf("  %-$max_drive_strlen"."s ", "$sp_drive:"));
+                if (empty($stat->total_space)) {
+                    $this->log("                 Offline                  ");
+                } else {
+                    $this->log(
+                            sprintf('%5.0f', $stat->total_space/1024/1024) . "G"               //   Total
+                        . ' - ' . sprintf('%5.0f', $stat->used_space/1024/1024). "G"                 // - Used
+                        . ' = ' . sprintf('%5.0f', $stat->free_space/1024/1024) . "G"                // = Free
+                        . ' + ' . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G"                // + Trash
+                        . ' = ' . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G" // = Possible
+                    );
+                }
+            }
+            $this->log();
+        }
+    }
+
+    public static function get_stats() {
         $totals = array(
             'total_space' => 0,
             'used_space' => 0,
@@ -89,35 +122,7 @@ class StatsCliRunner extends AbstractAnonymousCliRunner {
             $totals['potential_available_space'] += $potential_available_space;
         }
         $stats['Total'] = (object) $totals;
-
-        if (isset($this->options['json'])) {
-            echo json_encode($stats);
-        } else {
-            $this->log();
-            $this->log("Greyhole Statistics");
-            $this->log("===================");
-            $this->log();
-            $this->log("Storage Pool");
-            $this->log(sprintf("%$max_drive_strlen"."s    Total -   Used =   Free +  Trash = Possible", ''));
-            foreach ($stats as $sp_drive => $stat) {
-                if ($sp_drive == 'Total') {
-                    $this->log(sprintf("  %-$max_drive_strlen"."s ==========================================", ""));
-                }
-                $this->logn(sprintf("  %-$max_drive_strlen"."s ", "$sp_drive:"));
-                if (empty($stat->total_space)) {
-                    $this->log("                 Offline                  ");
-                } else {
-                    $this->log(
-                            sprintf('%5.0f', $stat->total_space/1024/1024) . "G"               //   Total
-                        . ' - ' . sprintf('%5.0f', $stat->used_space/1024/1024). "G"                 // - Used
-                        . ' = ' . sprintf('%5.0f', $stat->free_space/1024/1024) . "G"                // = Free
-                        . ' + ' . sprintf('%5.0f', $stat->trash_size/1024/1024) . "G"                // + Trash
-                        . ' = ' . sprintf('%5.0f', $stat->potential_available_space/1024/1024) . "G" // = Possible
-                    );
-                }
-            }
-            $this->log();
-        }
+        return $stats;
     }
 }
 

@@ -1,0 +1,96 @@
+
+.chart-container {
+    position: relative;
+    width:95vw;
+}
+
+.treemap_container {
+    width: 90vw;
+    height: 80vh;
+    margin: 0 auto;
+}
+
+.treemap_container canvas, #chart_shares_usage {
+    cursor: pointer;
+}
+
+.navbar-brand a {
+    color: white;
+}
+
+@media (min-width: 992px) {
+    .chart-container {
+        width: 50vw;
+        height: 38vw;
+        max-width: 800px;
+        padding-right: 45px;
+    }
+}
+
+#footer-padding {
+    height: 4em;
+}
+
+#needs-restart-container {
+    position: fixed;
+    top: 0;
+    right: 10px;
+    max-width: 350px;
+    z-index: 2;
+}
+
+#needs-daemon-restart, #needs-samba-restart {
+    margin-top: 1em;
+    color: var(--dark);
+    background-color: var(--light);
+    padding: 1em;
+    border: 1px solid var(--dark);
+    -moz-box-shadow:    2px 2px 5px 1px var(--dark);
+    -webkit-box-shadow: 2px 2px 5px 1px var(--dark);
+    box-shadow:         2px 2px 5px 1px var(--dark);
+}
+
+.mt-8, .my-8 {
+    margin-top: 3rem !important;
+}
+
+.sp-bar-td {
+    line-height: 0.5;
+}
+.sp-bar {
+    display: inline-block;
+    height: 37px;
+    margin-right: 1px;
+}
+.sp-bar.used {
+    background-color: rgba(222, 66, 91, 1);
+}
+.sp-bar.trash {
+    background-color: rgba(255, 236, 152, 1);
+}
+.sp-bar.free {
+    background-color: rgba(72, 143, 49, 1);
+}
+.sp-bar.treemap:not(.nolink) {
+    cursor: pointer;
+}
+
+td .form-group {
+    margin-bottom: 0;
+}
+
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+th, td {
+    padding: 6px;
+}
+
+td.centered {
+    text-align: center;
+}
+td.centered .row {
+    display: inline-block;
+}

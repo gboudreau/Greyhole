@@ -37,19 +37,25 @@ final class StoragePool {
             $is_greyhole_owned_drive = FALSE;
         }
         if (!$is_greyhole_owned_drive) {
-            $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
-            if (!$drives_definitions) {
-                $drives_definitions = MigrationHelper::convertStoragePoolDrivesTagFiles();
-            }
             $drive_uuid = SystemHelper::directory_uuid($sp_drive);
-            $is_greyhole_owned_drive = @$drives_definitions[$sp_drive] === $drive_uuid && $drive_uuid !== FALSE;
+            if (DB::isConnected()) {
+                $drives_definitions = Settings::get('sp_drives_definitions', TRUE);
+                if (!$drives_definitions) {
+                    $drives_definitions = MigrationHelper::convertStoragePoolDrivesTagFiles();
+                }
+                $is_greyhole_owned_drive = @$drives_definitions[$sp_drive] === $drive_uuid && $drive_uuid !== FALSE;
+            } else {
+                $is_greyhole_owned_drive = is_dir("$sp_drive/.gh_metastore");
+            }
             if (!$is_greyhole_owned_drive) {
                 // Maybe this is a remote mount? Those don't have UUIDs, so we use the .greyhole_uses_this technique.
                 $is_greyhole_owned_drive = file_exists("$sp_drive/.greyhole_uses_this");
                 if ($is_greyhole_owned_drive && isset($drives_definitions[$sp_drive])) {
                     // This remote drive was listed in MySQL; it shouldn't be. Let's remove it.
                     unset($drives_definitions[$sp_drive]);
-                    Settings::set('sp_drives_definitions', $drives_definitions);
+                    if (DB::isConnected()) {
+                        Settings::set('sp_drives_definitions', $drives_definitions);
+                    }
                 }
             }
             if ($is_greyhole_owned_drive) {
