@@ -45,7 +45,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 <?php endif; ?>
 
-<h4>Recent log entries</h4>
+<h4 class="mt-4">Recent log entries</h4>
 <code>
     <?php
     if (DB::isConnected()) {
@@ -68,3 +68,52 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
     Last logged action: <strong><?php phe($last_action) ?></strong>,
     on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?>
 </div>
+
+<?php if (@$task->action == 'balance') : ?>
+    <h4 class="mt-4">Balance Status</h4>
+    <?php $groups = BalanceStatusCliRunner::getData() ?>
+    <?php foreach ($groups as $group) : ?>
+        <div class="alert alert-success" role="alert">
+            Target free space in <?php phe($group->name) ?> storage pool drives: <strong><?php echo bytes_to_human($group->target_avail_space*1024, TRUE, TRUE) ?></strong>
+        </div>
+        <div class="col">
+            <table id="table-sp-drives">
+                <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Needs</th>
+                    <th>Usage</th>
+                </tr>
+                </thead>
+                <tbody>
+                <?php
+                $max = 0;
+                foreach ($group->drives as $sp_drive => $drive_infos) {
+                    if ($drive_infos->df['used'] > $max) {
+                        $max = $drive_infos->df['used'];
+                    }
+                }
+                ?>
+                <?php foreach ($group->drives as $sp_drive => $drive_infos) : ?>
+                    <?php
+                    $target_used_space = $drive_infos->df['used'] + ($drive_infos->direction ? -1 : 1) * $drive_infos->diff;
+                    ?>
+                    <tr>
+                        <td>
+                            <?php phe($sp_drive) ?>
+                        </td>
+                        <td>
+                            <?php echo $drive_infos->direction . ' ' . bytes_to_human($drive_infos->diff*1024, TRUE, TRUE) ?>
+                        </td>
+                        <td class="sp-bar-td">
+                            <div class="sp-bar target" data-width="<?php echo ($target_used_space/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Target: " . bytes_to_human($target_used_space*1024, FALSE, TRUE)) ?>">
+                            </div><div class="sp-bar <?php echo ($drive_infos->direction == '-' ? 'used' : 'free') ?>" data-width="<?php echo ($drive_infos->diff/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Diff: " . $drive_infos->direction . ' ' . bytes_to_human($drive_infos->diff*1024, FALSE, TRUE)) ?>"></div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <hr/>
+    <?php endforeach; ?>
+<?php endif; ?>

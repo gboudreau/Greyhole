@@ -71,6 +71,9 @@
 .sp-bar.free {
     background-color: rgba(72, 143, 49, 1);
 }
+.sp-bar.target {
+    background-color: rgba(205, 205, 205, 1);
+}
 .sp-bar.treemap:not(.nolink) {
     cursor: pointer;
 }

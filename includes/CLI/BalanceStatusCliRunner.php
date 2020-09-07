@@ -45,6 +45,42 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
         $max_storage_pool_strlen = max(array_map('mb_strlen', Config::storagePoolDrives()));
         $cols -= $max_storage_pool_strlen + 14;
 
+        $groups = static::getData();
+        foreach ($groups as $group) {
+            printf("\n%$max_storage_pool_strlen"."s  %s", "", "Target free space in $group->name storage pool drives: " . bytes_to_human($group->target_avail_space*1024, FALSE) . "\n");
+            $num_lines += 2;
+
+            foreach ($group->drives as $sp_drive => $drive_infos) {
+                $cols_free = ceil($cols * $drive_infos->percent_free);
+                $cols_used = $cols - abs($cols_free);
+
+                $suffix = "\033[0m";
+                if ($drive_infos->direction == '-') {
+                    $cols_diff = round($cols * $drive_infos->percent_diff);
+                    $cols_used -= $cols_diff;
+                    $prefix = "\033[31m";
+                } else {
+                    $cols_diff = round($cols * $drive_infos->percent_diff);
+                    $cols_free -= $cols_diff;
+                    $prefix = "\033[32m";
+                }
+                $how_much = round($drive_infos->diff / 1024 / 1024) . 'GB';
+
+                $sign = $drive_infos->direction;
+
+                $cols_used = max($cols_used, 0);
+                $cols_diff = max($cols_diff, 0);
+                $cols_free = max($cols_free, 0);
+                printf("%$max_storage_pool_strlen"."s  [%s%s%s%s%s]  %s %6s\n", $sp_drive, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_used), $prefix, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_diff), $suffix, str_repeat(' ', $cols_free), $sign, $how_much);
+                $num_lines++;
+            }
+        }
+
+        return $num_lines;
+    }
+
+    public static function getData() {
+        $groups = [];
 
         /** @var $drives_selectors PoolDriveSelector[] */
         $drives_selectors = Config::get(CONFIG_DRIVE_SELECTION_ALGORITHM);
@@ -57,15 +93,19 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
                     continue;
                 }
             }
-            
+
             if (count($pool_drives_avail_space) == 0) {
                 continue;
             }
 
             $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
 
-            printf("\n%$max_storage_pool_strlen"."s  %s", "", "Target free space in $ds->group_name storage pool drives: " . bytes_to_human($target_avail_space*1024, FALSE) . "\n");
-            $num_lines += 2;
+            $group = (object) [
+                'name' => $ds->group_name,
+                'target_avail_space' => $target_avail_space,
+                'drives' => [],
+            ];
+            $groups[] = $group;
 
             foreach (Config::storagePoolDrives() as $sp_drive) {
                 if (!array_contains($ds->drives, $sp_drive)) {
@@ -78,37 +118,25 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
 
                 $df['free'] -= (float) Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive);
 
-                $percent_free = $df['free'] / ($df['free'] + $df['used']);
-                $cols_free = ceil($cols * $percent_free);
-                $cols_used = $cols - abs($cols_free);
+                $drive_infos = (object) [
+                    'df' => $df,
+                    'percent_free' => $df['free'] / ($df['free'] + $df['used']),
+                ];
+                $group->drives[$sp_drive] = $drive_infos;
 
-                $suffix = "\033[0m";
                 if ($df['free'] < $target_avail_space) {
-                    $diff = $target_avail_space - $df['free'];
-                    $percent_diff = $diff / ($df['free'] + $df['used']);
-                    $cols_diff = round($cols * $percent_diff);
-                    $cols_used -= $cols_diff;
-                    $prefix = "\033[31m";
-                    $sign = '-';
+                    $drive_infos->direction = '-';
+                    $drive_infos->diff = $target_avail_space - $df['free'];
+                    $drive_infos->percent_diff = $drive_infos->diff / ($df['free'] + $df['used']);
                 } else {
-                    $diff = $df['free'] - $target_avail_space;
-                    $percent_diff = $diff / ($df['free'] + $df['used']);
-                    $cols_diff = round($cols * $percent_diff);
-                    $cols_free -= $cols_diff;
-                    $prefix = "\033[32m";
-                    $sign = '+';
+                    $drive_infos->direction = '+';
+                    $drive_infos->diff = $df['free'] - $target_avail_space;
+                    $drive_infos->percent_diff = $drive_infos->diff / ($df['free'] + $df['used']);
                 }
-                $how_much = round($diff / 1024 / 1024) . 'GB';
-
-                $cols_used = max($cols_used, 0);
-                $cols_diff = max($cols_diff, 0);
-                $cols_free = max($cols_free, 0);
-                printf("%$max_storage_pool_strlen"."s  [%s%s%s%s%s]  %s %6s\n", $sp_drive, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_used), $prefix, str_repeat(mb_convert_encoding('&#9724;', 'UTF-8', 'HTML-ENTITIES'), $cols_diff), $suffix, str_repeat(' ', $cols_free), $sign, $how_much);
-                $num_lines++;
             }
         }
 
-        return $num_lines;
+        return $groups;
     }
 }
 
