@@ -157,6 +157,9 @@ function gh_is_file_locked($real_fullpath) {
     }
     $result = exec("lsof -n -P -l " . escapeshellarg($real_fullpath) . " 2> /dev/null");
     if (string_contains($result, $real_fullpath)) {
+        if (preg_match('/^([^\s]+)\s+(\d+)\s/U', $result, $re)) {
+            return "$re[1], PID $re[2]";
+        }
         return $result;
     }
     return FALSE;
