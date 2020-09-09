@@ -135,17 +135,19 @@ function get_debug_bt() {
             $prefix = basename($d['file']) . '[L' . $d['line'] . '] ';
         }
         if (!isset($d['args'])) {
-            $d['args'] = array();
+            $d['args'] = [];
         }
-        foreach ($d['args'] as $k => $v) {
+        $args = [];
+        foreach ($d['args'] as $v) {
             if (is_object($v)) {
-                $d['args'][$k] = 'stdClass';
-            }
-            if (is_array($v)) {
-                $d['args'][$k] = str_replace("\n", "", var_export($v, TRUE));
+                $args[] = 'stdClass';
+            } elseif (is_array($v)) {
+                $args[] = str_replace("\n", "", var_export($v, TRUE));
+            } else {
+                $args[] = $v;
             }
         }
-        $bt = $prefix . $d['function'] .'(' . implode(',', @$d['args']) . ')' . $bt;
+        $bt = $prefix . $d['function'] .'(' . implode(',', $args) . ')' . $bt;
     }
     return $bt;
 }
