@@ -206,7 +206,7 @@ final class StoragePool {
 
     public static function reload_gone_ok_drives() {
         self::$gone_ok_drives = Settings::get('Gone-OK-Drives', TRUE);
-        if (!self::$gone_ok_drives) {
+        if (self::$gone_ok_drives === FALSE) {
             self::$gone_ok_drives = array();
             Settings::set('Gone-OK-Drives', self::$gone_ok_drives);
         }
@@ -239,7 +239,7 @@ final class StoragePool {
     }
 
     public static function gone_fscked($sp_drive, $force_reload=FALSE) {
-        if ($force_reload || self::$fscked_gone_drives == NULL) {
+        if ($force_reload || self::$fscked_gone_drives === NULL) {
             self::reload_fsck_gone_drives();
         }
         if (isset(self::$fscked_gone_drives[$sp_drive])) {
