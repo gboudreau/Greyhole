@@ -250,7 +250,7 @@ final class StoragePool {
 
     public static function reload_fsck_gone_drives() {
         self::$fscked_gone_drives = Settings::get('Gone-FSCKed-Drives', TRUE);
-        if (!self::$fscked_gone_drives) {
+        if (self::$fscked_gone_drives === FALSE) {
             self::$fscked_gone_drives = array();
             Settings::set('Gone-FSCKed-Drives', self::$fscked_gone_drives);
         }
