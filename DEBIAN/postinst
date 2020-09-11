@@ -153,14 +153,18 @@ fi
 if [ -f /proc/fs/cifs/OplockEnabled ]; then
     # cifs client workaround
     # Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
-    modprobe cifs
+    modprobe cifs || true
+    set +e
     echo 0 > /proc/fs/cifs/OplockEnabled
+    set -e
 fi
 if [ -f /sys/module/cifs/parameters/enable_oplocks ]; then
     # cifs client workaround
     # Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
-    modprobe cifs enable_oplocks=0
+    modprobe cifs enable_oplocks=0 || true
+    set +e
     echo 0 > /sys/module/cifs/parameters/enable_oplocks
+    set -e
 fi
 
 uses_systemd=$(stat -c '%N' /proc/1/exe | grep systemd | wc -l)
