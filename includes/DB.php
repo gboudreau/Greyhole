@@ -59,7 +59,9 @@ final class DB {
         if (self::$handle) {
             DB::execute("SET SESSION group_concat_max_len = 1048576");
             DB::execute("SET SESSION wait_timeout = 86400"); # Allow 24h fsck!
-            DB::migrate();
+            if (self::$options->name != 'mysql') {
+                DB::migrate();
+            }
         }
 
         return self::$handle;

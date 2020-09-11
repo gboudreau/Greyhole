@@ -431,11 +431,6 @@ final class ConfigHelper {
     private static function init() {
         Log::setLevel(Config::get(CONFIG_LOG_LEVEL));
 
-        if (count(Config::storagePoolDrives()) == 0) {
-            Log::error("You have no '" . CONFIG_STORAGE_POOL_DRIVE . "' defined. Greyhole can't run.", Log::EVENT_CODE_CONFIG_NO_STORAGE_POOL);
-            return FALSE;
-        }
-
         self::$df_command = "df -k";
         foreach (Config::storagePoolDrives() as $sp_drive) {
             self::$df_command .= " " . escapeshellarg($sp_drive);
@@ -568,6 +563,11 @@ final class ConfigHelper {
             openlog("Greyhole", LOG_PID, LOG_USER);
         }
 
+        if (count(Config::storagePoolDrives()) == 0) {
+            Log::error("You have no '" . CONFIG_STORAGE_POOL_DRIVE . "' defined. Greyhole can't run.", Log::EVENT_CODE_CONFIG_NO_STORAGE_POOL);
+            return FALSE;
+        }
+
         return TRUE;
     }
 
@@ -675,7 +675,11 @@ final class SharesConfig {
 
     public static function getShares() {
         $result = array();
-        foreach (self::$shares_config as $share_name => $share_config) {
+        $all_shares = self::$shares_config;
+        if (!is_array($all_shares)) {
+            $all_shares = [];
+        }
+        foreach ($all_shares as $share_name => $share_config) {
             if ($share_name != CONFIG_TRASH_SHARE) {
                 $result[$share_name] = $share_config;
             }

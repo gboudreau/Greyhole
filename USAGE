@@ -6,22 +6,32 @@ The following are instructions on how to configure and run Greyhole.
 You need Greyhole installed for those instructions to make sense. 
 See https://github.com/gboudreau/Greyhole/wiki/Installing for details.
 
-Most of the commands below require root access, so now would be a good time 
+To configure Greyhole, you can either choose to use the web UI (wizard), or do the steps manually, from a terminal.
+
+If you'd like to use the web UI, start the built-in server from a terminal:
+
+    sudo php -S 0.0.0.0:8012 /usr/share/greyhole/web-app/index.php
+
+Then point your browser to: http://server_hostname_or_ip:8012/install/
+
+If you'd prefer to use the command line, follow the steps below instead.
+
+Most of the commands below require root access, so now would be a good time
 to become root, if you're not already (use `sudo -i` if you don't have the root password).
 
-1. Read the following documentation pages.
-   The first page will help you understand why you're doing the next steps.
+1. Read the following documentation pages.  
+   The first page will help you understand why you're doing the next steps.  
    The second page will help you choose your Landing Zones (/path/to/landing_zone/share_name, in the next step) correctly.
 
-   How Greyhole Works:     https://github.com/gboudreau/Greyhole/wiki/HowGreyholeWorks
+   How Greyhole Works:     https://github.com/gboudreau/Greyhole/wiki/HowGreyholeWorks  
    About the Landing Zone: https://github.com/gboudreau/Greyhole/wiki/AboutLZ
    
 2. Setup Samba:
 
-	Before you continue, make sure you have shares created on Samba, and that you are able to connect to those shares remotely (or locally, using mount.cifs).
+	Before you continue, make sure you have shares created on Samba, and that you are able to connect to those shares remotely (or locally, using mount.cifs).  
 	Of note: Samba uses its own users database; you'll need to create your user(s) using `smbpasswd -a` before you can connect to your shares.
 
-	Edit /etc/samba/smb.conf
+	Edit `/etc/samba/smb.conf`  
 	Change or add the following values in the [global] section (making sure this section is above all shares definition):
 
 		unix extensions = no # Or use 'allow insecure wide links = yes', if you want/need to keep unix extensions enabled
@@ -30,6 +40,7 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 	For each of your shares, add a 'dfree command' and 'vfs objects' lines, as seen below.
 
 	Example share definition:
+
 		[share_name]
 		    path = /path/to/landing_zone/share_name
 		    create mask = 0770
@@ -43,44 +54,46 @@ to become root, if you're not already (use `sudo -i` if you don't have the root 
 		    dfree command = /usr/bin/greyhole-dfree
 		    vfs objects = greyhole
 
-	Fedora: service smb restart
-	Ubuntu (< 10): /etc/init.d/samba restart
-	Ubuntu (10-14): restart smbd
-	Ubuntu (15+): service smbd restart
+	Fedora: service smb restart  
+	Ubuntu (< 10): /etc/init.d/samba restart  
+	Ubuntu (10-14): restart smbd  
+	Ubuntu (15+): service smbd restart  
 	Debian: service samba restart
 
 3. Setup the database:
 
-	# Make sure your MySQL server service (mysqld) is running, and runs on boot.
-	Fedora: service mysqld start; chkconfig mysqld on
-	Ubuntu (< 10): /etc/init.d/mysqld start; update-rc.d mysqld defaults
-	Ubuntu (10-14): start mysql
-	Ubuntu (15+): service mysql start
+	Make sure your MySQL server service (mysqld) is running, and runs on boot.
+
+	Fedora: service mysqld start; chkconfig mysqld on  
+	Ubuntu (< 10): /etc/init.d/mysqld start; update-rc.d mysqld defaults  
+	Ubuntu (10-14): start mysql  
+	Ubuntu (15+): service mysql start  
 	Debian: service mysql start
 		
-	# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
-	mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS greyhole; CREATE USER IF NOT EXISTS greyhole_user@localhost IDENTIFIED BY '89y63jdwe'; GRANT ALL ON greyhole.* TO greyhole_user@localhost;"
-	mysql -u greyhole_user -p89y63jdwe greyhole < /usr/share/greyhole/schema-mysql.sql
+     	# Remove the -p parameter if your MySQL root user doesn't require a password for local connections.
+	    mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS greyhole; CREATE USER IF NOT EXISTS greyhole_user@localhost IDENTIFIED BY '89y63jdwe'; GRANT ALL ON greyhole.* TO greyhole_user@localhost;"
+	    mysql -u greyhole_user -p89y63jdwe greyhole < /usr/share/greyhole/schema-mysql.sql
 
-4. Customize the Greyhole configuration file, /etc/greyhole.conf, as needed.
+4. Customize the Greyhole configuration file, /etc/greyhole.conf, as needed.  
    Important: you need to either use the `date.timezone` setting in your php.ini, or specify your timezone in greyhole.conf, using the `timezone` config option.
 
 5. Start the Greyhole service:
 
-	Fedora: service greyhole start
-	Ubuntu (< 10): /etc/init.d/greyhole start
-	Ubuntu (10-14): start greyhole
-	Ubuntu (15+): service greyhole start
+	Fedora: service greyhole start  
+	Ubuntu (< 10): /etc/init.d/greyhole start  
+	Ubuntu (10-14): start greyhole  
+	Ubuntu (15+): service greyhole start  
 	Debian: service greyhole start
 
-Check for errors, or check what the Greyhole service is working on, in the Greyhole log: greyhole --logs
+    Check for errors, or check what the Greyhole service is working on, in the Greyhole log: greyhole --logs
 
 6. If you'd like Greyhole to check your file copies, to make sure they all have the same checksum (as they should),
-   you'll need to manually (or using cron) schedule a fsck using the --checksums option.
-   As this can be quite time-consuming, it is not enabled by default in the Greyhole crontab.
-   Example cron job (first Sunday of every month, at 1am):
-   0 1 1-7 * *  [ "$(date '+\%u')" = "7" ] && greyhole --fsck --email-report --checksums
+   you'll need to manually (or using cron) schedule a fsck using the --checksums option.  
+   As this can be quite time-consuming, it is not enabled by default in the Greyhole crontab.  
+   Example cron job (first Sunday of every month, at 1am):  
 
-If you use any application that needs to use files on your shares, you'll need to mount the shares locally, and point your applications to those mounts.
-You should never work on the files in your storage pool directories, or the symlinks in your shared directories.
+       0 1 1-7 * *  [ "$(date '+\%u')" = "7" ] && greyhole --fsck --email-report --checksums
+
+If you use any application that needs to use files on your shares, you'll need to mount the shares locally, and point your applications to those mounts.  
+You should never work on the files in your storage pool directories, or the symlinks in your shared directories.  
 Ref: https://github.com/gboudreau/Greyhole/wiki/Mountshareslocally

@@ -38,13 +38,24 @@ if (php_sapi_name() == 'cli-server') {
         include 'web-app/du/index.php';
         exit();
     }
+
+    if (!defined('INSTALL')) {
+        if (strpos($_SERVER['REQUEST_URI'], '/install/') === 0) {
+            define('INSTALL', TRUE);
+            include 'web-app/install/index.php';
+            exit();
+        }
+        if (strpos($_SERVER['REQUEST_URI'], '/install') === 0) {
+            header('Location: ' . $_SERVER['REQUEST_URI'] . '/');
+            exit();
+        }
+    }
 }
 
-include('includes/common.php');
-include('includes/CLI/CommandLineHelper.php');
-include('includes/DaemonRunner.php');
-
-include('web-app/functions.inc.php');
+if (!defined('DB')) {
+    define('IS_WEB_APP', TRUE);
+    include 'web-app/includes.inc.php';
+}
 
 // Log all notice/warnings/errors
 error_reporting(E_ALL);
@@ -53,7 +64,14 @@ restore_error_handler();
 
 setlocale(LC_CTYPE, "en_US.UTF-8");
 
-ConfigHelper::parse();
+try {
+    ConfigHelper::parse();
+} catch (Exception $ex) {
+    error_log($ex->getMessage());
+    echo "Fatal error: " . $ex->getMessage();
+    exit();
+}
+
 try {
     DB::connect(FALSE, TRUE, 2);
 } catch (Exception $ex) {
@@ -63,6 +81,7 @@ try {
 if (!empty($_GET['ajax'])) {
     header('Content-Type: text/json; charset=utf8');
 
+    error_log("Received POST ?ajax: " . json_encode($_POST));
     switch($_GET['ajax']) {
     case 'config':
         if (string_starts_with($_POST['name'], 'smb.conf')) {
@@ -70,6 +89,7 @@ if (!empty($_GET['ajax'])) {
         }
         ConfigCliRunner::change_config($_POST['name'], $_POST['value'], NULL, $error);
         if (!empty($error)) {
+            error_log("Error: $error");
             echo json_encode(['result' => 'error', 'message' => "Error: $error"]);
             exit();
         }
@@ -108,13 +128,18 @@ if (!empty($_GET['ajax'])) {
             }
             exec("id " . escapeshellarg($username) . " >/dev/null 2>&1", $tmp, $return_var);
             if ($return_var) {
-                echo json_encode(['result' => 'error', 'message' => "Error: UNIX user doesn't not exist.\nYou can only create Samba users for existing UNIX users."]);
-                exit();
+                // Create UNIX user first
+                unset($output);
+                exec("/usr/sbin/adduser --home /nonexistent --no-create-home --shell /usr/sbin/nologin --disabled-password --gecos " . escapeshellarg($username) . " " . escapeshellarg($username) . " 2>&1", $output, $return_var);
+                if ($return_var) {
+                    $output = implode(" ", $output);
+                    echo json_encode(['result' => 'error', 'message' => "Error: UNIX user doesn't not exist, and failed to create ($output).\nYou can only create Samba users for existing UNIX users."]);
+                }
             }
-            $cmd = "(echo " . escapeshellarg($password) . "; echo " . escapeshellarg($password) . ") | /usr/bin/smbpasswd -a -s " . escapeshellarg($username) . " 2>&1 | grep -v 'WARNING: '";
-            exec($cmd, $output);
+            $cmd = "(echo " . escapeshellarg($password) . "; echo " . escapeshellarg($password) . ") | /usr/bin/smbpasswd -a -s " . escapeshellarg($username) . " 2>&1";
+            exec($cmd, $output, $return_var);
             error_log("Result of 'smbpasswd -a $username': " . implode("\n", $output));
-            if (!empty($output)) {
+            if ($return_var) {
                 $error = implode("\n", $output);
                 echo json_encode(['result' => 'error', 'message' => $error]);
                 exit();
@@ -138,6 +163,69 @@ if (!empty($_GET['ajax'])) {
             }
         }
         break;
+    case 'install':
+        $step = $_POST['step'];
+
+        if ($step == 4) {
+            $host = $_POST['host'];
+            if (empty($host)) {
+                echo json_encode(['result' => 'error', 'message' => "Error: MySQL host can't be left empty."]);
+                exit();
+            }
+            try {
+                $pwd = $_POST['root_pwd'];
+                DB::setOptions(['host' => $host, 'name' => 'mysql', 'user' => 'root', 'pass' => $pwd]);
+                DB::connect(FALSE, TRUE, 5);
+            } catch (Exception $ex) {
+                echo json_encode(['result' => 'error', 'message' => "Error: failed to connect to MySQL host $host using root user: " . $ex->getMessage()]);
+                exit();
+            }
+
+            try {
+                $q = "SELECT user()";
+                $user = DB::getFirstValue($q);
+                list(, $client_host) = explode('@', $user);
+
+                $username = Config::get(CONFIG_DB_USER);
+                $db_name = 'greyhole';
+
+                $q = "CREATE DATABASE IF NOT EXISTS $db_name";
+                DB::execute($q);
+                $q = "CREATE USER IF NOT EXISTS :username@:client_host IDENTIFIED BY :pwd";
+                DB::execute($q, ['username' => $username, 'client_host' => $client_host, 'pwd' => '89y63jdwe']);
+                $q = "GRANT ALL ON $db_name.* TO :username@:client_host";
+                DB::execute($q, ['username' => $username, 'client_host' => $client_host]);
+                $q = "USE $db_name";
+                DB::execute($q);
+                $q = file_get_contents('schema-mysql.sql');
+                DB::execute($q);
+
+                ConfigCliRunner::change_config(CONFIG_DB_HOST, $host, NULL);
+                ConfigCliRunner::change_config(CONFIG_DB_NAME, 'greyhole', NULL);
+            } catch (Exception $ex) {
+                echo json_encode(['result' => 'error', 'message' => "Error: failed to initialize Greyhole database: " . $ex->getMessage() . "; Query: $q"]);
+                exit();
+            }
+        }
+
+        if ($step == 6) {
+            if (!SambaUtils::samba_restart()) {
+                echo json_encode(['result' => 'error', 'message' => "Error: was not able to identify how to restart Samba. Please do so manually."]);
+                exit();
+            }
+            if (!DaemonRunner::restart_service()) {
+                echo json_encode(['result' => 'error', 'message' => "Error: was not able to identify how to restart the Greyhole daemon. Please do so manually."]);
+                exit();
+            }
+        }
+
+        $next_step = $step + 1;
+
+        $url = $_SERVER['REQUEST_URI'];
+        $url = preg_replace('/\?.*$/', '', $url);
+        $next_url = $url . '?step=' . $next_step;
+        echo json_encode(['result' => 'success', 'next_page' => $next_url]);
+        exit();
     }
 
     echo json_encode(['result' => 'success', 'config_hash' => get_config_hash(), 'config_hash_samba' => get_config_hash_samba()]);
@@ -146,4 +234,9 @@ if (!empty($_GET['ajax'])) {
 
 header('Content-Type: text/html; charset=utf8');
 
-$is_dark_mode = ($_COOKIE['darkmode'] === '1');
+$is_dark_mode = (@$_COOKIE['darkmode'] === '1');
+
+if (DB::isConnected()) {
+    // Make sure the list of storage pool drives is up to date (eg. after we added a new drive, but didn't restart the daemon yet)
+    MigrationHelper::convertStoragePoolDrivesTagFiles();
+}

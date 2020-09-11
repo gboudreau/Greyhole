@@ -89,7 +89,7 @@ if ($total_bytes_files > 0) {
     <script src="../scripts.js"></script>
     <link rel="stylesheet" href="../styles.css">
     <link rel="shortcut icon" type="image/png" href="../favicon.png" sizes="64x64">
-    <title>Shares Disk Usage - <?php phe($level_min > 1 ? "$path - " : "") ?>Greyhole Admin</title>
+    <title>Greyhole Admin - Shares Disk Usage <?php phe($level_min > 1 ? "- $path" : "") ?></title>
 </head>
 <body class="<?php if ($is_dark_mode) echo "dark" ?>">
 

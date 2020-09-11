@@ -19,7 +19,9 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 ?>
 
-<h2 class="mt-8">Samba Shares</h2>
+<?php if (!defined('SKIP_TITLE')) : ?>
+    <h2 class="mt-8">Samba Shares</h2>
+<?php endif; ?>
 
 <?php
 $max = count(Config::storagePoolDrives());
@@ -62,16 +64,20 @@ foreach ($output as $line) {
     }
 }
 natksort($all_samba_shares);
+
+$cols_width = defined('IS_INITIAL_SETUP') ? 'col-12' : 'col-12 col-lg-6';
 ?>
 <div class="row">
-    <div class="col col-sm-12 col-lg-6">
+    <div class="col <?php echo $cols_width ?>">
         <table id="table-shares">
             <thead>
             <tr>
                 <th>Share</th>
                 <th>Landing zone</th>
-                <th>Greyhole-enabled?</th>
-                <th>Number of file copies</th>
+                <?php if (!defined('SKIP_GH_COLUMNS')) : ?>
+                    <th>Greyhole-enabled?</th>
+                    <th>Number of file copies</th>
+                <?php endif; ?>
             </tr>
             </thead>
             <tbody>
@@ -79,25 +85,27 @@ natksort($all_samba_shares);
                 <tr>
                     <td><?php phe($share_name) ?></td>
                     <td><code><?php phe($share_options['landing_zone']) ?></code></td>
-                    <td class="centered">
-                        <?php
-                        if (@$share_options['is_trash']) {
-                            echo '<a href="https://github.com/gboudreau/Greyhole/wiki/AboutTrash" target="_blank">Greyhole Trash</a>';
-                        } else {
-                            echo get_config_html(['name' => "gh_enabled[$share_name]", 'type' => 'bool', 'onchange' => 'toggleSambaShareGreyholeEnabled(this)', 'data' => ['sharename' => $share_name]], @$share_options[CONFIG_NUM_COPIES . '_raw'] !== '0', FALSE);
-                        }
-                        ?>
-                    </td>
-                    <td class="centered">
-                        <?php
-                        if (@$share_options['is_trash']) {
-                            echo 'N/A';
-                        } else {
-                            echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options[CONFIG_NUM_COPIES . '_raw'], FALSE);
-                        }
-                        ?>
-                        <input type="hidden" name="vfs_objects[<?php phe($share_name) ?>]" value="<?php phe($share_options['vfs_objects']) ?>" />
-                    </td>
+                    <?php if (!defined('SKIP_GH_COLUMNS')) : ?>
+                        <td class="centered">
+                            <?php
+                            if (@$share_options['is_trash']) {
+                                echo '<a href="https://github.com/gboudreau/Greyhole/wiki/AboutTrash" target="_blank">Greyhole Trash</a>';
+                            } else {
+                                echo get_config_html(['name' => "gh_enabled[$share_name]", 'type' => 'bool', 'onchange' => 'toggleSambaShareGreyholeEnabled(this)', 'data' => ['sharename' => $share_name]], @$share_options[CONFIG_NUM_COPIES . '_raw'] !== '0', FALSE);
+                            }
+                            ?>
+                        </td>
+                        <td class="centered">
+                            <?php
+                            if (@$share_options['is_trash']) {
+                                echo 'N/A';
+                            } else {
+                                echo get_config_html(['name' => CONFIG_NUM_COPIES . "[$share_name]", 'type' => 'select', 'possible_values' => $possible_values_num_copies], $share_options[CONFIG_NUM_COPIES . '_raw'], FALSE);
+                            }
+                            ?>
+                            <input type="hidden" name="vfs_objects[<?php phe($share_name) ?>]" value="<?php phe($share_options['vfs_objects']) ?>" />
+                        </td>
+                    <?php endif; ?>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -106,25 +114,27 @@ natksort($all_samba_shares);
             Add Samba Share
         </button>
     </div>
-    <div class="col col-sm-12 col-lg-6">
-        <?php if (DB::isConnected()) : ?>
-            <?php
-            $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
-            $rows = DB::getAll($q);
-            ?>
-            <div class="chart-container">
-                <canvas id="chart_shares_usage" width="200" height="200"></canvas>
-            </div>
-            <script>
-                defer(function(){
-                    let ctx = document.getElementById('chart_shares_usage').getContext('2d');
-                    drawPieChartDiskUsage(ctx, <?php echo json_encode($rows) ?>);
-                });
-            </script>
-        <?php else : ?>
-            (Warning: Can't connect to database to load disk usage statistics.)
-        <?php endif; ?>
-    </div>
+    <?php if (!defined('IS_INITIAL_SETUP')) : ?>
+        <div class="col <?php echo $cols_width ?>">
+            <?php if (DB::isConnected()) : ?>
+                <?php
+                $q = "SELECT size, depth, share AS file_path FROM du_stats WHERE depth = 1 ORDER BY size DESC";
+                $rows = DB::getAll($q);
+                ?>
+                <div class="chart-container">
+                    <canvas id="chart_shares_usage" width="200" height="200"></canvas>
+                </div>
+                <script>
+                    defer(function(){
+                        let ctx = document.getElementById('chart_shares_usage').getContext('2d');
+                        drawPieChartDiskUsage(ctx, <?php echo json_encode($rows) ?>);
+                    });
+                </script>
+            <?php else : ?>
+                (Warning: Can't connect to database to load disk usage statistics.)
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 </div>
 <div id="modal-add-samba-share" class="modal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">

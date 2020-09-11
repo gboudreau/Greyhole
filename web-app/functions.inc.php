@@ -32,7 +32,7 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     if ($config->type == 'group') {
         $html .= "<div class='input_group mt-4'>";
         foreach ($config->values as $config) {
-            $html .= get_config_html($config);
+            $html .= get_config_html($config, NULL, $fixed_width_label);
         }
         $html .= "</div>";
         return $html;
@@ -54,7 +54,7 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
     }
 
     if (!empty($config->display_name)) {
-        $html .= '<label for="' . he($field_id) . '" class="col-sm-' . ($fixed_width_label ? '2' : 'auto') .' col-form-label">' . he($config->display_name) . "</label>";
+        $html .= '<label for="' . he($field_id) . '" class="col-' . ($fixed_width_label === TRUE ? '2' : (is_int($fixed_width_label) ? $fixed_width_label : 'auto')) .' col-form-label">' . he($config->display_name) . "</label>";
     }
 
     $html .= '<div class="col-auto">';
@@ -109,11 +109,15 @@ function get_config_html($config, $current_value = NULL, $fixed_width_label = TR
         }
         $html .= $input_tag->getHTML();
     }
-    if ($config->type == 'string') {
+    if ($config->type == 'string' || $config->type == 'password') {
         if (empty($config->width)) {
             $config->width = 300;
         }
-        $html .= $input_tag->textInput($current_value, $config->width)->getHTML();
+        $input_tag->textInput($current_value, $config->width);
+        if ($config->type == 'password') {
+            $input_tag->attr('type', 'password');
+        }
+        $html .= $input_tag->getHTML();
     }
     elseif ($config->type == 'multi-string') {
         if (empty($config->width)) {
@@ -356,14 +360,13 @@ class InputTag {
         foreach ($this->attributes as $name => $value) {
             $html .= he($name) . "='" . he($value) . "' ";
         }
-        if (!empty($this->content)) {
-            $html .= '>';
-            $html .= $this->content;
-        }
         if ($this->tag_name == 'input') {
             $html .= ' />' . "\n";
-        }
-        if (!empty($this->content)) {
+        } else {
+            $html .= '>';
+            if (!empty($this->content)) {
+                $html .= $this->content;
+            }
             $html .= "</$this->tag_name>" . "\n";
         }
         return $html;

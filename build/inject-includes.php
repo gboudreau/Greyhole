@@ -24,7 +24,7 @@ if ($argc != 2) {
 }
 
 $prefix = "#!/usr/bin/greyhole-php\n";
-if ($argv[1] == 'web-app/index.php') {
+if ($argv[1] == 'web-app/includes.inc.php') {
     $prefix = '';
 }
 file_put_contents($argv[1], $prefix . inject_in_file($argv[1]));

@@ -55,7 +55,9 @@ class StatusCliRunner extends AbstractAnonymousCliRunner {
 
         $this->log();
         $this->log("Last logged action: $last_action");
-        $this->log("  on " . date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")");
+        if (!empty($last_action_time)) {
+            $this->log("  on " . date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")");
+        }
         $this->log();
     }
 
@@ -69,8 +71,10 @@ class StatusCliRunner extends AbstractAnonymousCliRunner {
     }
 
     public static function get_last_action() {
-        exec("tail -1 " . escapeshellarg(Config::get(CONFIG_GREYHOLE_LOG_FILE)), $last_log_lines);
-        $last_log_line = $last_log_lines[count($last_log_lines)-1];
+        $last_log_line = exec("tail -n 1 " . escapeshellarg(Config::get(CONFIG_GREYHOLE_LOG_FILE)) . " 2>/dev/null");
+        if (empty($last_log_line)) {
+            return ['N/A', NULL];
+        }
         $last_action_time = strtotime(mb_substr($last_log_line, 0, 15));
         $raw_last_log_line = mb_substr($last_log_line, 16);
         $last_log_line = explode(' ', $raw_last_log_line);

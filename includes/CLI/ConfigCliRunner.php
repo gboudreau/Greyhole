@@ -157,12 +157,17 @@ class ConfigCliRunner extends AbstractCliRunner {
 
             if ($name == "storage_pool_drive") {
                 // Do some basic checks, before allowing a new Storage Pool drive to be added
-                // @TODO Add more checks, like making sure this new folder is not on the same drive as another existing sp_drive (unless CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE = yes)
-                // @TODO Create the folder ourselves here, if the parent exists
+                if (!Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
+                    // @TODO Add more checks, like making sure this new folder is not on the same drive as another existing sp_drive
+                }
+                if (!is_dir($sp_drive) && is_dir(dirname($sp_drive))) {
+                    // Create the folder ourselves, if the parent exists
+                    mkdir($sp_drive, 0777);
+                }
                 if (!is_dir($sp_drive)) {
                     $error = "Specified path '$sp_drive' does not exist.";
+                    return;
                 }
-                return;
             }
 
             $log_fct("Will append to " . $config_file . ':');

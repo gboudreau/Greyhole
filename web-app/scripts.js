@@ -30,6 +30,8 @@ function defer(method) {
 
 defer(function() {
     $(function () {
+        checkSambaConfig();
+
         $('[data-toggle="tooltip"]').tooltip();
     });
 });
@@ -714,6 +716,55 @@ function donationComplete(el) {
                 } else {
                     alert("An error occurred. Check your logs for details.");
                 }
+            }
+        },
+    });
+}
+
+function checkSambaConfig() {
+    let wide_link_config = $('[name=' + $.escapeSelector('smb.conf:[global]wide_links') + ']:checked').val();
+    if (wide_link_config === 'no') {
+        $('[name=' + $.escapeSelector('smb.conf:[global]wide_links') + ']').parent('label').removeClass('btn-outline-primary').addClass('btn-outline-danger');
+    } else {
+        $('[name=' + $.escapeSelector('smb.conf:[global]wide_links') + ']').parent('label').removeClass('btn-outline-danger').addClass('btn-outline-primary');
+    }
+
+    let unix_extensions_config = $('[name=' + $.escapeSelector('smb.conf:[global]unix_extensions') + ']:checked').val();
+    let allow_insecure_wide_links_config = $('[name=' + $.escapeSelector('smb.conf:[global]allow_insecure_wide_links') + ']:checked').val();
+    if (unix_extensions_config === 'yes' && allow_insecure_wide_links_config === 'no') {
+        $('[name=' + $.escapeSelector('smb.conf:[global]unix_extensions') + ']').parent('label').removeClass('btn-outline-primary').addClass('btn-outline-danger');
+        $('[name=' + $.escapeSelector('smb.conf:[global]allow_insecure_wide_links') + ']').parent('label').removeClass('btn-outline-primary').addClass('btn-outline-danger');
+    } else {
+        $('[name=' + $.escapeSelector('smb.conf:[global]unix_extensions') + ']').parent('label').removeClass('btn-outline-danger').addClass('btn-outline-primary');
+        $('[name=' + $.escapeSelector('smb.conf:[global]allow_insecure_wide_links') + ']').parent('label').removeClass('btn-outline-danger').addClass('btn-outline-primary');
+    }
+}
+
+function continueInstall(button, current_step) {
+    let data = '';
+
+    if (current_step === 4) {
+        data = '&host=' + encodeURIComponent($('#inputdb_host').val());
+        data += '&root_pwd=' + encodeURIComponent($('#inputdb_root_password').val());
+    }
+
+    let $button = $(button);
+    let original_text = $button.text();
+    $button.text('Loading...').prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=install',
+        data: 'step=' + encodeURIComponent(current_step) + data,
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                location.href = data.next_page;
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+                $button.text(original_text).prop('disabled', false);
             }
         },
     });

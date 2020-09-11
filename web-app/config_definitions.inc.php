@@ -2,7 +2,7 @@
 
 $configs = [];
 
-if (!$licensed) {
+if (!@$licensed && !defined('IS_INITIAL_SETUP')) {
     $configs[] = [
         'name' => 'License',
         'type' => 'group',
@@ -37,35 +37,49 @@ if (!$licensed) {
     ];
 }
 
+if (!defined('IS_INITIAL_SETUP')) {
+    $configs[] = [
+        'name' => 'Database connexion',
+        'type' => 'group',
+        'values' => [
+            [
+                'name' => CONFIG_DB_HOST,
+                'display_name' => "Host (name or IP address)",
+                'type' => 'string',
+                'help' => "Hostname or IP address of your MySQL(-compatible) server. Normally 'localhost'",
+            ],
+            [
+                'name' => CONFIG_DB_USER,
+                'display_name' => "Username",
+                'type' => 'string',
+                'help' => "Username used to connect to the above server. Normally 'greyhole_user'",
+            ],
+            [
+                'name' => CONFIG_DB_PASS,
+                'display_name' => "Password",
+                'type' => 'string',
+                'help' => "Password for the above user.",
+            ],
+            [
+                'name' => CONFIG_DB_NAME,
+                'display_name' => "Database (name)",
+                'type' => 'string',
+                'help' => "Database name used by Greyhole. Normally 'greyhole'",
+            ],
+        ],
+    ];
+}
 $configs[] = [
-    'name' => 'Database connexion',
+    'name' => 'Server',
     'type' => 'group',
     'values' => [
         [
-            'name' => CONFIG_DB_HOST,
-            'display_name' => "Host (hostname or IP address)",
-            'type' => 'string',
-            'help' => "Hostname or IP address of your MySQL(-compatible) server. Normally 'localhost'",
+            'name' => CONFIG_TIMEZONE,
+            'display_name' => "Timezone",
+            'type' => 'timezone',
+            'help' => "The timezone used for logs.",
         ],
-        [
-            'name' => CONFIG_DB_USER,
-            'display_name' => "Username",
-            'type' => 'string',
-            'help' => "Username used to connect to the above server. Normally 'greyhole'",
-        ],
-        [
-            'name' => CONFIG_DB_PASS,
-            'display_name' => "Password",
-            'type' => 'string',
-            'help' => "Password for the above user.",
-        ],
-        [
-            'name' => CONFIG_DB_NAME,
-            'display_name' => "Database (name)",
-            'type' => 'string',
-            'help' => "Database name used by Greyhole. Normally 'greyhole'",
-        ],
-    ],
+    ]
 ];
 $configs[] = [
     'name' => 'Notifications',
@@ -107,18 +121,6 @@ $configs[] = [
             'display_name' => "Log memory usage?",
             'type' => 'bool',
             'help' => "Log Greyhole memory usage on each log line? (Enable only when debugging a memory isssue.)",
-        ],
-    ]
-];
-$configs[] = [
-    'name' => 'Server',
-    'type' => 'group',
-    'values' => [
-        [
-            'name' => CONFIG_TIMEZONE,
-            'display_name' => "Timezone",
-            'type' => 'timezone',
-            'help' => "The timezone used for logs.",
         ],
     ]
 ];
@@ -261,7 +263,7 @@ $drive_selection->values[] = [
     'display_name' => "Use (force) groups?",
     'name' => CONFIG_DRIVE_SELECTION_ALGORITHM . "_forced",
     'type' => 'bool',
-    'current_value' => $is_forced ? 'yes' : 'no',
+    'current_value' => $is_forced,
 ];
 
 $possible_values_num_drives = [];
@@ -295,7 +297,7 @@ if ($is_forced) {
     }
 }
 
-if ($licensed) {
+if (@$licensed) {
     $configs[] = [
         'name' => 'License',
         'type' => 'group',

@@ -104,7 +104,7 @@ class DaemonRunner extends AbstractRunner {
 
 	public static function restart_service() {
 		if (is_file('/etc/init.d/greyhole')) {
-			exec("/etc/init.d/greyhole condrestart");
+			exec("/etc/init.d/greyhole restart");
 			return TRUE;
 		} else if (is_file('/etc/init/greyhole.conf')) {
 			exec("/sbin/restart greyhole");

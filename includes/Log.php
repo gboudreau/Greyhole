@@ -180,6 +180,9 @@ final class Log {
             $use_syslog = FALSE;
         } elseif (self::$action == ACTION_INITIALIZE && !DaemonRunner::isCurrentProcessDaemon()) {
             if ($local_log_level === self::CRITICAL) {
+                if (defined('IS_WEB_APP')) {
+                    throw new Exception($text);
+                }
                 exit(1);
             }
             return;
@@ -246,6 +249,9 @@ final class Log {
         }
 
         if ($local_log_level === self::CRITICAL) {
+            if (defined('IS_WEB_APP')) {
+                throw new Exception($text);
+            }
             exit(1);
         }
     }

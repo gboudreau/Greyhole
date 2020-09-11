@@ -20,13 +20,17 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 final class Settings {
     public static function get($name, $unserialize=FALSE, $value=FALSE) {
-        $query = "SELECT * FROM settings WHERE name LIKE :name";
-        $params = array('name' => $name);
-        if ($value !== FALSE) {
-            $query .= " AND value LIKE :value";
-            $params['value'] = $value;
+        if (!DB::isConnected()) {
+            $setting = FALSE;
+        } else {
+            $query = "SELECT * FROM settings WHERE name LIKE :name";
+            $params = array('name' => $name);
+            if ($value !== FALSE) {
+                $query .= " AND value LIKE :value";
+                $params['value'] = $value;
+            }
+            $setting = DB::getFirst($query, $params);
         }
-        $setting = DB::getFirst($query, $params);
         if ($setting === FALSE) {
             return FALSE;
         }

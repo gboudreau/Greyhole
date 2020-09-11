@@ -19,7 +19,15 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 ?>
 
-<h2 class="mt-8">Greyhole Config</h2>
+<?php if (defined('IS_INITIAL_SETUP')) : ?>
+    <h2 class="mt-8 mb-3">Configure Greyhole</h2>
+    <div class="mb-4">
+        Change any config option below, based on your server, situation and preferences.<br/>
+        Navigate the different sections using the tabs, and use the <code>Continue</code> button once you're done.
+    </div>
+<?php else : ?>
+    <h2 class="mt-8 mb-4">Greyhole Config</h2>
+<?php endif; ?>
 
 <?php
 global $configs;
