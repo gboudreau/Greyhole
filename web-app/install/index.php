@@ -27,6 +27,12 @@ if (empty($step)) {
     $step = 1;
 }
 $num_steps = 6;
+
+if ($step > $num_steps) {
+    $page_title = "Done!";
+} else {
+    $page_title = "Step $step / $num_steps";
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -41,7 +47,7 @@ $num_steps = 6;
     <script src="../scripts.js"></script>
     <link rel="stylesheet" href="../styles.css">
     <link rel="shortcut icon" type="image/png" href="../favicon.png" sizes="64x64">
-    <title>Greyhole Initial Setup Wizard - Step <?php echo "$step / $num_steps" ?></title>
+    <title>Greyhole Initial Setup Wizard - <?php phe($page_title) ?></title>
 </head>
 <body class="<?php if ($is_dark_mode) echo "dark" ?>">
 
