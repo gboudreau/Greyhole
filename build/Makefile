@@ -48,7 +48,7 @@ dist:
     # Inject require()'d files
 	(cd release/$(PACKAGE)-$(VERSION)/ && ../../build/inject-includes.php greyhole)
 	(cd release/$(PACKAGE)-$(VERSION)/ && ../../build/inject-includes.php greyhole-dfree.php)
-	(cd release/$(PACKAGE)-$(VERSION)/ && ../../build/inject-includes.php web-app/index.php)
+	(cd release/$(PACKAGE)-$(VERSION)/ && ../../build/inject-includes.php web-app/includes.inc.php)
 
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Version:\(\s*\).VERSION\s*$$/Version:\1$(VERSION)/' $(PACKAGE).spec)
 	(cd release/$(PACKAGE)-$(VERSION)/ && sed -i -e 's/^Release:\(\s*\).BUILD_NUMBER\s*$$/Release:\1$(BUILD_NUMBER)/' $(PACKAGE).spec)

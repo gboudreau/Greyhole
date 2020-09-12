@@ -27,6 +27,9 @@ build:
 	mkdir -p $(DESTDIR)usr/share/greyhole/
 	mkdir -p $(DESTDIR)etc/logrotate.d/
 	mkdir -p $(DESTDIR)usr/share/greyhole/web-app/
+	mkdir -p $(DESTDIR)usr/share/greyhole/web-app/du/
+	mkdir -p $(DESTDIR)usr/share/greyhole/web-app/install/
+	mkdir -p $(DESTDIR)usr/share/greyhole/web-app/views/
 	mkdir -p $(DESTDIR)usr/share/greyhole/scripts-examples/
 	mkdir -p $(DESTDIR)etc/cron.d/
 	mkdir -p $(DESTDIR)etc/cron.daily/
@@ -53,6 +56,27 @@ build:
 
 	install -m 0644 -D -p web-app/index.php $(DESTDIR)usr/share/greyhole/web-app/index.php
 	install -m 0644 -D -p web-app/README $(DESTDIR)usr/share/greyhole/web-app/README
+	install -m 0644 -D -p web-app/LICENSE.md $(DESTDIR)usr/share/greyhole/web-app/LICENSE.md
+	install -m 0644 -D -p web-app/favicon.png $(DESTDIR)usr/share/greyhole/web-app/favicon.png
+	install -m 0644 -D -p web-app/includes.inc.php $(DESTDIR)usr/share/greyhole/web-app/includes.inc.php
+	install -m 0644 -D -p web-app/init.inc.php $(DESTDIR)usr/share/greyhole/web-app/init.inc.php
+	install -m 0644 -D -p web-app/config_definitions.inc.php $(DESTDIR)usr/share/greyhole/web-app/config_definitions.inc.php
+	install -m 0644 -D -p web-app/scripts.js $(DESTDIR)usr/share/greyhole/web-app/scripts.js
+	install -m 0644 -D -p web-app/styles.css $(DESTDIR)usr/share/greyhole/web-app/styles.css
+	install -m 0644 -D -p web-app/du/index.php $(DESTDIR)usr/share/greyhole/web-app/du/index.php
+	install -m 0644 -D -p web-app/install/index.php $(DESTDIR)usr/share/greyhole/web-app/install/index.php
+	install -m 0644 -D -p web-app/install/step1.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step1.inc.php
+	install -m 0644 -D -p web-app/install/step2.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step2.inc.php
+	install -m 0644 -D -p web-app/install/step3.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step3.inc.php
+	install -m 0644 -D -p web-app/install/step4.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step4.inc.php
+	install -m 0644 -D -p web-app/install/step5.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step5.inc.php
+	install -m 0644 -D -p web-app/install/step6.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step6.inc.php
+	install -m 0644 -D -p web-app/install/step7.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step7.inc.php
+	install -m 0644 -D -p web-app/views/greyhole_config.php $(DESTDIR)usr/share/greyhole/web-app/views/greyhole_config.php
+	install -m 0644 -D -p web-app/views/samba_config.php $(DESTDIR)usr/share/greyhole/web-app/views/samba_config.php
+	install -m 0644 -D -p web-app/views/samba_shares.php $(DESTDIR)usr/share/greyhole/web-app/views/samba_shares.php
+	install -m 0644 -D -p web-app/views/status.php $(DESTDIR)usr/share/greyhole/web-app/views/status.php
+	install -m 0644 -D -p web-app/views/storage_pool.php $(DESTDIR)usr/share/greyhole/web-app/views/storage_pool.php
 
 	install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
 	install -m 0755 -D -p scripts-examples/greyhole_idle.sh $(DESTDIR)usr/share/greyhole/scripts-examples/

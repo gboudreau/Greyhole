@@ -42,8 +42,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	install -m 0644 -D -p greyhole.cron.d /etc/cron.d/greyhole
 	install -m 0755 -D -p greyhole.cron.weekly /etc/cron.weekly/greyhole
 	install -m 0755 -D -p greyhole.cron.daily /etc/cron.daily/greyhole
-	install -m 0644 -D -p web-app/index.php /usr/share/greyhole/web-app
-	install -m 0644 -D -p web-app/README /usr/share/greyhole/web-app
+	cp -r web-app /usr/share/greyhole/web-app
 	install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh /usr/share/greyhole/scripts-examples
 	install -m 0755 -D -p scripts-examples/greyhole_idle.sh /usr/share/greyhole/scripts-examples
 	install -m 0755 -D -p scripts-examples/greyhole_notify_error.sh /usr/share/greyhole/scripts-examples
