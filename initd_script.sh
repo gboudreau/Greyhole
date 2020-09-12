@@ -55,9 +55,9 @@ status () {
 }
 
 daemon_start () {
-    n=$(grep daemon_niceness /etc/greyhole.conf | grep -v '#.*daemon_niceness' | sed 's/^.*= *\(.*\) *$/\1/')
+    n=$(/usr/bin/greyhole --config daemon_niceness)
     if [ "$n" = "" ]; then
-        n=1
+        n=0
     fi
     nice -n $n /usr/bin/greyhole --daemon > /dev/null &
     RETVAL=$?
@@ -68,9 +68,9 @@ daemon_start () {
 start () {
     printf "Starting Greyhole ... "
     status && echo "greyhole already running." && return 0
-    n=$(grep daemon_niceness /etc/greyhole.conf | grep -v '#.*daemon_niceness' | sed 's/^.*= *\(.*\) *$/\1/')
+    n=$(/usr/bin/greyhole --config daemon_niceness)
     if [ "$n" = "" ]; then
-        n=1
+        n=0
     fi
     /usr/bin/greyhole --test-config > /dev/null
     TESTRESULT=$?

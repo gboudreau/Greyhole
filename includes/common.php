@@ -211,7 +211,7 @@ function memory_check() {
     $used = $usage / Config::get(CONFIG_MEMORY_LIMIT);
     $used = $used * 100;
     if ($used > 95) {
-        Log::critical("$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in /etc/greyhole.conf", Log::EVENT_CODE_MEMORY_LIMIT_REACHED);
+        Log::critical("$used% memory usage, exiting. Please increase '" . CONFIG_MEMORY_LIMIT . "' in " . ConfigHelper::$config_file, Log::EVENT_CODE_MEMORY_LIMIT_REACHED);
     }
 }
 
