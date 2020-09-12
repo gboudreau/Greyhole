@@ -47,9 +47,9 @@ $configs = [
             $unix_extensions = exec("/usr/bin/testparm -sl --parameter-name='unix extensions' 2>/dev/null");
             $allow_insecure_wide_links = exec("/usr/bin/testparm -sl --parameter-name='allow insecure wide links' 2>/dev/null");
             ?>
-            <?php echo get_config_html(['name' => 'smb.conf:[global]wide_links', 'display_name' => 'Wide links', 'type' => 'bool', 'help' => "Wide links needs to be enabled, or you won't be able to access your files on your Greyhole-enabled Samba shares."], $wide_links == 'Yes') ?>
-            <?php echo get_config_html(['name' => 'smb.conf:[global]unix_extensions', 'display_name' => 'Unix Extensions', 'type' => 'bool', 'help' => "Either you disable Unix Extensions, or enable Allow Insecure Wide Links below."], $unix_extensions == 'Yes') ?>
-            <?php echo get_config_html(['name' => 'smb.conf:[global]allow_insecure_wide_links', 'display_name' => 'Allow Insecure Wide Links', 'type' => 'bool'], $allow_insecure_wide_links == 'Yes') ?>
+            <?php echo get_config_html(['name' => 'smb.conf:[global]wide_links', 'display_name' => 'Wide links', 'type' => 'bool', 'help' => "Wide links needs to be enabled, or you won't be able to access your files on your Greyhole-enabled Samba shares.", 'onchange' => "checkSambaConfig(); config_value_changed(this)"], $wide_links == 'Yes') ?>
+            <?php echo get_config_html(['name' => 'smb.conf:[global]unix_extensions', 'display_name' => 'Unix Extensions', 'type' => 'bool', 'help' => "Either you disable Unix Extensions, or enable Allow Insecure Wide Links below.", 'onchange' => "checkSambaConfig(); config_value_changed(this)"], $unix_extensions == 'Yes') ?>
+            <?php echo get_config_html(['name' => 'smb.conf:[global]allow_insecure_wide_links', 'display_name' => 'Allow Insecure Wide Links', 'type' => 'bool', 'onchange' => "checkSambaConfig(); config_value_changed(this)"], $allow_insecure_wide_links == 'Yes') ?>
         </div>
     </div>
     <div class="tab-pane fade <?php if ($selected_tab == 'smb-users') echo 'show active' ?>" id="id_smb-users" role="tabpanel" aria-labelledby="id-smb-users-tab">
