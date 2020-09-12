@@ -213,6 +213,10 @@ final class DB {
             DB::migrate_16_larger_action();
             Settings::set('db_version', 16);
         }
+        if ($db_version < 17) {
+            DB::migrate_17_status_action();
+            Settings::set('db_version', 17);
+        }
     }
 
     // Migration #1 (complete = frozen|thawed)
@@ -489,6 +493,11 @@ final class DB {
         $query = "ALTER TABLE `tasks` CHANGE `action` `action` varchar(12) CHARACTER SET ascii NOT NULL DEFAULT ''";
         DB::execute($query);
         $query = "ALTER TABLE `tasks_completed` CHANGE `action` `action` varchar(12) CHARACTER SET ascii NOT NULL DEFAULT ''";
+        DB::execute($query);
+    }
+
+    private static function migrate_17_status_action() {
+        $query = "ALTER TABLE `status` CHANGE `action` `action` varchar(16) CHARACTER SET latin1 COLLATE latin1_general_ci DEFAULT NULL";
         DB::execute($query);
     }
 

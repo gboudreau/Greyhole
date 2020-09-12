@@ -192,7 +192,8 @@ final class Log {
                     }
                     static::$last_log = $text;
                 } catch (\Exception $ex) {
-                    error_log("[Greyhole] Error logging status in database: " . $ex->getMessage());
+                    $text .= " [ERROR logging status in database: " . $ex->getMessage() . "]";
+                    $local_log_level = self::ERROR;
                 }
             }
             if ($local_log_level > self::$level) {

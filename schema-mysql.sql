@@ -6,7 +6,7 @@ PRIMARY KEY (`name`)
 
 INSERT INTO `settings` (`name`, `value`) VALUES ('last_read_log_smbd_line', '0');
 INSERT INTO `settings` (`name`, `value`) VALUES ('last_OOS_notification', '0');
-INSERT INTO `settings` (`name`, `value`) VALUES ('db_version', '16');
+INSERT INTO `settings` (`name`, `value`) VALUES ('db_version', '17');
 
 CREATE TABLE `tasks` (
 `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -52,7 +52,8 @@ PRIMARY KEY (`id`)
 CREATE TABLE `status` (
 `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 `date_time` timestamp NOT NULL DEFAULT current_timestamp(),
-`action` enum('initialize','unknown','daemon','pause','resume','fsck','balance','stats','status','logs','trash','queue','iostat','getuid','worker','symlinks','replace','for','gone','going','thaw','debug','metadata','share','check_pool','sleep','read_smb_spool','fsck_file') DEFAULT NULL,
+`action` varchar(16) CHARACTER SET latin1 COLLATE latin1_general_ci DEFAULT NULL,
+-- `action` enum('initialize','unknown','daemon','pause','resume','fsck','balance','stats','status','logs','trash','queue','iostat','getuid','worker','symlinks','replace','for','gone','going','thaw','debug','metadata','share','check_pool','sleep','read_smb_spool','fsck_file') DEFAULT NULL,
 `log` text NOT NULL,
 UNIQUE KEY `id` (`id`)
 ) ENGINE = MYISAM DEFAULT CHARSET=utf8;
