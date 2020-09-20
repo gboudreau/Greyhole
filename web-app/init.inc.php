@@ -165,6 +165,15 @@ if (!empty($_GET['ajax'])) {
         break;
     case 'fsck':
         $options = [];
+        if (@$_POST['action'] == 'cancel') {
+            DB::execute("DELETE FROM tasks WHERE action IN ('fsck', 'md5')");
+            if (!DaemonRunner::restart_service()) {
+                echo json_encode(['result' => 'error', 'message' => "Error: was not able to identify how to restart daemon. Please do so manually."]);
+                exit();
+            }
+            echo json_encode(['result' => 'success']);
+            exit();
+        }
         foreach ($_POST as $k => $v) {
             if ($k == 'dir') {
                 if ($v != '') {

@@ -148,58 +148,48 @@ function ajax_value_changed($el, name, value, success) {
     });
 }
 
-function restartDaemon(button) {
+function ajaxCallFromButton(button, ajax_action, data, onbusy_btn_text, onsuccess_btn_text, final_btn_text, onsuccess, onsuccess_delay) {
     let $button = $(button);
-    $button.text('Restarting...').prop('disabled', true);
+    let original_btn_text = $button.text();
+    $button.text(onbusy_btn_text).prop('disabled', true);
     $.ajax({
         type: 'POST',
-        url: './?ajax=daemon',
-        data: 'action=restart',
+        url: './?ajax=' + ajax_action,
+        data: data,
         success: function(data, textStatus, jqXHR) {
             if (data.result === 'success') {
-                last_known_config_hash = data.config_hash;
-                $button.text('Restarted').toggleClass('btn-primary').toggleClass('btn-success');
+                if (onsuccess_delay > 0) {
+                    $button.text(onsuccess_btn_text);
+                }
+                $button.toggleClass('btn-primary').toggleClass('btn-success');
                 setTimeout(function() {
-                    $('#needs-daemon-restart').hide();
-                    $button.text('Restart').prop('disabled', false).toggleClass('btn-primary').toggleClass('btn-success');
-                }, 3*1000);
+                    $button.text(final_btn_text).prop('disabled', false).toggleClass('btn-primary').toggleClass('btn-success');
+                    onsuccess(data, $button);
+                }, onsuccess_delay*1000);
             } else {
                 if (data.result === 'error') {
                     alert(data.message);
                 } else {
                     alert("An error occurred. Check your logs for details.");
                 }
-                $button.text('Restart').prop('disabled', false);
+                $button.text(original_btn_text).prop('disabled', false);
             }
         },
     });
 }
 
+function restartDaemon(button) {
+    ajaxCallFromButton(button, 'daemon', 'action=restart', 'Restarting...', 'Restarted', 'Restart', function (data, $button) {
+        last_known_config_hash = data.config_hash;
+        $('#needs-daemon-restart').hide();
+    }, 3);
+}
+
 function restartSamba(button) {
-    let $button = $(button);
-    $button.text('Restarting...').prop('disabled', true);
-    $.ajax({
-        type: 'POST',
-        url: './?ajax=samba',
-        data: 'action=restart',
-        success: function(data, textStatus, jqXHR) {
-            if (data.result === 'success') {
-                last_known_config_hash_samba = data.config_hash_samba;
-                $button.text('Restarted').toggleClass('btn-primary').toggleClass('btn-success');
-                setTimeout(function() {
-                    $('#needs-samba-restart').hide();
-                    $button.text('Restart').prop('disabled', false).toggleClass('btn-primary').toggleClass('btn-success');
-                }, 3*1000);
-            } else {
-                if (data.result === 'error') {
-                    alert(data.message);
-                } else {
-                    alert("An error occurred. Check your logs for details.");
-                }
-                $button.text('Restart').prop('disabled', false);
-            }
-        },
-    });
+    ajaxCallFromButton(button, 'samba', 'action=restart', 'Restarting...', 'Restarted', 'Restart', function (data, $button) {
+        last_known_config_hash_samba = data.config_hash_samba;
+        $('#needs-samba-restart').hide();
+    }, 3);
 }
 
 function get_forced_groups_config() {
@@ -557,30 +547,11 @@ function addSambaUser(button) {
     let $modal = $button.closest('.modal');
     let username = $modal.find('[name=samba_username]').val();
     let password = $modal.find('[name=samba_password]').val();
-
-    let button_original_text = $button.text();
-    $button.text('Creating...').prop('disabled', true);
-    $.ajax({
-        type: 'POST',
-        url: './?ajax=samba',
-        data: 'action=add_user&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
-        success: function(data, textStatus, jqXHR) {
-            if (data.result === 'success') {
-                $button.text('User Created').toggleClass('btn-primary').toggleClass('btn-success');
-                setTimeout(function() {
-                    $button.text('Reloading page...');
-                    location.reload();
-                }, 3*1000);
-            } else {
-                if (data.result === 'error') {
-                    alert(data.message);
-                } else {
-                    alert("An error occurred. Check your logs for details.");
-                }
-                $button.text(button_original_text).prop('disabled', false);
-            }
-        },
-    });
+    let data = 'action=add_user&username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+    ajaxCallFromButton(button, 'samba', data, 'Creating...', 'User Created', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.reload();
+    }, 3);
 }
 
 function updateSambaSharePath(el) {
@@ -596,30 +567,11 @@ function addSambaShare(button) {
     let share_name = $modal.find('[name=samba_share_name]').val();
     let share_path = $modal.find('[name=samba_share_path]').val();
     let share_options = $modal.find('[name=samba_share_options]').val();
-
-    let button_original_text = $button.text();
-    $button.text('Creating...').prop('disabled', true);
-    $.ajax({
-        type: 'POST',
-        url: './?ajax=samba',
-        data: 'action=add_share&name=' + encodeURIComponent(share_name) + '&path=' + encodeURIComponent(share_path) + '&options=' + encodeURIComponent(share_options),
-        success: function(data, textStatus, jqXHR) {
-            if (data.result === 'success') {
-                $button.text('Share Created').toggleClass('btn-primary').toggleClass('btn-success');
-                setTimeout(function() {
-                    $button.text('Reloading page...');
-                    location.reload();
-                }, 3*1000);
-            } else {
-                if (data.result === 'error') {
-                    alert(data.message);
-                } else {
-                    alert("An error occurred. Check your logs for details.");
-                }
-                $button.text(button_original_text).prop('disabled', false);
-            }
-        },
-    });
+    let data = 'action=add_share&name=' + encodeURIComponent(share_name) + '&path=' + encodeURIComponent(share_path) + '&options=' + encodeURIComponent(share_options);
+    ajaxCallFromButton(button, 'samba', data, 'Creating...', 'Share Created', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.reload();
+    }, 3);
 }
 
 function getPageTitle() {
@@ -700,25 +652,12 @@ function donate() {
 function donationComplete(el) {
     let $el = $(el);
     let email = $el.val();
-    $.ajax({
-        type: 'POST',
-        url: './?ajax=donate',
-        data: 'email=' + encodeURIComponent(email),
-        success: function(data, textStatus, jqXHR) {
-            if (data.result === 'success') {
-                if ($el) {
-                    $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'Thank you!').tooltip({trigger: 'manual'}).tooltip('show');
-                    setTimeout(function() { $el.tooltip('hide'); location.reload(); }, 3*1000);
-                }
-            } else {
-                if (data.result === 'error') {
-                    alert(data.message);
-                } else {
-                    alert("An error occurred. Check your logs for details.");
-                }
-            }
-        },
-    });
+    ajaxCallFromButton(button, 'donate', 'email=' + encodeURIComponent(email), 'Saving...', null, 'Saved',  function (data, $button) {
+        if ($el) {
+            $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'Thank you!').tooltip({trigger: 'manual'}).tooltip('show');
+            setTimeout(function() { $el.tooltip('hide'); location.reload(); }, 3*1000);
+        }
+    }, 0);
 }
 
 function checkSambaConfig() {
@@ -748,26 +687,10 @@ function continueInstall(button, current_step) {
         data += '&root_pwd=' + encodeURIComponent($('#inputdb_root_password').val());
     }
 
-    let $button = $(button);
-    let original_text = $button.text();
-    $button.text('Loading...').prop('disabled', true);
-    $.ajax({
-        type: 'POST',
-        url: './?ajax=install',
-        data: 'step=' + encodeURIComponent(current_step) + data,
-        success: function(data, textStatus, jqXHR) {
-            if (data.result === 'success') {
-                location.href = data.next_page;
-            } else {
-                if (data.result === 'error') {
-                    alert(data.message);
-                } else {
-                    alert("An error occurred. Check your logs for details.");
-                }
-                $button.text(original_text).prop('disabled', false);
-            }
-        },
-    });
+    ajaxCallFromButton(button, 'install', 'step=' + encodeURIComponent(current_step) + data, 'Loading...', null, 'Continuing...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.href = data.next_page;
+    }, 0);
 }
 
 function parseParams(params) {
@@ -795,7 +718,7 @@ function getFsckParams() {
     return params;
 }
 
-function confirmFsckCommand(button) {
+function confirmFsckCommand() {
     let params = getFsckParams();
     let command = "greyhole --fsck ";
     for (let k in params) {
@@ -812,27 +735,15 @@ function confirmFsckCommand(button) {
 }
 
 function startFsck(button) {
-    let $button = $(button);
-    let original_btn_text = $button.text();
-    $button.text('Starting fsck...').prop('disabled', true);
-    $.ajax({
-        type: 'POST',
-        url: './?ajax=fsck',
-        data: getFsckParams(),
-        success: function(data, textStatus, jqXHR) {
-            if (data.result === 'success') {
-                $button.text('Started fsck. Reloading...').toggleClass('btn-primary').toggleClass('btn-success');
-                setTimeout(function() {
-                    location.href = './';
-                }, 3*1000);
-            } else {
-                if (data.result === 'error') {
-                    alert(data.message);
-                } else {
-                    alert("An error occurred. Check your logs for details.");
-                }
-                $button.text(original_btn_text).prop('disabled', false);
-            }
-        },
-    });
+    ajaxCallFromButton(button, 'fsck', getFsckParams(), 'Starting fsck...', 'Started fsck', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.href = './';
+    }, 3);
+}
+
+function cancelFsck(button) {
+    ajaxCallFromButton(button, 'fsck', 'action=cancel', 'Cancelling...', 'Cancelled', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.href = './';
+    }, 3);
 }

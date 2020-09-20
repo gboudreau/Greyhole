@@ -58,7 +58,7 @@ $configs = [
             }
             ?>
             <?php echo get_config_html(['name' => 'dir', 'display_name' => 'Folder', 'type' => 'select', 'possible_values' => $possible_values, 'help' => "Choose a share or storage pool drive to scan.", 'onchange' => FALSE]) ?>
-            <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="confirmFsckCommand(this)">
+            <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="confirmFsckCommand()">
                 Start fsck...
             </button>
         </div>

@@ -22,8 +22,7 @@ require_once('includes/CLI/AbstractCliRunner.php');
 
 class CancelFsckCliRunner extends AbstractCliRunner {
     public function run() {
-        DB::execute("DELETE FROM tasks WHERE action = 'fsck'");
-        DB::execute("DELETE FROM tasks WHERE action = 'md5'");
+        DB::execute("DELETE FROM tasks WHERE action IN ('fsck', 'md5')");
         $this->log("All scheduled fsck tasks have now been deleted.");
         $this->log("Specific files checks might have been queued for problematic files, and those (fsck_file) tasks will still be executed, once other tasks have been processed.");
         $this->restart_service();

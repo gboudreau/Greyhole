@@ -43,6 +43,11 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
         }
         ?>
     </div>
+    <?php if (@$task->action == 'fsck') : ?>
+        <button class="btn btn-danger" onclick="cancelFsck(this)">
+            Cancel fsck
+        </button>
+    <?php endif; ?>
 <?php endif; ?>
 
 <h4 class="mt-4">Recent log entries</h4>
