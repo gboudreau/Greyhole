@@ -32,10 +32,10 @@ $cols_width = defined('IS_INITIAL_SETUP') ? 'col-12' : 'col-12 col-lg-6';
     <h2 class="mt-8">Storage Pool</h2>
 <?php endif; ?>
 
-<?php $stats = StatsCliRunner::get_stats() ?>
+<?php $sp_stats = StatsCliRunner::get_stats() ?>
 <div class="row">
     <div class="col <?php echo $cols_width ?>">
-        <?php if (count($stats) > 1) : ?>
+        <?php if (count($sp_stats) > 1) : ?>
             <table id="table-sp-drives">
                 <thead>
                 <tr>
@@ -48,14 +48,14 @@ $cols_width = defined('IS_INITIAL_SETUP') ? 'col-12' : 'col-12 col-lg-6';
                 <tbody>
                 <?php
                 $max = 0;
-                foreach ($stats as $sp_drive => $stat) {
+                foreach ($sp_stats as $sp_drive => $stat) {
                     if ($sp_drive == 'Total') continue;
                     if ($stat->total_space > $max) {
                         $max = $stat->total_space;
                     }
                 }
                 ?>
-                <?php foreach ($stats as $sp_drive => $stat) : ?>
+                <?php foreach ($sp_stats as $sp_drive => $stat) : ?>
                     <?php if ($sp_drive == 'Total') continue; ?>
                     <tr>
                         <td>
@@ -95,7 +95,7 @@ $cols_width = defined('IS_INITIAL_SETUP') ? 'col-12' : 'col-12 col-lg-6';
             <script>
                 defer(function(){
                     let ctx = document.getElementById('chart_storage_pool').getContext('2d');
-                    drawPieChartStorage(ctx, <?php echo json_encode($stats) ?>);
+                    drawPieChartStorage(ctx, <?php echo json_encode($sp_stats) ?>);
                 });
             </script>
         </div>

@@ -203,6 +203,10 @@ if (!empty($_GET['ajax'])) {
         $query = "INSERT INTO tasks (action, share, complete) VALUES ('balance', '', 'yes')";
         DB::insert($query);
         break;
+    case 'trash':
+        $runner = new EmptyTrashCliRunner([], 'empty-trash');
+        $runner->run();
+        break;
     case 'past_tasks':
         $q = "SELECT COUNT(*) FROM tasks_completed";
         $num_rows = DB::getFirstValue($q);

@@ -31,6 +31,7 @@ function defer(method) {
 defer(function() {
     $(function () {
         checkSambaConfig();
+        colorizeTrashContent();
         $('#past-tasks-table').DataTable({
             processing: true,
             serverSide: true,
@@ -773,4 +774,29 @@ function cancelBalance(button) {
         $button.prop('disabled', true);
         location.href = './';
     }, 3);
+}
+
+function emptyTrash(button) {
+    ajaxCallFromButton(button, 'trash', 'action=empty', 'Emptying...', 'Trash emptied', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.reload();
+    }, 3);
+}
+
+function colorizeTrashContent() {
+    let max = 0, min = 9999999999999;
+    let $els = $('#trash-content .colorize');
+    $els.each(function () {
+        let value = $(this).data('value');
+        if (value > max) {
+            max = value;
+        }
+        if (value < min) {
+            min = value;
+        }
+    });
+    $els.each(function () {
+        let value = $(this).data('value');
+        $(this).css('color', getTreemapColor(value, max, min));
+    });
 }

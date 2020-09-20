@@ -38,6 +38,22 @@ class EmptyTrashCliRunner extends AbstractCliRunner {
             exec("rm -rf " . escapeshellarg($trash_share[CONFIG_LANDING_ZONE]) . '/*');
         }
     }
+
+    protected function log($what='') {
+        if (isset($_POST)) {
+            error_log($what);
+        } else {
+            echo "$what\n";
+        }
+    }
+
+    protected function logn($what) {
+        if (isset($_POST)) {
+            error_log($what);
+        } else {
+            echo $what;
+        }
+    }
 }
 
 ?>

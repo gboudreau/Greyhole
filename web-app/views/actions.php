@@ -21,6 +21,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 $configs = [
     'fsck_action'    => 'fsck',
     'balance' => 'Balance',
+    'trash'   => 'Greyhole Trash',
 ];
 ?>
 
@@ -76,7 +77,20 @@ $configs = [
         </div>
     </div>
     <div class="tab-pane fade <?php if ($selected_tab == 'trash') echo 'show active' ?>" id="id_trash" role="tabpanel" aria-labelledby="id_trash_tab">
-        @TODO Trash
+        <div class="mt-4">
+            Trash content:
+            <table id="trash-content">
+                <?php global $sp_stats; foreach ($sp_stats as $sp_drive => $stat) : if ($sp_drive == 'Total') continue; ?>
+                    <tr>
+                        <td><code><?php phe($sp_drive) ?></code></td>
+                        <td class="colorize" data-value="<?php phe($stat->trash_size) ?>"><?php echo bytes_to_human($stat->trash_size*1024, TRUE, TRUE) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </table>
+        </div>
+        <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="emptyTrash(this)">
+            Empty Trash
+        </button>
     </div>
 </div>
 <div id="modal-confirm-fsck" class="modal" tabindex="-1" role="dialog">
