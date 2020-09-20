@@ -97,3 +97,15 @@ td.centered {
 td.centered .row {
     display: inline-block;
 }
+
+table#queue td.num {
+    text-align: center;
+}
+table#queue td.num.nonzero {
+    font-weight: bolder;
+    color: #e83e8c;
+}
+
+table#queue tr.total td {
+    font-weight: bolder;
+}

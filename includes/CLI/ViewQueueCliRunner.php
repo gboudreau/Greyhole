@@ -27,39 +27,7 @@ class ViewQueueCliRunner extends AbstractAnonymousCliRunner {
 
         $max_share_strlen = max(array_merge(array_map('mb_strlen', $shares_names), array(7)));
 
-        $queues = array();
-        $total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = $total_num_fsck_pending = 0;
-        foreach ($shares_names as $share_name) {
-            $num_writes_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE action = 'write' AND share = :share AND complete IN ('yes', 'thawed')", array('share' => $share_name));
-            $total_num_writes_pending += $num_writes_pending;
-
-            $num_delete_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'unlink' OR action = 'rmdir') AND share = :share AND complete IN ('yes', 'thawed')", array('share' => $share_name));
-            $total_num_delete_pending += $num_delete_pending;
-
-            $num_rename_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE action = 'rename' AND share = :share AND complete IN ('yes', 'thawed')", array('share' => $share_name));
-            $total_num_rename_pending += $num_rename_pending;
-
-            $num_fsck_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share = :share", array('share' => $share_name));
-
-            $landing_zone = SharesConfig::get($share_name, CONFIG_LANDING_ZONE);
-            $num_fsck_pending += (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share LIKE :landing_zone", array('landing_zone' => "$landing_zone/%"));
-            $total_num_fsck_pending += $num_fsck_pending;
-
-            $queues[$share_name] = (object) array(
-                'num_writes_pending' => $num_writes_pending,
-                'num_delete_pending' => $num_delete_pending,
-                'num_rename_pending' => $num_rename_pending,
-                'num_fsck_pending' => $num_fsck_pending,
-            );
-        }
-        $queues['Total'] = (object) array(
-            'num_writes_pending' => $total_num_writes_pending,
-            'num_delete_pending' => $total_num_delete_pending,
-            'num_rename_pending' => $total_num_rename_pending,
-            'num_fsck_pending' => $total_num_fsck_pending,
-        );
-
-        $queues['Spooled'] = (int) exec("find -L /var/spool/greyhole -type f 2> /dev/null | wc -l");
+        $queues = static::getData();
 
         if (isset($this->options['json'])) {
             echo json_encode($queues);
@@ -104,6 +72,46 @@ class ViewQueueCliRunner extends AbstractAnonymousCliRunner {
             $this->log(sprintf("%-$max_share_strlen"."s  ", 'Spooled') . number_format($queues['Spooled'], 0));
             $this->log();
         }
+    }
+
+    public static function getData() {
+        $shares_names = array_keys(SharesConfig::getShares());
+        natcasesort($shares_names);
+
+        $queues = array();
+        $total_num_writes_pending = $total_num_delete_pending = $total_num_rename_pending = $total_num_fsck_pending = 0;
+        foreach ($shares_names as $share_name) {
+            $num_writes_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE action = 'write' AND share = :share AND complete IN ('yes', 'thawed', 'written')", array('share' => $share_name));
+            $total_num_writes_pending += $num_writes_pending;
+
+            $num_delete_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'unlink' OR action = 'rmdir') AND share = :share AND complete IN ('yes', 'thawed', 'written')", array('share' => $share_name));
+            $total_num_delete_pending += $num_delete_pending;
+
+            $num_rename_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE action = 'rename' AND share = :share AND complete IN ('yes', 'thawed', 'written')", array('share' => $share_name));
+            $total_num_rename_pending += $num_rename_pending;
+
+            $num_fsck_pending = (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share = :share", array('share' => $share_name));
+
+            $landing_zone = SharesConfig::get($share_name, CONFIG_LANDING_ZONE);
+            $num_fsck_pending += (int) DB::getFirstValue("SELECT COUNT(*) FROM tasks WHERE (action = 'fsck' OR action = 'fsck_file' OR action = 'md5') AND share LIKE :landing_zone", array('landing_zone' => "$landing_zone/%"));
+            $total_num_fsck_pending += $num_fsck_pending;
+
+            $queues[$share_name] = (object) array(
+                'num_writes_pending' => $num_writes_pending,
+                'num_delete_pending' => $num_delete_pending,
+                'num_rename_pending' => $num_rename_pending,
+                'num_fsck_pending' => $num_fsck_pending,
+            );
+        }
+        $queues['Total'] = (object) array(
+            'num_writes_pending' => $total_num_writes_pending,
+            'num_delete_pending' => $total_num_delete_pending,
+            'num_rename_pending' => $total_num_rename_pending,
+            'num_fsck_pending' => $total_num_fsck_pending,
+        );
+
+        $queues['Spooled'] = (int) exec("find -L /var/spool/greyhole -type f 2> /dev/null | wc -l");
+        return $queues;
     }
 }
 

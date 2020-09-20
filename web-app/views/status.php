@@ -71,6 +71,62 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
     <?php endif; ?>
 </div>
 
+<h4 class="mt-4">Queue</h4>
+
+<div>
+    This table gives you the number of pending operations queued for the Greyhole daemon, per share.
+</div>
+
+<table id="queue">
+    <thead>
+        <tr>
+            <th>Share</th>
+            <th>Write</th>
+            <th>Delete</th>
+            <th>Rename</th>
+            <th>Check</th>
+        </tr>
+    </thead>
+<?php
+$queues = ViewQueueCliRunner::getData();
+$num_rows = 0;
+foreach ($queues as $share_name => $queue) {
+    if ($share_name == 'Spooled') {
+        // Will be shown below table
+        continue;
+    }
+    if ($share_name != 'Total' && $queue->num_writes_pending + $queue->num_delete_pending + $queue->num_rename_pending + $queue->num_fsck_pending == 0) {
+        // Don't show the rows with no data, except Total
+        continue;
+    }
+    if ($share_name == 'Total' && $num_rows == 1) {
+        // Skip Total row if there was only 1 row above it!
+        continue;
+    }
+
+    $num_rows++;
+
+    $tr_class = $share_name == 'Total' ? 'total' : '';
+    echo "<tr class='$tr_class'>";
+    echo "<td>" . he($share_name) . "</td>";
+    foreach (['num_writes_pending', 'num_delete_pending', 'num_rename_pending', 'num_fsck_pending'] as $prop) {
+        $class = $queue->{$prop} > 0 ? 'nonzero' : '';
+        echo "<td class='num $class'>{$queue->{$prop}}</td>";
+    }
+    echo "</tr>";
+}
+?>
+</table>
+
+<div class="mt-4">
+    The following is the number of pending operations that the Greyhole daemon still needs to parse.<br/>
+    Until it does, the nature of those operations is unknown.<br/>
+    Spooled operations that have been parsed will be listed above and disappear from the count below.
+    <div class="mt-2" style="font-size: 1.3em; font-weight: bold">
+        Spooled operations: <?php echo number_format($queues['Spooled'], 0) ?>
+    </div>
+</div>
+
 <?php if (@$task->action == 'balance') : ?>
     <h4 class="mt-4">Balance Status</h4>
     <?php $groups = BalanceStatusCliRunner::getData() ?>
