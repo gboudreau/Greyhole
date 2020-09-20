@@ -67,6 +67,7 @@ install -m 0644 -D -p web-app/install/step4.inc.php ${RPM_BUILD_ROOT}/usr/share/
 install -m 0644 -D -p web-app/install/step5.inc.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/install/
 install -m 0644 -D -p web-app/install/step6.inc.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/install/
 install -m 0644 -D -p web-app/install/step7.inc.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/install/
+install -m 0644 -D -p web-app/views/actions.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/
 install -m 0644 -D -p web-app/views/greyhole_config.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/
 install -m 0644 -D -p web-app/views/samba_config.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/
 install -m 0644 -D -p web-app/views/samba_shares.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/

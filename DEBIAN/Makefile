@@ -72,6 +72,7 @@ build:
 	install -m 0644 -D -p web-app/install/step5.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step5.inc.php
 	install -m 0644 -D -p web-app/install/step6.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step6.inc.php
 	install -m 0644 -D -p web-app/install/step7.inc.php $(DESTDIR)usr/share/greyhole/web-app/install/step7.inc.php
+	install -m 0644 -D -p web-app/views/actions.php $(DESTDIR)usr/share/greyhole/web-app/views/actions.php
 	install -m 0644 -D -p web-app/views/greyhole_config.php $(DESTDIR)usr/share/greyhole/web-app/views/greyhole_config.php
 	install -m 0644 -D -p web-app/views/samba_config.php $(DESTDIR)usr/share/greyhole/web-app/views/samba_config.php
 	install -m 0644 -D -p web-app/views/samba_shares.php $(DESTDIR)usr/share/greyhole/web-app/views/samba_shares.php

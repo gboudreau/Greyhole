@@ -769,3 +769,70 @@ function continueInstall(button, current_step) {
         },
     });
 }
+
+function parseParams(params) {
+    let parsedParams = {};
+    params.split("&").forEach(function (pair) {
+        if (pair === "") return;
+        var parts = pair.split("=");
+        parsedParams[parts[0]] = parts[1] && decodeURIComponent(parts[1].replace(/\+/g, " "));
+    });
+    return parsedParams;
+}
+
+function getFsckParams() {
+    let params = {};
+    let s = $('#id_fsck').find('input, select').serialize();
+    let parsedParams = parseParams(s);
+    for (let name in parsedParams) {
+        let value = parsedParams[name];
+        if (name === 'walk-metadata-store') {
+            name = 'dont-walk-metadata-store';
+            value = (value === 'yes' ? 'no' : 'yes');
+        }
+        params[name] = value;
+    }
+    return params;
+}
+
+function confirmFsckCommand(button) {
+    let params = getFsckParams();
+    let command = "greyhole --fsck ";
+    for (let k in params) {
+        let v = params[k];
+        if (k === 'dir') {
+            if (v !== '') {
+                command += "--dir=" + v;
+            }
+        } else if (v === 'yes') {
+            command += "--" + k + " ";
+        }
+    }
+    $('#modal-confirm-fsck code').text(command);
+}
+
+function startFsck(button) {
+    let $button = $(button);
+    let original_btn_text = $button.text();
+    $button.text('Starting fsck...').prop('disabled', true);
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=fsck',
+        data: getFsckParams(),
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                $button.text('Started fsck. Reloading...').toggleClass('btn-primary').toggleClass('btn-success');
+                setTimeout(function() {
+                    location.href = './';
+                }, 3*1000);
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+                $button.text(original_btn_text).prop('disabled', false);
+            }
+        },
+    });
+}

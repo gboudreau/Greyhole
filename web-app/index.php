@@ -26,6 +26,7 @@ $tabs = [
     'Samba Shares'    => 'samba_shares.php',
     'Samba Config'    => 'samba_config.php',
     'Greyhole Config' => 'greyhole_config.php',
+    'Actions'         => 'actions.php',
 ];
 
 $last_known_config_hash = DB::isConnected() ? Settings::get('last_known_config_hash') : get_config_hash();

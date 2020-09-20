@@ -91,6 +91,22 @@ class FsckCliRunner extends AbstractCliRunner {
         // Also clean the tasks_completed table
         DB::deleteExecutedTasks();
     }
+
+    protected function log($what='') {
+        if (isset($_POST)) {
+            error_log($what);
+        } else {
+            echo "$what\n";
+        }
+    }
+
+    protected function logn($what) {
+        if (isset($_POST)) {
+            error_log($what);
+        } else {
+            echo $what;
+        }
+    }
 }
 
 ?>

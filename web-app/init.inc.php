@@ -81,7 +81,7 @@ try {
 if (!empty($_GET['ajax'])) {
     header('Content-Type: text/json; charset=utf8');
 
-    error_log("Received POST ?ajax: " . json_encode($_POST));
+    error_log("Received POST ?ajax=" . $_GET['ajax'] . ": " . json_encode($_POST));
     switch($_GET['ajax']) {
     case 'config':
         if (string_starts_with($_POST['name'], 'smb.conf')) {
@@ -162,6 +162,24 @@ if (!empty($_GET['ajax'])) {
                 mkdir($path, 0777, TRUE);
             }
         }
+        break;
+    case 'fsck':
+        $options = [];
+        foreach ($_POST as $k => $v) {
+            if ($k == 'dir') {
+                if ($v != '') {
+                    if (!is_dir($v)) {
+                        echo json_encode(['result' => 'error', 'message' => "Specified dir not found: " . $v]);
+                        exit();
+                    }
+                    $options['dir'] = $v;
+                }
+            } elseif ($v == 'yes') {
+                $options[$k] = TRUE;
+            }
+        }
+        $runner = new FsckCliRunner($options, 'fsck');
+        $runner->run();
         break;
     case 'install':
         $step = $_POST['step'];
