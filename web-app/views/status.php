@@ -18,6 +18,13 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+if (DB::isConnected()) {
+    $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
+    if (!empty($tasks)) {
+        $task = array_shift($tasks);
+    }
+}
+
 $tabs = [];
 if (@$task->action == 'balance') {
     $balance_tab = new Tab('balance', 'Balance Status');
@@ -41,16 +48,17 @@ if (FSCKWorkLog::isReportAvailable()) {
 
 <?php $logs_tab->startContent() ?>
 <h4 class="mt-4">Recent log entries</h4>
-<code>
+<div>
+    <div class="custom-control custom-switch navbar-text">
+        <input type="checkbox" class="custom-control-input" id="tail-status-log" onchange="tailStatusLogs(this)">
+        <label class="custom-control-label" for="tail-status-log">Follow (tail) status logs</label>
+    </div>
+</div>
+<code id="status_logs">
     <?php
     if (DB::isConnected()) {
-        foreach (StatusCliRunner::get_recent_status_entries() as $log) {
-            $date = date("M d H:i:s", strtotime($log->date_time));
-            $log_text = sprintf("%s%s",
-                "$date $log->action: ",
-                $log->log
-            );
-            echo "  " . he($log_text) . "<br/>";
+        foreach (get_status_logs() as $log) {
+            echo he($log) . "<br/>";
         }
     } else {
         echo " (Warning: Can't connect to database to load log entries.)";
@@ -155,7 +163,7 @@ foreach ($queues as $share_name => $queue) {
     <h4 class="mt-4">Balance Status</h4>
     <?php $groups = BalanceStatusCliRunner::getData() ?>
     <?php foreach ($groups as $group) : ?>
-        <div class="alert alert-success" role="alert">
+        <div class="alert alert-info" role="alert">
             Target free space in <?php phe($group->name) ?> storage pool drives: <strong><?php echo bytes_to_human($group->target_avail_space*1024, TRUE, TRUE) ?></strong>
         </div>
         <div class="col">
@@ -238,11 +246,9 @@ foreach ($queues as $share_name => $queue) {
         Greyhole daemon is currently running:
         <?php
         if (DB::isConnected()) {
-            $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
             if (empty($tasks)) {
                 echo "idling.";
             } else {
-                $task = array_shift($tasks);
                 phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
             }
         } else {

@@ -219,6 +219,10 @@ if (!empty($_GET['ajax'])) {
         $runner = new EmptyTrashCliRunner([], 'empty-trash');
         $runner->run();
         break;
+    case 'logs':
+        $logs = get_status_logs();
+        echo json_encode(['result' => 'success', 'logs' => $logs]);
+        exit();
     case 'past_tasks':
         $q = "SELECT COUNT(*) FROM tasks_completed";
         $num_rows = DB::getFirstValue($q);

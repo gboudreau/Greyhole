@@ -814,3 +814,36 @@ function resumeDaemon(button) {
         location.reload();
     }, 3);
 }
+
+let status_logs_timer;
+function tailStatusLogs(button) {
+    if (status_logs_timer) {
+        clearInterval(status_logs_timer);
+    }
+    if ($(button).prop('checked')) {
+        reloadStatusLogs();
+        status_logs_timer = setInterval(reloadStatusLogs, 10*1000);
+    }
+}
+
+function reloadStatusLogs() {
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=logs',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                let $container = $('#status_logs');
+                $container.text('');
+                for (let log of data.logs) {
+                    $container.append($('<div/>').text(log).html() + "<br/>");
+                }
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+        },
+    });
+}

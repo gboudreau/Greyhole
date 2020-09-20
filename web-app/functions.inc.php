@@ -280,6 +280,19 @@ function get_new_share_defaults($all_samba_shares) {
     return [$default_path, $options];
 }
 
+function get_status_logs() {
+    $logs = [];
+    foreach (StatusCliRunner::get_recent_status_entries() as $log) {
+        $date = date("M d H:i:s", strtotime($log->date_time));
+        $log_text = sprintf("%s%s",
+            "$date $log->action: ",
+            $log->log
+        );
+        $logs[] = $log_text;
+    }
+    return $logs;
+}
+
 class InputTag {
     private $tag_name;
     private $content;

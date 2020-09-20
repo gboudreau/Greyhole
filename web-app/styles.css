@@ -132,3 +132,8 @@ body.dark .dataTables_wrapper .dataTables_processing {
 .dataTables_wrapper .dataTables_processing {
     padding-top: 6px;
 }
+
+body.dark .custom-control-input:checked ~ .custom-control-label::before {
+    border-color: #62c462;
+    background-color: #62c462;
+}
