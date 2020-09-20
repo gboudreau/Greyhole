@@ -21,20 +21,47 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 require_once('includes/CLI/AbstractCliRunner.php');
 
 class PauseCliRunner extends AbstractCliRunner {
+    public static function isPaused() {
+        $flags = exec('ps ax -o pid,stat,comm,args | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v bash | awk \'{print $2}\'');
+        return string_contains($flags, 'T');
+    }
+
     public function run() {
-        $pid = (int) exec('ps ax | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v bash | awk \'{print $1}\'');
+        $pid = (int) exec('ps ax -o pid,stat,comm,args | grep "greyhole --daemon\|greyhole -D" | grep -v grep | grep -v bash | awk \'{print $1}\'');
         if ($pid) {
             if ($this instanceof ResumeCliRunner) {
                 exec('kill -CONT ' . $pid);
-                echo "The Greyhole daemon has resumed.\n";
+                $this->log("The Greyhole daemon (PID $pid) has resumed.");
             } else {
                 exec('kill -STOP ' . $pid);
-                echo "The Greyhole daemon has been paused. Use `greyhole --resume` to restart it.\n";
+                $this->log("The Greyhole daemon (PID $pid) has been paused. Use `greyhole --resume` to restart it.");
+            }
+            if (isset($_POST)) {
+                return TRUE;
             }
             exit(0);
         } else {
-            echo "Couldn't find a Greyhole daemon running.\n";
+            $this->log("Couldn't find a Greyhole daemon running.");
+            if (isset($_POST)) {
+                return FALSE;
+            }
             exit(1);
+        }
+    }
+
+    protected function log($what='') {
+        if (isset($_POST)) {
+            error_log($what);
+        } else {
+            echo "$what\n";
+        }
+    }
+
+    protected function logn($what) {
+        if (isset($_POST)) {
+            error_log($what);
+        } else {
+            echo $what;
         }
     }
 }

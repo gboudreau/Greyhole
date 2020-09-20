@@ -30,6 +30,13 @@ class StatusCliRunner extends AbstractAnonymousCliRunner {
             $this->finish(1);
         }
 
+        if (PauseCliRunner::isPaused()) {
+            $this->log();
+            $this->log("Greyhole daemon is currently paused. Use `greyhole --resume` to restart it.");
+            $this->log();
+            $this->finish(1);
+        }
+
         $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE);
         if (empty($tasks)) {
             $this->log();

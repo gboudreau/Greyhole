@@ -800,3 +800,17 @@ function colorizeTrashContent() {
         $(this).css('color', getTreemapColor(value, max, min));
     });
 }
+
+function pauseDaemon(button) {
+    ajaxCallFromButton(button, 'pause', 'action=pause', 'Pausing...', 'Daemon paused', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.reload();
+    }, 3);
+}
+
+function resumeDaemon(button) {
+    ajaxCallFromButton(button, 'pause', 'action=resume', 'Resuming...', 'Daemon resumed', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.reload();
+    }, 3);
+}

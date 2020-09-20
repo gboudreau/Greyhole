@@ -226,6 +226,13 @@ foreach ($queues as $share_name => $queue) {
     <div class="alert alert-danger" role="alert">
         Greyhole daemon is currently stopped.
     </div>
+<?php elseif (PauseCliRunner::isPaused()) : ?>
+    <div class="alert alert-danger" role="alert">
+        Greyhole daemon is currently paused.<br/>
+        <button type="button" class="btn btn-primary mt-2" onclick="resumeDaemon(this)">
+            Resume Daemon
+        </button>
+    </div>
 <?php else : ?>
     <div class="alert alert-success" role="alert">
         Greyhole daemon is currently running:

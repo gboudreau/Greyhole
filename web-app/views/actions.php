@@ -21,7 +21,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 $fsck_tab    = new Tab('action_fsck', 'fsck');
 $balance_tab = new Tab('action_balance', 'Balance');
 $trash_tab   = new Tab('action_trash', 'Greyhole Trash');
-$tabs = [$fsck_tab, $balance_tab, $trash_tab];
+$daemon_tab  = new Tab('action_daemon', 'Daemon');
+$tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab];
 ?>
 
 <?php $fsck_tab->startContent() ?>
@@ -77,6 +78,21 @@ $tabs = [$fsck_tab, $balance_tab, $trash_tab];
     Empty Trash
 </button>
 <?php $trash_tab->endContent() ?>
+
+<?php $daemon_tab->startContent() ?>
+<div class="mt-4">
+    Use this button to temporarily pause and resume the daemon.<br/>
+    <?php if (!PauseCliRunner::isPaused()) : ?>
+        <button type="button" class="btn btn-primary mt-4" onclick="pauseDaemon(this)">
+            Pause Daemon
+        </button>
+    <?php else : ?>
+        <button type="button" class="btn btn-primary mt-4" onclick="resumeDaemon(this)">
+            Resume Daemon
+        </button>
+    <?php endif; ?>
+</div>
+<?php $daemon_tab->endContent() ?>
 
 
 <h2 class="mt-8">Greyhole Actions</h2>

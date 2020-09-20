@@ -203,6 +203,18 @@ if (!empty($_GET['ajax'])) {
         $query = "INSERT INTO tasks (action, share, complete) VALUES ('balance', '', 'yes')";
         DB::insert($query);
         break;
+    case 'pause':
+        if (@$_POST['action'] == 'pause') {
+            $runner = new PauseCliRunner([], 'pause');
+        } else {
+            $runner = new ResumeCliRunner([], 'resume');
+        }
+        $success = $runner->run();
+        if (!$success) {
+            echo json_encode(['result' => 'error', 'message' => "Error: couldn't find a Greyhole daemon running."]);
+            exit();
+        }
+        break;
     case 'trash':
         $runner = new EmptyTrashCliRunner([], 'empty-trash');
         $runner->run();
