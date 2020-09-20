@@ -755,7 +755,21 @@ function startFsck(button) {
 }
 
 function cancelFsck(button) {
-    ajaxCallFromButton(button, 'fsck', 'action=cancel', 'Cancelling...', 'Cancelled', 'Reloading...', function (data, $button) {
+    ajaxCallFromButton(button, 'fsck', 'action=cancel', 'Cancelling...', 'fsck Cancelled', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.href = './';
+    }, 3);
+}
+
+function startBalance(button) {
+    ajaxCallFromButton(button, 'balance', 'action=start', 'Starting...', 'Balance started', 'Reloading...', function (data, $button) {
+        $button.prop('disabled', true);
+        location.href = './';
+    }, 3);
+}
+
+function cancelBalance(button) {
+    ajaxCallFromButton(button, 'balance', 'action=cancel', 'Cancelling...', 'Balance cancelled', 'Reloading...', function (data, $button) {
         $button.prop('disabled', true);
         location.href = './';
     }, 3);

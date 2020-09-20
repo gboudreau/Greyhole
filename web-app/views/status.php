@@ -17,17 +17,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-$tabs = [];
-if (@$task->action == 'balance') {
-    $tabs['balance'] = 'Balance Status';
-}
-$tabs['logs'] = 'Logs';
-$tabs['queue'] = 'Queue';
-$tabs['past_tasks'] = 'Past Tasks';
-if (FSCKWorkLog::isReportAvailable()) {
-    $tabs['fsck'] = 'fsck Report';
-}
 ?>
 
 <h2 class="mt-8">Status</h2>
@@ -55,6 +44,19 @@ if (FSCKWorkLog::isReportAvailable()) {
         ?>
     </div>
 <?php endif; ?>
+
+<?php
+$tabs = [];
+if (@$task->action == 'balance') {
+    $tabs['balance'] = 'Balance Status';
+}
+$tabs['logs'] = 'Logs';
+$tabs['queue'] = 'Queue';
+$tabs['past_tasks'] = 'Past Tasks';
+if (FSCKWorkLog::isReportAvailable()) {
+    $tabs['fsck'] = 'fsck Report';
+}
+?>
 
 <?php ob_start() ?>
 <h4 class="mt-4">Recent log entries</h4>
@@ -161,6 +163,14 @@ foreach ($queues as $share_name => $queue) {
 
 <?php if (@$tabs['balance']) : ?>
     <?php ob_start() ?>
+    <?php if (@$task->action == 'balance') : ?>
+        <div class="mt-4">
+            <button class="btn btn-danger" onclick="cancelBalance(this)">
+                Cancel ongoing balance
+            </button>
+        </div>
+    <?php endif; ?>
+
     <h4 class="mt-4">Balance Status</h4>
     <?php $groups = BalanceStatusCliRunner::getData() ?>
     <?php foreach ($groups as $group) : ?>

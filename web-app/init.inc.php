@@ -190,6 +190,19 @@ if (!empty($_GET['ajax'])) {
         $runner = new FsckCliRunner($options, 'fsck');
         $runner->run();
         break;
+    case 'balance':
+        if (@$_POST['action'] == 'cancel') {
+            DB::execute("DELETE FROM tasks WHERE action = 'balance'");
+            if (!DaemonRunner::restart_service()) {
+                echo json_encode(['result' => 'error', 'message' => "Error: was not able to identify how to restart daemon. Please do so manually."]);
+                exit();
+            }
+            echo json_encode(['result' => 'success']);
+            exit();
+        }
+        $query = "INSERT INTO tasks (action, share, complete) VALUES ('balance', '', 'yes')";
+        DB::insert($query);
+        break;
     case 'past_tasks':
         $q = "SELECT COUNT(*) FROM tasks_completed";
         $num_rows = DB::getFirstValue($q);

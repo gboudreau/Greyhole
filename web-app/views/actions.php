@@ -19,14 +19,15 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 $configs = [
-    'fsck'    => 'fsck',
+    'fsck_action'    => 'fsck',
+    'balance' => 'Balance',
 ];
 ?>
 
 <h2 class="mt-8">Greyhole Actions</h2>
 
-<ul class="nav nav-tabs" id="myTabsSamba" role="tablist" data-name="paction">
-    <?php $first = empty($_GET['paction']); foreach ($configs as $id => $name) : $active = $first || @$_GET['paction'] == 'id_' . $id . '_tab'; if ($active) $selected_tab = $id; ?>
+<ul class="nav nav-tabs" id="myTabsActions" role="tablist" data-name="page_action">
+    <?php $first = empty($_GET['page_action']); foreach ($configs as $id => $name) : $active = $first || @$_GET['page_action'] == 'id_' . $id . '_tab'; if ($active) $selected_tab = $id; ?>
         <li class="nav-item">
             <a class="nav-link <?php echo $active ? 'active' : '' ?>"
                id="id_<?php echo $id ?>_tab"
@@ -39,7 +40,7 @@ $configs = [
     <?php $first = FALSE; endforeach; ?>
 </ul>
 <div class="tab-content" id="myTabContentActions">
-    <div class="tab-pane fade <?php if ($selected_tab == 'fsck') echo 'show active' ?>" id="id_fsck" role="tabpanel" aria-labelledby="id-fsck-tab">
+    <div class="tab-pane fade <?php if ($selected_tab == 'fsck_action') echo 'show active' ?>" id="id_fsck_action" role="tabpanel" aria-labelledby="id_fsck_action_tab">
         <div class="input_group mt-4">
             <?php echo get_config_html(['name' => 'email-report', 'display_name' => 'Email Report', 'type' => 'bool', 'help' => "Send an email when fsck completes, to report on what was checked, and any error that was found.", 'onchange' => FALSE], TRUE) ?>
             <?php echo get_config_html(['name' => 'disk-usage-report', 'display_name' => 'Calculate Disk Usage', 'type' => 'bool', 'help' => "Calculate the disk usage of scanned folders & files.", 'onchange' => FALSE], TRUE) ?>
@@ -62,6 +63,20 @@ $configs = [
                 Start fsck...
             </button>
         </div>
+    </div>
+    <div class="tab-pane fade <?php if ($selected_tab == 'balance') echo 'show active' ?>" id="id_balance" role="tabpanel" aria-labelledby="id_balance_tab">
+        <div class="input_group mt-4">
+            <div>
+                Try to balance <?php ?> on all your storage pool drives (based on your <code>Drive Selection Algorithm</code> config).<br/>
+                You can follow the advancement of this operation in the Status page.
+            </div>
+            <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="startBalance(this)">
+                Start Balance
+            </button>
+        </div>
+    </div>
+    <div class="tab-pane fade <?php if ($selected_tab == 'trash') echo 'show active' ?>" id="id_trash" role="tabpanel" aria-labelledby="id_trash_tab">
+        @TODO Trash
     </div>
 </div>
 <div id="modal-confirm-fsck" class="modal" tabindex="-1" role="dialog">
