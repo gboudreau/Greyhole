@@ -17,48 +17,29 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
-?>
 
-<h2 class="mt-8">Status</h2>
-
-<?php $num_dproc = StatusCliRunner::get_num_daemon_proc() ?>
-<?php if ($num_dproc == 0) : ?>
-    <div class="alert alert-danger" role="alert">
-        Greyhole daemon is currently stopped.
-    </div>
-<?php else : ?>
-    <div class="alert alert-success" role="alert">
-        Greyhole daemon is currently running:
-        <?php
-        if (DB::isConnected()) {
-            $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
-            if (empty($tasks)) {
-                echo "idling.";
-            } else {
-                $task = array_shift($tasks);
-                phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
-            }
-        } else {
-            echo " (Warning: Can't connect to database to load current task.)";
-        }
-        ?>
-    </div>
-<?php endif; ?>
-
-<?php
 $tabs = [];
 if (@$task->action == 'balance') {
-    $tabs['balance'] = 'Balance Status';
+    $balance_tab = new Tab('balance', 'Balance Status');
+    $tabs[] = $balance_tab;
 }
-$tabs['logs'] = 'Logs';
-$tabs['queue'] = 'Queue';
-$tabs['past_tasks'] = 'Past Tasks';
+
+$logs_tab = new Tab('logs', 'Logs');
+$tabs[] = $logs_tab;
+
+$queue_tab = new Tab('queue', 'Queue');
+$tabs[] = $queue_tab;
+
+$past_tasks_tab = new Tab('past_tasks', 'Past Tasks');
+$tabs[] = $past_tasks_tab;
+
 if (FSCKWorkLog::isReportAvailable()) {
-    $tabs['fsck'] = 'fsck Report';
+    $fsck_tab = new Tab('fsck', 'fsck Report');
+    $tabs[] = $fsck_tab;
 }
 ?>
 
-<?php ob_start() ?>
+<?php $logs_tab->startContent() ?>
 <h4 class="mt-4">Recent log entries</h4>
 <code>
     <?php
@@ -84,9 +65,9 @@ if (FSCKWorkLog::isReportAvailable()) {
         , on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?>
     <?php endif; ?>
 </div>
-<?php $tabs_content['logs'] = ob_get_clean() ?>
+<?php $logs_tab->endContent(); ?>
 
-<?php ob_start() ?>
+<?php $queue_tab->startContent() ?>
 <h4 class="mt-4">Queue</h4>
 
 <div>
@@ -142,9 +123,9 @@ foreach ($queues as $share_name => $queue) {
         Spooled operations: <?php echo number_format($queues['Spooled'], 0) ?>
     </div>
 </div>
-<?php $tabs_content['queue'] = ob_get_clean() ?>
+<?php $queue_tab->endContent(); ?>
 
-<?php ob_start() ?>
+<?php $past_tasks_tab->startContent() ?>
 <h4 class="mt-4">Past Tasks</h4>
 <div class="col mt-4">
     <table id="past-tasks-table">
@@ -159,10 +140,10 @@ foreach ($queues as $share_name => $queue) {
         </thead>
     </table>
 </div>
-<?php $tabs_content['past_tasks'] = ob_get_clean() ?>
+<?php $past_tasks_tab->endContent(); ?>
 
-<?php if (@$tabs['balance']) : ?>
-    <?php ob_start() ?>
+<?php if (isset($balance_tab)) : ?>
+    <?php $balance_tab->startContent() ?>
     <?php if (@$task->action == 'balance') : ?>
         <div class="mt-4">
             <button class="btn btn-danger" onclick="cancelBalance(this)">
@@ -217,11 +198,11 @@ foreach ($queues as $share_name => $queue) {
         </div>
     <hr/>
     <?php endforeach; ?>
-    <?php $tabs_content['balance'] = ob_get_clean() ?>
+    <?php $balance_tab->endContent(); ?>
 <?php endif; ?>
 
-<?php if (@$tabs['fsck']) : ?>
-    <?php ob_start() ?>
+<?php if (isset($fsck_tab)) : ?>
+    <?php $fsck_tab->startContent(); ?>
     <?php if (@$task->action == 'fsck') : ?>
         <div class="mt-4">
             <button class="btn btn-danger" onclick="cancelFsck(this)">
@@ -234,26 +215,34 @@ foreach ($queues as $share_name => $queue) {
     <div class="col mt-4">
         <code><?php echo nl2br(he(FSCKWorkLog::getHumanReadableReport())) ?></code>
     </div>
-    <?php $tabs_content['fsck'] = ob_get_clean() ?>
+    <?php $fsck_tab->endContent(); ?>
 <?php endif; ?>
 
-<ul class="nav nav-tabs" id="myTabsStatus" role="tablist" data-name="pagestatus">
-    <?php $first = empty($_GET['pagestatus']); foreach ($tabs as $id => $name) : $active = $first || @$_GET['pagestatus'] == 'id_' . $id . '_tab'; if ($active) $selected_tab = $id; ?>
-        <li class="nav-item">
-            <a class="nav-link <?php echo $active ? 'active' : '' ?>"
-               id="id_<?php echo $id ?>_tab"
-               data-toggle="tab"
-               href="#id_<?php echo $id ?>"
-               role="tab"
-               aria-controls="id_<?php echo $id ?>"
-               aria-selected="<?php echo $active ? 'true' : 'false' ?>"><?php phe($name) ?></a>
-        </li>
-        <?php $first = FALSE; endforeach; ?>
-</ul>
-<div class="tab-content" id="myTabContentStatus">
-    <?php foreach ($tabs as $id => $name) : $active = ($selected_tab == $id); ?>
-        <div class="tab-pane fade <?php if ($active) echo 'show active' ?>" id="id_<?php echo $id ?>" role="tabpanel" aria-labelledby="id_<?php echo $id ?>_tab">
-            <?php echo $tabs_content[$id] ?>
-        </div>
-    <?php endforeach; ?>
-</div>
+
+<h2 class="mt-8">Status</h2>
+
+<?php $num_dproc = StatusCliRunner::get_num_daemon_proc() ?>
+<?php if ($num_dproc == 0) : ?>
+    <div class="alert alert-danger" role="alert">
+        Greyhole daemon is currently stopped.
+    </div>
+<?php else : ?>
+    <div class="alert alert-success" role="alert">
+        Greyhole daemon is currently running:
+        <?php
+        if (DB::isConnected()) {
+            $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
+            if (empty($tasks)) {
+                echo "idling.";
+            } else {
+                $task = array_shift($tasks);
+                phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
+            }
+        } else {
+            echo " (Warning: Can't connect to database to load current task.)";
+        }
+        ?>
+    </div>
+<?php endif; ?>
+
+<?php Tab::printTabs($tabs, 'page_status') ?>

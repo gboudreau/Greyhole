@@ -32,24 +32,13 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 <?php
 global $configs;
 include 'web-app/config_definitions.inc.php';
+
+$tabs = [];
+foreach ($configs as $i => $config) {
+    $tab = new Tab('gh_config_' . md5($config->name), $config->name);
+    $tab->content = get_config_html($config);
+    $tabs[] = $tab;
+}
 ?>
-<ul class="nav nav-tabs" id="myTabGreyhole" role="tablist" data-name="pagegh">
-    <?php $first = empty($_GET['pagegh']); foreach ($configs as $i => $config) : $active = $first || @$_GET['pagegh'] == 'id_' . md5($config->name) . '_tab'; if ($active) $selected_tab = $i; ?>
-        <li class="nav-item">
-            <a class="nav-link <?php echo $active ? 'active' : '' ?>"
-               id="id_<?php echo md5($config->name) ?>_tab"
-               data-toggle="tab"
-               href="#id_<?php echo md5($config->name) ?>"
-               role="tab"
-               aria-controls="id_<?php echo md5($config->name) ?>"
-               aria-selected="<?php echo $active ? 'true' : 'false' ?>"><?php phe($config->name) ?></a>
-        </li>
-    <?php $first = FALSE; endforeach; ?>
-</ul>
-<div class="tab-content" id="myTabContentGreyhole">
-    <?php foreach ($configs as $i => $config) : ?>
-        <div class="tab-pane fade <?php if ($i == $selected_tab) echo 'show active' ?>" id="id_<?php echo md5($config->name) ?>" role="tabpanel" aria-labelledby="id_<?php echo md5($config->name) ?>_tab">
-            <?php echo get_config_html($config) ?>
-        </div>
-    <?php endforeach; ?>
-</div>
+
+<?php Tab::printTabs($tabs, 'page_gh_config') ?>

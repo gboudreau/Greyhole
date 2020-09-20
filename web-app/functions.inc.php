@@ -372,3 +372,47 @@ class InputTag {
         return $html;
     }
 }
+
+class Tab {
+    public $id;
+    public $name;
+    public $content;
+
+    public function __construct($id, $name) {
+        $this->id = $id;
+        $this->name = $name;
+    }
+
+    public function startContent() {
+        ob_start();
+    }
+
+    public function endContent() {
+        $this->content = ob_get_clean();
+    }
+
+    public static function printTabs($tabs, $tab_selector_name) {
+        ?>
+        <ul class="nav nav-tabs" role="tablist" data-name="<?php phe($tab_selector_name) ?>">
+            <?php $first = empty($_GET[$tab_selector_name]); foreach ($tabs as $tab) : $active = $first || @$_GET[$tab_selector_name] == 'id_' . $tab->id . '_tab'; if ($active) $selected_tab = $tab->id; ?>
+                <li class="nav-item">
+                    <a class="nav-link <?php echo $active ? 'active' : '' ?>"
+                       id="id_<?php echo $tab->id ?>_tab"
+                       data-toggle="tab"
+                       href="#id_<?php echo $tab->id ?>"
+                       role="tab"
+                       aria-controls="id_<?php echo $tab->id ?>"
+                       aria-selected="<?php echo $active ? 'true' : 'false' ?>"><?php phe($tab->name) ?></a>
+                </li>
+                <?php $first = FALSE; endforeach; ?>
+        </ul>
+        <div class="tab-content">
+            <?php foreach ($tabs as $tab) : ?>
+                <div class="tab-pane fade <?php if ($tab->id == $selected_tab) echo 'show active' ?>" id="id_<?php phe($tab->id) ?>" role="tabpanel" aria-labelledby="id_<?php phe($tab->id) ?>_tab">
+                    <?php echo $tab->content ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <?php
+    }
+}

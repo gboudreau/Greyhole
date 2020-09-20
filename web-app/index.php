@@ -145,8 +145,10 @@ if (DB::isConnected()) {
             }
 
             selectInitialTab('page');
-            selectInitialTab('pagesmb');
-            selectInitialTab('pagegh', true);
+            selectInitialTab('page_status');
+            selectInitialTab('page_smb_config', true);
+            selectInitialTab('page_gh_config', true);
+            selectInitialTab('page_action', true);
 
             $('.nav .nav-link').on('shown.bs.tab', function (evt) {
                 changedTab(evt.target);

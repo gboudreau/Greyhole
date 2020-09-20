@@ -659,8 +659,8 @@ function selectInitialTab(name, replace) {
 }
 
 function donate() {
-    $('#id_6e63d8ace53681936423edd454569328_tab').tab('show');
-    $('#id_794df3791a8c800841516007427a2aa3_tab').tab('show');
+    $('#id_6e63d8ace53681936423edd454569328_tab').tab('show'); // Greyhole Config
+    $('#id_gh_config_794df3791a8c800841516007427a2aa3_tab').tab('show'); // License
 }
 
 function donationComplete(el) {
@@ -719,7 +719,7 @@ function parseParams(params) {
 
 function getFsckParams() {
     let params = {};
-    let s = $('#id_fsck').find('input, select').serialize();
+    let s = $('#id_action_fsck').find('input, select').serialize();
     let parsedParams = parseParams(s);
     for (let name in parsedParams) {
         let value = parsedParams[name];

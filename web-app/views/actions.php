@@ -18,81 +18,71 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-$configs = [
-    'fsck_action'    => 'fsck',
-    'balance' => 'Balance',
-    'trash'   => 'Greyhole Trash',
-];
+$fsck_tab    = new Tab('action_fsck', 'fsck');
+$balance_tab = new Tab('action_balance', 'Balance');
+$trash_tab   = new Tab('action_trash', 'Greyhole Trash');
+$tabs = [$fsck_tab, $balance_tab, $trash_tab];
 ?>
+
+<?php $fsck_tab->startContent() ?>
+<div class="input_group mt-4">
+    <?php echo get_config_html(['name' => 'email-report', 'display_name' => 'Email Report', 'type' => 'bool', 'help' => "Send an email when fsck completes, to report on what was checked, and any error that was found.", 'onchange' => FALSE], TRUE) ?>
+    <?php echo get_config_html(['name' => 'disk-usage-report', 'display_name' => 'Calculate Disk Usage', 'type' => 'bool', 'help' => "Calculate the disk usage of scanned folders & files.", 'onchange' => FALSE], TRUE) ?>
+    <?php echo get_config_html(['name' => 'walk-metadata-store', 'display_name' => 'Walk Metadata Store', 'type' => 'bool', 'help' => "You can speed up fsck by turning off this option, in order to skip the scan of the metadata store directories. Scanning the metadata stores is only required to re-create symbolic links that might be missing from your shared directories.", 'onchange' => FALSE], TRUE) ?>
+    <?php echo get_config_html(['name' => 'find-orphaned-files', 'display_name' => 'Find Orphaned Files', 'type' => 'bool', 'help' => "Scan for files with no metadata in the storage pool drives. This will allow you to include existing files on a drive in your storage pool without having to copy them manually.", 'onchange' => FALSE], FALSE) ?>
+    <?php echo get_config_html(['name' => 'delete-orphaned-metadata', 'display_name' => 'Delete Orphaned Metadata', 'type' => 'bool', 'help' => "When fsck find metadata files with no file copies, delete those metadata files. If the file copies re-appear later, you'll need to run fsck with --find-orphaned-files to have them reappear in your shares.", 'onchange' => FALSE], FALSE) ?>
+    <?php echo get_config_html(['name' => 'checksums', 'display_name' => 'Checksum all files', 'type' => 'bool', 'help' => "Read ALL files in your storage pool, and check that file copies are identical. This will identify any problem you might have with your file-systems. NOTE: this can take a LONG time to complete, since it will read everything from all your drives!", 'onchange' => FALSE], FALSE) ?>
+    <?php
+    $possible_values = [];
+    $possible_values[''] = 'All shares';
+    foreach (SharesConfig::getShares() as $share_name => $share_options) {
+        $possible_values[$share_options[CONFIG_LANDING_ZONE]] = "Share: $share_name";
+    }
+    foreach (Config::storagePoolDrives() as $sp_drive) {
+        $possible_values[$sp_drive] = "Drive: $sp_drive";
+    }
+    ?>
+    <?php echo get_config_html(['name' => 'dir', 'display_name' => 'Folder', 'type' => 'select', 'possible_values' => $possible_values, 'help' => "Choose a share or storage pool drive to scan.", 'onchange' => FALSE]) ?>
+    <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="confirmFsckCommand()">
+        Start fsck...
+    </button>
+</div>
+<?php $fsck_tab->endContent() ?>
+
+<?php $balance_tab->startContent() ?>
+<div class="input_group mt-4">
+    <div>
+        Try to balance <?php ?> on all your storage pool drives (based on your <code>Drive Selection Algorithm</code> config).<br/>
+        You can follow the advancement of this operation in the Status page.
+    </div>
+    <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="startBalance(this)">
+        Start Balance
+    </button>
+</div>
+<?php $balance_tab->endContent() ?>
+
+<?php $trash_tab->startContent() ?>
+<div class="mt-4">
+    Trash content:
+    <table id="trash-content">
+        <?php global $sp_stats; foreach ($sp_stats as $sp_drive => $stat) : if ($sp_drive == 'Total') continue; ?>
+            <tr>
+                <td><code><?php phe($sp_drive) ?></code></td>
+                <td class="colorize" data-value="<?php phe($stat->trash_size) ?>"><?php echo bytes_to_human($stat->trash_size*1024, TRUE, TRUE) ?></td>
+            </tr>
+        <?php endforeach; ?>
+    </table>
+</div>
+<button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="emptyTrash(this)">
+    Empty Trash
+</button>
+<?php $trash_tab->endContent() ?>
+
 
 <h2 class="mt-8">Greyhole Actions</h2>
 
-<ul class="nav nav-tabs" id="myTabsActions" role="tablist" data-name="page_action">
-    <?php $first = empty($_GET['page_action']); foreach ($configs as $id => $name) : $active = $first || @$_GET['page_action'] == 'id_' . $id . '_tab'; if ($active) $selected_tab = $id; ?>
-        <li class="nav-item">
-            <a class="nav-link <?php echo $active ? 'active' : '' ?>"
-               id="id_<?php echo $id ?>_tab"
-               data-toggle="tab"
-               href="#id_<?php echo $id ?>"
-               role="tab"
-               aria-controls="id_<?php echo $id ?>"
-               aria-selected="<?php echo $active ? 'true' : 'false' ?>"><?php phe($name) ?></a>
-        </li>
-    <?php $first = FALSE; endforeach; ?>
-</ul>
-<div class="tab-content" id="myTabContentActions">
-    <div class="tab-pane fade <?php if ($selected_tab == 'fsck_action') echo 'show active' ?>" id="id_fsck_action" role="tabpanel" aria-labelledby="id_fsck_action_tab">
-        <div class="input_group mt-4">
-            <?php echo get_config_html(['name' => 'email-report', 'display_name' => 'Email Report', 'type' => 'bool', 'help' => "Send an email when fsck completes, to report on what was checked, and any error that was found.", 'onchange' => FALSE], TRUE) ?>
-            <?php echo get_config_html(['name' => 'disk-usage-report', 'display_name' => 'Calculate Disk Usage', 'type' => 'bool', 'help' => "Calculate the disk usage of scanned folders & files.", 'onchange' => FALSE], TRUE) ?>
-            <?php echo get_config_html(['name' => 'walk-metadata-store', 'display_name' => 'Walk Metadata Store', 'type' => 'bool', 'help' => "You can speed up fsck by turning off this option, in order to skip the scan of the metadata store directories. Scanning the metadata stores is only required to re-create symbolic links that might be missing from your shared directories.", 'onchange' => FALSE], TRUE) ?>
-            <?php echo get_config_html(['name' => 'find-orphaned-files', 'display_name' => 'Find Orphaned Files', 'type' => 'bool', 'help' => "Scan for files with no metadata in the storage pool drives. This will allow you to include existing files on a drive in your storage pool without having to copy them manually.", 'onchange' => FALSE], FALSE) ?>
-            <?php echo get_config_html(['name' => 'delete-orphaned-metadata', 'display_name' => 'Delete Orphaned Metadata', 'type' => 'bool', 'help' => "When fsck find metadata files with no file copies, delete those metadata files. If the file copies re-appear later, you'll need to run fsck with --find-orphaned-files to have them reappear in your shares.", 'onchange' => FALSE], FALSE) ?>
-            <?php echo get_config_html(['name' => 'checksums', 'display_name' => 'Checksum all files', 'type' => 'bool', 'help' => "Read ALL files in your storage pool, and check that file copies are identical. This will identify any problem you might have with your file-systems. NOTE: this can take a LONG time to complete, since it will read everything from all your drives!", 'onchange' => FALSE], FALSE) ?>
-            <?php
-            $possible_values = [];
-            $possible_values[''] = 'All shares';
-            foreach (SharesConfig::getShares() as $share_name => $share_options) {
-                $possible_values[$share_options[CONFIG_LANDING_ZONE]] = "Share: $share_name";
-            }
-            foreach (Config::storagePoolDrives() as $sp_drive) {
-                $possible_values[$sp_drive] = "Drive: $sp_drive";
-            }
-            ?>
-            <?php echo get_config_html(['name' => 'dir', 'display_name' => 'Folder', 'type' => 'select', 'possible_values' => $possible_values, 'help' => "Choose a share or storage pool drive to scan.", 'onchange' => FALSE]) ?>
-            <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="confirmFsckCommand()">
-                Start fsck...
-            </button>
-        </div>
-    </div>
-    <div class="tab-pane fade <?php if ($selected_tab == 'balance') echo 'show active' ?>" id="id_balance" role="tabpanel" aria-labelledby="id_balance_tab">
-        <div class="input_group mt-4">
-            <div>
-                Try to balance <?php ?> on all your storage pool drives (based on your <code>Drive Selection Algorithm</code> config).<br/>
-                You can follow the advancement of this operation in the Status page.
-            </div>
-            <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="startBalance(this)">
-                Start Balance
-            </button>
-        </div>
-    </div>
-    <div class="tab-pane fade <?php if ($selected_tab == 'trash') echo 'show active' ?>" id="id_trash" role="tabpanel" aria-labelledby="id_trash_tab">
-        <div class="mt-4">
-            Trash content:
-            <table id="trash-content">
-                <?php global $sp_stats; foreach ($sp_stats as $sp_drive => $stat) : if ($sp_drive == 'Total') continue; ?>
-                    <tr>
-                        <td><code><?php phe($sp_drive) ?></code></td>
-                        <td class="colorize" data-value="<?php phe($stat->trash_size) ?>"><?php echo bytes_to_human($stat->trash_size*1024, TRUE, TRUE) ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            </table>
-        </div>
-        <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="emptyTrash(this)">
-            Empty Trash
-        </button>
-    </div>
-</div>
+<?php Tab::printTabs($tabs, 'page_action') ?>
+
 <div id="modal-confirm-fsck" class="modal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
