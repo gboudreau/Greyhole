@@ -17,6 +17,16 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+$tabs = [];
+if (@$task->action == 'balance') {
+    $tabs['balance'] = 'Balance Status';
+}
+$tabs['logs'] = 'Logs';
+$tabs['queue'] = 'Queue';
+if (FSCKWorkLog::isReportAvailable()) {
+    $tabs['fsck'] = 'fsck Report';
+}
 ?>
 
 <h2 class="mt-8">Status</h2>
@@ -43,13 +53,9 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
         }
         ?>
     </div>
-    <?php if (@$task->action == 'fsck') : ?>
-        <button class="btn btn-danger" onclick="cancelFsck(this)">
-            Cancel fsck
-        </button>
-    <?php endif; ?>
 <?php endif; ?>
 
+<?php ob_start() ?>
 <h4 class="mt-4">Recent log entries</h4>
 <code>
     <?php
@@ -75,7 +81,9 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
         , on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?>
     <?php endif; ?>
 </div>
+<?php $tabs_content['logs'] = ob_get_clean() ?>
 
+<?php ob_start() ?>
 <h4 class="mt-4">Queue</h4>
 
 <div>
@@ -131,8 +139,10 @@ foreach ($queues as $share_name => $queue) {
         Spooled operations: <?php echo number_format($queues['Spooled'], 0) ?>
     </div>
 </div>
+<?php $tabs_content['queue'] = ob_get_clean() ?>
 
-<?php if (@$task->action == 'balance') : ?>
+<?php if (@$tabs['balance']) : ?>
+    <?php ob_start() ?>
     <h4 class="mt-4">Balance Status</h4>
     <?php $groups = BalanceStatusCliRunner::getData() ?>
     <?php foreach ($groups as $group) : ?>
@@ -179,4 +189,43 @@ foreach ($queues as $share_name => $queue) {
         </div>
     <hr/>
     <?php endforeach; ?>
+    <?php $tabs_content['balance'] = ob_get_clean() ?>
 <?php endif; ?>
+
+<?php if (@$tabs['fsck']) : ?>
+    <?php ob_start() ?>
+    <?php if (@$task->action == 'fsck') : ?>
+        <div class="mt-4">
+            <button class="btn btn-danger" onclick="cancelFsck(this)">
+                Cancel ongoing fsck
+            </button>
+        </div>
+    <?php endif; ?>
+
+    <h4 class="mt-4">Latest fsck Report</h4>
+    <div class="col mt-4">
+        <code><?php echo nl2br(he(FSCKWorkLog::getHumanReadableReport())) ?></code>
+    </div>
+    <?php $tabs_content['fsck'] = ob_get_clean() ?>
+<?php endif; ?>
+
+<ul class="nav nav-tabs" id="myTabsStatus" role="tablist" data-name="pagestatus">
+    <?php $first = empty($_GET['pagestatus']); foreach ($tabs as $id => $name) : $active = $first || @$_GET['pagestatus'] == 'id_' . $id . '_tab'; if ($active) $selected_tab = $id; ?>
+        <li class="nav-item">
+            <a class="nav-link <?php echo $active ? 'active' : '' ?>"
+               id="id_<?php echo $id ?>_tab"
+               data-toggle="tab"
+               href="#id_<?php echo $id ?>"
+               role="tab"
+               aria-controls="id_<?php echo $id ?>"
+               aria-selected="<?php echo $active ? 'true' : 'false' ?>"><?php phe($name) ?></a>
+        </li>
+        <?php $first = FALSE; endforeach; ?>
+</ul>
+<div class="tab-content" id="myTabContentStatus">
+    <?php foreach ($tabs as $id => $name) : $active = ($selected_tab == $id); ?>
+        <div class="tab-pane fade <?php if ($active) echo 'show active' ?>" id="id_<?php echo $id ?>" role="tabpanel" aria-labelledby="id_<?php echo $id ?>_tab">
+            <?php echo $tabs_content[$id] ?>
+        </div>
+    <?php endforeach; ?>
+</div>

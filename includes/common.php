@@ -450,6 +450,10 @@ class FSCKWorkLog {
         }
     }
 
+    public static function isReportAvailable() {
+        return file_exists(static::FILE) && !empty(unserialize(file_get_contents(static::FILE)));
+    }
+
     public static function getHumanReadableReport() {
         $fsck_work_log = static::getFromDisk();
 
