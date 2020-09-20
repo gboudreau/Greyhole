@@ -31,7 +31,20 @@ function defer(method) {
 defer(function() {
     $(function () {
         checkSambaConfig();
-
+        $('#past-tasks-table').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: './?ajax=past_tasks',
+            columns: [
+                { data: 'id', orderSequence: ['desc', 'asc'] },
+                { data: 'event_date', orderSequence: ['desc', 'asc'] },
+                { data: 'action' },
+                { data: 'share' },
+                { data: 'full_path' }
+            ],
+            order: [[0, 'desc']],
+            pageLength: 10,
+        });
         $('[data-toggle="tooltip"]').tooltip();
     });
 });

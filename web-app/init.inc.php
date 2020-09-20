@@ -190,6 +190,40 @@ if (!empty($_GET['ajax'])) {
         $runner = new FsckCliRunner($options, 'fsck');
         $runner->run();
         break;
+    case 'past_tasks':
+        $q = "SELECT COUNT(*) FROM tasks_completed";
+        $num_rows = DB::getFirstValue($q);
+
+        $columns = ['id', 'event_date', 'action', 'share', 'full_path'];
+        $order_by = [];
+        foreach ($_GET['order'] as $ob) {
+            $order_by[] = $columns[$ob['column']] . ($ob['dir'] == 'desc' ? ' DESC' : '');
+        }
+
+        $where = "1";
+        $search = NULL;
+        if (!empty($_GET['search']['value'])) {
+            $where = "full_path LIKE :search OR share LIKE :search OR event_date LIKE :search OR action LIKE :search";
+            $search = "%" . str_replace(' ', '%', $_GET['search']['value']) . "%";
+        }
+
+        $start = (int) $_GET['start'];
+        $length = (int) $_GET['length'];
+
+        $q = "SELECT * FROM tasks_completed WHERE $where ORDER BY " . implode(', ', $order_by) . " LIMIT $start,$length";
+        $tasks = DB::getAll($q, ['search' => $search]);
+
+        foreach ($tasks as $task) {
+            if ($task->action == 'rename') {
+                $task->full_path .= "<br/>=> $task->additional_info";
+            }
+        }
+
+        $q = "SELECT COUNT(*) FROM tasks_completed WHERE $where";
+        $num_rows_filtered = DB::getFirstValue($q, ['search' => $search]);
+
+        echo json_encode(['draw' => $_GET['draw'], 'recordsTotal' => $num_rows, 'recordsFiltered' => $num_rows_filtered, 'data' => $tasks]);
+        exit();
     case 'install':
         $step = $_POST['step'];
 

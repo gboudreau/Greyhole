@@ -24,6 +24,7 @@ if (@$task->action == 'balance') {
 }
 $tabs['logs'] = 'Logs';
 $tabs['queue'] = 'Queue';
+$tabs['past_tasks'] = 'Past Tasks';
 if (FSCKWorkLog::isReportAvailable()) {
     $tabs['fsck'] = 'fsck Report';
 }
@@ -140,6 +141,23 @@ foreach ($queues as $share_name => $queue) {
     </div>
 </div>
 <?php $tabs_content['queue'] = ob_get_clean() ?>
+
+<?php ob_start() ?>
+<h4 class="mt-4">Past Tasks</h4>
+<div class="col mt-4">
+    <table id="past-tasks-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Queued When</th>
+                <th>Action</th>
+                <th>Share</th>
+                <th>Path</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<?php $tabs_content['past_tasks'] = ob_get_clean() ?>
 
 <?php if (@$tabs['balance']) : ?>
     <?php ob_start() ?>
