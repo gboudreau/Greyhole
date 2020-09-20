@@ -59,13 +59,14 @@ final class DBSpool {
     }
 
     /**
-     * @param bool $incl_md5    Include or not MD5 tasks?
-     * @param bool $update_idle If no tasks are found, return 'complete=idle' tasks, if any.
+     * @param bool $incl_md5        Include or not MD5 tasks?
+     * @param bool $update_idle     If no tasks are found, return 'complete=idle' tasks, if any.
+     * @param bool $include_written Include tasks with status = 'written', in addition to yes/thawed statuses
      *
      * @return stdClass[]
      * @throws Exception
      */
-    public function fetch_next_tasks($incl_md5, $update_idle) {
+    public function fetch_next_tasks($incl_md5, $update_idle, $include_written = TRUE) {
         $where_clause = "";
         if (!empty($this->locked_shares)) {
             $where_clause .= " AND share NOT IN ('" . implode("','", array_keys($this->locked_shares)) . "')";
@@ -74,7 +75,12 @@ final class DBSpool {
             $where_clause .= " AND action != 'md5'";
         }
 
-        $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ('yes', 'thawed', 'written') $where_clause ORDER BY id ASC LIMIT 20";
+        if ($include_written) {
+            $statuses = "'yes', 'thawed', 'written'";
+        } else {
+            $statuses = "'yes', 'thawed'";
+        }
+        $query = "SELECT id, action, share, full_path, additional_info, complete FROM tasks WHERE complete IN ($statuses) $where_clause ORDER BY id ASC LIMIT 20";
         $tasks = DB::getAll($query);
 
         if (empty($tasks) && $update_idle) {

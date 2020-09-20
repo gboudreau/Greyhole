@@ -31,7 +31,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
         Greyhole daemon is currently running:
         <?php
         if (DB::isConnected()) {
-            $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE);
+            $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
             if (empty($tasks)) {
                 echo "idling.";
             } else {
