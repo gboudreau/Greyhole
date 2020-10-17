@@ -1,7 +1,6 @@
 #!/bin/sh
 
 # Weekly fsck
-rm -f /usr/share/greyhole/gh-disk-usage.log
 /usr/bin/greyhole --fsck --email-report --dont-walk-metadata-store --disk-usage-report > /dev/null
 
 # This calls home to report anonymous data about Greyhole usage.
