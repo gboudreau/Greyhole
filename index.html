@@ -126,19 +126,20 @@ License URL: https://creativecommons.org/licenses/by/3.0/
             <h2>Step 1</h2>
 
             <h3>Using <span>APT</span> (Ubuntu, Debian) or <span>Yum</span> (CentOS, Fedora, RHEL)</h3>
-             <pre style="text-align: center; max-width: 790px"><span class="command">curl -Ls</span> <span class="url">http://bit.ly/greyhole-package</span> | <span class="code">sudo bash</span></pre>
-            <br/>
+            <pre style="text-align: center; max-width: 790px"><span class="command">curl -Ls</span> <span class="url">http://bit.ly/greyhole-package</span> | <span class="code">sudo bash</span></pre>
 
-            <h3>Manually</h3>
-            <p class="desc" style="font-size: 1em">Downloads are hosted on the <a href="https://github.com/gboudreau/Greyhole/releases" target="_blank">Github Releases page</a>.<br/>
-                Just download the latest .tar.gz file (using the green button).<br/>
-                Then follow the instructions from the <a href="https://raw.github.com/gboudreau/Greyhole/master/INSTALL" target="_blank">INSTALL</a> file.</p>
+            <h3 style="margin-top: 0.7em">Or manually</h3>
+            <p class="desc" style="font-size: 1em">Just download the latest .tar.gz file from the <a href="https://github.com/gboudreau/Greyhole/releases" target="_blank">Github Releases page</a>.<br/>
+                Then follow the instructions from the <a href="https://github.com/gboudreau/Greyhole/blob/master/INSTALL" target="_blank">INSTALL</a> file.</p>
 
-            <br/><br/>
-            <h2>Step 2</h2>
+            <h2 style="margin-top: 1em">Step 2</h2>
 
-            <h3>Configuration</h3>
-            <p class="desc" style="font-size: 1em">Follow the instructions from the <a href="https://raw.github.com/gboudreau/Greyhole/master/USAGE" target="_blank">USAGE</a> file.<br/>
+            <h3>Initial configuration using the web UI wizard</h3>
+            <pre style="text-align: center; max-width: 790px"><span class="command">sudo php -S</span> <span class="url">0.0.0.0:8012</span> <span class="code">/usr/share/greyhole/web-app/index.php</span></pre>
+            <p class="desc" style="margin-top: 0.3em; font-size: 1em">Then point your browser to: <span>http://server_hostname_or_ip:8012/install</span></p>
+
+            <h3 style="margin-top: 0.7em">Or manually</h3>
+            <p class="desc" style="font-size: 1em">Follow the instructions from the <a href="https://github.com/gboudreau/Greyhole/blob/master/USAGE" target="_blank">USAGE</a> file.<br/>
                 There is also a copy of this file in <span>/usr/share/greyhole/USAGE</span></p>
         </div>
     </div>
@@ -163,7 +164,7 @@ License URL: https://creativecommons.org/licenses/by/3.0/
                 <p class="desc">Search the <a href="https://github.com/gboudreau/Greyhole/issues?q=is%3Aissue" target="_blank">Issues on Github</a>, to see if someone else had the same problem in the past,<br/>and what the resolution/workarounds were suggested.</p>
                 <!--p class="desc"><a href="https://www.greyhole.net/irc/">Live chat logs</a> - search here to see if your questions was answered already.</p-->
                 <!--p class="desc"><a href="https://www.greyhole.net/chat/">Live chat</a> #greyhole on Freenode</p-->
-                <p class="desc"><a href="https://greyhole.freshdesk.com">Support</a> on FreshDesk</p>
+                <p class="desc"><a href="https://greyhole.freshdesk.com" target="_blank">Support</a> on FreshDesk</p>
             </div>
         </div>
     </div>
