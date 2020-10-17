@@ -68,10 +68,7 @@ if (FSCKWorkLog::isReportAvailable()) {
 
 <div class="alert alert-primary mt-3" role="alert">
     <?php list($last_action, $last_action_time) = StatusCliRunner::get_last_action() ?>
-    Last logged action: <strong><?php phe($last_action) ?></strong>
-    <?php if (!empty($last_action_time)) : ?>
-        , on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?>
-    <?php endif; ?>
+    Last logged action: <strong><?php phe($last_action) ?></strong><?php if (!empty($last_action_time)) : ?>, on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?><?php endif; ?>
 </div>
 <?php $logs_tab->endContent(); ?>
 
