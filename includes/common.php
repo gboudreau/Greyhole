@@ -247,7 +247,7 @@ class FSCKReport {
     /** @var string[] */
     protected static $dirs = [];
 
-    public function __construct($what) {
+    public function __construct($what, $reset_dirs = FALSE) {
         $this->start          = time();
         $this->end            = NULL;
         $this->what           = $what;
@@ -261,6 +261,10 @@ class FSCKReport {
         $this->found_problems = array();
         foreach (array(FSCK_PROBLEM_NO_COPIES_FOUND, FSCK_PROBLEM_TOO_MANY_COPIES, FSCK_PROBLEM_WRONG_COPY_SIZE, FSCK_PROBLEM_TEMP_FILE) as $name) {
             $this->found_problems[$name] = array();
+        }
+
+        if ($reset_dirs) {
+            static::$dirs = [];
         }
     }
 
@@ -469,7 +473,7 @@ class FSCKWorkLog {
             }
         } else {
             //  All shares
-            $report = new FSCKReport(NULL);
+            $report = new FSCKReport(NULL, TRUE);
             foreach ($fsck_work_log->tasks as $task) {
                 $report->mergeReport($task->report);
             }
