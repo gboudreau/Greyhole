@@ -22,11 +22,15 @@ if (DB::isConnected()) {
     $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
     if (!empty($tasks)) {
         $task = array_shift($tasks);
+
+        $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
+        $last_status = DB::getFirst($q);
+        $current_action = $last_status->action;
     }
 }
 
 $tabs = [];
-if (@$task->action == 'balance') {
+if (@$current_action == 'balance') {
     $balance_tab = new Tab('balance', 'Balance Status');
     $tabs[] = $balance_tab;
 }
@@ -149,7 +153,7 @@ foreach ($queues as $share_name => $queue) {
 
 <?php if (isset($balance_tab)) : ?>
     <?php $balance_tab->startContent() ?>
-    <?php if (@$task->action == 'balance') : ?>
+    <?php if (@$current_action == 'balance') : ?>
         <div class="mt-4">
             <button class="btn btn-danger" onclick="cancelBalance(this)">
                 Cancel ongoing balance
@@ -208,7 +212,7 @@ foreach ($queues as $share_name => $queue) {
 
 <?php if (isset($fsck_tab)) : ?>
     <?php $fsck_tab->startContent(); ?>
-    <?php if (@$task->action == 'fsck') : ?>
+    <?php if (@$current_action == 'fsck') : ?>
         <div class="mt-4">
             <button class="btn btn-danger" onclick="cancelFsck(this)">
                 Cancel ongoing fsck
@@ -246,7 +250,11 @@ foreach ($queues as $share_name => $queue) {
             if (empty($tasks)) {
                 echo "idling.";
             } else {
-                phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
+                if ($current_action == $task->action) {
+                    phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
+                } else {
+                    phe("working on '$current_action' task");
+                }
             }
         } else {
             echo " (Warning: Can't connect to database to load current task.)";

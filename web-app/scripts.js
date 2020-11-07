@@ -825,6 +825,7 @@ function tailStatusLogs(button) {
         status_logs_timer = setInterval(reloadStatusLogs, 10*1000);
     }
 }
+defer(function(){ tailStatusLogs($('#tail-status-log').prop('checked', true)); });
 
 function reloadStatusLogs() {
     $.ajax({
