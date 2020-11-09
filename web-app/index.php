@@ -23,6 +23,7 @@ include(__DIR__ . '/init.inc.php');
 $tabs = [
     'Status'          => 'status.php',
     'Storage pool'    => 'storage_pool.php',
+    'Trash Manager'   => 'trash.php',
     'Samba Shares'    => 'samba_shares.php',
     'Samba Config'    => 'samba_config.php',
     'Greyhole Config' => 'greyhole_config.php',
