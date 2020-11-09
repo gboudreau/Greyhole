@@ -1,33 +1,7 @@
 <?php
 //header('Content-Type: text/html; charset=utf-8');
 set_time_limit(90);
-/* Notes (2013 edition):
-        This code not designed for public consumption. It may work, but the code is quick and dirty.
-   The coding style used in this code is not reflective of my professional work, but rather my "lets
-   get it done now" style of work. It is only used by me in my LAN environment. This is not secure,
-   so do not use it in a production environment. Protect it with .htaccess/.htpasswd and
-   use common sense. The apache user (or suPHP user) will need write access to the Greyhole shares,
-   and read access to /etc/greyhole.conf
-
-   "Copies", when the result is a directory, is more like "Spanned across X drives".
-   "Copies", when the result is a file, is an accurate representation of how many drives
-   that specific file is on.
-
-   This was merely created to suit my needs and make it easier to purge/restore deleted items
-   from a greyhole share's trash. It is not a complete management system, nor does it have all the
-   features that it could. Basically, it does what I need. I share the code in case someone else
-   desires the same functionality, or would like to expand it (either for personal or commercial
-   use. My only request is if you expand this code and sell it, that I get a free license ;)
-
-   An example gallery can be found here: http://imgur.com/a/rTg3x
-
-   Created by Zefie of Zefie Networks. BSD License, or whatever. Do what you want with it.
-
-   Updated 2014-02-11, because I started using Greyhole again and noticed some missing features.
-   Added: Last Modified, Size, and UTF-8 support.
-
--------------------------------------------------------------------------------------------------------
-
+/*
    Notes 2020-11-08:
           Updated to be compatible with the 'new' greyhole web-ui, and clean up some code.
    Old code remains commented at this time, pending future removal. The rewrite for the Greyhole
@@ -42,19 +16,17 @@ set_time_limit(90);
     * Fix any outstanding bugs
 */
 
-//$prefix = $_SERVER['HTTPS'] ? "https" : "http";
-//$prefix = "http";
-//$domain = $_SERVER['HTTP_HOST'];
 $qpath = $_SERVER['SCRIPT_NAME'];
 parse_str($_SERVER['QUERY_STRING'],$query);
 
-// build query string
-$cururi = $qpath . "?page=id_".md5($name)."_tab";
+// build query data for links and forms
+$query['page'] = "id_".md5($name)."_tab"; // overwrite page ID with our own
+$cururi = $qpath . "?page=".$query['page'];
 
 $drives = getDrives();
 
-$sambainfo = getSambaShares();
-
+// We could use _SERVER['GET'] but we already use $query
+// for ['page'] and this works fine
 $ext = isset($query['path']) ? $query['path'] : "";
 $view = isset($query['view']) ? $query['view'] : "";
 $drive = isset($query['drive']) ? $query['drive'] : "";
@@ -62,7 +34,7 @@ $action = isset($query['action']) ? $query['action'] : "";
 $confirm = isset($query['confirm']) ? $query['confirm'] : "";
 
 if (($drive == "" || $view == "") && $action == "") {
-	$ptitle = "Trash Manager";
+	$ptitle = $name;
 	if ($ext != "") {
 		$ptitle .= " - ".$ext;
 	}
@@ -106,10 +78,7 @@ if (($drive == "" || $view == "") && $action == "") {
 		$parentpath = rtrim(dirname($ext,1),"/.");
 		echo "<tr>\n";
 		echo "<td><a href=\"".$cururi."&path=".rawurlencode($parentpath)."\">Parent Directory</a></td>\n";
-		echo "<td> - </td>\n";
-		echo "<td> - </td>\n";
-		echo "<td> - </td>\n";
-		echo "<td> - </td>\n";
+		for ($i=0; $i<4; $i++) echo "<td> - </td>\n";
 		echo "</tr>\n";
 	}
 
@@ -144,8 +113,7 @@ if (($drive == "" || $view == "") && $action == "") {
 			echo "<tr>\n";
 			if (is_dir($z[$k]."/.gh_trash/".$ext."/".$k)) {
 				echo "<td><a href=\"".$cururi."&path=".rawurlencode($ext."/".$k)."\">".$k."</a></td>\n";
-				echo "<td>-</td>\n";
-				echo "<td>-</td>\n";
+				for ($i=0; $i<2; $i++) echo "<td> - </td>\n";
 				echo "<td>".(@$q[$k]+1)."</td>\n";
 			} else {
 				$dr = (array_search($z[$k],$drives)+1);
@@ -153,7 +121,7 @@ if (($drive == "" || $view == "") && $action == "") {
 //				echo "<td><a href=\"".$cururi."&view=".rawurlencode($ext."/".$k)."&drive=".$dr."\">".$k."</a></td>\n";
 				echo "<td>".$k."</td>\n";
 				$fsize = filesize($z[$k]."/.gh_trash/".$ext."/".$k);
-				echo "<td>".$fsize." bytes (".friendlyBytes($fsize).")</td>\n";
+				echo "<td>".$fsize." bytes (".formatBytes($fsize).")</td>\n";
 				$ftime = filemtime($z[$k]."/.gh_trash/".$ext."/".$k);
 				echo "<td>".strftime("%m/%e/%Y %r",$ftime)."</td>\n";
 				echo "<td>".(@$q[$k]+1)."</td>\n";
@@ -197,6 +165,8 @@ if (($drive == "" || $view == "") && $action == "") {
 	echo "</body>\n";
 	echo "</html>\n";
 } else {
+/*
+	// view/download feature disabled
 	if ($view != "" && $drive != "") {
 		$dpath = $drives[($drive-1)]."/.gh_trash";
 		$fpath = $dpath.$view;
@@ -208,6 +178,7 @@ if (($drive == "" || $view == "") && $action == "") {
 		http_send_file($fpath);
 		exit();
 	}
+*/
 	if ($action == "remove" && $ext != "") {
 		if ($confirm != "Yes") {
 			echo "<h2 class=\"mt-8\">Removing ".$ext."</h2>\n";
@@ -366,6 +337,7 @@ if (($drive == "" || $view == "") && $action == "") {
 }
 
 function rrmdir($dir) {
+	// recursive remove directory
 	if (is_dir($dir)) {
 		$objects = scandir($dir);
 		foreach ($objects as $object) {
@@ -383,6 +355,7 @@ function rrmdir($dir) {
 }
 
 function xcopy($src,$dest) {
+	// recursive copy
 	if (!is_dir($dest)) {
 		mkdir($dest);
 	}
@@ -403,23 +376,23 @@ function xcopy($src,$dest) {
 	 }
 }
 
-function getSpace($friendlyBytes = false) {
-	global $stats;
-	$space['total'] = $stats['Total']->total_space;
-	$space['avail'] = $stats['Total']->free_space;
-	$space['used'] = $stats['Total']->used_space;
-	$space['trash'] = $stats['Total']->trash_size;
+function getSpace($formatBytes = false) {
 //	$space['trash'] = 0;
 //	$drives = getDrives();
 //	foreach ($drives as $d) {
 //		$dudat = `du -sk $d/.gh_trash/`;
 //		$space['trash'] = ($space['trash'] + $dudat);
 //	}
+	global $stats;
+	$space['total'] = $stats['Total']->total_space;
+	$space['avail'] = $stats['Total']->free_space;
+	$space['used']  = $stats['Total']->used_space;
+	$space['trash'] = $stats['Total']->trash_size;
 	$space['possible'] = ($space['avail'] + $space['trash']);
 
-	if ($friendlyBytes) {
+	if ($formatBytes) {
 		foreach ($space as $k => $v) {
-			$space[$k] = friendlyBytes($v * 1024);
+			$space[$k] = formatBytes($v * 1024);
 		}
 	}
 	return $space;
@@ -454,25 +427,14 @@ function getDrives() {
 	return $drives;
 }
 
-function friendlyBytes($size) {
+function formatBytes($size, $precision = 2)
+{
+    $unit = ['B','KB','MB','GB'];
+    for($i = 0; $size >= 1024 && $i < count($unit)-1; $i++){
+        $size /= 1024;
+    }
 
-	// Uncomment below to enable rounding to Terabytes.
-	// Leave commented to function as shown in example screenshots.
-
-//	if ($size > 1099511627776) {
-//		return round(($size / 1099511627776),2)."TB";
-//	}
-
-	if ($size > 1073741824) {
-		return round(($size / 1073741824),2)."GB";
-	}
-	if ($size > 1048576) {
-		return round(($size / 1048576),2)."MB";
-	}
-	if ($size > 1024) {
-		return round(($size / 1024),2)."KB";
-	}
-	return $size."B";
+    return round($size, $precision).' '.$unit[$i];
 }
 
 
@@ -504,7 +466,7 @@ function getSambaShares() {
 }
 
 function getShareInfo($path) {
-	global $sambainfo;
+	$sambainfo = getSambaShares();
 	$out = [];
 	$path = trim($path,"/");
 	$pathsplit = preg_split("/\//",$path);
