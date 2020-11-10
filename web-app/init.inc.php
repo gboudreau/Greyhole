@@ -320,6 +320,30 @@ if (!empty($_GET['ajax'])) {
         $next_url = $url . '?step=' . $next_step;
         echo json_encode(['result' => 'success', 'next_page' => $next_url]);
         exit();
+    case 'pre-remove-drive':
+        $drive = $_REQUEST['drive'];
+        if (is_dir("$drive/.gh_metastore/")) {
+            echo json_encode(['result' => 'success', 'drive_is_available' => TRUE]);
+        } else {
+            echo json_encode(['result' => 'success', 'drive_is_available' => FALSE]);
+        }
+        exit();
+    case 'remove_drive':
+        $drive = $_REQUEST['drive'];
+        $drive_still_available = ($_REQUEST['drive_is_available'] == 'yes');
+
+        $query = "INSERT INTO tasks SET action = :action, share = :share, full_path = :full_path, additional_info = :options, complete = 'yes'";
+        $params = array(
+            'action'    => ACTION_REMOVE,
+            'share'     => 'pool drive ',
+            'full_path' => $drive,
+            'options'   => ( $drive_still_available ? OPTION_DRIVE_IS_AVAILABLE : '' ),
+        );
+        DB::insert($query, $params);
+        sleep(1);
+
+        echo json_encode(['result' => 'success', 'text' => "Removal of $drive has been scheduled. It will start after all currently pending tasks have been completed.\nYou will receive an email notification once it completes.\nYou can also tail the Greyhole log to follow this operation."]);
+        exit();
     }
 
     echo json_encode(['result' => 'success', 'config_hash' => get_config_hash(), 'config_hash_samba' => get_config_hash_samba()]);

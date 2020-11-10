@@ -28,7 +28,7 @@ class RemoveCliRunner extends AbstractPoolDriveCliRunner {
         } else {
             echo "(It looks like it is not.)\n";
         }
-        echo "If so, we'll try to move all file copies that are only on this drive, onto your other drives.\n";
+        echo "If so, Greyhole will try to move all file copies that are only on this drive, onto your other drives.\n";
         do {
             $answer = strtolower(readline("Yes, or No? "));
         } while ($answer != 'yes' && $answer != 'no');

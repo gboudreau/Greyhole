@@ -663,6 +663,11 @@ function donate() {
     $('#id_gh_config_794df3791a8c800841516007427a2aa3_tab').tab('show'); // License
 }
 
+function goto_remove_drive() {
+    $('#id_06df33001c1d7187fdd81ea1f5b277aa_tab').tab('show'); // Actions
+    $('#id_action_removedrive_tab').tab('show'); // Remove Drive
+}
+
 function donationComplete(el) {
     let $el = $(el);
     let email = $el.val();
@@ -730,6 +735,50 @@ function getFsckParams() {
         params[name] = value;
     }
     return params;
+}
+
+function confirmRemoveDrive() {
+    let drive = $('#inputremove_drive').val();
+    if (drive === '0') {
+        alert('meh!');
+        return;
+    }
+
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=pre-remove-drive&drive=' + encodeURIComponent(drive),
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                if (data.drive_is_available) {
+                    $('[name=drive_is_available][value=yes]').prop('checked', true).parent().addClass('active');
+                    $('[name=drive_is_available][value=no]').prop('checked', false).parent().removeClass('active');
+                } else {
+                    $('[name=drive_is_available][value=no]').prop('checked', true).parent().addClass('active');
+                    $('[name=drive_is_available][value=yes]').prop('checked', false).parent().removeClass('active');
+                }
+                $('#remove-drive-preparing').addClass('d-none');
+                $('#remove-drive-ready').removeClass('d-none');
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+        },
+    });
+}
+
+function startRemoveDrive(button) {
+    let drive = $('#inputremove_drive').val();
+    let drive_is_available = $('[name=drive_is_available]:checked').val();
+    ajaxCallFromButton(button, 'remove_drive', 'drive=' + encodeURIComponent(drive) + '&drive_is_available=' + drive_is_available, 'Starting drive removal...', 'Started drive removal', 'Reloading...', function (data, $button) {
+        $('#remove-drive-ready').addClass('d-none');
+        $('#remove-drive-done').removeClass('d-none');
+        let body = $(button).closest('.modal-content').find('.modal-body');
+        body.text(data.text);
+        body.html(body.html().replace(/\n/g, "<br>"));
+    }, 0);
 }
 
 function confirmFsckCommand() {

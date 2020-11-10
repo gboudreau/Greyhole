@@ -22,7 +22,8 @@ $fsck_tab    = new Tab('action_fsck', 'fsck');
 $balance_tab = new Tab('action_balance', 'Balance');
 $trash_tab   = new Tab('action_trash', 'Greyhole Trash');
 $daemon_tab  = new Tab('action_daemon', 'Daemon');
-$tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab];
+$remove_tab  = new Tab('action_removedrive', 'Remove Drive');
+$tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab, $remove_tab];
 ?>
 
 <?php $fsck_tab->startContent() ?>
@@ -56,7 +57,7 @@ $tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab];
         Try to balance <?php ?> on all your storage pool drives (based on your <code>Drive Selection Algorithm</code> config).<br/>
         You can follow the advancement of this operation in the Status page.
     </div>
-    <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="startBalance(this)">
+    <button type="button" class="btn btn-primary mt-2" onclick="startBalance(this)">
         Start Balance
     </button>
 </div>
@@ -74,7 +75,7 @@ $tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab];
         <?php endforeach; ?>
     </table>
 </div>
-<button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-confirm-fsck" onclick="emptyTrash(this)">
+<button type="button" class="btn btn-primary mt-2" onclick="emptyTrash(this)">
     Empty Trash
 </button>
 <?php $trash_tab->endContent() ?>
@@ -93,6 +94,24 @@ $tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab];
     <?php endif; ?>
 </div>
 <?php $daemon_tab->endContent() ?>
+
+<?php $remove_tab->startContent() ?>
+<div class="mt-4">
+    Tell Greyhole that you want to remove a drive. Greyhole
+    will then make sure you don't lose any files, and that
+    the correct number of file copies are created to replace
+    the missing drive.
+    <div class="mt-4">
+        <?php
+        $possible_values = array_combine(Config::storagePoolDrives(), Config::storagePoolDrives());
+        echo get_config_html(['name' => 'remove_drive', 'display_name' => 'Drive to remove', 'type' => 'select', 'possible_values' => $possible_values, 'onchange' => FALSE], NULL, FALSE);
+        ?>
+        <button type="button" class="btn btn-danger mt-2" data-toggle="modal" data-target="#modal-confirm-remove-drive" onclick="confirmRemoveDrive()">
+            Remove Drive...
+        </button>
+    </div>
+</div>
+<?php $remove_tab->endContent() ?>
 
 
 <h2 class="mt-8">Greyhole Actions</h2>
@@ -117,6 +136,34 @@ $tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab];
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" onclick="startFsck(this)">Start fsck</button>
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-confirm-remove-drive" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Remove Drive</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <?php echo get_config_html(['name' => 'drive_is_available', 'display_name' => 'Is the specified drive still available?', 'type' => 'bool', 'onchange' => FALSE, 'help' => "If so, Greyhole will try to move all file copies that are only on this drive, onto your other drives."], TRUE, FALSE) ?>
+            </div>
+            <div class="modal-footer">
+                <div id="remove-drive-preparing">
+                    Loading... Please wait.
+                </div>
+                <div id="remove-drive-ready" class="d-none">
+                    <button type="button" class="btn btn-danger" onclick="startRemoveDrive(this)">Remove Drive</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                </div>
+                <div id="remove-drive-done" class="d-none">
+                    <button type="button" class="btn btn-secondary" onclick="$(this).text('Reloading...').prop('disabled', true); window.location='./'">Ok</button>
+                </div>
             </div>
         </div>
     </div>

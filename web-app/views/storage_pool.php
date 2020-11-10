@@ -85,6 +85,9 @@ $cols_width = defined('IS_INITIAL_SETUP') ? 'col-12' : 'col-12 col-lg-6';
         <?php endif; ?>
         <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-storage-pool-drive">
             Add Drive to Storage Pool
+        </button><br/>
+        <button type="button" class="btn btn-primary mt-2" onclick="goto_remove_drive()">
+            Remove Drive from Storage Pool...
         </button>
     </div>
     <?php if (!defined('IS_INITIAL_SETUP')) : ?>
