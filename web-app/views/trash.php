@@ -21,7 +21,7 @@ parse_str($_SERVER['QUERY_STRING'],$query);
 
 // build query data for links and forms
 $query['page'] = "id_".md5($name)."_tab"; // overwrite page ID with our own
-$cururi = $qpath . "?page=".$query['page'];
+$cururi = "?page=".$query['page'];
 
 $drives = getDrives();
 
