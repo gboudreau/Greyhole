@@ -19,18 +19,15 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 if (DB::isConnected()) {
-    $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
-    if (!empty($tasks)) {
-        $task = array_shift($tasks);
-
-        $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
-        $last_status = DB::getFirst($q);
-        $current_action = $last_status->action;
-    }
+    $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
+    $last_status = DB::getFirst($q);
+    $current_action = $last_status->action;
+} else {
+    $current_action = FALSE;
 }
 
 $tabs = [];
-if (@$current_action == 'balance') {
+if ($current_action == 'balance') {
     $balance_tab = new Tab('balance', 'Balance Status');
     $tabs[] = $balance_tab;
 }
@@ -60,20 +57,15 @@ if (FSCKWorkLog::isReportAvailable()) {
 </div>
 <code id="status_logs">
     <?php
-    if (DB::isConnected()) {
-        foreach (get_status_logs() as $log) {
-            echo he($log) . "<br/>";
-        }
-    } else {
+    if (!DB::isConnected()) {
         echo " (Warning: Can't connect to database to load log entries.)";
+    } else {
+        echo "Loading...";
     }
     ?>
 </code>
 
-<div class="alert alert-primary mt-3" role="alert">
-    <?php list($last_action, $last_action_time) = StatusCliRunner::get_last_action() ?>
-    Last logged action: <strong><?php phe($last_action) ?></strong><?php if (!empty($last_action_time)) : ?>, on <?php phe(date('Y-m-d H:i:s', $last_action_time) . " (" . how_long_ago($last_action_time) . ")") ?><?php endif; ?>
-</div>
+<div class="alert alert-primary mt-3" role="alert" id="last_action"></div>
 <?php $logs_tab->endContent(); ?>
 
 <?php $queue_tab->startContent() ?>
@@ -85,7 +77,7 @@ if (FSCKWorkLog::isReportAvailable()) {
 
 <table id="queue">
     <thead>
-        <tr>
+        <tr class="header">
             <th>Share</th>
             <th>Write</th>
             <th>Delete</th>
@@ -93,35 +85,9 @@ if (FSCKWorkLog::isReportAvailable()) {
             <th>Check</th>
         </tr>
     </thead>
-<?php
-$queues = ViewQueueCliRunner::getData();
-$num_rows = 0;
-foreach ($queues as $share_name => $queue) {
-    if ($share_name == 'Spooled') {
-        // Will be shown below table
-        continue;
-    }
-    if ($share_name != 'Total' && $queue->num_writes_pending + $queue->num_delete_pending + $queue->num_rename_pending + $queue->num_fsck_pending == 0) {
-        // Don't show the rows with no data, except Total
-        continue;
-    }
-    if ($share_name == 'Total' && $num_rows == 1) {
-        // Skip Total row if there was only 1 row above it!
-        continue;
-    }
-
-    $num_rows++;
-
-    $tr_class = $share_name == 'Total' ? 'total' : '';
-    echo "<tr class='$tr_class'>";
-    echo "<td>" . he($share_name) . "</td>";
-    foreach (['num_writes_pending', 'num_delete_pending', 'num_rename_pending', 'num_fsck_pending'] as $prop) {
-        $class = $queue->{$prop} > 0 ? 'nonzero' : '';
-        echo "<td class='num $class'>{$queue->{$prop}}</td>";
-    }
-    echo "</tr>";
-}
-?>
+    <tr class="loading">
+        <td colspan="5">Loading...</td>
+    </tr>
 </table>
 
 <div class="mt-4">
@@ -129,7 +95,7 @@ foreach ($queues as $share_name => $queue) {
     Until it does, the nature of those operations is unknown.<br/>
     Spooled operations that have been parsed will be listed above and disappear from the count below.
     <div class="mt-2" style="font-size: 1.3em; font-weight: bold">
-        Spooled operations: <?php echo number_format($queues['Spooled'], 0) ?>
+        Spooled operations: <span id="num_spooled_ops"></span>
     </div>
 </div>
 <?php $queue_tab->endContent(); ?>
@@ -153,76 +119,30 @@ foreach ($queues as $share_name => $queue) {
 
 <?php if (isset($balance_tab)) : ?>
     <?php $balance_tab->startContent() ?>
-    <?php if (@$current_action == 'balance') : ?>
-        <div class="mt-4">
-            <button class="btn btn-danger" onclick="cancelBalance(this)">
-                Cancel ongoing balance
-            </button>
-        </div>
-    <?php endif; ?>
+    <div class="mt-4" id="cancel_balance_container" style="display:none">
+        <button class="btn btn-danger" onclick="cancelBalance(this)">
+            Cancel ongoing balance
+        </button>
+    </div>
 
     <h4 class="mt-4">Balance Status</h4>
-    <?php $groups = BalanceStatusCliRunner::getData() ?>
-    <?php foreach ($groups as $group) : ?>
-        <div class="alert alert-info" role="alert">
-            Target free space in <?php phe($group->name) ?> storage pool drives: <strong><?php echo bytes_to_human($group->target_avail_space*1024, TRUE, TRUE) ?></strong>
-        </div>
-        <div class="col">
-            <table id="table-sp-drives">
-                <thead>
-                <tr>
-                    <th>Path</th>
-                    <th>Needs</th>
-                    <th>Usage</th>
-                </tr>
-                </thead>
-                <tbody>
-                <?php
-                $max = 0;
-                foreach ($group->drives as $sp_drive => $drive_infos) {
-                    if ($drive_infos->df['used'] > $max) {
-                        $max = $drive_infos->df['used'];
-                    }
-                }
-                ?>
-                <?php foreach ($group->drives as $sp_drive => $drive_infos) : ?>
-                    <?php
-                    $target_used_space = $drive_infos->df['used'] + ($drive_infos->direction ? -1 : 1) * $drive_infos->diff;
-                    ?>
-                    <tr>
-                        <td>
-                            <?php phe($sp_drive) ?>
-                        </td>
-                        <td>
-                            <?php echo $drive_infos->direction . ' ' . bytes_to_human($drive_infos->diff*1024, TRUE, TRUE) ?>
-                        </td>
-                        <td class="sp-bar-td">
-                            <div class="sp-bar target" data-width="<?php echo ($target_used_space/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Target: " . bytes_to_human($target_used_space*1024, FALSE, TRUE)) ?>">
-                            </div><div class="sp-bar <?php echo ($drive_infos->direction == '-' ? 'used' : 'free') ?>" data-width="<?php echo ($drive_infos->diff/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Diff: " . $drive_infos->direction . ' ' . bytes_to_human($drive_infos->diff*1024, FALSE, TRUE)) ?>"></div>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <hr/>
-    <?php endforeach; ?>
+
+    <div id="balance_groups"></div>
+
     <?php $balance_tab->endContent(); ?>
 <?php endif; ?>
 
 <?php if (isset($fsck_tab)) : ?>
     <?php $fsck_tab->startContent(); ?>
-    <?php if (@$current_action == 'fsck') : ?>
-        <div class="mt-4">
-            <button class="btn btn-danger" onclick="cancelFsck(this)">
-                Cancel ongoing fsck
-            </button>
-        </div>
-    <?php endif; ?>
+    <div class="mt-4" id="cancel_fsck_container" style="display: none">
+        <button class="btn btn-danger" onclick="cancelFsck(this)">
+            Cancel ongoing fsck
+        </button>
+    </div>
 
     <h4 class="mt-4">Latest fsck Report</h4>
     <div class="col mt-4">
-        <code><?php echo nl2br(he(FSCKWorkLog::getHumanReadableReport())) ?></code>
+        <code id="fsck-report-code">Loading...</code>
     </div>
     <?php $fsck_tab->endContent(); ?>
 <?php endif; ?>
@@ -230,37 +150,18 @@ foreach ($queues as $share_name => $queue) {
 
 <h2 class="mt-8">Status</h2>
 
-<?php $num_dproc = StatusCliRunner::get_num_daemon_proc() ?>
-<?php if ($num_dproc == 0) : ?>
-    <div class="alert alert-danger" role="alert">
-        Greyhole daemon is currently stopped.
-    </div>
-<?php elseif (PauseCliRunner::isPaused()) : ?>
-    <div class="alert alert-danger" role="alert">
-        Greyhole daemon is currently paused.<br/>
-        <button type="button" class="btn btn-primary mt-2" onclick="resumeDaemon(this)">
-            Resume Daemon
-        </button>
-    </div>
-<?php else : ?>
-    <div class="alert alert-success" role="alert">
-        Greyhole daemon is currently running:
-        <?php
-        if (DB::isConnected()) {
-            if (empty($tasks)) {
-                echo "idling.";
-            } else {
-                if ($current_action == $task->action) {
-                    phe("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
-                } else {
-                    phe("working on '$current_action' task");
-                }
-            }
-        } else {
-            echo " (Warning: Can't connect to database to load current task.)";
-        }
-        ?>
-    </div>
-<?php endif; ?>
+<div class="alert alert-danger daemon-status" role="alert" id="daemon-status-stopped" style="display: none">
+    Greyhole daemon is currently stopped.
+</div>
+
+<div class="alert alert-danger daemon-status" role="alert" id="daemon-status-paused" style="display: none">
+    Greyhole daemon is currently paused.<br/>
+    <button type="button" class="btn btn-primary mt-2" onclick="resumeDaemon(this)">
+        Resume Daemon
+    </button>
+</div>
+
+<div class="alert alert-success daemon-status" role="alert" id="daemon-status-running" style="display: none">
+</div>
 
 <?php Tab::printTabs($tabs, 'page_status') ?>

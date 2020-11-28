@@ -20,6 +20,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 include(__DIR__ . '/../init.inc.php');
 
+global $is_dark_mode; // is defined in init.inc.php; adding this here to make IDE happy
+
 define('IS_INITIAL_SETUP', TRUE);
 
 $step = @$_REQUEST['step'];

@@ -28,14 +28,69 @@ function defer(method) {
     }
 }
 
+let urlParams = {};
+function parse_url_params() {
+    let match,
+        pl     = /\+/g,  // Regex for replacing addition symbol with a space
+        search = /([^&=]+)=?([^&]*)/g,
+        decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+        query  = window.location.search.substring(1);
+    urlParams = {};
+    while (match = search.exec(query)) {
+        urlParams[decode(match[1])] = decode(match[2]);
+    }
+}
+
+let tab_changed_functions = {
+    id_ec53a8c4f07baed5d8825072c89799be_tab: function () { loadStatus(); topTabChanged(); },
+        id_logs_tab: loadStatusLogs,
+        id_queue_tab: loadStatusQueue,
+        id_past_tasks_tab: loadStatusPastTasks,
+        id_fsck_tab: loadStatusFsckReport,
+        id_balance_tab: loadStatusBalanceReport,
+
+    id_40cf615dcacf5ec5faf6a3cdf1ff5a6e_tab: loadStoragePool,
+
+    id_action_trash_tab: loadActionsTrashContent,
+
+};
+function topTabChanged() {
+    let visible_tab_id = $('.navbar-nav .active').attr('aria-controls');
+    let $target = $('#' + visible_tab_id).find('.nav-tabs .active');
+    if ($target.length > 0) {
+        // Will load data from the currently visible sub-tab
+        changedTab($target[0]);
+    } else {
+        changedTab($('.navbar-nav .active')[0]);
+    }
+}
+
 defer(function() {
     $(function () {
+        $('.nav .nav-link').on('shown.bs.tab', function (evt) {
+            changedTab(evt.target);
+        });
+
+        $(window).on('popstate', function (evt) {
+            parse_url_params();
+            for (let selected_tab of evt.originalEvent.state.selected_tabs) {
+                skip_changed_tab_event = true;
+                $('#' + selected_tab).tab('show');
+            }
+        });
+
+        $(window).resize(function() {
+            resizeSPDrivesUsageGraphs();
+        });
+
+        $('[data-toggle="tooltip"]').tooltip();
+
         checkSambaConfig();
-        colorizeTrashContent();
+
         $('#past-tasks-table').DataTable({
             processing: true,
             serverSide: true,
-            ajax: './?ajax=past_tasks',
+            ajax: './?ajax=get_status_past_tasks',
             columns: [
                 { data: 'id', orderSequence: ['desc', 'asc'] },
                 { data: 'event_date', orderSequence: ['desc', 'asc'] },
@@ -46,22 +101,30 @@ defer(function() {
             order: [[0, 'desc']],
             pageLength: 10,
         });
-        $('[data-toggle="tooltip"]').tooltip();
+
+        topTabChanged();
     });
 });
 
 function resizeSPDrivesUsageGraphs() {
-    var $table = $('#table-sp-drives');
-    let total_width = $table.closest('.col').width() - 30;
-    let width_left = total_width - $table.find('td:nth-child(1)').width() - $table.find('td:nth-child(2)').width() - $table.find('td:nth-child(3)').width() - 3*12;
-    $('.sp-bar').each(function(i, el) {
-        width = $(el).data('width') * width_left;
-        $(el).css('width', width + 'px');
-        if ($(el).hasClass('treemap')) {
-            let $table = $(el).closest('table');
-            let color = getTreemapColor($(el).data('value'), $table.data('min-value'), $table.data('max-value'));
-            $(el).css('background-color', color);
+    $('.table-sp-drives').each(function(i, el) {
+        let $table = $(el);
+        let total_width = $table.closest('.col').width() - 30;
+        let width_left = total_width;
+        let num_rows = $table.find('tr:nth-child(1)').find('th').length;
+        for (let i=1; i<num_rows; i++) {
+            width_left -= $table.find('td:nth-child('+i+')').width();
+            width_left -= 12;
         }
+        $table.find('.sp-bar').each(function(i, el) {
+            width = $(el).data('width') * width_left;
+            $(el).css('width', width + 'px');
+            if ($(el).hasClass('treemap')) {
+                let $table = $(el).closest('table');
+                let color = getTreemapColor($(el).data('value'), $table.data('min-value'), $table.data('max-value'));
+                $(el).css('background-color', color);
+            }
+        });
     });
 }
 
@@ -618,9 +681,9 @@ function changedTab(el, first, replace) {
         return;
     }
 
-    $(el).blur();
+    console.log("changedTab()", $(el).prop('id'));
 
-    resizeSPDrivesUsageGraphs();
+    $(el).blur();
 
     [$active_page_link, $sub_page_active_link] = getActiveLinks();
 
@@ -644,18 +707,12 @@ function changedTab(el, first, replace) {
     if (replace) {
         history.replaceState({selected_tabs: selected_tabs}, null, url);
     }
-}
 
-function selectInitialTab(name, replace) {
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    let el;
-    if (urlParams.get(name) === null) {
-        el = $('.nav[data-name="' + name + '"] .nav-link:first')[0];
-    } else {
-        el = $('#' + urlParams.get(name))[[0]];
+    parse_url_params();
+
+    if ($(el).prop('id') in tab_changed_functions) {
+        tab_changed_functions[$(el).prop('id')]();
     }
-    changedTab(el, true, replace);
 }
 
 function donate() {
@@ -870,22 +927,22 @@ function tailStatusLogs(button) {
         clearInterval(status_logs_timer);
     }
     if ($(button).prop('checked')) {
-        reloadStatusLogs();
-        status_logs_timer = setInterval(reloadStatusLogs, 10*1000);
+        loadStatusLogs();
+        status_logs_timer = setInterval(loadStatusLogs, 10*1000);
     }
 }
 defer(function(){ tailStatusLogs($('#tail-status-log').prop('checked', true)); });
 
-function reloadStatusLogs() {
+function loadStatus() {
     $.ajax({
         type: 'POST',
-        url: './?ajax=logs',
+        url: './?ajax=get_status',
         success: function(data, textStatus, jqXHR) {
             if (data.result === 'success') {
-                let $container = $('#status_logs');
-                $container.text('');
-                for (let log of data.logs) {
-                    $container.append($('<div/>').text(log).html() + "<br/>");
+                $('.daemon-status').hide();
+                $('#daemon-status-' + data.daemon_status).show();
+                if (data.daemon_status === 'running') {
+                    $('#daemon-status-running').html(data.status_text);
                 }
             } else {
                 if (data.result === 'error') {
@@ -894,6 +951,256 @@ function reloadStatusLogs() {
                     alert("An error occurred. Check your logs for details.");
                 }
             }
+        },
+    });
+}
+
+function loadStatusLogs() {
+    if (!('page_status' in urlParams) || urlParams.page_status !== 'id_logs_tab') {
+        // console.log("Skipping loadStatusLogs() because Logs tab is not visible.");
+        return;
+    }
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=get_status_logs',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                let $container = $('#status_logs');
+                $container.text('');
+                for (let log of data.logs) {
+                    $container.append($('<div/>').text(log).html() + "<br/>");
+                }
+                $('#last_action').text('')
+                    .html("Last logged action: ")
+                    .append($('<strong/>').text(data.last_action));
+                if (data.last_action_time !== null) {
+                    $('#last_action').append(", on " + data.last_action_time + " (" + data.last_action_time_relative + ")");
+                }
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+        },
+    });
+}
+
+function loadStatusQueue() {
+    var $table = $('#queue');
+    var $loading_row = $table.find('.loading');
+    $loading_row.show();
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=get_status_queue_content',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                $table.find('tr:not(.loading):not(.header)').detach();
+                for (let row of data.rows) {
+                    let $tr = $('<tr/>');
+                    if (row.share_name === 'Total') {
+                        $tr.addClass('total');
+                    }
+                    $tr.append($('<td/>').text(row.share_name));
+                    for (let prop of ['num_writes_pending', 'num_delete_pending', 'num_rename_pending', 'num_fsck_pending']) {
+                        let $td = $('<td/>').addClass('num').text(row.queue[prop]);
+                        if (row.queue[prop] > 0) {
+                            $td.addClass('nonzero');
+                        }
+                        $tr.append($td);
+                    }
+                    $table.append($tr);
+                }
+                $('#num_spooled_ops').text(data.num_spooled_ops);
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+            $loading_row.hide();
+        },
+    });
+}
+
+function loadStatusPastTasks() {
+    $('#past-tasks-table').DataTable().ajax.reload();
+}
+
+function loadStatusFsckReport() {
+    $('#fsck-report-code').text('Loading...');
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=get_status_fsck_report',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                $('#fsck-report-code').html(data.report_html);
+                if (data.show_stop_button) {
+                    $('#cancel_fsck_container').show();
+                } else {
+                    $('#cancel_fsck_container').hide();
+                }
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+        },
+    });
+}
+
+function loadStatusBalanceReport() {
+    let $container = $('#balance_groups');
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=get_status_balance_report',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                if (data.show_stop_button) {
+                    $('#cancel_balance_container').show();
+                } else {
+                    $('#cancel_balance_container').hide();
+                }
+
+                for (let group of data.groups) {
+                    let $alert = $('<div/>')
+                        .addClass('alert alert-info')
+                        .prop('role', 'alert')
+                        .text('Target free space in ' + group.name + ' storage pool drives: ')
+                        .append($('<strong/>').html(group.target_avail_space_html));
+
+                    let $table = $('<table/>').addClass('table-sp-drives')
+                        .append(
+                            $('<tr/>')
+                                .append($('<th/>').text('Path'))
+                                .append($('<th/>').text('Needs'))
+                                .append($('<th/>').text('Usage'))
+                        );
+
+                    for (let sp_drive in group.drives) {
+                        let drive_infos = group.drives[sp_drive];
+                        let $tr = $('<tr/>');
+                        $tr.append($('<td/>').text(sp_drive));
+                        $tr.append($('<td/>').html(drive_infos.direction + ' ' + drive_infos.diff_html));
+                        let $td = $('<td/>').addClass('sp-bar-td');
+                        $td.append(
+                            $('<div/>').addClass('sp-bar target')
+                                .data('width', drive_infos.target_width)
+                                .data('toggle', 'tooltip')
+                                .data('placement', 'bottom')
+                                .prop('title', 'Target: ' + drive_infos.target_used_space)
+                                .tooltip()
+                        );
+                        $td.append(
+                            $('<div/>').addClass('sp-bar')
+                                .addClass(drive_infos.direction === '-' ? 'used' : 'free')
+                                .data('width', drive_infos.diff_width)
+                                .data('toggle', 'tooltip')
+                                .data('placement', 'bottom')
+                                .prop('title', 'Diff: ' + drive_infos.direction + ' ' + drive_infos.diff)
+                                .tooltip()
+                        );
+                        $tr.append($td);
+                        $table.append($tr);
+                    }
+
+                    $container.text('')
+                        .append($alert)
+                        .append($('<div/>').addClass('col').append($table))
+                        .append($('<hr/>'));
+
+                    resizeSPDrivesUsageGraphs();
+                }
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+        },
+    });
+}
+
+function loadStoragePool() {
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=get_storage_pool',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                let $table = $('#table-sp tbody').text('');
+                for (let sp_drive in data.sp_stats) {
+                    if (sp_drive === 'Total') {
+                        continue;
+                    }
+                    let drive_infos = data.sp_stats[sp_drive];
+                    let $tr = $('<tr/>');
+                    $tr.append($('<td/>').text(sp_drive));
+                    $tr.append($('<td/>').html(drive_infos.min_free_html));
+                    $tr.append($('<td/>').html(drive_infos.size_html));
+                    let $td = $('<td/>').addClass('sp-bar-td');
+                    $td.append(
+                        $('<div/>').addClass('sp-bar used')
+                            .data('width', drive_infos.used_width)
+                            .data('toggle', 'tooltip').data('placement', 'bottom').prop('title', drive_infos.used_tooltip).tooltip()
+                    );
+                    $td.append(
+                        $('<div/>').addClass('sp-bar trash')
+                            .data('width', drive_infos.trash_width)
+                            .data('toggle', 'tooltip').data('placement', 'bottom').prop('title', drive_infos.trash_tooltip).tooltip()
+                    );
+                    $td.append(
+                        $('<div/>').addClass('sp-bar free')
+                            .data('width', drive_infos.free_width)
+                            .data('toggle', 'tooltip').data('placement', 'bottom').prop('title', drive_infos.free_tooltip).tooltip()
+                    );
+                    $tr.append($td);
+                    $table.append($tr);
+                }
+                resizeSPDrivesUsageGraphs();
+
+                let ctx = document.getElementById('chart_storage_pool').getContext('2d');
+                drawPieChartStorage(ctx, data.sp_stats);
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+        },
+    });
+}
+
+function loadActionsTrashContent() {
+    var $table = $('#trash-content');
+    var $loading_row = $table.find('.loading');
+    $loading_row.show();
+    $.ajax({
+        type: 'POST',
+        url: './?ajax=trash_content',
+        success: function(data, textStatus, jqXHR) {
+            if (data.result === 'success') {
+                $table.find('tr:not(.loading)').detach();
+                for (let row of data.sp_stats) {
+                    let $tr = $('<tr/>');
+                    $tr.append($('<td/>').append('<code/>').text(row.drive));
+                    $tr.append($('<td/>').addClass('colorize').data('value', row.trash_size).html(row.trash_size_human));
+                    $table.append($tr);
+                }
+                colorizeTrashContent();
+            } else {
+                if (data.result === 'error') {
+                    alert(data.message);
+                } else {
+                    alert("An error occurred. Check your logs for details.");
+                }
+            }
+            $loading_row.hide();
         },
     });
 }

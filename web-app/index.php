@@ -20,6 +20,8 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 include(__DIR__ . '/init.inc.php');
 
+global $is_dark_mode; // is defined in init.inc.php; adding this here to make IDE happy
+
 $tabs = [
     'Status'          => 'status.php',
     'Storage pool'    => 'storage_pool.php',
@@ -143,27 +145,6 @@ if (DB::isConnected()) {
             if (<?php echo json_encode(get_config_hash_samba()) ?> !== last_known_config_hash_samba) {
                 $('#needs-samba-restart').show();
             }
-
-            selectInitialTab('page');
-            selectInitialTab('page_status');
-            selectInitialTab('page_smb_config', true);
-            selectInitialTab('page_gh_config', true);
-            selectInitialTab('page_action', true);
-
-            $('.nav .nav-link').on('shown.bs.tab', function (evt) {
-                changedTab(evt.target);
-            });
-
-            $(window).on('popstate', function (evt) {
-                for (let selected_tab of evt.originalEvent.state.selected_tabs) {
-                    skip_changed_tab_event = true;
-                    $('#' + selected_tab).tab('show');
-                }
-            });
-
-            $(window).resize(function() {
-                resizeSPDrivesUsageGraphs();
-            });
         });
     </script>
 </div>

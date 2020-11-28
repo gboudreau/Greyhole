@@ -67,12 +67,9 @@ $tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab, $remove_tab];
 <div class="mt-4">
     Trash content:
     <table id="trash-content">
-        <?php global $sp_stats; foreach ($sp_stats as $sp_drive => $stat) : if ($sp_drive == 'Total') continue; ?>
-            <tr>
-                <td><code><?php phe($sp_drive) ?></code></td>
-                <td class="colorize" data-value="<?php phe($stat->trash_size) ?>"><?php echo bytes_to_human($stat->trash_size*1024, TRUE, TRUE) ?></td>
-            </tr>
-        <?php endforeach; ?>
+        <tr class="loading">
+            <td colspan="2">Loading...</td>
+        </tr>
     </table>
 </div>
 <button type="button" class="btn btn-primary mt-2" onclick="emptyTrash(this)">

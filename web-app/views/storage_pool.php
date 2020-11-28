@@ -32,57 +32,20 @@ $cols_width = defined('IS_INITIAL_SETUP') ? 'col-12' : 'col-12 col-lg-6';
     <h2 class="mt-8">Storage Pool</h2>
 <?php endif; ?>
 
-<?php $sp_stats = StatsCliRunner::get_stats() ?>
 <div class="row">
     <div class="col <?php echo $cols_width ?>">
-        <?php if (count($sp_stats) > 1) : ?>
-            <table id="table-sp-drives">
-                <thead>
-                <tr>
-                    <th>Path</th>
-                    <th>Min. free space</th>
-                    <th>Size</th>
-                    <th>Usage</th>
-                </tr>
-                </thead>
-                <tbody>
-                <?php
-                $max = 0;
-                foreach ($sp_stats as $sp_drive => $stat) {
-                    if ($sp_drive == 'Total') continue;
-                    if ($stat->total_space > $max) {
-                        $max = $stat->total_space;
-                    }
-                }
-                ?>
-                <?php foreach ($sp_stats as $sp_drive => $stat) : ?>
-                    <?php if ($sp_drive == 'Total') continue; ?>
-                    <tr>
-                        <td>
-                            <?php phe($sp_drive) ?>
-                        </td>
-                        <td>
-                            <?php echo get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[$sp_drive]", 'type' => 'kbytes'], Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive)) ?>
-                        </td>
-                        <td>
-                            <?php if (empty($stat->total_space)) : ?>
-                                Offline
-                            <?php else : ?>
-                                <?php echo bytes_to_human($stat->total_space*1024, TRUE, TRUE) ?>
-                            <?php endif; ?>
-                        </td>
-                        <td class="sp-bar-td">
-                            <?php if (!empty($stat->total_space)) : ?>
-                                <div class="sp-bar used" data-width="<?php echo (($stat->used_space - $stat->trash_size)/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Used: " . bytes_to_human(($stat->used_space - $stat->trash_size)*1024, FALSE, TRUE)) ?>">
-                                </div><div class="sp-bar trash" data-width="<?php echo ($stat->trash_size/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Trash: " . bytes_to_human($stat->trash_size*1024, FALSE, TRUE)) ?>">
-                                </div><div class="sp-bar free" data-width="<?php echo ($stat->free_space/$max) ?>" data-toggle="tooltip" data-placement="bottom" title="<?php phe("Free: " . bytes_to_human($stat->free_space*1024, FALSE, TRUE)) ?>"></div>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
+        <table class="table-sp-drives" id="table-sp">
+            <thead>
+            <tr>
+                <th>Path</th>
+                <th>Min. free space</th>
+                <th>Size</th>
+                <th>Usage</th>
+            </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
         <button type="button" class="btn btn-primary mt-2" data-toggle="modal" data-target="#modal-storage-pool-drive">
             Add Drive to Storage Pool
         </button><br/>
@@ -95,15 +58,10 @@ $cols_width = defined('IS_INITIAL_SETUP') ? 'col-12' : 'col-12 col-lg-6';
             <div class="chart-container">
                 <canvas id="chart_storage_pool" width="200" height="200"></canvas>
             </div>
-            <script>
-                defer(function(){
-                    let ctx = document.getElementById('chart_storage_pool').getContext('2d');
-                    drawPieChartStorage(ctx, <?php echo json_encode($sp_stats) ?>);
-                });
-            </script>
         </div>
     <?php endif; ?>
 </div>
+
 <div id="modal-storage-pool-drive" class="modal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">

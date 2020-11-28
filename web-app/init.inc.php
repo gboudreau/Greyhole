@@ -219,11 +219,66 @@ if (!empty($_GET['ajax'])) {
         $runner = new EmptyTrashCliRunner([], 'empty-trash');
         $runner->run();
         break;
-    case 'logs':
-        $logs = get_status_logs();
-        echo json_encode(['result' => 'success', 'logs' => $logs]);
+    case 'get_status':
+        if (DB::isConnected()) {
+            $tasks = DBSpool::getInstance()->fetch_next_tasks(TRUE, FALSE, FALSE);
+            if (!empty($tasks)) {
+                $task = array_shift($tasks);
+
+                $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
+                $last_status = DB::getFirst($q);
+                $current_action = $last_status->action;
+            }
+
+            $status_text = "Greyhole daemon is currently running: ";
+            if (empty($tasks)) {
+                $status_text .= "idling";
+            } else {
+                if ($current_action == $task->action) {
+                    $status_text .= he("working on task ID $task->id: $task->action " . clean_dir("$task->share/$task->full_path") . ($task->action == 'rename' ? " -> " . clean_dir("$task->share/$task->additional_info") : ''));
+                } else {
+                    $status_text .= he("working on '$current_action' task");
+                }
+            }
+        } else {
+            $status_text = "Can't connect to database to load current task.";
+        }
+
+        $num_dproc = StatusCliRunner::get_num_daemon_proc();
+
+        echo json_encode(['result' => 'success', 'daemon_status' => $num_dproc == 0 ? 'stopped' : (PauseCliRunner::isPaused() ? 'paused' : 'running'), 'status_text' => $status_text]);
         exit();
-    case 'past_tasks':
+    case 'get_status_logs':
+        $logs = get_status_logs();
+        list($last_action, $last_action_time) = StatusCliRunner::get_last_action();
+        echo json_encode(['result' => 'success', 'logs' => $logs, 'last_action' => $last_action, 'last_action_time' => empty($last_action_time) ? NULL : date('Y-m-d H:i:s', $last_action_time), 'last_action_time_relative' => empty($last_action_time) ? NULL : how_long_ago($last_action_time)]);
+        exit();
+    case 'get_status_queue_content':
+        $queues = ViewQueueCliRunner::getData();
+        $num_rows = 0;
+        $rows = [];
+        foreach ($queues as $share_name => $queue) {
+            if ($share_name == 'Spooled') {
+                // Will be shown below table
+                continue;
+            }
+            if ($share_name != 'Total' && $queue->num_writes_pending + $queue->num_delete_pending + $queue->num_rename_pending + $queue->num_fsck_pending == 0) {
+                // Don't show the rows with no data, except Total
+                continue;
+            }
+            if ($share_name == 'Total' && $num_rows == 1) {
+                // Skip Total row if there was only 1 row above it!
+                continue;
+            }
+
+            $num_rows++;
+
+            $rows[] = ['share_name' => $share_name, 'queue' => $queue];
+        }
+
+        echo json_encode(['result' => 'success', 'rows' => $rows, 'num_spooled_ops' => number_format($queues['Spooled'], 0)]);
+        exit();
+    case 'get_status_past_tasks':
         $q = "SELECT COUNT(*) FROM tasks_completed";
         $num_rows = DB::getFirstValue($q);
 
@@ -256,6 +311,65 @@ if (!empty($_GET['ajax'])) {
         $num_rows_filtered = DB::getFirstValue($q, ['search' => $search]);
 
         echo json_encode(['draw' => $_GET['draw'], 'recordsTotal' => $num_rows, 'recordsFiltered' => $num_rows_filtered, 'data' => $tasks]);
+        exit();
+    case 'get_status_fsck_report':
+        $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
+        $last_status = DB::getFirst($q);
+
+        $report_html = nl2br(he(FSCKWorkLog::getHumanReadableReport()));
+
+        echo json_encode(['result' => 'success', 'show_stop_button' => ($last_status->action == 'fsck'), 'report_html' => $report_html]);
+        exit();
+    case 'get_status_balance_report':
+        $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
+        $last_status = DB::getFirst($q);
+
+        $groups = BalanceStatusCliRunner::getData();
+        foreach ($groups as $group) {
+            $group->target_avail_space_html = bytes_to_human($group->target_avail_space*1024, TRUE, TRUE);
+
+            $max = 0;
+            foreach ($group->drives as $sp_drive => $drive_infos) {
+                if ($drive_infos->df['used'] > $max) {
+                    $max = $drive_infos->df['used'];
+                }
+            }
+
+            foreach ($group->drives as $sp_drive => $drive_infos) {
+                $target_used_space = $drive_infos->df['used'] + ($drive_infos->direction ? -1 : 1) * $drive_infos->diff;
+                $drive_infos->target_width = $target_used_space / $max;
+                $drive_infos->diff_width = $drive_infos->diff / $max;
+                $drive_infos->target_used_space = bytes_to_human($target_used_space*1024, FALSE, TRUE);
+                $drive_infos->diff_html = bytes_to_human($drive_infos->diff*1024, TRUE, TRUE);
+                $drive_infos->diff = bytes_to_human($drive_infos->diff*1024, FALSE, TRUE);
+            }
+        }
+
+        echo json_encode(['result' => 'success', 'show_stop_button' => ($last_status->action == 'balance'), 'groups' => $groups]);
+        exit();
+    case 'get_storage_pool':
+        $sp_stats = StatsCliRunner::get_stats();
+
+        $max = 0;
+        foreach ($sp_stats as $sp_drive => $stat) {
+            if ($sp_drive == 'Total') continue;
+            if ($stat->total_space > $max) {
+                $max = $stat->total_space;
+            }
+        }
+
+        foreach ($sp_stats as $sp_drive => $stat) {
+            $stat->min_free_html = get_config_html(['name' => CONFIG_MIN_FREE_SPACE_POOL_DRIVE . "[$sp_drive]", 'type' => 'kbytes'], Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive));
+            $stat->size_html = empty($stat->total_space) ? 'Offline' : bytes_to_human($stat->total_space*1024, TRUE, TRUE);
+            $stat->used_width = ($stat->used_space - $stat->trash_size) / $max;
+            $stat->used_tooltip = 'Used: ' . bytes_to_human(($stat->used_space - $stat->trash_size)*1024, FALSE, TRUE);
+            $stat->trash_width = $stat->trash_size / $max;
+            $stat->trash_tooltip = 'Trash: ' . bytes_to_human(($stat->trash_size)*1024, FALSE, TRUE);
+            $stat->free_width = $stat->free_space / $max;
+            $stat->free_tooltip = 'Free: ' . bytes_to_human(($stat->free_space)*1024, FALSE, TRUE);
+        }
+
+        echo json_encode(['result' => 'success', 'sp_stats' => $sp_stats]);
         exit();
     case 'install':
         $step = $_POST['step'];
@@ -343,6 +457,16 @@ if (!empty($_GET['ajax'])) {
         sleep(1);
 
         echo json_encode(['result' => 'success', 'text' => "Removal of $drive has been scheduled. It will start after all currently pending tasks have been completed.\nYou will receive an email notification once it completes.\nYou can also tail the Greyhole log to follow this operation."]);
+        exit();
+    case 'trash_content':
+        $sp_stats = [];
+        foreach (StatsCliRunner::get_stats() as $sp_drive => $stat) {
+            if ($sp_drive == 'Total') {
+                continue;
+            }
+            $sp_stats[] = ['drive' => $sp_drive, 'trash_size' => $stat->trash_size, 'trash_size_human' => bytes_to_human($stat->trash_size*1024, TRUE, TRUE)];
+        }
+        echo json_encode(['result' => 'success', 'sp_stats' => $sp_stats]);
         exit();
     }
 
