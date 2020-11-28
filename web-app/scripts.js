@@ -42,17 +42,14 @@ function parse_url_params() {
 }
 
 let tab_changed_functions = {
-    id_ec53a8c4f07baed5d8825072c89799be_tab: function () { loadStatus(); topTabChanged(); },
-        id_logs_tab: loadStatusLogs,
-        id_queue_tab: loadStatusQueue,
-        id_past_tasks_tab: loadStatusPastTasks,
-        id_fsck_tab: loadStatusFsckReport,
-        id_balance_tab: loadStatusBalanceReport,
-
-    id_40cf615dcacf5ec5faf6a3cdf1ff5a6e_tab: loadStoragePool,
-
-    id_action_trash_tab: loadActionsTrashContent,
-
+    id_l1_status_tab:            function () { loadStatus(); topTabChanged(); },
+    id_l2_status_logs_tab:       loadStatusLogs,
+    id_l2_status_queue_tab:      loadStatusQueue,
+    id_l2_status_past_tasks_tab: loadStatusPastTasks,
+    id_l2_status_fsck_tab:       loadStatusFsckReport,
+    id_l2_status_balance_tab:    loadStatusBalanceReport,
+    id_l1_spool_tab:             loadStoragePool,
+    id_l2_actions_trash_tab:     loadActionsTrashContent,
 };
 function topTabChanged() {
     let visible_tab_id = $('.navbar-nav .active').attr('aria-controls');
@@ -681,7 +678,7 @@ function changedTab(el, first, replace) {
         return;
     }
 
-    console.log("changedTab()", $(el).prop('id'));
+    // console.log("changedTab()", $(el).prop('id'));
 
     $(el).blur();
 
@@ -716,13 +713,13 @@ function changedTab(el, first, replace) {
 }
 
 function donate() {
-    $('#id_6e63d8ace53681936423edd454569328_tab').tab('show'); // Greyhole Config
-    $('#id_gh_config_794df3791a8c800841516007427a2aa3_tab').tab('show'); // License
+    $('#id_l1_ghconfig_tab').tab('show'); // Greyhole Config
+    $('#id_l2_ghconfig_794df3791a8c800841516007427a2aa3_tab').tab('show'); // License
 }
 
 function goto_remove_drive() {
-    $('#id_06df33001c1d7187fdd81ea1f5b277aa_tab').tab('show'); // Actions
-    $('#id_action_removedrive_tab').tab('show'); // Remove Drive
+    $('#id_l1_actions_tab').tab('show'); // Actions
+    $('#id_l2_actions_removedrive_tab').tab('show'); // Remove Drive
 }
 
 function donationComplete(el) {
@@ -781,7 +778,7 @@ function parseParams(params) {
 
 function getFsckParams() {
     let params = {};
-    let s = $('#id_action_fsck').find('input, select').serialize();
+    let s = $('#id_l2_actions_fsck').find('input, select').serialize();
     let parsedParams = parseParams(s);
     for (let name in parsedParams) {
         let value = parsedParams[name];
@@ -956,7 +953,7 @@ function loadStatus() {
 }
 
 function loadStatusLogs() {
-    if (!('page_status' in urlParams) || urlParams.page_status !== 'id_logs_tab') {
+    if (!('page_status' in urlParams) || urlParams.page_status !== 'id_l2_status_logs_tab') {
         // console.log("Skipping loadStatusLogs() because Logs tab is not visible.");
         return;
     }

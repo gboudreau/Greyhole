@@ -18,8 +18,8 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-$gh_options_tab = new Tab('smb_config_general', 'Greyhole-required options');
-$users_tab      = new Tab('smb_config_users', 'Users');
+$gh_options_tab = new Tab('l2_smbconfig_general', 'Greyhole-required options');
+$users_tab      = new Tab('l2_smbconfig_users', 'Users');
 $tabs = [$gh_options_tab, $users_tab];
 ?>
 

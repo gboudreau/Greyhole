@@ -391,9 +391,15 @@ class Tab {
     public $name;
     public $content;
 
-    public function __construct($id, $name) {
+    public function __construct($id, $name, $view = NULL) {
         $this->id = $id;
         $this->name = $name;
+        if (!empty($view)) {
+            $this->startContent();
+            /** @noinspection PhpIncludeInspection */
+            include "web-app/views/$view";
+            $this->endContent();
+        }
     }
 
     public function startContent() {
@@ -404,9 +410,14 @@ class Tab {
         $this->content = ob_get_clean();
     }
 
-    public static function printTabs($tabs, $tab_selector_name) {
+    public static function printTabs($tabs, $tab_selector_name, $navbar_classes = 'nav-tabs') {
+        $selected_tab = static::printTabsNav($tabs, $tab_selector_name, $navbar_classes);
+        static::printTabsContent($tabs, $selected_tab);
+    }
+
+    public static function printTabsNav($tabs, $tab_selector_name, $navbar_classes) {
         ?>
-        <ul class="nav nav-tabs" role="tablist" data-name="<?php phe($tab_selector_name) ?>">
+        <ul class="nav <?php phe($navbar_classes) ?>" role="tablist" data-name="<?php phe($tab_selector_name) ?>">
             <?php $first = empty($_GET[$tab_selector_name]); foreach ($tabs as $tab) : $active = $first || @$_GET[$tab_selector_name] == 'id_' . $tab->id . '_tab'; if ($active) $selected_tab = $tab->id; ?>
                 <li class="nav-item">
                     <a class="nav-link <?php echo $active ? 'active' : '' ?>"
@@ -419,6 +430,12 @@ class Tab {
                 </li>
                 <?php $first = FALSE; endforeach; ?>
         </ul>
+        <?php
+        return @$selected_tab;
+    }
+
+    public static function printTabsContent($tabs, $selected_tab) {
+        ?>
         <div class="tab-content">
             <?php foreach ($tabs as $tab) : ?>
                 <div class="tab-pane fade <?php if ($tab->id == $selected_tab) echo 'show active' ?>" id="id_<?php phe($tab->id) ?>" role="tabpanel" aria-labelledby="id_<?php phe($tab->id) ?>_tab">

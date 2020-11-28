@@ -28,21 +28,21 @@ if (DB::isConnected()) {
 
 $tabs = [];
 if ($current_action == 'balance') {
-    $balance_tab = new Tab('balance', 'Balance Status');
+    $balance_tab = new Tab('l2_status_balance', 'Balance Status');
     $tabs[] = $balance_tab;
 }
 
-$logs_tab = new Tab('logs', 'Logs');
+$logs_tab = new Tab('l2_status_logs', 'Logs');
 $tabs[] = $logs_tab;
 
-$queue_tab = new Tab('queue', 'Queue');
+$queue_tab = new Tab('l2_status_queue', 'Queue');
 $tabs[] = $queue_tab;
 
-$past_tasks_tab = new Tab('past_tasks', 'Past Tasks');
+$past_tasks_tab = new Tab('l2_status_past_tasks', 'Past Tasks');
 $tabs[] = $past_tasks_tab;
 
 if (FSCKWorkLog::isReportAvailable()) {
-    $fsck_tab = new Tab('fsck', 'fsck Report');
+    $fsck_tab = new Tab('l2_status_fsck', 'fsck Report');
     $tabs[] = $fsck_tab;
 }
 ?>

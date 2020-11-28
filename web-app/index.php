@@ -22,13 +22,20 @@ include(__DIR__ . '/init.inc.php');
 
 global $is_dark_mode; // is defined in init.inc.php; adding this here to make IDE happy
 
+global $licensed;
+$licensed = FALSE;
+if (DB::isConnected()) {
+    $guid = GetGUIDCliRunner::setUniqID();
+    $licensed = trim(file_get_contents("https://www.greyhole.net/license/check/?guid=" . urlencode($guid))) === '1';
+}
+
 $tabs = [
-    'Status'          => 'status.php',
-    'Storage pool'    => 'storage_pool.php',
-    'Samba Shares'    => 'samba_shares.php',
-    'Samba Config'    => 'samba_config.php',
-    'Greyhole Config' => 'greyhole_config.php',
-    'Actions'         => 'actions.php',
+    new Tab('l1_status',    'Status',          'status.php'),
+    new Tab('l1_spool',     'Storage pool',    'storage_pool.php'),
+    new Tab('l1_smbshares', 'Samba Shares',    'samba_shares.php'),
+    new Tab('l1_smbconfig', 'Samba Config',    'samba_config.php'),
+    new Tab('l1_ghconfig',  'Greyhole Config', 'greyhole_config.php'),
+    new Tab('l1_actions',   'Actions',         'actions.php'),
 ];
 
 $last_known_config_hash = DB::isConnected() ? Settings::get('last_known_config_hash') : get_config_hash();
@@ -44,12 +51,6 @@ if (empty($last_known_config_hash_samba)) {
         DB::execute($q);
         Settings::set('last_known_config_hash_samba=' . SambaUtils::get_smbd_pid(), $last_known_config_hash_samba);
     }
-}
-
-$licensed = FALSE;
-if (DB::isConnected()) {
-    $guid = GetGUIDCliRunner::setUniqID();
-    $licensed = trim(file_get_contents("https://www.greyhole.net/license/check/?guid=" . urlencode($guid))) === '1';
 }
 ?>
 <!doctype html>
@@ -83,19 +84,7 @@ if (DB::isConnected()) {
         </button>
 
         <div class="collapse navbar-collapse" id="navbarSupportedContent">
-            <ul class="nav navbar-nav mr-auto" data-name="page">
-                <?php $first = empty($_GET['page']); foreach ($tabs as $name => $view) : $active = $first || @$_GET['page'] == 'id_' . md5($name) . '_tab'; if ($active) $selected_page_tab = $name; ?>
-                    <li class="nav-item">
-                        <a class="nav-link <?php echo $active ? 'active' : '' ?>"
-                           id="id_<?php echo md5($name) ?>_tab"
-                           data-toggle="tab"
-                           href="#id_<?php echo md5($name) ?>"
-                           role="tab"
-                           aria-controls="id_<?php echo md5($name) ?>"
-                           aria-selected="<?php echo $first ? 'true' : 'false' ?>"><?php phe($name) ?></a>
-                    </li>
-                <?php $first = FALSE; endforeach; ?>
-            </ul>
+            <?php $selected_tab = Tab::printTabsNav($tabs, 'page', 'navbar-nav mr-auto') ?>
 
             <div class="custom-control custom-switch navbar-text">
                 <input type="checkbox" class="custom-control-input" id="darkSwitch" onchange="toggleDarkMode()">
@@ -112,13 +101,7 @@ if (DB::isConnected()) {
         </div>
     </nav>
 
-    <div class="tab-content">
-        <?php foreach ($tabs as $name => $view) : ?>
-            <div class="tab-pane fade <?php echo $name == $selected_page_tab ? 'show active' : '' ?>" id="id_<?php echo md5($name) ?>" role="tabpanel" aria-labelledby="id_<?php echo md5($name) ?>_tab">
-                <?php include "web-app/views/$view" ?>
-            </div>
-        <?php endforeach; ?>
-    </div>
+    <?php Tab::printTabsContent($tabs, $selected_tab) ?>
 
     <div id="footer-padding"></div>
 

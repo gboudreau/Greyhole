@@ -2,6 +2,7 @@
 
 $configs = [];
 
+global $licensed;
 if (!@$licensed && !defined('IS_INITIAL_SETUP')) {
     $configs[] = [
         'name' => 'License',

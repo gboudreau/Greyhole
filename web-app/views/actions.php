@@ -18,11 +18,11 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-$fsck_tab    = new Tab('action_fsck', 'fsck');
-$balance_tab = new Tab('action_balance', 'Balance');
-$trash_tab   = new Tab('action_trash', 'Greyhole Trash');
-$daemon_tab  = new Tab('action_daemon', 'Daemon');
-$remove_tab  = new Tab('action_removedrive', 'Remove Drive');
+$fsck_tab    = new Tab('l2_actions_fsck', 'fsck');
+$balance_tab = new Tab('l2_actions_balance', 'Balance');
+$trash_tab   = new Tab('l2_actions_trash', 'Greyhole Trash');
+$daemon_tab  = new Tab('l2_actions_daemon', 'Daemon');
+$remove_tab  = new Tab('l2_actions_removedrive', 'Remove Drive');
 $tabs = [$fsck_tab, $balance_tab, $trash_tab, $daemon_tab, $remove_tab];
 ?>
 

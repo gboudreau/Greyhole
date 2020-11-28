@@ -35,7 +35,7 @@ include 'web-app/config_definitions.inc.php';
 
 $tabs = [];
 foreach ($configs as $i => $config) {
-    $tab = new Tab('gh_config_' . md5($config->name), $config->name);
+    $tab = new Tab('l2_ghconfig_' . md5($config->name), $config->name);
     $tab->content = get_config_html($config);
     $tabs[] = $tab;
 }
