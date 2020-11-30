@@ -108,6 +108,7 @@ ifeq ($(ARCH), amd64)
 	install -m 0644 -D -p samba-module/bin/4.10/greyhole-x86_64.so $(DESTDIR)usr/lib64/greyhole/greyhole-samba410.so
 	install -m 0644 -D -p samba-module/bin/4.11/greyhole-x86_64.so $(DESTDIR)usr/lib64/greyhole/greyhole-samba411.so
 	install -m 0644 -D -p samba-module/bin/4.12/greyhole-x86_64.so $(DESTDIR)usr/lib64/greyhole/greyhole-samba412.so
+	install -m 0644 -D -p samba-module/bin/4.13/greyhole-x86_64.so $(DESTDIR)usr/lib64/greyhole/greyhole-samba413.so
 else
 ifeq ($(ARCH), armhf)
 		mkdir -p $(DESTDIR)usr/lib/greyhole/
@@ -136,6 +137,7 @@ ifeq ($(ARCH), arm64)
 		install -m 0644 -D -p samba-module/bin/4.10/greyhole-arm64.so $(DESTDIR)usr/lib/aarch64-linux-gnu/greyhole/greyhole-samba410.so
 		install -m 0644 -D -p samba-module/bin/4.11/greyhole-arm64.so $(DESTDIR)usr/lib/aarch64-linux-gnu/greyhole/greyhole-samba411.so
 		install -m 0644 -D -p samba-module/bin/4.12/greyhole-arm64.so $(DESTDIR)usr/lib/aarch64-linux-gnu/greyhole/greyhole-samba412.so
+		install -m 0644 -D -p samba-module/bin/4.13/greyhole-arm64.so $(DESTDIR)usr/lib/aarch64-linux-gnu/greyhole/greyhole-samba413.so
 else
 		mkdir -p $(DESTDIR)usr/lib/greyhole/
 		install -m 0644 -D -p samba-module/bin/3.4/greyhole-i386.so $(DESTDIR)usr/lib/greyhole/greyhole-samba34.so
@@ -154,6 +156,7 @@ else
 		install -m 0644 -D -p samba-module/bin/4.10/greyhole-i386.so $(DESTDIR)usr/lib/greyhole/greyhole-samba410.so
 		install -m 0644 -D -p samba-module/bin/4.11/greyhole-i386.so $(DESTDIR)usr/lib/greyhole/greyhole-samba411.so
 		install -m 0644 -D -p samba-module/bin/4.12/greyhole-i386.so $(DESTDIR)usr/lib/greyhole/greyhole-samba412.so
+		install -m 0644 -D -p samba-module/bin/4.13/greyhole-i386.so $(DESTDIR)usr/lib/greyhole/greyhole-samba413.so
 endif
 endif
 endif

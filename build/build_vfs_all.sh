@@ -25,7 +25,7 @@ if [ "$ARCH" = "i686" ]; then
     ARCH="i386"
 fi
 
-for version in 4.12.0 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
+for version in 4.13.0 4.12.0 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
     set +e
     GREYHOLE_COMPILED_MODULE="$(ls -1 "$GREYHOLE_VFS_BUILD_DIR"/samba-$version/bin/default/source3/modules/libvfs*greyhole.so 2>/dev/null)"
     set -e

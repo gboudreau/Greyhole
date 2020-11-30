@@ -54,6 +54,16 @@ if [ $M -ge 4 ] && [ $m -ge 12 ]; then
     PERL_MM_USE_DEFAULT=1
     cpan Parse::Yapp::Driver
 fi
+if [ $M -ge 4 ] && [ $m -ge 13 ]; then
+    echo "Installing zlib-devel ..."
+    if command -v apt-get >/dev/null; then
+        apt-get -y install zlib1g-dev || true
+    fi
+    if command -v yum >/dev/null; then
+        yum -y install zlib-devel || true
+    fi
+fi
+
 echo
 
 echo "Compiling Greyhole VFS module for samba-${version}... "
@@ -120,6 +130,9 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     CONF_OPTIONS="--enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --without-ad-dc"
     if [[ ${m} -gt 6 ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --disable-python"
+    fi
+    if [[ ${m} -gt 12 ]]; then
+      CONF_OPTIONS="${CONF_OPTIONS} --with-shared-modules=!vfs_snapper"
     fi
     if [[ ${m} -gt 9 ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --without-json --without-libarchive"

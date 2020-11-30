@@ -11,43 +11,26 @@ How to build the VFS module binaries for a new Samba version.
 
 3. Add the new Samba version number in `build/build_vfs_all.sh @L23`
 
-4. Run the build/build_vfs_all.sh script
-
-        cd ~/git/Greyhole/
-
-        SSH_HOST="gh-builder-i386"
-        rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build/build_vfs_all.sh ; exec bash"'
-
-        SSH_HOST="gh-builder-x86_64"
-        rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'screen sh -c "sudo /home/gb/Greyhole/build/build_vfs_all.sh ; exec bash"'
-
-        SSH_HOST="gh-builder-arm64"
-        rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole
-        ssh -t $SSH_HOST 'screen sh -c "sudo /home/pi/Greyhole/build/build_vfs_all.sh ; exec bash"'
-
+4. Run the build/build_vfs_all.sh script, and
 5. Copy the resulting binaries back into your workstation:
 
-        cd ~/git/Greyhole/samba-module/bin/
+    cd ~/git/Greyhole/ && export SSH_HOST="gh-builder-x86_64" ; rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole && ssh -t $SSH_HOST 'sudo /home/gb/Greyhole/build/build_vfs_all.sh'
+    cd ~/git/Greyhole/samba-module/bin/ && export SSH_HOST="gh-builder-x86_64" ; rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
-        SSH_HOST="gh-builder-i386"
-        rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
+    cd ~/git/Greyhole/ && export SSH_HOST="gh-builder-i386" ; rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole && ssh -t $SSH_HOST 'sudo /home/gb/Greyhole/build/build_vfs_all.sh'
+    cd ~/git/Greyhole/samba-module/bin/ && export SSH_HOST="gh-builder-i386" ; rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
-        SSH_HOST="gh-builder-x86_64"
-        rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
-
-        SSH_HOST="gh-builder-arm64"
-        rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
+    cd ~/git/Greyhole/ && export SSH_HOST="gh-builder-arm64" ; rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole && ssh -t $SSH_HOST 'sudo /home/pi/Greyhole/build/build_vfs_all.sh'
+    cd ~/git/Greyhole/samba-module/bin/ && export SSH_HOST="gh-builder-arm64" ; rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
 
 6. Edit `INSTALL`
-    - Change latest version of Samba supported in point 3 (near L98).
+    - Change latest version of Samba supported in point 3 (near L85).
 
 7. Edit DEBIAN/Makefile
-    - Add lines near L88, L104, L121
+    - Add lines near L127, L140, L159
 
 8. Edit DEBIAN/postinst
-    - Add an `elif` block near L85, and change the `else` block to use the latest version
+    - Add an `elif` block near L94, and change the `else` block to use the latest version
 
 9. Commit all changes & new binaries
    See [this commit](https://github.com/gboudreau/Greyhole/commit/7d5a46aa35392e524ac8ef8a360a9544219a446a) for an example of what your commit should contain.
