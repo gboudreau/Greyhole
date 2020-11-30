@@ -78,6 +78,7 @@ build:
 	install -m 0644 -D -p web-app/views/samba_shares.php $(DESTDIR)usr/share/greyhole/web-app/views/samba_shares.php
 	install -m 0644 -D -p web-app/views/status.php $(DESTDIR)usr/share/greyhole/web-app/views/status.php
 	install -m 0644 -D -p web-app/views/storage_pool.php $(DESTDIR)usr/share/greyhole/web-app/views/storage_pool.php
+	install -m 0644 -D -p web-app/views/trash.php $(DESTDIR)usr/share/greyhole/web-app/views/trash.php
 
 	install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
 	install -m 0755 -D -p scripts-examples/greyhole_idle.sh $(DESTDIR)usr/share/greyhole/scripts-examples/

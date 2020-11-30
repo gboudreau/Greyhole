@@ -73,6 +73,7 @@ install -m 0644 -D -p web-app/views/samba_config.php ${RPM_BUILD_ROOT}/usr/share
 install -m 0644 -D -p web-app/views/samba_shares.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/
 install -m 0644 -D -p web-app/views/status.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/
 install -m 0644 -D -p web-app/views/storage_pool.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/
+install -m 0644 -D -p web-app/views/trash.php ${RPM_BUILD_ROOT}/usr/share/greyhole/web-app/views/
 
 install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
 install -m 0755 -D -p scripts-examples/greyhole_idle.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
