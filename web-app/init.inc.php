@@ -371,6 +371,247 @@ if (!empty($_GET['ajax'])) {
 
         echo json_encode(['result' => 'success', 'sp_stats' => $sp_stats]);
         exit();
+    case 'get_trashman_content':
+        // Find all files in specified directory, with their size (%s) and last modified date (%T@)
+        $dir = $_REQUEST['dir'];
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            // Ensure the specified dir doesn't contains .. to try to go outside the trash folder!
+            $base_dir = "$sp_drive/.gh_trash";
+            if (substr("$base_dir/$dir",0, strlen($base_dir)) !== $base_dir) {
+                continue;
+            }
+            if (is_dir("$sp_drive/.gh_trash/$dir")) {
+                chdir("$sp_drive/.gh_trash/$dir");
+                exec("find . -type f -printf \"%s %T@ %p\\n\"", $output);
+            }
+        }
+        chdir(__DIR__);
+
+        // Build $trash_content array that counts and sums the filesize of all files contained in the current directory
+        $trash_content = [];
+        $restore_content = [];
+        foreach ($output as $line) {
+            $line = explode(" ", trim($line));
+            $size = array_shift($line);
+            $last_modified = date('Y-m-d H:i:s', explode('.', array_shift($line))[0]);
+            $line = implode(" ", $line);
+            $file_path = explode("/", $line);
+            array_shift($file_path);
+            $dir_path = ['.'];
+            foreach ($file_path as $part) {
+                $key = implode("/", $dir_path);
+                if (!isset($trash_content[$key])) {
+                    $trash_content[$key] = [];
+                }
+                if (count($dir_path) > 1) {
+                    // No need to calculate stats for subfolders
+                    break;
+                }
+                if (!isset($trash_content[$key][$part])) {
+                    $trash_content[$key][$part] = ['size' => 0, 'num_copies' => 0, 'modified' => $last_modified];
+                }
+                $trash_content[$key][$part]['size'] += $size;
+                $trash_content[$key][$part]['num_copies']++;
+                $dir_path[] = $part;
+
+                $restore_content[$part][implode("/", $file_path)] = $size;
+            }
+        }
+
+        if (!isset($trash_content['.'])) {
+            // Can happen after someone deleted the last entry using trashman
+            $data[] = ['path' => 'Empty', 'size' => '', 'copies' => '', 'modified' => '', 'actions' => ''];
+        } else {
+            // Display the files/folders found in the current dir (.)
+            $result = $trash_content['.'];
+            $num_rows = count($result);
+            foreach ($result as $path => $stat) {
+                $files_to_restore = $restore_content[$path];
+                $data[] = ['path' => $path, 'size' => $stat['size'], 'copies' => $stat['num_copies'], 'modified' => $stat['modified'], 'copies_restore' => count($files_to_restore), 'size_restore' => bytes_to_human(array_sum($files_to_restore), TRUE, TRUE)];
+            }
+
+            // Sort (using user-specified column & direction)
+            $columns = ['path', 'size', 'copies', 'modified'];
+            $order_by = [];
+            foreach ($_GET['order'] as $ob) {
+                $order_by[] = [$columns[$ob['column']], $ob['dir']];
+            }
+            usort($data, function ($d1, $d2) use ($order_by) {
+                foreach ($order_by as $ob) {
+                    $col = $ob[0];
+                    $dir = $ob[1];
+                    if ($d1[$col] < $d2[$col]) {
+                        if ($dir == 'asc') {
+                            return -1;
+                        }
+                        return 1;
+                    }
+                    if ($d1[$col] > $d2[$col]) {
+                        if ($dir == 'asc') {
+                            return 1;
+                        }
+                        return -1;
+                    }
+                }
+                return 0;
+            });
+
+            // Format size values; add link (navigation) for directories, add action buttons (delete, restore)
+            foreach ($data as &$d) {
+                $d['raw_path'] = $d['path'];
+                $key = './' . $d['path'];
+                $d['size_delete'] = bytes_to_human($d['size'], TRUE, TRUE);
+                if (isset($trash_content[$key])) {
+                    // Is a folder
+                    $d['path'] = '<a href="#enter" onclick="trashmanEnterFolder(this); return false">' . he($d['path']) . '</a>';
+                    $d['size'] = number_format($d['size']);
+                } else {
+                    // Is a file
+                    $d['path'] = $key;
+                    if ($d['copies'] > 1) {
+                        $d['size'] = $d['copies'] . ' x ' . bytes_to_human($d['size'] / $d['copies'], TRUE, TRUE) . ' = ' . number_format($d['size']);
+                    } else {
+                        $d['size'] = number_format($d['size']);
+                    }
+                }
+                $d['actions'] = '<a class="btn btn-danger" href="#delete" onclick="trashmanDelete(this); return false">Delete forever...</a> <a class="btn btn-success" href="restore" onclick="trashmanRestore(this); return false">Restore...</a>';
+            }
+        }
+
+        // If we're in a sub-directory, add a row at the top to allow navigating back to the parent directory
+        if ($dir != '.') {
+            array_unshift($data, ['path' => '<a href="#parent" onclick="trashmanGoToParent(); return false">&lt; Parent directory</a>', 'size' => '', 'modified' => '', 'copies' => '', 'actions' => '']);
+        }
+
+        echo json_encode(['draw' => $_GET['draw'], 'recordsTotal' => $num_rows, 'recordsFiltered' => $num_rows, 'data' => $data]);
+        exit();
+    case 'restore_from_trash':
+        $folder = $_REQUEST['folder'];
+        $restore_content = [];
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            // Ensure the specified dir doesn't contains .. to try to go outside the trash folder!
+            $base_dir = "$sp_drive/.gh_trash";
+            if (substr("$base_dir/$folder",0, strlen($base_dir)) !== $base_dir) {
+                continue;
+            }
+            if (is_dir("$sp_drive/.gh_trash/$folder")) {
+                chdir("$sp_drive/.gh_trash/$folder");
+                $dir = $folder;
+                unset($output);
+                exec("find . -type f -printf \"%s %T@ %p\\n\"", $output);
+                chdir(__DIR__);
+            } elseif (is_file("$sp_drive/.gh_trash/$folder")) {
+                $file = "$sp_drive/.gh_trash/$folder";
+                $size = gh_filesize($file);
+                $last_modified = filemtime($file);
+                $file = substr($file, strlen("$sp_drive/.gh_trash/"));
+                $dir = dirname($file);
+                $output = ["$size $last_modified ./" . basename($file)];
+            } else {
+                continue;
+            }
+            foreach ($output as $line) {
+                $line = explode(" ", trim($line));
+                $size = array_shift($line);
+                $last_modified = date('Y-m-d H:i:s', explode('.', array_shift($line))[0]);
+                $line = implode(" ", $line);
+                $file_path = explode("/", $line);
+                array_shift($file_path);
+                $file_path = implode("/", $file_path);
+                $restore_content[$file_path][] = ['path' => "$sp_drive/.gh_trash/$dir/$file_path", 'size' => $size, 'last_modified' => $last_modified, 'sp_drive' => $sp_drive];
+            }
+        }
+
+        $total_size = 0;
+        $file_copies_to_restore = [];
+        foreach ($restore_content as $trashed_files) {
+            $max_last_modified = 0;
+            $file_to_restore = ['last_modified' => 0, 'size' => 0];
+            foreach ($trashed_files as $trashed_file) {
+                if (strtotime($trashed_file['last_modified']) >= $file_to_restore['last_modified']) {
+                    if (strtotime($trashed_file['last_modified']) > $file_to_restore['last_modified'] || $trashed_file['size'] > $file_to_restore['size']) {
+                        $file_to_restore = $trashed_file;
+                    }
+                }
+            }
+            $file_copies_to_restore[] = $file_to_restore;
+            $total_size += $file_to_restore['size'];
+        }
+
+        error_log("Restoring " . count($file_copies_to_restore) . " files totaling " . bytes_to_human($total_size, FALSE, TRUE) . " from trash into $dir");
+
+        foreach ($file_copies_to_restore as $file_copy_to_restore) {
+            $source = $file_copy_to_restore['path'];
+            $target = str_replace($file_copy_to_restore['sp_drive'] . "/.gh_trash/", $file_copy_to_restore['sp_drive'] . "/", $file_copy_to_restore['path']);
+
+            $link = substr($target, strlen($file_copy_to_restore['sp_drive'])+1);
+            $link = explode("/", $link);
+            $share = array_shift($link);
+            $full_path = implode("/", $link);
+            $link = get_share_landing_zone($share) . "/$full_path";
+
+            $tentative_link = $link;
+            $i = 0;
+            while (file_exists($tentative_link)) {
+                $i++;
+                $tentative_link = $link . " (restored $i)";
+            }
+            $link = $tentative_link;
+
+            if ($i > 0) {
+                $target .= " (restored $i)";
+            }
+            error_log("- Moving $source into $target");
+            gh_mkdir(dirname($target), dirname($source));
+            rename($source, $target);
+
+            error_log("- Creating symlink at $link");
+            gh_mkdir(dirname($link), dirname($source));
+            gh_symlink($target, $link);
+            FsckFileTask::queue($share, dirname($full_path) . '/' . basename($link));
+        }
+
+        echo json_encode(['result' => 'success']);
+        exit();
+    case 'delete_from_trash':
+        foreach (Config::storagePoolDrives() as $sp_drive) {
+            $base_dir = "$sp_drive/.gh_trash";
+            $path_to_delete_tr = realpath("$base_dir/" . $_REQUEST['folder']);
+            if ($path_to_delete_tr && substr($path_to_delete_tr,0, strlen($base_dir)) === $base_dir) {
+                // First, delete the folders & symlinks from the Trash share, if it exists
+                $trash_share = SharesConfig::getConfigForShare(CONFIG_TRASH_SHARE);
+                if ($trash_share) {
+                    $base_dir = $trash_share[CONFIG_LANDING_ZONE];
+                    $path_to_delete = "$base_dir/" . $_REQUEST['folder'];
+                    if (file_exists($path_to_delete)) {
+                        $rm_command = "rm -rf " . escapeshellarg($path_to_delete);
+                        error_log($rm_command);
+                        exec($rm_command);
+
+                        // Also delete other copies symlinks from the Trash share, if any (those are named "FILENAME copy #")
+                        $i = 1;
+                        while (TRUE) {
+                            $path_to_delete = "$base_dir/" . $_REQUEST['folder'] . " copy $i";
+                            if (file_exists($path_to_delete) && !is_dir($path_to_delete)) {
+                                $rm_command = "rm -rf " . escapeshellarg($path_to_delete);
+                                error_log($rm_command);
+                                exec($rm_command);
+                                $i++;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Then delete the trashed files from the .gh_trash
+                $rm_command = "rm -rf " . escapeshellarg($path_to_delete_tr);
+                error_log($rm_command);
+                exec($rm_command);
+            }
+        }
+        echo json_encode(['result' => 'success']);
+        exit();
     case 'install':
         $step = $_POST['step'];
 

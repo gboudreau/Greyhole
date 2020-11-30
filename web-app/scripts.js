@@ -49,6 +49,7 @@ let tab_changed_functions = {
     id_l2_status_fsck_tab:       loadStatusFsckReport,
     id_l2_status_balance_tab:    loadStatusBalanceReport,
     id_l1_spool_tab:             loadStoragePool,
+    id_l1_trashman_tab:          loadTrashmanContent,
     id_l2_actions_trash_tab:     loadActionsTrashContent,
 };
 function topTabChanged() {
@@ -97,11 +98,116 @@ defer(function() {
             ],
             order: [[0, 'desc']],
             pageLength: 10,
+            responsive: true,
+        });
+
+        $('#trashman-table').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: './?ajax=get_trashman_content&dir=' + encodeURIComponent($('#trashman-current-dir').val()),
+            columns: [
+                { data: 'path' },
+                { data: 'size', orderSequence: ['desc', 'asc'] },
+                { data: 'copies', orderSequence: ['desc', 'asc'], width: '110px' },
+                { data: 'modified', width: '140px' },
+                { data: 'actions', sorting: false }
+            ],
+            order: [[0, 'asc']],
+            paging: false,
+            searching: false,
+            info: false,
+            responsive: true,
+            "fnRowCallback": function(nRow, aData, iDisplayIndex, iDisplayIndexFull) {
+                $(nRow).data('path', aData.raw_path);
+                $(nRow).data('copies', aData.copies);
+                $(nRow).data('size', aData.size);
+                $(nRow).data('size-delete', aData.size_delete);
+                $(nRow).data('copies-restore', aData.copies_restore);
+                $(nRow).data('size-restore', aData.size_restore);
+            },
+        }).on('draw', function () {
+            // Adjust columns size
+            $('#trashman-table').DataTable().columns.adjust();
         });
 
         topTabChanged();
     });
 });
+
+function trashmanGoToParent() {
+    let current_dir = $('#trashman-current-dir').val().split('/');
+    current_dir.pop();
+    let new_dir = current_dir.join('/');
+    trashmanDataForDir(new_dir);
+}
+
+function trashmanEnterFolder(btn) {
+    let folder = $(btn).closest('tr').data('path');
+    let current_dir = $('#trashman-current-dir').val();
+    let new_dir = current_dir + '/' + folder;
+    trashmanDataForDir(new_dir);
+}
+
+function trashmanDelete(btn) {
+    let $row = $(btn).closest('tr');
+    let folder = $('#trashman-current-dir').val() + '/' + $row.data('path');
+    folder = folder.substring(2);
+
+    let $modal = $('#modal-trashman-delete');
+    $modal.find('.copies').text($row.data('copies'));
+    $modal.find('.path').text(folder);
+    $modal.find('.size').html($row.data('size-delete'));
+    $modal.find('.btn-danger').data('folder', folder);
+    $modal.modal('show');
+}
+
+function trashmanConfirmDelete(btn) {
+    let folder = $(btn).data('folder');
+    ajaxCallFromButton(btn, 'delete_from_trash', 'folder=' + encodeURIComponent(folder), 'Deleting...', 'Deleted', 'Delete forever', function (data, $button) {
+        $(btn).closest('.modal').modal('hide');
+        let dir = $('#trashman-current-dir').val();
+        trashmanDataForDir(dir);
+    }, 0);
+}
+
+function trashmanRestore(btn) {
+    let $row = $(btn).closest('tr');
+    let folder = $('#trashman-current-dir').val() + '/' + $row.data('path');
+    folder = folder.substring(2);
+
+    let $modal = $('#modal-trashman-restore');
+    $modal.find('.copies').text($row.data('copies-restore'));
+    $modal.find('.path').text(folder);
+    $modal.find('.size').html($row.data('size-restore'));
+    $modal.find('.btn-success').data('folder', folder);
+    $modal.modal('show');
+}
+
+function trashmanConfirmRestore(btn) {
+    let folder = $(btn).data('folder');
+    ajaxCallFromButton(btn, 'restore_from_trash', 'folder=' + encodeURIComponent(folder), 'Restoring...', 'Restored', 'Restore', function (data, $button) {
+        $(btn).closest('.modal').modal('hide');
+        let dir = $('#trashman-current-dir').val();
+        trashmanDataForDir(dir);
+    }, 0);
+}
+
+function trashmanDataForDir(new_dir) {
+    $('#trashman-current-dir').val(new_dir);
+
+    // ajax.url is normally only set when the Datatable is initialized; we need to update it because it needs to use new_dir
+    $('#trashman-table').DataTable().ajax.url('./?ajax=get_trashman_content&dir=' + encodeURIComponent(new_dir));
+    // Reload data from server
+    $('#trashman-table').DataTable().ajax.reload();
+
+    // Show/hide current folder, based of if we're showing the root folder or not
+    if (new_dir === '.') {
+        $('#trashman-current-dir-header').hide();
+    } else {
+        $('#trashman-current-dir-header').show();
+        $('#trashman-current-dir-header').text(' | ' + new_dir.substring(2));
+    }
+}
 
 function resizeSPDrivesUsageGraphs() {
     $('.table-sp-drives').each(function(i, el) {
@@ -1171,6 +1277,10 @@ function loadStoragePool() {
             }
         },
     });
+}
+
+function loadTrashmanContent() {
+    trashmanDataForDir('.');
 }
 
 function loadActionsTrashContent() {

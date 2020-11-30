@@ -32,6 +32,7 @@ if (DB::isConnected()) {
 $tabs = [
     new Tab('l1_status',    'Status',          'status.php'),
     new Tab('l1_spool',     'Storage pool',    'storage_pool.php'),
+    new Tab('l1_trashman',  'Trash Manager',   'trash.php'),
     new Tab('l1_smbshares', 'Samba Shares',    'samba_shares.php'),
     new Tab('l1_smbconfig', 'Samba Config',    'samba_config.php'),
     new Tab('l1_ghconfig',  'Greyhole Config', 'greyhole_config.php'),

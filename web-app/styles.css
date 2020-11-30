@@ -137,3 +137,10 @@ body.dark .custom-control-input:checked ~ .custom-control-label::before {
     border-color: #62c462;
     background-color: #62c462;
 }
+
+#trashman-table td:nth-child(2) {
+    text-align: right;
+}
+#trashman-table td:nth-child(3), #trashman-table td:nth-child(4) {
+    text-align: center;
+}
