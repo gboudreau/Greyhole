@@ -99,6 +99,9 @@ defer(function() {
             order: [[0, 'desc']],
             pageLength: 10,
             responsive: true,
+            "fnRowCallback": function(nRow, aData, iDisplayIndex, iDisplayIndexFull) {
+                $(nRow).addClass(aData.action);
+            },
         });
 
         $('#trashman-table').DataTable({

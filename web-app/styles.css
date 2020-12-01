@@ -113,6 +113,22 @@ table#queue tr.total td {
 #past-tasks-table {
     width: 100% !important;
 }
+#past-tasks-table tr.write {
+    color: rgba(72, 143, 49, 1);
+}
+#past-tasks-table tr.unlink, #past-tasks-table tr.remove, #past-tasks-table tr.rmdir {
+    color: rgba(222, 66, 91, 1);
+}
+#past-tasks-table tr.rename {
+    color: rgba(255, 150, 0, 1);
+}
+.dark #past-tasks-table tr.rename {
+    color: rgba(255, 236, 152, 1);
+}
+#past-tasks-table tr.fsck, #past-tasks-table tr.fsck_file, #past-tasks-table tr.md5, #past-tasks-table tr.link {
+    color: rgba(66, 91, 222, 1);
+}
+
 .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
     background: inherit;
     border: 1px solid transparent;
