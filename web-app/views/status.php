@@ -103,7 +103,7 @@ if (FSCKWorkLog::isReportAvailable()) {
 <?php $past_tasks_tab->startContent() ?>
 <h4 class="mt-4">Past Tasks</h4>
 <div class="col mt-4">
-    <table id="past-tasks-table">
+    <table id="past-tasks-table" style="width: 100%">
         <thead>
             <tr>
                 <th>ID</th>

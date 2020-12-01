@@ -26,7 +26,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 <input id="trashman-current-dir" type="hidden" value="." />
 
-<table id="trashman-table">
+<table id="trashman-table" style="width: 100%">
     <thead>
     <tr>
         <th>Path</th>
