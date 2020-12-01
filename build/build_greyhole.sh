@@ -122,7 +122,7 @@ scp release/greyhole-"$VERSION"-*.deb ${HOST}:${PATH_TO_RELEASES}/deb/.
 ##########################
 # Update YUM/APT repo data
 
-ssh ${HOST} ${PATH_TO_REPOS_UPDATER}/update_yum_repodata.sh
+ssh ${HOST} /opt/docker-services/greyhole-repos/run.sh /var/www/html/greyhole.net/update_yum_repodata.sh
 
 # update_deb_repodata.sh needs to be called from an interactive session on $HOST, because it needs the GPG secret key passphrase to work!
 echo
