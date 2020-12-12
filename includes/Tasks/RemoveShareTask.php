@@ -83,9 +83,7 @@ class RemoveShareTask extends AbstractTask {
     protected function sendEmail() {
         // Email report
         $subject = "[Greyhole] Removal of share '$this->share' completed on " . exec('hostname');
-        $email_to = Config::get(CONFIG_EMAIL_TO);
-        Log::debug("Sending share removal report to $email_to");
-        mail($email_to, $subject, $this->log);
+        email_sysadmin($subject, $this->log);
     }
 
     protected function log($log = '') {

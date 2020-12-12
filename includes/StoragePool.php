@@ -132,7 +132,7 @@ final class StoragePool {
             if (strlen($subject) > 255) {
                 $subject = substr($subject, 0, 255);
             }
-            mail(Config::get(CONFIG_EMAIL_TO), $subject, $body);
+            email_sysadmin($subject, $body);
         }
         if (count($missing_drives) > 0) {
             $body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives has disappeared:\n";
@@ -161,7 +161,7 @@ final class StoragePool {
             if (strlen($subject) > 255) {
                 $subject = substr($subject, 0, 255);
             }
-            mail(Config::get(CONFIG_EMAIL_TO), $subject, $body);
+            email_sysadmin($subject, $body);
         }
         if ($needs_fsck !== FALSE) {
             Metastores::choose_metastores_backups();
@@ -484,10 +484,6 @@ final class StoragePool {
                 $last_OOS_notification = $setting;
             }
             if ($last_OOS_notification < strtotime('-1 day')) {
-                $email_to = Config::get(CONFIG_EMAIL_TO);
-
-                Log::info("  Sending email notification to $email_to");
-
                 $hostname = exec('hostname');
                 $body = "This is an automated email from Greyhole.
 
@@ -499,7 +495,7 @@ You probably want to do something about this!
                     $minimum_free_space = (int) Config::get(CONFIG_MIN_FREE_SPACE_POOL_DRIVE, $sp_drive) / 1024 / 1024;
                     $body .= "$sp_drive has " . number_format($free_space/1024/1024, 2) . " GB free; minimum specified in greyhole.conf: $minimum_free_space GB.\n";
                 }
-                mail($email_to, "Greyhole is out of space on $hostname!", $body);
+                email_sysadmin("Greyhole is out of space on $hostname!", $body);
 
                 $last_OOS_notification = time();
                 Settings::set('last_OOS_notification', $last_OOS_notification);

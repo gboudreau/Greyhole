@@ -215,6 +215,13 @@ function memory_check() {
     }
 }
 
+function email_sysadmin($subject, $body) {
+    $email_to = Config::get(CONFIG_EMAIL_TO);
+    Log::debug("Sending email to $email_to; subject: $subject");
+    mail($email_to, $subject, $body);
+    EmailHook::trigger($subject, $body);
+}
+
 define('FSCK_COUNT_META_FILES',           1);
 define('FSCK_COUNT_META_DIRS',            2);
 define('FSCK_COUNT_LZ_FILES',             3);
@@ -509,9 +516,7 @@ class FSCKWorkLog {
                 $fsck_report_body = static::getHumanReadableReport();
 
                 if ($send_email) {
-                    $email_to = Config::get(CONFIG_EMAIL_TO);
-                    Log::debug("Sending fsck report to $email_to");
-                    mail($email_to, $subject, $fsck_report_body);
+                    email_sysadmin($subject, $fsck_report_body);
                 }
 
                 LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $subject . "\n" . $fsck_report_body);
@@ -558,9 +563,7 @@ class FSCKLogFile {
         $last_mod_date = filemtime($logfile);
         if ($last_mod_date > $this->getLastEmailSentTime()) {
             if ($this->shouldSendViaEmail()) {
-                $email_to = Config::get(CONFIG_EMAIL_TO);
-                Log::info("Sending $logfile by email to $email_to");
-                mail($email_to, $this->getSubject(), $this->getBody());
+                email_sysadmin($this->getSubject(), $this->getBody());
             }
 
             LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $this->getSubject() . "\n" . $this->getBody());

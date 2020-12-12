@@ -79,6 +79,7 @@ install -m 0755 -D -p scripts-examples/greyhole_file_changed.sh ${RPM_BUILD_ROOT
 install -m 0755 -D -p scripts-examples/greyhole_idle.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
 install -m 0755 -D -p scripts-examples/greyhole_notify_error.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
 install -m 0755 -D -p scripts-examples/greyhole_send_fsck_report.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
+install -m 0755 -D -p scripts-examples/greyhole_sysadmin_notification.sh ${RPM_BUILD_ROOT}/usr/share/greyhole/scripts-examples/
 
 install -m 0644 -D -p USAGE ${RPM_BUILD_ROOT}/usr/share/greyhole/
 

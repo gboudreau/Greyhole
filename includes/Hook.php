@@ -197,4 +197,33 @@ class LogHook extends Hook
     }
 }
 
+class EmailHookContext implements HookContext
+{
+    public $subject;
+    public $body;
+    public function __construct($subject, $body) {
+        $this->subject = $subject;
+        $this->body = $body;
+    }
+}
+
+class EmailHook extends Hook
+{
+    public static function trigger($subject, $body) {
+        Hook::_trigger('email', new EmailHookContext($subject, $body));
+    }
+
+    /**
+     * @param EmailHookContext $context
+     * @return array
+     */
+    protected function getArgs($context) {
+        return array(
+            escapeshellarg($this->event_type),
+            escapeshellarg($context->subject),
+            escapeshellarg($context->body)
+        );
+    }
+}
+
 ?>

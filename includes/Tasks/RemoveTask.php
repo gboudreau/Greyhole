@@ -110,9 +110,7 @@ class RemoveTask extends AbstractTask {
 
         // Email report
         $subject = "[Greyhole] Removal of pool drive at $this->drive completed on " . exec('hostname');
-        $email_to = Config::get(CONFIG_EMAIL_TO);
-        Log::debug("Sending drive removal report to $email_to");
-        mail($email_to, $subject, $this->log);
+        email_sysadmin($subject, $this->log);
 
         DaemonRunner::restart_service();
     }

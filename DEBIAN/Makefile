@@ -84,6 +84,7 @@ build:
 	install -m 0755 -D -p scripts-examples/greyhole_idle.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
 	install -m 0755 -D -p scripts-examples/greyhole_notify_error.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
 	install -m 0755 -D -p scripts-examples/greyhole_send_fsck_report.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
+	install -m 0755 -D -p scripts-examples/greyhole_sysadmin_notification.sh $(DESTDIR)usr/share/greyhole/scripts-examples/
 
 	install -m 0644 -D -p USAGE $(DESTDIR)usr/share/greyhole/
 
