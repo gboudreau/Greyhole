@@ -18,19 +18,10 @@ You should have received a copy of the GNU General Public License
 along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-if (DB::isConnected()) {
-    $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
-    $last_status = DB::getFirst($q);
-    $current_action = $last_status->action;
-} else {
-    $current_action = FALSE;
-}
-
 $tabs = [];
-if ($current_action == 'balance') {
-    $balance_tab = new Tab('l2_status_balance', 'Balance Status');
-    $tabs[] = $balance_tab;
-}
+
+$balance_tab = new Tab('l2_status_balance', 'Balance Status');
+$tabs[] = $balance_tab;
 
 $logs_tab = new Tab('l2_status_logs', 'Logs');
 $tabs[] = $logs_tab;
@@ -46,6 +37,18 @@ if (FSCKWorkLog::isReportAvailable()) {
     $tabs[] = $fsck_tab;
 }
 ?>
+
+<?php $balance_tab->startContent() ?>
+<div class="mt-4" id="cancel_balance_container" style="display:none">
+    <button class="btn btn-danger" onclick="cancelBalance(this)">
+        Cancel ongoing balance
+    </button>
+</div>
+
+<h4 class="mt-4">Balance Status</h4>
+
+<div id="balance_groups"></div>
+<?php $balance_tab->endContent(); ?>
 
 <?php $logs_tab->startContent() ?>
 <h4 class="mt-4">Recent log entries</h4>
@@ -116,21 +119,6 @@ if (FSCKWorkLog::isReportAvailable()) {
     </table>
 </div>
 <?php $past_tasks_tab->endContent(); ?>
-
-<?php if (isset($balance_tab)) : ?>
-    <?php $balance_tab->startContent() ?>
-    <div class="mt-4" id="cancel_balance_container" style="display:none">
-        <button class="btn btn-danger" onclick="cancelBalance(this)">
-            Cancel ongoing balance
-        </button>
-    </div>
-
-    <h4 class="mt-4">Balance Status</h4>
-
-    <div id="balance_groups"></div>
-
-    <?php $balance_tab->endContent(); ?>
-<?php endif; ?>
 
 <?php if (isset($fsck_tab)) : ?>
     <?php $fsck_tab->startContent(); ?>

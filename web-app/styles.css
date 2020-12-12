@@ -58,9 +58,14 @@
     line-height: 0.5;
 }
 .sp-bar {
-    display: inline-block;
+    display: inherit;
     height: 37px;
     margin-right: 1px;
+    text-align: right;
+    padding-right: 4px;
+    line-height: 37px;
+    color: #272b30;
+    font-weight: bold;
 }
 .sp-bar.used {
     background-color: rgba(222, 66, 91, 1);
@@ -70,6 +75,8 @@
 }
 .sp-bar.free {
     background-color: rgba(72, 143, 49, 1);
+    text-align: left;
+    padding-left: 4px;
 }
 .sp-bar.target {
     background-color: rgba(205, 205, 205, 1);
@@ -158,5 +165,10 @@ body.dark .custom-control-input:checked ~ .custom-control-label::before {
     text-align: right;
 }
 #trashman-table td:nth-child(3), #trashman-table td:nth-child(4) {
+    text-align: center;
+}
+
+#balance_groups .table-sp-drives tr td:nth-last-child(2) {
+    min-width: 90px;
     text-align: center;
 }

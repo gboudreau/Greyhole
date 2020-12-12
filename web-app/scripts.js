@@ -133,6 +133,7 @@ defer(function() {
             $('#trashman-table').DataTable().columns.adjust();
         });
 
+        loadStatus();
         topTabChanged();
     });
 });
@@ -215,15 +216,14 @@ function trashmanDataForDir(new_dir) {
 function resizeSPDrivesUsageGraphs() {
     $('.table-sp-drives').each(function(i, el) {
         let $table = $(el);
-        let total_width = $table.closest('.col').width() - 30;
-        let width_left = total_width;
+        let width_left = $table.closest('.col').width() - 30; // 15+15 padding left-right
         let num_rows = $table.find('tr:nth-child(1)').find('th').length;
         for (let i=1; i<num_rows; i++) {
             width_left -= $table.find('td:nth-child('+i+')').width();
-            width_left -= 12;
+            width_left -= 12; // 6+6 padding left-right
         }
         $table.find('.sp-bar').each(function(i, el) {
-            width = $(el).data('width') * width_left;
+            let width = $(el).data('width') * width_left;
             $(el).css('width', width + 'px');
             if ($(el).hasClass('treemap')) {
                 let $table = $(el).closest('table');
@@ -1050,6 +1050,11 @@ function loadStatus() {
                 if (data.daemon_status === 'running') {
                     $('#daemon-status-running').html(data.status_text);
                 }
+                if (data.current_action === 'balance') {
+                    $('#id_l2_status_balance_tab').show();
+                } else {
+                    $('#id_l2_status_balance_tab').hide();
+                }
             } else {
                 if (data.result === 'error') {
                     alert(data.message);
@@ -1062,6 +1067,14 @@ function loadStatus() {
 }
 
 function loadStatusLogs() {
+    if (!('page' in urlParams) || urlParams.page === 'id_l1_status_tab') {
+        loadStatus();
+        return;
+    }
+    if (!('page_status' in urlParams) || urlParams.page_status === 'id_l2_status_balance_tab') {
+        loadStatusBalanceReport();
+        return;
+    }
     if (!('page_status' in urlParams) || urlParams.page_status !== 'id_l2_status_logs_tab') {
         // console.log("Skipping loadStatusLogs() because Logs tab is not visible.");
         return;
@@ -1194,26 +1207,28 @@ function loadStatusBalanceReport() {
                         $tr.append($('<td/>').html(drive_infos.direction + ' ' + drive_infos.diff_html));
                         let $td = $('<td/>').addClass('sp-bar-td');
                         $td.append(
-                            $('<div/>').addClass('sp-bar target')
+                            $('<div/>').addClass('sp-bar target has_tooltip')
                                 .data('width', drive_infos.target_width)
                                 .data('toggle', 'tooltip')
                                 .data('placement', 'bottom')
-                                .prop('title', 'Target: ' + drive_infos.target_used_space)
+                                .prop('title', drive_infos.tooltip)
                                 .tooltip()
                         );
                         $td.append(
-                            $('<div/>').addClass('sp-bar')
+                            $('<div/>').addClass('sp-bar has_tooltip')
                                 .addClass(drive_infos.direction === '-' ? 'used' : 'free')
+                                .text(drive_infos.direction === '-' ? '←' : '→')
                                 .data('width', drive_infos.diff_width)
                                 .data('toggle', 'tooltip')
                                 .data('placement', 'bottom')
-                                .prop('title', 'Diff: ' + drive_infos.direction + ' ' + drive_infos.diff)
+                                .prop('title', drive_infos.tooltip)
                                 .tooltip()
                         );
                         $tr.append($td);
                         $table.append($tr);
                     }
 
+                    $container.find('.has_tooltip').tooltip('hide'); // Hide any visible tooltip, because it would be stuck visible after detaching it from the document below
                     $container.text('')
                         .append($alert)
                         .append($('<div/>').addClass('col').append($table))

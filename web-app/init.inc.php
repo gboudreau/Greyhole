@@ -225,13 +225,13 @@ if (!empty($_GET['ajax'])) {
             if (!empty($tasks)) {
                 $task = array_shift($tasks);
 
-                $q = "SELECT date_time, action FROM `status` ORDER BY id DESC LIMIT 1";
+                $q = "SELECT date_time, action FROM `status` WHERE date_time > DATE_SUB(NOW(), INTERVAL 1 MINUTE) ORDER BY id DESC LIMIT 1";
                 $last_status = DB::getFirst($q);
                 $current_action = $last_status->action;
             }
 
             $status_text = "Greyhole daemon is currently running: ";
-            if (empty($tasks)) {
+            if (empty($tasks) && empty($current_action)) {
                 $status_text .= "idling";
             } else {
                 if ($current_action == $task->action) {
@@ -246,7 +246,7 @@ if (!empty($_GET['ajax'])) {
 
         $num_dproc = StatusCliRunner::get_num_daemon_proc();
 
-        echo json_encode(['result' => 'success', 'daemon_status' => $num_dproc == 0 ? 'stopped' : (PauseCliRunner::isPaused() ? 'paused' : 'running'), 'status_text' => $status_text]);
+        echo json_encode(['result' => 'success', 'daemon_status' => $num_dproc == 0 ? 'stopped' : (PauseCliRunner::isPaused() ? 'paused' : 'running'), 'status_text' => $status_text, 'current_action' => $current_action]);
         exit();
     case 'get_status_logs':
         $logs = get_status_logs();
@@ -333,15 +333,23 @@ if (!empty($_GET['ajax'])) {
                 if ($drive_infos->df['used'] > $max) {
                     $max = $drive_infos->df['used'];
                 }
+                if ($drive_infos->df['used'] + abs($drive_infos->diff) > $max) {
+                    $max = $drive_infos->df['used'] + abs($drive_infos->diff);
+                }
             }
 
             foreach ($group->drives as $sp_drive => $drive_infos) {
-                $target_used_space = $drive_infos->df['used'] + ($drive_infos->direction ? -1 : 1) * $drive_infos->diff;
+                $target_used_space = $drive_infos->df['used'] - ($drive_infos->direction == '+' ? 0 : $drive_infos->diff);
                 $drive_infos->target_width = $target_used_space / $max;
                 $drive_infos->diff_width = $drive_infos->diff / $max;
                 $drive_infos->target_used_space = bytes_to_human($target_used_space*1024, FALSE, TRUE);
                 $drive_infos->diff_html = bytes_to_human($drive_infos->diff*1024, TRUE, TRUE);
                 $drive_infos->diff = bytes_to_human($drive_infos->diff*1024, FALSE, TRUE);
+                if ($drive_infos->direction == '+') {
+                    $drive_infos->tooltip = bytes_to_human($drive_infos->df['used']*1024, FALSE, TRUE) . " (used) + " . $drive_infos->diff . " (to be added)";
+                } else {
+                    $drive_infos->tooltip = bytes_to_human($drive_infos->df['used']*1024, FALSE, TRUE) . " (used) - " . $drive_infos->diff . " (to be removed) = " . $drive_infos->target_used_space = bytes_to_human($target_used_space*1024, FALSE, TRUE) . " (target)";
+                }
             }
         }
 
