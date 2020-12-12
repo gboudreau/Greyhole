@@ -43,6 +43,8 @@ abstract class Hook
             $hook = new FileHook($event_type, $script);
         } elseif (array_contains(LogHook::getEventTypes(), $event_type)) {
             $hook = new LogHook($event_type, $script);
+        } elseif ($event_type == 'email') {
+            $hook = new EmailHook($event_type, $script);
         } else {
             Log::warn("Unknown hook event type '$event_type'; ignoring.", Log::EVENT_CODE_HOOK_NOT_EXECUTABLE);
             return;
