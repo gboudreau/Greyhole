@@ -1069,7 +1069,6 @@ function loadStatus() {
 function loadStatusLogs() {
     if (!('page' in urlParams) || urlParams.page === 'id_l1_status_tab') {
         loadStatus();
-        return;
     }
     if (!('page_status' in urlParams) || urlParams.page_status === 'id_l2_status_balance_tab') {
         loadStatusBalanceReport();
