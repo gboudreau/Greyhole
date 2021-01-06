@@ -20,11 +20,11 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 
 $tabs = [];
 
-$balance_tab = new Tab('l2_status_balance', 'Balance Status');
-$tabs[] = $balance_tab;
-
 $logs_tab = new Tab('l2_status_logs', 'Logs');
 $tabs[] = $logs_tab;
+
+$balance_tab = new Tab('l2_status_balance', 'Balance Status');
+$tabs[] = $balance_tab;
 
 $queue_tab = new Tab('l2_status_queue', 'Queue');
 $tabs[] = $queue_tab;
