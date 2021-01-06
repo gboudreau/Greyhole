@@ -246,7 +246,7 @@ if (!empty($_GET['ajax'])) {
 
         $num_dproc = StatusCliRunner::get_num_daemon_proc();
 
-        echo json_encode(['result' => 'success', 'daemon_status' => $num_dproc == 0 ? 'stopped' : (PauseCliRunner::isPaused() ? 'paused' : 'running'), 'status_text' => $status_text, 'current_action' => $current_action]);
+        echo json_encode(['result' => 'success', 'daemon_status' => $num_dproc == 0 ? 'stopped' : (PauseCliRunner::isPaused() ? 'paused' : 'running'), 'status_text' => $status_text, 'current_action' => @$current_action]);
         exit();
     case 'get_status_logs':
         $logs = get_status_logs();
@@ -382,6 +382,7 @@ if (!empty($_GET['ajax'])) {
     case 'get_trashman_content':
         // Find all files in specified directory, with their size (%s) and last modified date (%T@)
         $dir = $_REQUEST['dir'];
+        $output = [];
         foreach (Config::storagePoolDrives() as $sp_drive) {
             // Ensure the specified dir doesn't contains .. to try to go outside the trash folder!
             $base_dir = "$sp_drive/.gh_trash";
@@ -491,6 +492,9 @@ if (!empty($_GET['ajax'])) {
             array_unshift($data, ['path' => '<a href="#parent" onclick="trashmanGoToParent(); return false">&lt; Parent directory</a>', 'size' => '', 'modified' => '', 'copies' => '', 'actions' => '']);
         }
 
+        if (!isset($num_rows)) {
+            $num_rows = 0;
+        }
         echo json_encode(['draw' => $_GET['draw'], 'recordsTotal' => $num_rows, 'recordsFiltered' => $num_rows, 'data' => $data]);
         exit();
     case 'restore_from_trash':
