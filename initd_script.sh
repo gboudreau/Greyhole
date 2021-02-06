@@ -56,8 +56,8 @@ status () {
 
 daemon_start () {
     n=$(/usr/bin/greyhole --config daemon_niceness)
-    if [ "$n" = "" ]; then
-        n=0
+    if [ "$n" = "false" ]; then
+        n=1
     fi
     nice -n $n /usr/bin/greyhole --daemon > /dev/null &
     RETVAL=$?
@@ -69,8 +69,8 @@ start () {
     printf "Starting Greyhole ... "
     status && echo "greyhole already running." && return 0
     n=$(/usr/bin/greyhole --config daemon_niceness)
-    if [ "$n" = "" ]; then
-        n=0
+    if [ "$n" = "false" ]; then
+        n=1
     fi
     /usr/bin/greyhole --test-config > /dev/null
     TESTRESULT=$?
