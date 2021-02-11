@@ -68,12 +68,13 @@ static void gh_spoolf(const char* format, ...)
 void compute_md5(const char *str, char *out) {
 	MD5_CTX ctx;
 	unsigned char hash[16];
+    int n;
 
 	MD5Init(&ctx);
 	MD5Update(&ctx, str, strlen(str));
 	MD5Final(hash, &ctx);
 
-    for (int n = 0; n < 16; ++n) {
+    for (n = 0; n < 16; ++n) {
         snprintf(&(out[n*2]), 3, "%02x", (unsigned int)hash[n]);
     }
 }

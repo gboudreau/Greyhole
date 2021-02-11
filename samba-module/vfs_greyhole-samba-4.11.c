@@ -80,6 +80,7 @@ void compute_hash(const char *str, char *out) {
 	gnutls_hash_hd_t hash_hnd = NULL;
 	uint8_t digest[gnutls_hash_get_len(GNUTLS_DIG_SHA1)];
 	int rc;
+    int n;
 
 	GNUTLS_FIPS140_SET_LAX_MODE();
 
@@ -98,7 +99,7 @@ void compute_hash(const char *str, char *out) {
 
 	gnutls_hash_deinit(hash_hnd, digest);
 
-    for (int n = 0; n < gnutls_hash_get_len(GNUTLS_DIG_SHA1); ++n) {
+    for (n = 0; n < gnutls_hash_get_len(GNUTLS_DIG_SHA1); ++n) {
         snprintf(&(out[n*2]), 3, "%02x", (unsigned int)digest[n]);
     }
 
