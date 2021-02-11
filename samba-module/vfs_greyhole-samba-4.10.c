@@ -73,7 +73,8 @@ void compute_md5(const char *str, char *out) {
 	MD5Update(&ctx, str, strlen(str));
 	MD5Final(hash, &ctx);
 
-    for (int n = 0; n < 16; ++n) {
+    int n;
+    for (n = 0; n < 16; ++n) {
         snprintf(&(out[n*2]), 3, "%02x", (unsigned int)hash[n]);
     }
 }
