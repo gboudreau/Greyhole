@@ -834,7 +834,7 @@ function goto_remove_drive() {
 function donationComplete(el) {
     let $el = $(el);
     let email = $el.val();
-    ajaxCallFromButton(button, 'donate', 'email=' + encodeURIComponent(email), 'Saving...', null, 'Saved',  function (data, $button) {
+    ajaxCallFromButton(null, 'donate', 'email=' + encodeURIComponent(email), 'Saving...', null, 'Saved',  function (data, $button) {
         if ($el) {
             $el.attr('data-toggle', 'tooltip').attr('data-placement', 'bottom').attr('title', 'Thank you!').tooltip({trigger: 'manual'}).tooltip('show');
             setTimeout(function() { $el.tooltip('hide'); location.reload(); }, 3*1000);
