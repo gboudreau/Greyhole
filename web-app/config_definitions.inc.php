@@ -40,7 +40,7 @@ if (!@$licensed && !defined('IS_INITIAL_SETUP')) {
 
 if (!defined('IS_INITIAL_SETUP')) {
     $configs[] = [
-        'name' => 'Database connexion',
+        'name' => 'Database connection',
         'type' => 'group',
         'values' => [
             [
