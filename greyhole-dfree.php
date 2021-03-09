@@ -27,7 +27,7 @@ ConfigHelper::parse();
 $total_space = 0;
 $total_free_space = 0;
 foreach (Config::storagePoolDrives() as $sp_drive) {
-	$response = explode(' ', exec("df -k ".escapeshellarg($sp_drive)." 2>/tmp/greyhole_df_error.log | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'"));
+	$response = explode(' ', exec("df -k ".escapeshellarg($sp_drive)." 2>/tmp/greyhole_df_error_\$(whoami).log | tail -1 | awk '{print \$(NF-4),\$(NF-2)}'"));
 	if (count($response) != 2) {
 		continue;
 	}
