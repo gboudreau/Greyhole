@@ -426,6 +426,7 @@ function drawPieChartStorage(ctx, stats) {
     let dataset_trash = [];
     let dataset_free = [];
     let drives = [];
+    console.log(stats);
     for (let sp_drive in stats) {
         let stat = stats[sp_drive];
         if (sp_drive === 'Total') {
@@ -436,6 +437,7 @@ function drawPieChartStorage(ctx, stats) {
         dataset_trash.push(stat.trash_size);
         dataset_free.push(stat.free_space);
     }
+    console.log(dataset_used);
     let dataset_all_drives = dataset_used.concat(dataset_trash).concat(dataset_free);
     let labels_all_drives = [];
     let colors_all_drives = [];
@@ -456,20 +458,22 @@ function drawPieChartStorage(ctx, stats) {
     }
 
     let stat = stats['Total'];
-    let total = stat.used_space + stat.trash_size + stat.free_space;
+    let total = stat.used_space + stat.free_space;
     let labels_summary = [
-        'Used: ' + bytes_to_human(stat.used_space * 1024),
+        'Used: ' + bytes_to_human(stat.used_space * 1024 - stat.trash_size * 1024),
         'Trash: ' + bytes_to_human(stat.trash_size * 1024),
         'Free: ' + bytes_to_human(stat.free_space * 1024)
     ];
+    console.log(dataset_all_drives);
+    console.log(stat.used_space);
     new Chart(ctx, {
         type: 'pie',
         data: {
             datasets: [
                 {
-                    // "Sum" dataset needs to appear first, for Leged to appear correctly
+                    // "Sum" dataset needs to appear first, for Legend to appear correctly
                     weight: 0,
-                    data: [stat.used_space, stat.trash_size, stat.free_space],
+                    data: [stat.used_space - stat.trash_size, stat.trash_size, stat.free_space],
                     backgroundColor: [
                         window.chartColors.red,
                         window.chartColors.yellow,
@@ -485,7 +489,7 @@ function drawPieChartStorage(ctx, stats) {
                 },
                 {
                     weight: 50,
-                    data: [stat.used_space, stat.trash_size, stat.free_space],
+                    data: [stat.used_space - stat.trash_size, stat.trash_size, stat.free_space],
                     backgroundColor: [
                         window.chartColors.red,
                         window.chartColors.yellow,
