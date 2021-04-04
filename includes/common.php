@@ -87,7 +87,7 @@ function gh_shutdown() {
     }
 }
 
-function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
+function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext = NULL) {
     if(!($errno & error_reporting())) {
         // Ignored (@) warning
         return TRUE;
