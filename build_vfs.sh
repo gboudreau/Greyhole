@@ -52,7 +52,7 @@ if [ $M -ge 4 ] && [ $m -ge 12 ]; then
     echo "Installing Parse::Yapp::Driver perl module ..."
     # shellcheck disable=SC2034
     PERL_MM_USE_DEFAULT=1
-    cpan Parse::Yapp::Driver
+    perl -MCPAN -e 'install Parse::Yapp::Driver'
 fi
 if [ $M -ge 4 ] && [ $m -ge 13 ]; then
     echo "Installing zlib-devel ..."
