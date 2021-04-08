@@ -4,33 +4,24 @@ Samba VFS HOWTO
 How to build the VFS module binaries for a new Samba version.
 (Mostly, notes to self...)
 
-1. Create a new .patch file in `samba-module/`
-   For example, `samba-module/wscript-samba-$VERSION.patch`
+1. Create a new `samba-module/wscript-samba-$VERSION.patch`
 
 2. Create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
 
-3. Add the new Samba version number in `build/build_vfs_all.sh @L23`
+3. Copy those two new files into `vfs_greyhole-samba-4.x.c` and `wscript-samba-4.x.patch`
 
-4. Run the build/build_vfs_all.sh script, and
-5. Copy the resulting binaries back into your workstation:
+4. Add the new Samba version number in `build/build_vfs_all.sh` @L18
 
-    cd ~/git/Greyhole/ && export SSH_HOST="gh-builder-x86_64" ; rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole && ssh -t $SSH_HOST 'sudo /home/gb/Greyhole/build/build_vfs_all.sh'
-    cd ~/git/Greyhole/samba-module/bin/ && export SSH_HOST="gh-builder-x86_64" ; rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
-
-    cd ~/git/Greyhole/ && export SSH_HOST="gh-builder-i386" ; rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole && ssh -t $SSH_HOST 'sudo /home/gb/Greyhole/build/build_vfs_all.sh'
-    cd ~/git/Greyhole/samba-module/bin/ && export SSH_HOST="gh-builder-i386" ; rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
-
-    cd ~/git/Greyhole/ && export SSH_HOST="gh-builder-arm64" ; rsync -av --exclude .git --exclude release ./ $SSH_HOST:Greyhole && ssh -t $SSH_HOST 'sudo /home/pi/Greyhole/build/build_vfs_all.sh'
-    cd ~/git/Greyhole/samba-module/bin/ && export SSH_HOST="gh-builder-arm64" ; rsync -av $SSH_HOST:Greyhole/samba-module/bin/ .
+5. Run the `build/build_vfs_all.sh` script
 
 6. Edit `INSTALL`
-    - Change latest version of Samba supported in point 3 (near L85).
+    - Change latest version of Samba supported in point 3 (near L86, and in the two `cp` lines slightly below).
 
-7. Edit DEBIAN/Makefile
-    - Add lines near L127, L140, L159
+7. Edit `DEBIAN/Makefile`
+    - Add lines near L114, L144, L164
 
-8. Edit DEBIAN/postinst
-    - Add an `elif` block near L94, and change the `else` block to use the latest version
+8. Edit `DEBIAN/postinst`
+    - Add an `elif` block near L96, and change the `else` block to use the latest version
 
 9. Commit all changes & new binaries
    See [this commit](https://github.com/gboudreau/Greyhole/commit/7d5a46aa35392e524ac8ef8a360a9544219a446a) for an example of what your commit should contain.

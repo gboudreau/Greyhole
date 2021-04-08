@@ -126,7 +126,11 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     ./configure >gh_vfs_build.log 2>&1 &
     PROC_ID=$!
   else
-    patch -p1 < "${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.${m}.patch" >/dev/null
+    if [[ -f "${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.${m}.patch" ]]; then
+      patch -p1 < "${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.${m}.patch" >/dev/null
+    else
+      patch -p1 < "${GREYHOLE_INSTALL_DIR}/samba-module/wscript-samba-${M}.x.patch" >/dev/null
+    fi
     CONF_OPTIONS="--enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --without-ad-dc"
     if [[ ${m} -gt 6 ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --disable-python"

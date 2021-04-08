@@ -2,3 +2,5 @@
 release/
 .idea
 build/.github_token
+build/gh-vfs-build-docker/build_vfs.sh
+build/gh-vfs-build-docker/*-samba-*

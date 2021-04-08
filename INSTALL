@@ -1,30 +1,33 @@
 Greyhole Installation Instructions
 ==================================
 
-Greyhole comes as RPM or DEB packages. If your distribution supports those, you should definitely install one of them.
+Greyhole comes as RPM or DEB packages. If your distribution supports those, you should definitely install one of them.  
 To do so, you can use this script:
 
-    curl -Ls http://bit.ly/greyhole-package | sudo bash
+```bash
+curl -Ls http://bit.ly/greyhole-package | sudo bash
+```
 
-After installing, look in /usr/share/greyhole/USAGE (or online https://raw.github.com/gboudreau/Greyhole/master/USAGE) for configuration instructions.
+After installing, look in `/usr/share/greyhole/USAGE` (or online https://raw.github.com/gboudreau/Greyhole/master/USAGE) for configuration instructions.  
 If you can't install a pre-packaged version, follow the steps below to install from source.
 
-The following instructions have been tested on Fedora 12, and Ubuntu 9 & 10.
+The following instructions have been tested on Fedora 12, and Ubuntu 9 & 10.  
 If you know what you're doing, you should have no problem installing on any other Linux variant.
 
 1. Install the required applications: PHP 7+ (cli) with MySQL & mbstring extensions, MySQL server, Samba, rsync, GCC (etc.):
 
-	Fedora: yum -y install mysql-server php php-mysql php-mbstring php-intl samba samba-common php-pear rsync lsof
-	Ubuntu: apt-get -y install mysql-server php-cli php-mysql php-mysqlnd php-mbstring php-intl samba samba-common samba-common-bin samba-vfs-modules php-pear rsync lsof sysstat
+	- Fedora: `yum -y install mysql-server php php-mysql php-mbstring php-intl samba samba-common php-pear rsync lsof`
+	- Ubuntu: `apt-get -y install mysql-server php-cli php-mysql php-mysqlnd php-mbstring php-intl samba samba-common samba-common-bin samba-vfs-modules php-pear rsync lsof sysstat`
 
-	Note: you might need to install mariadb-server, if mysql-server is not available. Those two are equivalent.
-	Note 2: samba-vfs-modules might not be needed, but if it is available in your repo, it is required.
+	- Note: you might need to install mariadb-server, if mysql-server is not available. Those two are equivalent.
+	- Note 2: samba-vfs-modules might not be needed, but if it is available in your repo, it is required.
 
 2. Install Greyhole (as root):
 
-	Download the latest "greyhole-[VERSION].tar.gz" file from https://github.com/gboudreau/Greyhole/releases
+	- Download the latest "greyhole-[VERSION].tar.gz" file from https://github.com/gboudreau/Greyhole/releases
 	(Don't use the "Source Code" files.)
 
+	```bash
 	tar zxf greyhole-*.tar.gz && rm -f greyhole-*.tar.gz
 	cd greyhole-*
 	GREYHOLE_INSTALL_DIR=`pwd`
@@ -77,33 +80,39 @@ If you know what you're doing, you should have no problem installing on any othe
 
 	# For Systemd systems: install the service
 	install -m 0644 -D -p greyhole.systemd /usr/lib/systemd/system/greyhole.service
+	```
 
-	Fedora: service smb restart
-	Ubuntu (14-): /etc/init.d/samba restart, or restart smbd
-	Ubuntu (15+): /etc/init.d/smbd restart
-	Debian: service samba restart
+	- Fedora: `service smb restart`
+	- Ubuntu (14-): `/etc/init.d/samba restart`, or `restart smbd`
+	- Ubuntu (15+): `/etc/init.d/smbd restart`
+	- Debian: `service samba restart`
 
-3. For Samba 4.14 and later: The greyhole.so files packaged with Greyhole won't work on your system.
+3. For Samba 4.15 and later: The greyhole.so files packaged with Greyhole might not work on your system.  
    You'll need to compile your own VFS module.
 
-	Fedora: sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen
-	Ubuntu/Debian: sudo apt -y install build-essential python3-dev libgnutls28-dev pkg-config
-
+	- Fedora: `sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen`
+	- Ubuntu/Debian: `sudo apt -y install build-essential python3-dev libgnutls28-dev pkg-config`
+   
+	```bash
+	cp $GREYHOLE_INSTALL_DIR/samba-module/vfs_greyhole-samba-4.x.c $GREYHOLE_INSTALL_DIR/samba-module/vfs_greyhole-samba-4.15.c
+	cp $GREYHOLE_INSTALL_DIR/samba-module/wscript-samba-4.x.patch $GREYHOLE_INSTALL_DIR/samba-module/wscript-samba-4.15.patch
 	$GREYHOLE_INSTALL_DIR/build_vfs.sh current
+ 	```
 
 4. Add Greyhole to services that start on boot:
 
-	Fedora: chkconfig --add greyhole; chkconfig greyhole on
-	Ubuntu (< 10): update-rc.d greyhole defaults 98 20
-	Ubuntu (10-14): [nothing to do]
-	Ubuntu (15): update-rc.d greyhole defaults
-	Debian: update-rc.d greyhole defaults
-	Systemd: systemctl enable greyhole
+	- Fedora: `chkconfig --add greyhole; chkconfig greyhole on`
+	- Ubuntu (< 10): `update-rc.d greyhole defaults 98 20`
+	- Ubuntu (10-14): [nothing to do]
+	- Ubuntu (15+): `update-rc.d greyhole defaults`
+	- Debian: `update-rc.d greyhole defaults`
+	- Systemd: `systemctl enable greyhole`
 
-5. Work around problems with the CIFS client (as root):
-    Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
-	Note: The cron.d script added above includes an @reboot cron line to make this permanent.
+5. Work around problems with the CIFS client (as root):  
+    - Ref: http://blog.dhampir.no/content/cifs-vfs-no-response-for-cmd-n-mid
+	- Note: The cron.d script added above includes an @reboot cron line to make this permanent.
 
+	```bash
 	if [ -f /proc/fs/cifs/OplockEnabled ]; then
 		modprobe cifs
 		echo 0 > /proc/fs/cifs/OplockEnabled
@@ -112,8 +121,9 @@ If you know what you're doing, you should have no problem installing on any othe
 		modprobe cifs enable_oplocks=0
 		echo 0 > /sys/module/cifs/parameters/enable_oplocks
 	fi
+ 	```
 
-You are now ready to configure and use Greyhole.
-See the USAGE file for details:
-	/usr/share/greyhole/USAGE
-	or online https://raw.github.com/gboudreau/Greyhole/master/USAGE
+You are now ready to configure and use Greyhole.  
+
+See the USAGE file for details: `/usr/share/greyhole/USAGE`  
+or online https://raw.github.com/gboudreau/Greyhole/master/USAGE

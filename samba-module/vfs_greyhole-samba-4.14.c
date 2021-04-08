@@ -23,6 +23,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 #include "includes.h"
 #include "system/filesys.h"
 #include "smbd/smbd.h"
+#include "smbd/fd_handle_private.h"
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
 #include "../lib/crypto/gnutls_helpers.h"
