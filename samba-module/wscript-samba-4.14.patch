@@ -1,0 +1,31 @@
+diff -Naur a/source3/modules/wscript_build b/source3/modules/wscript_build
+--- a/source3/modules/wscript_build
++++ b/source3/modules/wscript_build
+@@ -476,6 +476,15 @@
+                  internal_module=bld.SAMBA3_IS_STATIC_MODULE('vfs_media_harmony'),
+                  enabled=bld.SAMBA3_IS_ENABLED_MODULE('vfs_media_harmony'))
+
++VFS_GREYHOLE_SRC = 'vfs_greyhole.c'
++bld.SAMBA3_MODULE('vfs_greyhole',
++                 subsystem='vfs',
++                 source=VFS_GREYHOLE_SRC,
++                 deps='',
++                 init_function='',
++                 internal_module=bld.SAMBA3_IS_STATIC_MODULE('vfs_greyhole'),
++                 enabled=bld.SAMBA3_IS_ENABLED_MODULE('vfs_greyhole'))
++
+ bld.SAMBA3_MODULE('vfs_unityed_media',
+                  subsystem='vfs',
+                  source='vfs_unityed_media.c',
+diff -Naur a/source3/wscript b/source3/wscript
+--- a/source3/wscript
++++ b/source3/wscript
+@@ -1903,7 +1903,7 @@
+                                       vfs_readahead vfs_xattr_tdb
+                                       vfs_streams_xattr vfs_streams_depot vfs_acl_xattr vfs_acl_tdb
+                                       vfs_preopen vfs_catia
+-                                      vfs_media_harmony vfs_unityed_media vfs_fruit vfs_shell_snap
++                                      vfs_media_harmony vfs_greyhole vfs_unityed_media vfs_fruit vfs_shell_snap
+                                       vfs_commit vfs_worm vfs_crossrename vfs_linux_xfs_sgid
+                                       vfs_time_audit vfs_offline vfs_virusfilter
+                                   '''))

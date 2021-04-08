@@ -7,7 +7,7 @@ How to build the VFS module binaries for a new Samba version.
 1. Create a new .patch file in `samba-module/`
    For example, `samba-module/wscript-samba-$VERSION.patch`
 
-2. If needed, create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
+2. Create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
 
 3. Add the new Samba version number in `build/build_vfs_all.sh @L23`
 
