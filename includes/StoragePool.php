@@ -308,7 +308,6 @@ final class StoragePool {
                 if (is_string($file_metafiles)) {
                     Log::critical("Fatal error! \$file_metafiles is now a string: '$file_metafiles'.", Log::EVENT_CODE_UNEXPECTED_VAR);
                 }
-                /** @noinspection PhpIllegalStringOffsetInspection */
                 $file_metafiles[$clean_full_path] = (object) array('path' => $clean_full_path, 'is_linked' => FALSE, 'state' => $state);
 
                 // Temp files leftovers of stopped Greyhole executions
@@ -325,7 +324,7 @@ final class StoragePool {
     }
 
     public static function get_free_space($for_sp_drive) {
-        if (time() > static::$last_df_time + Config::get(CONFIG_DF_CACHE_TIME)) {
+        if (time() > StoragePool::$last_df_time + Config::get(CONFIG_DF_CACHE_TIME)) {
             $dfs = [];
             exec(ConfigHelper::$df_command, $responses);
             $responses_arr = array();
@@ -372,14 +371,14 @@ final class StoragePool {
                 /** @noinspection PhpUndefinedVariableInspection */
                 $dfs[$sp_drive]['used'] = $target_usedspace;
             }
-            static::$last_df_time = time();
-            static::$last_dfs = $dfs;
+            StoragePool::$last_df_time = time();
+            StoragePool::$last_dfs = $dfs;
         }
 
-        if (empty(static::$last_dfs[$for_sp_drive])) {
+        if (empty(StoragePool::$last_dfs[$for_sp_drive])) {
             return FALSE;
         }
-        return static::$last_dfs[$for_sp_drive];
+        return StoragePool::$last_dfs[$for_sp_drive];
     }
 
     public static function choose_target_drives($filesize_kb, $include_full_drives, $share, $path, $log_prefix = '', &$is_sticky = NULL) {
