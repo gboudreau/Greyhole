@@ -290,16 +290,18 @@ if (!empty($_GET['ajax'])) {
 
         $where = "1";
         $search = NULL;
+        $params = [];
         if (!empty($_GET['search']['value'])) {
             $where = "full_path LIKE :search OR share LIKE :search OR event_date LIKE :search OR action LIKE :search";
             $search = "%" . str_replace(' ', '%', $_GET['search']['value']) . "%";
+            $params['search'] = $search;
         }
 
         $start = (int) $_GET['start'];
         $length = (int) $_GET['length'];
 
         $q = "SELECT * FROM tasks_completed WHERE $where ORDER BY " . implode(', ', $order_by) . " LIMIT $start,$length";
-        $tasks = DB::getAll($q, ['search' => $search]);
+        $tasks = DB::getAll($q, $params);
 
         foreach ($tasks as $task) {
             if ($task->action == 'rename') {
@@ -308,7 +310,7 @@ if (!empty($_GET['ajax'])) {
         }
 
         $q = "SELECT COUNT(*) FROM tasks_completed WHERE $where";
-        $num_rows_filtered = DB::getFirstValue($q, ['search' => $search]);
+        $num_rows_filtered = DB::getFirstValue($q, $params);
 
         echo json_encode(['draw' => $_GET['draw'], 'recordsTotal' => $num_rows, 'recordsFiltered' => $num_rows_filtered, 'data' => $tasks]);
         exit();
