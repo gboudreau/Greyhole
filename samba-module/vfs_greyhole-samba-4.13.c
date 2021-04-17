@@ -192,7 +192,7 @@ static int greyhole_openat(vfs_handle_struct *handle, const struct files_struct 
 			gh_spoolf("open\n%s\n%s\n%d\n%s\n",
 				lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
 				smb_fname->base_name,
-				result,
+				fsp->fh->fd,
 				"for writing ");
 		}
 	}
