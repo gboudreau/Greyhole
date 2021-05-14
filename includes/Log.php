@@ -77,6 +77,7 @@ final class Log {
     const EVENT_CODE_DB_MIGRATION_FAILED = 'db_migration_failed';
     const EVENT_CODE_DB_TABLE_CRASHED = 'db_table_crashed';
     const EVENT_CODE_FILE_COPY_FAILED = 'file_copy_failed';
+    const EVENT_CODE_FILE_INVALID = 'file_invalid_character';
     const EVENT_CODE_FSCK_REPORT = 'fsck_report';
     const EVENT_CODE_FSCK_EMPTY_FILE_COPY_FOUND = 'fsck_empty_file_copy_found';
     const EVENT_CODE_FSCK_MD5_LOG_FAILURE = 'fsck_md5_log_failure';

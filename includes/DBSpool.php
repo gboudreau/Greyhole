@@ -303,7 +303,15 @@ final class DBSpool {
             'additional_info' => $additional_info,
             'complete' => ( $action == 'write' ? 'no' : 'yes' ),
         );
-        $id = DB::insert($query, $params);
+        try {
+            $id = DB::insert($query, $params);
+        } catch (Exception $ex) {
+            if ($ex->getCode() == 1366) {
+                // Incorrect string value: '\x##\x##\x##'
+                Log::warn("File '$full_path' contains non UTF-8 character. Skipping.", Log::EVENT_CODE_FILE_INVALID);
+                return FALSE;
+            }
+        }
         return $id;
     }
 
@@ -318,7 +326,15 @@ final class DBSpool {
         if ($act === 'fwrite') {
             if (!empty($fullpath)) {
                 $q = "SELECT * FROM tasks WHERE action = 'write' AND complete IN ('written', 'no') AND share = :share AND $prop = :$prop";
-                $opened_task = DB::getFirst($q, array('share' => $share, $prop => $prop_value));
+                try {
+                    $opened_task = DB::getFirst($q, array('share' => $share, $prop => $prop_value));
+                } catch (Exception $ex) {
+                    if ($ex->getCode() == 1267) {
+                        // Illegal mix of collations
+                        Log::warn("File '$prop_value' contains non UTF-8 character. Skipping.", Log::EVENT_CODE_FILE_INVALID);
+                        return;
+                    }
+                }
                 if (!$opened_task) {
                     // Writing to a file that wasn't opened-for-writing... Log this as a write, complete=yes task
                     $id = $this->insert('write', $share, $fullpath, NULL, $fd);
