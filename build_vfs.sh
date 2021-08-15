@@ -147,6 +147,7 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     # shellcheck disable=SC2086
     ./configure ${CONF_OPTIONS} >>gh_vfs_build.log 2>&1 &
     PROC_ID=$!
+		sleep 15
 	fi
 
 	while kill -0 "$PROC_ID" >/dev/null 2>&1; do
@@ -160,8 +161,8 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
 	  echo "Configuring Samba failed."
 	  echo "Hint : install the required dependencies. See step 3 in https://raw.githubusercontent.com/gboudreau/Greyhole/master/INSTALL"
 	  echo
-	  echo "tail $(pwd)/gh_vfs_build.log :"
-	  tail -n 100 gh_vfs_build.log
+	  echo "cat $(pwd)/gh_vfs_build.log :"
+	  cat gh_vfs_build.log
 	  exit 4
   fi
   rm -rf .greyhole_needs_configures
