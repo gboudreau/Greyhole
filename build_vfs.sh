@@ -161,8 +161,8 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
 	  echo "Hint : install the required dependencies. See step 3 in https://raw.githubusercontent.com/gboudreau/Greyhole/master/INSTALL"
 	  echo
 	  echo "tail $(pwd)/gh_vfs_build.log :"
-	  tail gh_vfs_build.log
-	  exit 1
+	  tail -n 100 gh_vfs_build.log
+	  exit 4
   fi
   rm -rf .greyhole_needs_configures
 
@@ -181,6 +181,7 @@ sed -i '/#include <stdbool.h>/r file.txt' -- lib/tevent/tevent.h
 rm file.txt
 
 echo "  Compiling Samba..."
+set +e
 make -j >gh_vfs_build.log 2>&1 &
 PROC_ID=$!
 
@@ -189,8 +190,15 @@ while kill -0 "$PROC_ID" >/dev/null 2>&1; do
   echo -en "\r${ceol}    Progress: "
   echo -n "$(tail -n 1 gh_vfs_build.log)"
 done
-
 echo -en "\r${ceol}"
+if ! wait "$PROC_ID"; then
+  echo
+  echo "Compiling Samba failed."
+  echo
+  echo "tail $(pwd)/gh_vfs_build.log :"
+  tail -n 100 gh_vfs_build.log
+  exit 5
+fi
 echo
 
 V=$(echo "${version}" | awk -F'.' '{print $1$2}')
@@ -205,8 +213,13 @@ fi
 
 if [[ ! -f ${COMPILED_MODULE} ]]; then
 	>&2 echo "Failed to compile Greyhole VFS module."
+  echo
+  echo "tail $(pwd)/gh_vfs_build.log :"
+  tail -n 100 gh_vfs_build.log
 	exit 3
 fi
+
+set -e
 
 cp "${COMPILED_MODULE}" "${GREYHOLE_COMPILED_MODULE}"
 
