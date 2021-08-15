@@ -195,8 +195,8 @@ if ! wait "$PROC_ID"; then
   echo
   echo "Compiling Samba failed."
   echo
-  echo "tail $(pwd)/gh_vfs_build.log :"
-  tail -n 100 gh_vfs_build.log
+  echo "cat $(pwd)/gh_vfs_build.log :"
+  cat gh_vfs_build.log
   exit 5
 fi
 echo
@@ -214,8 +214,8 @@ fi
 if [[ ! -f ${COMPILED_MODULE} ]]; then
 	>&2 echo "Failed to compile Greyhole VFS module."
   echo
-  echo "tail $(pwd)/gh_vfs_build.log :"
-  tail -n 100 gh_vfs_build.log
+  echo "cat $(pwd)/gh_vfs_build.log :"
+  cat gh_vfs_build.log
 	exit 3
 fi
 
