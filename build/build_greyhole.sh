@@ -210,12 +210,24 @@ php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_ur
 #########################
 # Create new Docker image
 
+# Initial setup (for --push)
+# sudo docker login --username gboudreau
+
+# Requirements for multi-arch builds:
+# sudo -i
+# apt-get install -y --no-install-recommends qemu-user-static binfmt-support
+# update-binfmts --enable qemu-arm
+# update-binfmts --display qemu-arm
+# echo ':arm:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-arm-static:' > /proc/sys/fs/binfmt_misc/register
+# docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+# docker buildx create --name mybuilder --driver docker-container --use
+# docker buildx inspect --bootstrap
+
 echo "Creating new Docker images..."
 cd ~/docker-services/samba-greyhole/docker-build/
-sudo docker build -t "gboudreau/samba-greyhole:$VERSION" --build-arg "GREYHOLE_VERSION=$VERSION" .
-sudo docker push "gboudreau/samba-greyhole:$VERSION"
-sudo docker tag "gboudreau/samba-greyhole:$VERSION" "gboudreau/samba-greyhole:latest"
-sudo docker push "gboudreau/samba-greyhole:latest"
+sudo docker buildx use mybuilder
+PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+sudo docker buildx build --platform ${PLATFORMS} --push -t "gboudreau/samba-greyhole:$VERSION" -t "gboudreau/samba-greyhole:latest" --build-arg "GREYHOLE_VERSION=$VERSION" .
 echo
 
 ###
