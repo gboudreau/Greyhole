@@ -26,6 +26,8 @@ class CopyCliRunner extends AbstractCliRunner {
     protected $target;
 
     public function run() {
+        ConfigHelper::parse();
+        DB::connect();
         Log::setAction(ACTION_INITIALIZE);
         Metastores::choose_metastores_backups();
         Log::setAction(ACTION_CP);
