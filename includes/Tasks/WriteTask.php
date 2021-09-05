@@ -87,7 +87,7 @@ class WriteTask extends AbstractTask {
                         $keys_to_remove[] = $metafile->path;
                     }
                 }
-                if (!$found_source_file && count($keys_to_remove) > 0) {
+                if (!$found_source_file && !empty($keys_to_remove)) {
                     // This shouldn't happen, but if we're about to remove all copies, let's make sure we keep at least one.
                     $key = array_shift($keys_to_remove);
                     $source_file = $existing_metafiles[$key]->path;
@@ -137,8 +137,7 @@ class WriteTask extends AbstractTask {
             // There might be old metafiles... for example, when a delete task was skipped.
             // Let's remove the file copies if there are any leftovers; correct copies will be re-created in create_copies_from_metafiles()
             foreach (Metastores::get_metafiles($share, $path, $filename) as $existing_metafiles) {
-                Log::debug(count($existing_metafiles) . " metafiles loaded.");
-                if (count($existing_metafiles) > 0) {
+                if (!empty($existing_metafiles)) {
                     foreach ($existing_metafiles as $metafile) {
                         Trash::trash_file($metafile->path);
                     }
@@ -179,7 +178,7 @@ class WriteTask extends AbstractTask {
         list($path, $filename) = explode_full_path($full_path);
 
         // Only need to check for locking if we have something to do!
-        if ($num_copies_required > 1 || count($existing_metafiles) == 0) {
+        if ($num_copies_required > 1 || empty($existing_metafiles)) {
             // Check if another process locked this file before we work on it
             if ($this->is_file_locked($share, $full_path)) {
                 return FALSE;

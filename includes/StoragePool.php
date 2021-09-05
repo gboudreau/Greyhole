@@ -120,7 +120,7 @@ final class StoragePool {
                 $i = 0; $j = 0;
             }
         }
-        if (count($returned_drives) > 0) {
+        if (!empty($returned_drives)) {
             $body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives came back:\n";
             foreach ($returned_drives as $sp_drive) {
                 $body .= "$sp_drive was missing; it's now available again.\n";
@@ -134,7 +134,7 @@ final class StoragePool {
             }
             email_sysadmin($subject, $body);
         }
-        if (count($missing_drives) > 0) {
+        if (!empty($missing_drives)) {
             $body = "This is an automated email from Greyhole.\n\nOne (or more) of your storage pool drives has disappeared:\n";
 
             foreach ($missing_drives as $sp_drive) {
@@ -461,7 +461,7 @@ final class StoragePool {
                 foreach ($drives_last_resort as $sp_drive => $space) {
                     $last_resort_sorted_target_drives[$sp_drive] = $space;
                 }
-                if (count($drives) == 0 && count($drives_last_resort) == 0) {
+                if (empty($drives) && count($drives_last_resort) == 0) {
                     $num_empty_ds++;
                 }
             }
@@ -472,7 +472,7 @@ final class StoragePool {
         }
 
         // Email notification when all drives are over-capacity
-        if (count($sorted_target_drives) == 0) {
+        if (empty($sorted_target_drives)) {
             Log::error("  Warning! All storage pool drives are over-capacity!", Log::EVENT_CODE_ALL_DRIVES_FULL);
             if (!isset($last_OOS_notification)) {
                 $setting = Settings::get('last_OOS_notification');
@@ -502,7 +502,7 @@ You probably want to do something about this!
         }
 
         if (Log::getLevel() >= Log::DEBUG) {
-            if (count($sorted_target_drives) > 0) {
+            if (!empty($sorted_target_drives)) {
                 $log = $log_prefix . "Drives with available space: ";
                 foreach ($sorted_target_drives as $sp_drive => $space) {
                     /** @noinspection PhpUndefinedVariableInspection */
@@ -510,7 +510,7 @@ You probably want to do something about this!
                 }
                 Log::debug(mb_substr($log, 0, mb_strlen($log)-2));
             }
-            if (count($last_resort_sorted_target_drives) > 0) {
+            if (!empty($last_resort_sorted_target_drives)) {
                 $log = $log_prefix . "Drives with enough free space, but no available space: ";
                 foreach ($last_resort_sorted_target_drives as $sp_drive => $space) {
                     /** @noinspection PhpUndefinedVariableInspection */
@@ -518,7 +518,7 @@ You probably want to do something about this!
                 }
                 Log::debug(mb_substr($log, 0, mb_strlen($log)-2));
             }
-            if (count($full_drives) > 0) {
+            if (!empty($full_drives)) {
                 $log = $log_prefix . "Drives full: ";
                 foreach ($full_drives as $sp_drive => $free_space) {
                     $log .= "$sp_drive (" . bytes_to_human($free_space*1024, FALSE) . " free) - ";
@@ -544,7 +544,7 @@ You probably want to do something about this!
                     $is_sticky = TRUE;
 
                     $more_drives_needed = FALSE;
-                    if (count($stick_into) > 0) {
+                    if (!empty($stick_into)) {
                         // Stick files into specific drives: $stick_into
                         // Let's check if those drives are listed in the config file!
                         foreach ($stick_into as $key => $stick_into_dir) {
@@ -554,7 +554,7 @@ You probably want to do something about this!
                             }
                         }
                     }
-                    if (count($stick_into) == 0 || $more_drives_needed) {
+                    if (empty($stick_into) || $more_drives_needed) {
                         if (string_contains($share_dir, '*')) {
                             // Contains a wildcard... In this case, we want each directory that match the wildcard to have it's own setting. Let's find this directory...
                             // For example, if $share_dir == 'Videos/Movies/*/*' and "$share/$path/" == "Videos/Movies/HD/La Vita e Bella/", we want to save a 'stick_into' setting for 'Videos/Movies/HD/La Vita e Bella/'

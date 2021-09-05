@@ -700,13 +700,16 @@ function array_contains($haystack, $needle) {
 }
 
 function string_contains($haystack, $needle) {
-    if (!is_string($haystack)) {
+    if (!is_string($haystack) || empty($haystack)) {
         return FALSE;
     }
     return mb_strpos($haystack, $needle) !== FALSE;
 }
 
 function string_starts_with($haystack, $needle) {
+    if (!is_string($haystack) || empty($haystack)) {
+        return FALSE;
+    }
     if (is_array($needle)) {
         foreach ($needle as $n) {
             if (string_starts_with($haystack, $n)) {
@@ -719,6 +722,9 @@ function string_starts_with($haystack, $needle) {
 }
 
 function string_ends_with($haystack, $needle) {
+    if (!is_string($haystack) || empty($haystack)) {
+        return FALSE;
+    }
     if (is_array($needle)) {
         foreach ($needle as $n) {
             if (string_ends_with($haystack, $n)) {
