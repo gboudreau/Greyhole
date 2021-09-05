@@ -28,6 +28,7 @@ require_once('includes/CLI/BootInitCliRunner.php');
 require_once('includes/CLI/CancelBalanceCliRunner.php');
 require_once('includes/CLI/CancelFsckCliRunner.php');
 require_once('includes/CLI/ConfigCliRunner.php');
+require_once('includes/CLI/CopyCliRunner.php');
 require_once('includes/CLI/CreateMemSpoolRunner.php');
 require_once('includes/CLI/DebugCliRunner.php');
 require_once('includes/CLI/DeleteMetadataCliRunner.php');
@@ -82,6 +83,7 @@ class CommandLineHelper {
             new CliCommandDefinition('view-queue',       'q',   null,             ViewQueueCliRunner::class,      "Display the current work queue."),
             new CliCommandDefinition('empty-trash',      'a',   null,             EmptyTrashCliRunner::class,     "Empty the trash."),
             new CliCommandDefinition('mv',               '',    ' source target', MoveCliRunner::class,           "Move a folder or file from one Greyhole share to another. Run without parameters for details."),
+            new CliCommandDefinition('cp',               '',    ' source share/target/dir/', CopyCliRunner::class,"Copy a file or folder onto your storage pool without going through Samba. Run without parameters for details."),
             new CliCommandDefinition('debug:',           'b:',  '=filename',      DebugCliRunner::class,          "Debug past file operations."),
             new CliCommandDefinition('thaw::',           't::', '[=path]',        ThawCliRunner::class,           "Thaw a frozen directory. Greyhole will start working on files inside <path>. If you don't supply an option, the list of frozen directories will be displayed."),
             new CliCommandDefinition('wait-for::',       'w::', '[=path]',        WaitForCliRunner::class,        "Tell Greyhole that the missing drive at <path> will return soon, and that it shouldn't re-create additional file copies to replace it. If you don't supply an option, the available options (paths) will be displayed."),
@@ -151,6 +153,10 @@ class CommandLineHelper {
     }
 
     private function getRunner() {
+        if (empty($this->actionCmd) && basename(first($GLOBALS['argv'], '')) == 'cpgh') {
+            return new CopyCliRunner($this->options, $this->actionCmd);
+        }
+
         // No action specified on the command line; print usage help and exit.
         if (empty($this->actionCmd) || $this->actionCmd->getOpt() == 'help') {
             $this->printUsage();

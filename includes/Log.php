@@ -49,6 +49,7 @@ define('ACTION_SLEEP', 'sleep');
 define('ACTION_READ_SAMBA_POOL', 'read_smb_spool');
 define('ACTION_FSCK_FILE', 'fsck_file');
 define('ACTION_MOVE', 'move');
+define('ACTION_CP', 'cp');
 
 final class Log {
     const PERF     = 9;
@@ -176,9 +177,12 @@ final class Log {
     private static $last_log;
 
     private static function _log($local_log_level, $text, $event_code) {
-        if (self::$action == 'test-config') {
+        if (self::$action == 'test-config' || self::$action == ACTION_CP) {
             $greyhole_log_file = NULL;
             $use_syslog = FALSE;
+            if (self::$action == ACTION_CP && $local_log_level > self::$level) {
+                return;
+            }
         } elseif (self::$action == ACTION_INITIALIZE && !DaemonRunner::isCurrentProcessDaemon()) {
             if ($local_log_level === self::CRITICAL) {
                 if (defined('IS_WEB_APP')) {

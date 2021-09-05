@@ -29,7 +29,7 @@ final class StorageFile {
 
         $file_copies_to_create = [];
         foreach ($metafiles as $key => $metafile) {
-            if (!gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) {
+            if (!Log::actionIs(ACTION_CP) && !gh_file_exists("$landing_zone/$full_path", '  $real_path doesn\'t exist anymore. Aborting.')) {
                 return FALSE;
             }
 
@@ -126,6 +126,9 @@ final class StorageFile {
             $link_next = FALSE;
             if ($metafile->is_linked) {
                 Log::debug("  Creating symlink in share pointing to $metafile->path");
+                if (!is_dir("$landing_zone/$path/")) {
+                    gh_mkdir("$landing_zone/$path/", dirname($source_file));
+                }
                 gh_symlink($metafile->path, "$landing_zone/$path/.gh_$filename");
                 if (!file_exists("$landing_zone/$full_path") || unlink("$landing_zone/$full_path")) {
                     gh_rename("$landing_zone/$path/.gh_$filename", "$landing_zone/$path/$filename");
@@ -180,9 +183,9 @@ final class StorageFile {
         }
 
         if (isset($source_size)) {
-            Log::debug("  Copying " . bytes_to_human($source_size, FALSE) . " file to: " . implode(', ', $file_copies_to_create));
+            Log::info("  Copying " . bytes_to_human($source_size, FALSE) . " file to: " . implode(', ', $file_copies_to_create));
         } else {
-            Log::debug("  Copying file to: " . implode(', ', $file_copies_to_create));
+            Log::info("  Copying file to: " . implode(', ', $file_copies_to_create));
         }
 
         $start_time = time();
@@ -262,16 +265,16 @@ final class StorageFile {
         }
 
         if (isset($source_size)) {
-            Log::debug("  Copying " . bytes_to_human($source_size, FALSE) . " file to $destination_file");
+            Log::info("  Copying " . bytes_to_human($source_size, FALSE) . " file to $destination_file");
         } else {
-            Log::debug("  Copying file to $destination_file");
+            Log::info("  Copying file to $destination_file");
         }
 
         $renamed = FALSE;
         if (gh_is_file($source_file)) {
             $source_dev = gh_file_deviceid($source_file);
             $target_dev = gh_file_deviceid(dirname($destination_file));
-            if ($source_dev === $target_dev && $source_dev !== FALSE && !Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
+            if ($source_dev === $target_dev && $source_dev !== FALSE && !Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE) && !Log::actionIs(ACTION_CP)) {
                 Log::debug("  (using rename)");
                 $original_file_infos = StorageFile::get_file_permissions($source_file);
                 gh_rename($source_file, $temp_path);
@@ -324,7 +327,7 @@ final class StorageFile {
             static::set_file_permissions($destination_file, $original_file_infos);
             if (!empty($md5)) {
                 /** @noinspection PhpUndefinedVariableInspection */
-                list($share, $full_path) = get_share_and_fullpath_from_realpath($copy_source);
+                list($share, $full_path) = get_share_and_fullpath_from_realpath($destination_file);
                 log_file_checksum($share, $full_path, $md5);
             }
         } else {

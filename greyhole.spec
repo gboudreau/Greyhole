@@ -126,6 +126,10 @@ chmod 777 /var/spool/greyhole
 mkdir -p /var/cache/greyhole-dfree
 chmod 777 /var/cache/greyhole-dfree
 
+if [ ! -f /usr/bin/cpgh ]; then
+	ln -s /usr/bin/greyhole /usr/bin/cpgh
+fi
+
 if [ -d /usr/lib/x86_64-linux-gnu ]; then 
     SOURCE_LIBDIR="/usr/lib64"
     TARGET_LIBDIR="/usr/lib/x86_64-linux-gnu"

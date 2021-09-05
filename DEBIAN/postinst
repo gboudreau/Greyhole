@@ -7,6 +7,10 @@ chmod 777 /var/spool/greyhole
 mkdir -p /var/cache/greyhole-dfree
 chmod 777 /var/cache/greyhole-dfree
 
+if [ ! -f /usr/bin/cpgh ]; then
+	ln -s /usr/bin/greyhole /usr/bin/cpgh
+fi
+
 if [ -d /usr/lib/arm-linux-gnueabihf/samba/vfs ]; then
     SOURCE_LIBDIR="/usr/lib"
     TARGET_LIBDIR="/usr/lib/arm-linux-gnueabihf"

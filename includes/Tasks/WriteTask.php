@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2009-2020 Guillaume Boudreau
+Copyright 2009-2021 Guillaume Boudreau
 
 This file is part of Greyhole.
 
@@ -30,11 +30,17 @@ class WriteTask extends AbstractTask {
             return TRUE;
         }
 
-        if ($this->should_ignore_file()) {
+        if (string_starts_with($this->additional_info, 'source:')) {
+            $source_file = substr($this->additional_info, 7);
+        } else {
+            $source_file = "$landing_zone/$full_path";
+        }
+
+        if ($this->should_ignore_file() && !string_starts_with($this->additional_info, 'source:')) {
             return TRUE;
         }
 
-        if (!gh_file_exists("$landing_zone/$full_path", '$real_path doesn\'t exist anymore.')) {
+        if (!gh_file_exists($source_file, '$real_path doesn\'t exist anymore.')) {
             $new_full_path = static::find_future_full_path($share, $full_path, $task_id);
             if ($new_full_path != $full_path && gh_is_file("$landing_zone/$new_full_path")) {
                 Log::debug("  Found that $full_path has been renamed to $new_full_path. Will work using that instead.");
