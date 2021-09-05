@@ -4,16 +4,19 @@
 export PHPRC=/usr/share/greyhole/php.ini
 
 # Check that the required PHP extensions are loaded
-mods_required="mbstring mysql intl"
 function missing_mod
 {
 	echo "Error: PHP '$1' module missing; please enable it in your PHP configuration."
+	rm -f /tmp/greyhole-php.loaded.mods
 	exit 1
 }
-/usr/bin/php -m > /tmp/greyhole-php.loaded.mods
-chmod 666 /tmp/greyhole-php.loaded.mods 2>/dev/null
-for mod in ${mods_required[@]} ; do
-	grep "${mod}" /tmp/greyhole-php.loaded.mods >/dev/null || missing_mod "${mod}"
-done
+if [ ! -f /tmp/greyhole-php.loaded.mods ]; then
+  mods_required="mbstring mysql intl"
+  /usr/bin/php -m > /tmp/greyhole-php.loaded.mods
+  chmod 666 /tmp/greyhole-php.loaded.mods 2>/dev/null
+  for mod in ${mods_required[@]} ; do
+	  grep "${mod}" /tmp/greyhole-php.loaded.mods >/dev/null || missing_mod "${mod}"
+  done
+fi
 
 /usr/bin/php "$@"
