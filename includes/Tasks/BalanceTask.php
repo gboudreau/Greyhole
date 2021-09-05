@@ -135,9 +135,14 @@ class BalanceTask extends AbstractTask {
         $files = array();
         if (is_dir("$source_drive/$share")) {
             $max_file_size = floor($delta_needed / 1024);
-            $command = "find ". escapeshellarg("$source_drive/$share") ." -type f -size +10M -size -{$max_file_size}M";
-            Log::debug("│││ Looking for files to move on $share, with file size between 10-{$max_file_size} MB ...");
-            exec($command, $files);
+            foreach (['100', '10', '5', '1', '0'] as $min_file_size) {
+                $command = "find " . escapeshellarg("$source_drive/$share") . " -type f -size +{$min_file_size}M -size -{$max_file_size}M";
+                Log::debug("│││ Looking for files to move on $share, with file size between {$min_file_size}-{$max_file_size} MB ...");
+                exec($command, $files);
+                if (count($files) > 0) {
+                    break;
+                }
+            }
         }
         if (count($files) == 0) {
             Log::debug("│├┘ Found no files that could be moved.");
