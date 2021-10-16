@@ -172,3 +172,13 @@ body.dark .custom-control-input:checked ~ .custom-control-label::before {
     min-width: 90px;
     text-align: center;
 }
+
+.dark .btn-outline-primary:not(:disabled):not(.disabled):active,.dark .btn-outline-primary:not(:disabled):not(.disabled).active,.dark .show>.btn-outline-primary.dropdown-toggle {
+    color: #fff;
+    background-color: rgba(26, 119, 147, 0.6);
+    border-color: rgba(26, 119, 147, 1);
+}
+
+.dark .nav-tabs .nav-link:not([disabled]):not(.disabled):hover,.dark .nav-tabs .nav-link:not([disabled]):not(.disabled):focus,.dark .nav-tabs .nav-link:not([disabled]):not(.disabled):active,.dark .nav-tabs .nav-link:not([disabled]):not(.disabled).active {
+    background: rgba(26, 119, 147, 0.6);
+}
