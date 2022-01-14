@@ -62,6 +62,18 @@ final class DB {
             if (self::$options->name != 'mysql') {
                 DB::migrate();
             }
+
+            $now = DB::getFirstValue("SELECT NOW()");
+            $diff = time() - strtotime($now);
+            if (abs($diff) > 20*60) {
+                $symbol = $diff < 0 ? '-' : '+';
+                $diff_minutes = round(abs($diff)/60);
+                $diff_hours = floor($diff_minutes/60);
+                $diff_minutes -= $diff_hours*60;
+                $mysql_tz = sprintf("%s%02d:%02d", $symbol, $diff_hours, $diff_minutes);
+                Log::info("Adjusting MySQL Timezone: $diff secs difference between MySQL and PHP => Changing MySQL TZ to '$mysql_tz'");
+                DB::execute("SET time_zone = :tz", ['tz' => $mysql_tz]);
+            }
         }
 
         return self::$handle;
