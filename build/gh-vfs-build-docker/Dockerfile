@@ -1,4 +1,4 @@
-ARG IMAGE=ubuntu:latest
+ARG IMAGE=ubuntu@sha256:57df66b9fc9ce2947e434b4aa02dbe16f6685e20db0c170917d4a1962a5fe6a9
 FROM $IMAGE
 
 ENV DEBIAN_FRONTEND noninteractive
