@@ -6,7 +6,7 @@ ENV TERM=xterm
 ENV PERL_MM_USE_DEFAULT=1
 ENV PYTHONUTF8=1
 
-RUN apt-get update && apt-get install -y curl unzip samba samba-common samba-common-bin samba-vfs-modules build-essential python3-dev libgnutls28-dev pkg-config flex locales \
+RUN apt-get update && apt-get install -y curl unzip samba samba-common samba-common-bin samba-vfs-modules build-essential python3-dev libgnutls28-dev pkg-config flex locales comerr-dev heimdal-multidev \
 	# Clean apt, /tmp
 	&& rm -rf /var/lib/apt/lists/* /tmp/* \
 	&& perl -MCPAN -e 'install Parse::Yapp::Driver' \

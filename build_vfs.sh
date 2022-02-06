@@ -57,10 +57,19 @@ fi
 if [ $M -ge 4 ] && [ $m -ge 13 ]; then
     echo "Installing zlib-devel ..."
     if command -v apt-get >/dev/null; then
-        apt-get -y install zlib1g-dev || true
+        apt-get -y install zlib1g-dev flex locales || true
     fi
     if command -v yum >/dev/null; then
         yum -y install zlib-devel || true
+    fi
+fi
+if [ $M -ge 4 ] && [ $m -ge 15 ]; then
+    echo "Installing zlib-devel ..."
+    if command -v apt-get >/dev/null; then
+        apt-get -y install comerr-dev heimdal-multidev || true
+    fi
+    if command -v yum >/dev/null; then
+        yum -y install e2fsprogs-devel heimdal-devel || true
     fi
 fi
 
@@ -142,6 +151,9 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --without-json --without-libarchive"
     elif [[ ${m} -gt 8 ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
+    fi
+    if [[ ${m} -gt 14 ]]; then
+      CONF_OPTIONS="${CONF_OPTIONS} --with-system-heimdalkrb5"
     fi
     echo "./configure ${CONF_OPTIONS}" > gh_vfs_build.log
     # shellcheck disable=SC2086

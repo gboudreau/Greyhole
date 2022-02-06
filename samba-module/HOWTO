@@ -12,7 +12,7 @@ How to build the VFS module binaries for a new Samba version.
 
 4. Add the new Samba version number in `build/build_vfs_all.sh` @L18
 
-5. Run the `build/build_vfs_all.sh` script
+5. Run the `sudo build/build_vfs_all.sh` script
 
 6. Edit `INSTALL`
     - Change latest version of Samba supported in point 3 (near L86, and in the two `cp` lines slightly below).
