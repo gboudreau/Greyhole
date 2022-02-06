@@ -64,7 +64,7 @@ if [ $M -ge 4 ] && [ $m -ge 13 ]; then
     fi
 fi
 if [ $M -ge 4 ] && [ $m -ge 15 ]; then
-    echo "Installing zlib-devel ..."
+    echo "Installing com_err & heimdal-devel ..."
     if command -v apt-get >/dev/null; then
         apt-get -y install comerr-dev heimdal-multidev || true
     fi
