@@ -187,16 +187,16 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
   fi
 fi
 
-# Patch for compiling Samba on Alpine Linux
-sed -i -e 's/NETDB_INTERNAL/-1/' nsswitch/wins.c
-sed -i -e 's/NETDB_SUCCESS/0/' nsswitch/wins.c
+# Patches for compiling Samba on Alpine Linux; from https://git.alpinelinux.org/aports/tree/main/samba?h=3.15-stable
+echo "  Applying patches (if any)..."
+shopt -s nullglob
+for f in "${GREYHOLE_INSTALL_DIR}/"*.patch; do
+    echo -n "  - "
+    patch -p1 -i "$f"
+done
 echo '#include <sys/types.h>' > file.txt
 sed -i '/#include <stdbool.h>/r file.txt' -- lib/tevent/tevent.h
 rm file.txt
-# For ARM: uintptr_t is defined in alltypes.h, along with a flag __DEFINED_uintptr_t, but cmocka.h:113 does not know about that flag, and thus tries to re-define uintptr_t
-# ../../third_party/cmocka/cmocka.h:127:28: error: conflicting types for 'uintptr_t'
-# /usr/include/bits/alltypes.h:63:24: note: previous declaration of 'uintptr_t' was here
-sed -i -e 's/\!defined._UINTPTR_T_DEFINED./\!defined(_UINTPTR_T_DEFINED) \&\& \!defined(__DEFINED_uintptr_t)/' third_party/cmocka/cmocka.h
 
 echo "  Compiling Samba"
 set +e
