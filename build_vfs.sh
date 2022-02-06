@@ -152,7 +152,7 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     elif [[ ${m} -gt 8 ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
     fi
-    if [[ ${m} -gt 14 ]]; then
+    if [[ ${m} -gt 14 && ! -f /sbin/apk ]]; then
       CONF_OPTIONS="${CONF_OPTIONS} --with-system-heimdalkrb5"
     fi
     echo "./configure ${CONF_OPTIONS}" > gh_vfs_build.log
