@@ -41,7 +41,8 @@ m=$(echo "${version}" | awk -F'.' '{print $2}') # minor
 # shellcheck disable=SC2034
 B=$(echo "${version}" | awk -F'.' '{print $3}') # build
 
-echo "Installing build dependencies ..."
+echo
+echo "Installing build dependencies..."
 if command -v apt-get >/dev/null; then
     apt-get -y install build-essential python3-dev libgnutls28-dev pkg-config || true
 fi
@@ -49,13 +50,13 @@ if command -v yum >/dev/null; then
     yum -y install patch gcc python-devel gnutls-devel make rpcgen || true
 fi
 if [ $M -ge 4 ] && [ $m -ge 12 ]; then
-    echo "Installing Parse::Yapp::Driver perl module ..."
+    echo "- Installing Parse::Yapp::Driver perl module"
     # shellcheck disable=SC2034
     PERL_MM_USE_DEFAULT=1
-    perl -MCPAN -e 'install Parse::Yapp::Driver'
+    perl -MCPAN -e 'install Parse::Yapp::Driver' >/dev/null
 fi
 if [ $M -ge 4 ] && [ $m -ge 13 ]; then
-    echo "Installing zlib-devel ..."
+    echo "- Installing zlib-devel"
     if command -v apt-get >/dev/null; then
         apt-get -y install zlib1g-dev flex locales || true
     fi
@@ -64,7 +65,7 @@ if [ $M -ge 4 ] && [ $m -ge 13 ]; then
     fi
 fi
 if [ $M -ge 4 ] && [ $m -ge 15 ]; then
-    echo "Installing com_err & heimdal-devel ..."
+    echo "- Installing com_err & heimdal-devel"
     if command -v apt-get >/dev/null; then
         apt-get -y install comerr-dev heimdal-multidev || true
     fi
@@ -78,7 +79,7 @@ echo
 echo "Compiling Greyhole VFS module for samba-${version}... "
 
 if [[ -z ${GREYHOLE_INSTALL_DIR} ]]; then
-	echo "  Downloading Greyhole source code... "
+	echo "  Downloading Greyhole source code"
 	set +e
 	GH_VERSION=$(greyhole --version 2>&1 | grep version | head -1 | awk '{print $3}' | awk -F',' '{print $1}')
 	rm -f "greyhole-${GH_VERSION}.tar.gz"
@@ -97,7 +98,7 @@ if [[ -z ${GREYHOLE_INSTALL_DIR} ]]; then
 fi
 
 if [[ ! -d samba-${version} ]]; then
-	echo "  Downloading Samba source code... "
+	echo "  Downloading Samba source code"
 	curl -LOs "http://samba.org/samba/ftp/stable/samba-${version}.tar.gz" && tar zxf "samba-${version}.tar.gz" && rm -f "samba-${version}.tar.gz"
 fi
 
@@ -128,7 +129,7 @@ if [[ ${M} -eq 3 ]]; then
 fi
 
 if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
-	echo "  Running 'configure'..."
+	echo "  Running 'configure'"
 	touch .greyhole_needs_configures
 	set +e
 	if [[ ${M} -eq 3 ]]; then
@@ -197,7 +198,7 @@ rm file.txt
 # /usr/include/bits/alltypes.h:63:24: note: previous declaration of 'uintptr_t' was here
 sed -i -e 's/\!defined._UINTPTR_T_DEFINED./\!defined(_UINTPTR_T_DEFINED) \&\& \!defined(__DEFINED_uintptr_t)/' third_party/cmocka/cmocka.h
 
-echo "  Compiling Samba..."
+echo "  Compiling Samba"
 set +e
 make -j >gh_vfs_build.log 2>&1 &
 PROC_ID=$!
