@@ -127,7 +127,7 @@ final class SambaUtils {
         // Checking shared libraries required by greyhole.so
         exec("ldd " . escapeshellarg($vfs_file) . " 2>/dev/null | grep 'not found'", $output);
         if (!empty($output)) {
-            Log::warn("  Greyhole VFS module ($vfs_file) seems to be missing some required libraries. If you have issues connecting to your Greyhole-enabled shares, try to compile a new VFS module for Samba by running this command: /usr/share/greyhole/build_vfs.sh current", Log::EVENT_CODE_VFS_MODULE_WRONG);
+            Log::warn("  Greyhole VFS module ($vfs_file) seems to be missing some required libraries. If you have issues connecting to your Greyhole-enabled shares, try to compile a new VFS module for Samba by running this command: sudo /usr/share/greyhole/build_vfs.sh current", Log::EVENT_CODE_VFS_MODULE_WRONG);
         }
     }
 
