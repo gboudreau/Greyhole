@@ -50,6 +50,9 @@ if command -v yum >/dev/null; then
     yum -y install patch gcc python-devel gnutls-devel make rpcgen || true
 fi
 if [ $M -ge 4 ] && [ $m -ge 12 ]; then
+    if command -v yum >/dev/null; then
+        yum -y install perl-CPAN || true
+    fi
     echo "- Installing Parse::Yapp::Driver perl module"
     # shellcheck disable=SC2034
     PERL_MM_USE_DEFAULT=1
