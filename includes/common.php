@@ -54,7 +54,7 @@ setlocale(LC_CTYPE, "en_US.UTF-8");
 
 if (!defined('PHP_VERSION_ID')) {
     $version = explode('.', PHP_VERSION);
-    define('PHP_VERSION_ID', ($version[0] * 10000 + $version[1] * 100 + $version[2]));
+    define('PHP_VERSION_ID', (((int) $version[0] * 10000) + ((int) $version[1] * 100) + (int) $version[2]));
 }
 
 DBSpool::resetSleepingTasks();
@@ -87,6 +87,7 @@ function gh_shutdown() {
     }
 }
 
+/** @noinspection PhpUnusedParameterInspection */
 function gh_error_handler($errno, $errstr, $errfile, $errline, $errcontext = NULL) {
     if(!($errno & error_reporting())) {
         // Ignored (@) warning
@@ -349,7 +350,6 @@ class FSCKReport {
         }
 
         // Warnings
-        /** @noinspection PhpStatementHasEmptyBodyInspection */
         if ($this->counts[FSCK_COUNT_TOO_MANY_COPIES] == 0 && $this->counts[FSCK_COUNT_SYMLINK_TARGET_MOVED] == 0 && count($this->found_problems[FSCK_PROBLEM_TEMP_FILE]) == 0 && $this->counts[FSCK_COUNT_GONE_OK] == 0) {
             // Nothing to say...
         } else {
@@ -685,13 +685,15 @@ function schedule_fsck_all_shares($fsck_options=array()) {
 }
 
 function kshift(&$arr) {
-    if (count($arr) == 0) {
+    if (empty($arr)) {
         return FALSE;
     }
     foreach ($arr as $k => $v) {
         unset($arr[$k]);
         break;
     }
+
+    /** @noinspection PhpUndefinedVariableInspection */
     return array($k, $v);
 }
 
@@ -803,6 +805,7 @@ function json_pretty_print($json) {
 }
 
 function gh_wild_mb_strpos($haystack, $needle) {
+    /** @noinspection PhpSuspiciousNameCombinationInspection */
     $is_wild = string_contains($needle, "*");
     if (!$is_wild) {
         return mb_strpos($haystack, $needle);
@@ -814,6 +817,7 @@ function gh_wild_mb_strpos($haystack, $needle) {
     if ($needle[0] == '*') {
         $first_index = 0;
     }
+    $found = FALSE;
     foreach ($needles as $needle_part) {
         if ($needle_part == '') {
             continue;
@@ -830,6 +834,7 @@ function gh_wild_mb_strpos($haystack, $needle) {
         }
     }
     if ($found) {
+        /** @noinspection PhpUndefinedVariableInspection */
         return $first_index;
     }
     return FALSE;

@@ -79,7 +79,6 @@ abstract class Hook
             if ($result_code === 0) {
                 Log::debug("External hook exited with status code $result_code.");
             } else {
-                /** @noinspection PhpStatementHasEmptyBodyInspection */
                 if ($hook->event_type == LogHook::EVENT_TYPE_WARNING) {
                     // Don't start an infinite loop!
                 } else {

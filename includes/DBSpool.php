@@ -312,6 +312,7 @@ final class DBSpool {
                 return FALSE;
             }
         }
+        /** @noinspection PhpUndefinedVariableInspection */
         return $id;
     }
 
@@ -335,7 +336,7 @@ final class DBSpool {
                         return;
                     }
                 }
-                if (!$opened_task) {
+                if (empty($opened_task)) {
                     // Writing to a file that wasn't opened-for-writing... Log this as a write, complete=yes task
                     $id = $this->insert('write', $share, $fullpath, NULL, $fd);
                     $q = "UPDATE tasks SET complete = 'yes' WHERE id = :id";

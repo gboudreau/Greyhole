@@ -120,10 +120,11 @@ final class DB {
     }
 
     public static function getFirstValue($q, $args = array()) {
-        $row = (array) DB::getFirst($q, $args);
-        if (!is_array($row)) {
+        $row = DB::getFirst($q, $args);
+        if (empty($row)) {
             return FALSE;
         }
+        $row = (array) $row;
         return array_shift($row);
     }
 

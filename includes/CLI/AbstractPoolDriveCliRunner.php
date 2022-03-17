@@ -33,9 +33,6 @@ abstract class AbstractPoolDriveCliRunner extends AbstractCliRunner {
         $simple_long_opt = str_replace(':', '', $this->cli_command->getLongOpt());
         $this->drive = $this->parseCmdParamAsDriveAndExpect(Config::storagePoolDrives());
         if ($this->drive === FALSE) {
-            if (!empty($this->drive)) {
-                $this->log("Drive $this->drive is not one of your defined storage pool drives.");
-            }
             $this->log("Please use one of the following with the --$simple_long_opt option:");
             $this->log("  " . implode("\n  ", Config::storagePoolDrives()));
             $this->log("Note that the correct syntax for this command is:");

@@ -67,7 +67,6 @@ class RemoveTask extends AbstractTask {
                             }
                         }
                     }
-                    $this->log("  Done.");
                 } else {
                     // Temporarily rename $going_drive/$share_name for fix_symlinks_on_share to be able to find symlinks that will be broken once this drive is removed.
                     @rename("$going_drive/$share_name", "$going_drive/$share_name".".tmp");
@@ -77,9 +76,8 @@ class RemoveTask extends AbstractTask {
                     // Also, just to be safe, make sure that all the files in $going_drive/$share_name are also somewhere else, as expected.
                     $this->log("Checking that all the files in the share '$share_name' also exist on another drive...");
                     static::check_going_dir("$going_drive/$share_name", $share_name, $going_drive);
-                    $this->log("  Done.");
-
                 }
+                $this->log("  Done.");
             }
         }
 

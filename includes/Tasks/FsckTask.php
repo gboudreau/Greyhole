@@ -631,6 +631,7 @@ class FsckTask extends AbstractTask {
             }
         } else if (count($file_copies_inodes) < $num_copies_required && $num_copies_required > 0) {
             // Create new copies
+            /** @noinspection PhpUndefinedVariableInspection */
             Log::info("  Missing file copies. Expected $num_copies_required, got " . count($file_copies_inodes) . ". Will create more copies using $original_file_path");
             if ($this->fsck_report) {
                 $this->fsck_report->found_problem(FSCK_COUNT_MISSING_COPIES);
@@ -696,7 +697,6 @@ class FsckTask extends AbstractTask {
                             $expected_md5 = DB::getFirstValue($q, ['share' => $share, 'full_path' => "$file_path/$filename"]);
                             if (!$expected_md5) {
                                 if (empty($file_path)) {
-                                    $q = "SELECT checksum FROM checksums WHERE share = :share AND full_path = :full_path";
                                     $expected_md5 = DB::getFirstValue($q, ['share' => $share, 'full_path' => $filename]);
                                 }
                                 if (!$expected_md5) {
@@ -750,7 +750,7 @@ class FsckTask extends AbstractTask {
             Metastores::save_metafiles($share, $file_path, $filename, $file_metafiles);
         } else {
             # Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
-            foreach ($file_copies_inodes as $inode => $path) {
+            foreach ($file_copies_inodes as $inode => $meh) {
                 if (string_starts_with($inode, '/')) {
                     unset($file_copies_inodes[$inode]);
                 }
@@ -841,6 +841,7 @@ class FsckTask extends AbstractTask {
             // Retry 3 times, then just create a file copy even if the MD5 is wrong (maybe the checksum in the DB was wrong, for some reason)
             if ($num_retries <= 3) {
                 if ($num_retries == 3) {
+                    /** @noinspection PhpUndefinedVariableInspection */
                     $this->fsck_report->found_problem(FSCK_PROBLEM_WRONG_MD5, $error, $original_file_path);
                 }
                 $this->gh_fsck_file($path, $filename, $file_type, $source, $share, $storage_path, $num_retries+1);

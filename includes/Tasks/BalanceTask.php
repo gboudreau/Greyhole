@@ -195,7 +195,6 @@ class BalanceTask extends AbstractTask {
 
         unset($sp_drive);
         if ($is_sticky) {
-            /** @noinspection PhpStatementHasEmptyBodyInspection */
             if (count($target_drives) == $num_total_drives - 1 && !array_contains($target_drives, $source_drive)) {
                 // Only drive full is the source drive. Let's move files away from there!
             } else if (count($target_drives) < $num_total_drives) {

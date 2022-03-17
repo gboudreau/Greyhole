@@ -160,6 +160,7 @@ class ConfigCliRunner extends AbstractCliRunner {
                 if (!Config::get(CONFIG_ALLOW_MULTIPLE_SP_PER_DRIVE)) {
                     // @TODO Add more checks, like making sure this new folder is not on the same drive as another existing sp_drive
                 }
+                /** @noinspection PhpUndefinedVariableInspection */
                 if (!is_dir($sp_drive) && is_dir(dirname($sp_drive))) {
                     // Create the folder ourselves, if the parent exists
                     mkdir($sp_drive, 0777);

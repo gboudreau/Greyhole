@@ -360,7 +360,6 @@ final class StoragePool {
                     exec('df -k ' . $sp_drive, $responses);
                     foreach ($responses as $line) {
                         if (preg_match("@\s+[0-9]+\s+([0-9]+)\s+([0-9]+)\s+[0-9]+%\s+(.+)$@", $line, $regs)) {
-                            $responses_arr[] = array((float) $regs[1], (float) $regs[2], $sp_drive);
                             $target_freespace = (float) $regs[2];
                             $target_usedspace = (float) $regs[1];
                         }
@@ -448,8 +447,7 @@ final class StoragePool {
 
         $sorted_target_drives = array();
         $last_resort_sorted_target_drives = array();
-        $got_all_drives = FALSE;
-        while (!$got_all_drives) {
+        while (TRUE) {
             $num_empty_ds = 0;
             global $is_forced;
             foreach ($drives_selectors as $ds) {
@@ -583,6 +581,7 @@ You probably want to do something about this!
 
                         // Stick files into any drives
                         $setting_name = sprintf('stick_into-%s', $sticky_dir);
+                        /** @noinspection PhpConditionAlreadyCheckedInspection */
                         $setting = Settings::get($setting_name, TRUE);
                         if ($setting) {
                             $stick_into = array_merge($stick_into, $setting);

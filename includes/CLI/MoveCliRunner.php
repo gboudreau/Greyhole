@@ -67,7 +67,7 @@ class MoveCliRunner extends AbstractCliRunner {
         if (!$source_is_file) {
             $source_is_dir = is_dir("$landing_zone/$full_path");
             //echo "[DEBUG] source_is_dir: " . json_encode($source_is_dir) . "\n";
-            if (!$source_is_file && !$source_is_dir) {
+            if (!$source_is_dir) {
                 echo "Error: source does not exist.\n";
                 exit(2);
             }

@@ -158,6 +158,7 @@ class Md5Task extends AbstractTask {
                 }
 
                 if ($should_be_fixed) {
+                    /** @noinspection PhpUndefinedVariableInspection */
                     Log::warn("  A file copy with a different checksum than the original was found: $latest_file_copy = $md5. Original: $original_file_path = $original_md5. This copy will be deleted, and replaced with a new copy from $original_file_path", Log::EVENT_CODE_FSCK_MD5_MISMATCH);
                     Trash::trash_file($latest_file_copy);
 

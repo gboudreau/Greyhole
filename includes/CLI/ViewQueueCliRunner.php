@@ -48,6 +48,7 @@ class ViewQueueCliRunner extends AbstractAnonymousCliRunner {
             }
             $col_format = '%' . $col_size . 's';
 
+            /** @noinspection PhpFormatFunctionParametersMismatchInspection */
             $header = sprintf("%$max_share_strlen"."s  $col_format  $col_format  $col_format  $col_format", '', 'Write', 'Delete', 'Rename', 'Check');
             $this->log($header);
 

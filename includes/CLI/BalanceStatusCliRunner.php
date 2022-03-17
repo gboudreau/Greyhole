@@ -55,12 +55,11 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
                 $cols_used = $cols - abs($cols_free);
 
                 $suffix = "\033[0m";
+                $cols_diff = round($cols * $drive_infos->percent_diff);
                 if ($drive_infos->direction == '-') {
-                    $cols_diff = round($cols * $drive_infos->percent_diff);
                     $cols_used -= $cols_diff;
                     $prefix = "\033[31m";
                 } else {
-                    $cols_diff = round($cols * $drive_infos->percent_diff);
                     $cols_free -= $cols_diff;
                     $prefix = "\033[32m";
                 }
@@ -127,12 +126,11 @@ class BalanceStatusCliRunner extends AbstractAnonymousCliRunner {
                 if ($df['free'] < $target_avail_space) {
                     $drive_infos->direction = '-';
                     $drive_infos->diff = $target_avail_space - $df['free'];
-                    $drive_infos->percent_diff = $drive_infos->diff / ($df['free'] + $df['used']);
                 } else {
                     $drive_infos->direction = '+';
                     $drive_infos->diff = $df['free'] - $target_avail_space;
-                    $drive_infos->percent_diff = $drive_infos->diff / ($df['free'] + $df['used']);
                 }
+                $drive_infos->percent_diff = $drive_infos->diff / ($df['free'] + $df['used']);
             }
         }
 

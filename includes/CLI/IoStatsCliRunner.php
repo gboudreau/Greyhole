@@ -43,7 +43,7 @@ class IoStatsCliRunner extends AbstractAnonymousCliRunner {
                     continue;
                 }
                 $drive = $devices_drives[$device];
-                $iostat[$drive] = (int) round($read_kBps + $write_kBps);
+                $iostat[$drive] = (int) round((int) $read_kBps + (int) $write_kBps);
             }
             ksort($iostat);
             $this->log("--- [" . date('H:m:s') . "]");
