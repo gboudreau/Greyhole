@@ -63,6 +63,8 @@ function inject_in_file($file, $level=0) {
         } else if (preg_match("@^\\s*\/\/@", $line)) {
             // Remove whole-line comments
             // But do NOT remove the comments that use # character, as those can be instructions. eg. #[\ReturnTypeWillChange]
+        } else if (preg_match("@^#!/@", $line)) {
+            // Remove shebang lines
         } else if (preg_match("@^\\s*$@", $line)) {
             // Remove empty lines
         } else {
