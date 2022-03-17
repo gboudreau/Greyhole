@@ -58,7 +58,7 @@ class DebugCliRunner extends AbstractAnonymousCliRunner {
                 $params = array('full_path' => $row->full_path);
             }
 
-            # Is there more?
+            // Is there more?
             $new_query = preg_replace('/SELECT .* FROM/i', 'SELECT COUNT(*) FROM', $query);
             $count = DB::getFirstValue($new_query, $params);
             if ($count == 0) {

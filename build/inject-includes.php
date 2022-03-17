@@ -60,8 +60,9 @@ function inject_in_file($file, $level=0) {
             // Remove block comments
         } else if (($line == "<?php" || $line == "?>") && $level > 0) {
             // Remove PHP tags from all files except the first
-        } else if (preg_match("@^\\s*\/\/@", $line) || preg_match("@^\\s*#@", $line)) {
+        } else if (preg_match("@^\\s*\/\/@", $line)) {
             // Remove whole-line comments
+            // But do NOT remove the comments that use # character, as those can be instructions. eg. #[\ReturnTypeWillChange]
         } else if (preg_match("@^\\s*$@", $line)) {
             // Remove empty lines
         } else {

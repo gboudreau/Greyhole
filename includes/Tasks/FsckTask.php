@@ -749,7 +749,7 @@ class FsckTask extends AbstractTask {
             }
             Metastores::save_metafiles($share, $file_path, $filename, $file_metafiles);
         } else {
-            # Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
+            // Let's not assume that files on missing drives are really there... Removing files here could be dangerous!
             foreach ($file_copies_inodes as $inode => $meh) {
                 if (string_starts_with($inode, '/')) {
                     unset($file_copies_inodes[$inode]);

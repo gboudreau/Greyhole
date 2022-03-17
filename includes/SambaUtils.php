@@ -72,7 +72,7 @@ final class SambaUtils {
             $source_libdir = '/usr/lib64';
             $target_libdir = '/usr/lib64';
 
-            # For Ubuntu, where even x86_64 install use /usr/lib
+            // For Ubuntu, where even x86_64 install use /usr/lib
             if (file_exists('/usr/lib/samba/vfs')) {
                 $target_libdir = '/usr/lib';
             }

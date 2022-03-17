@@ -59,7 +59,7 @@ class RemoveShareCliRunner extends AbstractCliRunner {
         // Adjust the landing zone free space, if some file copies are already on that drive
         foreach (Config::storagePoolDrives() as $sp_drive) {
             if (!file_exists("$sp_drive/$this->share")) {
-                #echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
+                // echo "  Folder does not exist: $sp_drive/$share. Skipping.\n";
                 continue;
             }
             if (SystemHelper::directory_uuid("$sp_drive/$this->share") === SystemHelper::directory_uuid("$landing_zone")) {

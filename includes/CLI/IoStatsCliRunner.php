@@ -39,7 +39,7 @@ class IoStatsCliRunner extends AbstractAnonymousCliRunner {
                 $read_kBps = $info[1];
                 $write_kBps = $info[2];
                 if (!isset($devices_drives[$device])) {
-                    # That device isn't in the storage pool.
+                    // That device isn't in the storage pool.
                     continue;
                 }
                 $drive = $devices_drives[$device];

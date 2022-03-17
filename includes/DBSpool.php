@@ -267,7 +267,7 @@ final class DBSpool {
             return;
         }
 
-        # Postpone tasks in frozen directories until a --thaw command is received
+        // Postpone tasks in frozen directories until a --thaw command is received
         if ($task->shouldBeFrozen()) {
             Log::debug("  This directory is frozen. Will postpone this task until it is thawed.");
             $this->postpone_task($task->id, 'frozen');

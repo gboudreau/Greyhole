@@ -49,7 +49,7 @@ class RenameTask extends AbstractTask {
                 list($original_path, ) = explode_full_path(get_share_landing_zone($share) . "/$target_full_path");
 
                 if (is_dir("$sp_drive/$share/$full_path")) {
-                    # Make sure the parent directory of target_full_path exists, before we try moving something there...
+                    // Make sure the parent directory of target_full_path exists, before we try moving something there...
                     list($path, ) = explode_full_path("$sp_drive/$share/$target_full_path");
                     gh_mkdir($path, $original_path);
 

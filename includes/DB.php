@@ -439,7 +439,7 @@ final class DB {
         }
     }
 
-    # Migration #11: TINYTEXT > VARCHAR(255)
+    // Migration #11: TINYTEXT > VARCHAR(255)
     private static function migrate_11_varchar() {
         $q = "ALTER TABLE `settings` CHANGE `name` `name` VARCHAR(255) NOT NULL";
         DB::execute($q);
@@ -465,7 +465,7 @@ final class DB {
         DB::execute("ALTER TABLE tasks_completed CHANGE complete complete ENUM('yes','no','frozen','thawed','idle','written') CHARACTER SET ascii NOT NULL");
     }
 
-    # For users who deal with full_path > 255 characters, migrate to large TEXT fields
+    // For users who deal with full_path > 255 characters, migrate to large TEXT fields
     private static function migrate_large_fullpath() {
         $q = "ALTER TABLE `settings` DROP PRIMARY KEY";
         DB::execute($q);
