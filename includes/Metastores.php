@@ -479,6 +479,7 @@ class metafile_iterator implements Iterator {
         $this->load_nok_metafiles = $load_nok_metafiles;
     }
 
+    #[\ReturnTypeWillChange]
     public function rewind() {
         $this->metastores = Metastores::get_metastores();
         $this->directory_stack = array($this->path);
@@ -487,14 +488,17 @@ class metafile_iterator implements Iterator {
         $this->next();
     }
 
+    #[\ReturnTypeWillChange]
     public function current() {
         return $this->metafiles;
     }
 
+    #[\ReturnTypeWillChange]
     public function key() {
         return count($this->metafiles);
     }
 
+    #[\ReturnTypeWillChange]
     public function next() {
         $this->metafiles = array();
         while (count($this->directory_stack) > 0 && $this->directory_stack !== NULL) {
@@ -544,6 +548,7 @@ class metafile_iterator implements Iterator {
         return $this->metafiles;
     }
 
+    #[\ReturnTypeWillChange]
     public function valid() {
         return count($this->metafiles) > 0;
     }
