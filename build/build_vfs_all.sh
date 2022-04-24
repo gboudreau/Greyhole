@@ -15,7 +15,7 @@ export DOCKER_BUILDKIT=1
 
 cp "${GREYHOLE_INSTALL_DIR}/build_vfs.sh" .
 
-for version in 4.15.0 4.14.0 4.13.0 4.12.0 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0 4.5.0 4.4.0; do
+for version in 4.15.0 4.14.0 4.13.0 4.12.0 4.11.0; do
     M=$(echo ${version} | awk -F'.' '{print $1}') # major
     m=$(echo ${version} | awk -F'.' '{print $2}') # minor
     # shellcheck disable=SC2034
@@ -29,18 +29,23 @@ for version in 4.15.0 4.14.0 4.13.0 4.12.0 4.11.0 4.10.0 4.9.0 4.8.0 4.7.0 4.6.0
 
     cp "${GREYHOLE_INSTALL_DIR}/samba-module/"*$M.$m* .
 
-    echo
-    echo "********"
-    echo "1/3 Compiling VFS for arm64"
+    if [ "$(uname -m)" = "arm64" ]; then
+        # Build for arm64 only on Mac M1
+        echo
+        echo "********"
+        echo "1/3 Compiling VFS for arm64"
 
-    # Docker images for IMAGE arg: https://hub.docker.com/_/ubuntu?tab=tags
-    docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "IMAGE=ubuntu@sha256:8364cd6be2e81626a889a541bff7b48262caf49fca6e73b462cf49f45644d390" .
-    id=$(docker create greyhole-vfs-builder:arm64)
-    docker cp $id:/usr/share/greyhole/vfs-build/samba-$version/greyhole-samba$M$m.so "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64.so"
-    docker rm -v $id
-    echo
-    echo -n "New VFS module created was copied to "
-    ls -1 "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64.so"
+        # Docker images for IMAGE arg: https://hub.docker.com/_/ubuntu?tab=tags
+        docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "IMAGE=ubuntu@sha256:8364cd6be2e81626a889a541bff7b48262caf49fca6e73b462cf49f45644d390" .
+        id=$(docker create greyhole-vfs-builder:arm64)
+        docker cp $id:/usr/share/greyhole/vfs-build/samba-$version/greyhole-samba$M$m.so "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64.so"
+        docker rm -v $id
+        echo
+        echo -n "New VFS module created was copied to "
+        ls -1 "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64.so"
+
+        continue
+    fi
 
     echo
     echo "********"

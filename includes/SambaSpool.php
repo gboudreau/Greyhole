@@ -176,15 +176,21 @@ final class SambaSpool {
                 $share = array_shift($line);
                 if ($act == 'mkdir') {
                     // Just create the same folder on the 2 backup drives, to be able to get back empty folders, if we ever lose the LZ
-                    $dir_fullpath = get_share_landing_zone($share) . "/$line[0]";
-                    Log::debug("Directory created: $share/$line[0]");
+                    if (!empty($line[1])) {
+                        // two lines = basename\ndirname
+                        $path = str_replace(get_share_landing_zone($share) . '/', '', $line[1] . "/" . $line[0]);
+                    } else {
+                        $path = $line[0];
+                    }
+                    $dir_fullpath = get_share_landing_zone($share) . "/" . $path;
+                    Log::debug("Directory created: $share/$path");
                     foreach (Config::get(CONFIG_METASTORE_BACKUPS) as $metastore_backup_drive) {
                         $backup_drive = str_replace('/' . Metastores::METASTORE_BACKUP_DIR, '', $metastore_backup_drive);
                         if (StoragePool::is_pool_drive($backup_drive)) {
-                            gh_mkdir("$backup_drive/$share/$line[0]", $dir_fullpath);
+                            gh_mkdir("$backup_drive/$share/$path", $dir_fullpath);
                         }
                     }
-                    FileHook::trigger(FileHook::EVENT_TYPE_MKDIR, $share, $line[0]);
+                    FileHook::trigger(FileHook::EVENT_TYPE_MKDIR, $share, $path);
                     continue;
                 }
                 $result = array_pop($line);
@@ -199,6 +205,13 @@ final class SambaSpool {
                 case 'open':
                     $fullpath = array_shift($line);
                     $fd = array_shift($line);
+                    if (!empty($line)) {
+                        array_shift($line); // 'for writing'
+                    }
+                    if (!empty($line[0])) {
+                        // 1st line above is just basename - not really useful; this line here is the full real path, i.e. what we need (minute the LZ prefix)
+                        $fullpath = str_replace(get_share_landing_zone($share) . '/', '', array_shift($line));
+                    }
                     $act = 'write';
                     break;
                 case 'rmdir':
