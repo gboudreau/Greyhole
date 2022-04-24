@@ -112,8 +112,18 @@ final class DBSpool {
         return !empty($current_task) && $current_task->id === 0;
     }
 
-    public static function lockShare($share) {
+    public static function lockShare($share, $full_path, $task_id) {
         static::getInstance()->locked_shares[$share] = TRUE;
+
+        if (!empty($full_path) && !empty($task_id)) {
+            // Let's look for duplicate 'write' tasks that we could safely skip
+            $q = "SELECT id FROM tasks WHERE action = 'write' AND share = :share AND full_path = :full_path AND complete IN ('yes', 'thawed', 'idle') AND id > :task_id";
+            $duplicate_tasks_to_delete = DB::getAllValues($q, ['share' => $share, 'full_path' => $full_path, 'task_id' => $task_id]);
+            if (!empty($duplicate_tasks_to_delete)) {
+                Log::debug("  Deleting " . count($duplicate_tasks_to_delete) . " future 'write' tasks that are duplicate of this one.");
+                DBSpool::getInstance()->delete_tasks($duplicate_tasks_to_delete);
+            }
+        }
     }
 
     public static function resetSleepingTasks() {
@@ -262,16 +272,27 @@ final class DBSpool {
             }
         }
 
-        if (!empty($this->locked_shares) && array_contains(array_keys($this->locked_shares), $task->share)) {
-            Log::info("  Share is locked because another file operation is waiting for a file handle to be released. Skipping.");
-            return;
-        }
-
         // Postpone tasks in frozen directories until a --thaw command is received
         if ($task->shouldBeFrozen()) {
             Log::debug("  This directory is frozen. Will postpone this task until it is thawed.");
+
+            if ($task->action == 'write') {
+                // Let's look for duplicate 'write' tasks that we could safely skip
+                $q = "SELECT id FROM tasks WHERE action = 'write' AND share = :share AND full_path = :full_path AND complete IN ('yes', 'thawed', 'idle') AND id > :task_id";
+                $duplicate_tasks_to_delete = DB::getAllValues($q, ['share' => $task->share, 'full_path' => $task->full_path, 'task_id' => $task->id]);
+                if (!empty($duplicate_tasks_to_delete)) {
+                    Log::debug("  Deleting " . count($duplicate_tasks_to_delete) . " future 'write' tasks that are duplicate of this one.");
+                    DBSpool::getInstance()->delete_tasks($duplicate_tasks_to_delete);
+                }
+            }
+
             $this->postpone_task($task->id, 'frozen');
             static::archive_task($task->id);
+            return;
+        }
+
+        if (!empty($this->locked_shares) && array_contains(array_keys($this->locked_shares), $task->share)) {
+            Log::info("  Share is locked because another file operation is waiting for a file handle to be released. Skipping.");
             return;
         }
 

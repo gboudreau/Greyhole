@@ -129,7 +129,7 @@ abstract class AbstractTask {
         $locked_by = DBSpool::isFileLocked($share, $full_path);
         if ($locked_by !== FALSE) {
             Log::debug("  File $share/$full_path is locked by another process ($locked_by). Will wait until it's unlocked to work on any file in this share.");
-            DBSpool::lockShare($share);
+            DBSpool::lockShare($share, $full_path, $this->id);
             return TRUE;
         }
         return FALSE;
