@@ -249,8 +249,14 @@ final class SambaSpool {
             /** @noinspection PhpUndefinedVariableInspection */
             $db_spool->close_task($act, $share, $fd, @$fullpath, $close_tasks);
         }
+
+        Log::perf("Finished parsing spool.");
+
         // We also need to 'execute' all close tasks, now that all fwrite have been logged
-        $db_spool->close_all_tasks($close_tasks);
+        if (!empty($close_tasks)) {
+            Log::perf("Found " . count($close_tasks) . " close tasks. Will finalize all write tasks for those, if any...");
+            $db_spool->close_all_tasks($close_tasks);
+        }
 
         if ($new_tasks > 0) {
             Log::debug("Found $new_tasks new tasks in spool.");

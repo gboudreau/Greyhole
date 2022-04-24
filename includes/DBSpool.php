@@ -381,20 +381,31 @@ final class DBSpool {
                 // We need to do this because some fwrite spool file might apply to multiple write (open) tasks.
                 // For example: writing into two files in the same share within the same second. See Greyhole VFS implementation for writes to see why.
                 $last_id = DB::getFirstValue("SELECT MAX(id) FROM tasks");
-                if ($last_id) {
+                if ($last_id && $fullpath != '.') {
                     $task = (object) array(
                         'share' => $share,
                         'fd' => $fd,
                         'full_path' => $fullpath,
                         'last_id' => $last_id,
                     );
-                    $tasks[] = $task;
+                    $tasks[md5("$share/$fullpath<$last_id")] = $task;
                 }
             }
         }
     }
 
     public function close_all_tasks($tasks) {
+        $q = "SELECT COUNT(*) FROM tasks WHERE complete = 'no'";
+        $has_incomplete_tasks = (int) DB::getFirstValue($q);
+
+        $q = "SELECT COUNT(*) FROM tasks WHERE complete = 'written'";
+        $has_written_tasks = (int) DB::getFirstValue($q);
+
+        if (!$has_incomplete_tasks && !$has_written_tasks) {
+            Log::perf("  There are no complete=written or complete=no write tasks. No point looking into each individual close task...");
+            return;
+        }
+
         foreach ($tasks as $task) {
             $share = $task->share;
             $fd = $task->fd;
@@ -412,8 +423,18 @@ final class DBSpool {
                 $params[$prop] = $fd;
             }
 
-            $query = "UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'written' AND share = :share AND $prop = :$prop AND id <= :last_id";
-            DB::execute($query, $params);
+            if ($has_written_tasks) {
+                Log::perf("  Closing (complete=written) write tasks for $share/{$params[$prop]} (WHERE id <= $last_id)");
+                $query = "UPDATE tasks SET additional_info = NULL, complete = 'yes' WHERE complete = 'written' AND share = :share AND $prop = :$prop AND id <= :last_id";
+                DB::execute($query, $params);
+            }
+
+            if ($has_incomplete_tasks <= 0) {
+                // No need to look for complete = 'no' tasks below; we already know when are none
+                continue;
+            }
+
+            Log::perf("  Closing (complete=no) write tasks for $share/{$params[$prop]} (WHERE id <= $last_id)");
 
             // Remove write tasks that were not written to. But log them first.
             $query = "SELECT id, full_path FROM tasks WHERE complete = 'no' AND share = :share AND $prop = :$prop AND id <= :last_id";
@@ -429,6 +450,11 @@ final class DBSpool {
                     // Ignore
                     Log::debug("File pointer to $share/$row->full_path was closed without being written to. Ignoring.");
                 }
+                $has_incomplete_tasks--;
+            }
+            if (empty($rows)) {
+                Log::perf("    Found no writes.");
+                continue;
             }
 
             $query = "DELETE FROM tasks WHERE complete = 'no' AND share = :share AND $prop = :$prop AND id <= :last_id";

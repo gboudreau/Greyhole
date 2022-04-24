@@ -154,6 +154,10 @@ final class Log {
         self::$action = self::$old_action;
     }
 
+    public static function perf($text, $event_code = NULL) {
+        self::_log(self::PERF, $text, $event_code);
+    }
+
     public static function debug($text, $event_code = NULL) {
         self::_log(self::DEBUG, $text, $event_code);
     }
