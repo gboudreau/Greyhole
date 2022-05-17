@@ -438,10 +438,12 @@ static int greyhole_renameat(vfs_handle_struct *handle, files_struct *srcfsp, co
 	result = SMB_VFS_NEXT_RENAMEAT(handle, srcfsp, oldname, dstfsp, newname);
 
 	if (result >= 0) {
-		gh_spoolf("rename\n%s\n%s\n%s\n\n",
+		gh_spoolf("rename\n%s\n%s/%s\n%s/%s\n\n",
 			lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
-			oldname->base_name,
-			newname->base_name);
+			smb_fname_str(srcfsp->fsp_name),
+            oldname->base_name,
+			smb_fname_str(dstfsp->fsp_name),
+            newname->base_name);
 	}
 
 	return result;
@@ -455,9 +457,11 @@ static int greyhole_linkat(vfs_handle_struct *handle, files_struct *srcfsp, cons
 	result = SMB_VFS_NEXT_LINKAT(handle, srcfsp, oldname, dstfsp, newname, flags);
 
 	if (result >= 0) {
-		gh_spoolf("link\n%s\n%s\n%s\n\n",
+		gh_spoolf("link\n%s\n%s/%s\n%s/%s\n\n",
 			lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
+			smb_fname_str(srcfsp->fsp_name),
 			oldname->base_name,
+			smb_fname_str(dstfsp->fsp_name),
 			newname->base_name);
 	}
 
@@ -473,12 +477,14 @@ static int greyhole_unlinkat(vfs_handle_struct *handle, struct files_struct *dir
 
 	if (result >= 0) {
 		if (flags & AT_REMOVEDIR) {
-			gh_spoolf("rmdir\n%s\n%s\n\n",
+			gh_spoolf("rmdir\n%s\n%s/%s\n\n",
 				lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
+				smb_fname_str(dirfsp->fsp_name),
 				smb_fname->base_name);
 		} else {
-			gh_spoolf("unlink\n%s\n%s\n\n",
+			gh_spoolf("unlink\n%s\n%s/%s\n\n",
 				lp_servicename(talloc_tos(), lp_sub, handle->conn->params->service),
+				smb_fname_str(dirfsp->fsp_name),
 				smb_fname->base_name);
 		}
 	}
