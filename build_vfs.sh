@@ -56,7 +56,7 @@ if [ $M -ge 4 ] && [ $m -ge 12 ]; then
     echo "- Installing Parse::Yapp::Driver perl module"
     # shellcheck disable=SC2034
     PERL_MM_USE_DEFAULT=1
-    perl -MCPAN -e 'install Parse::Yapp::Driver' >/dev/null
+    echo | perl -MCPAN -e 'install Parse::Yapp::Driver' >/dev/null
 fi
 if [ $M -ge 4 ] && [ $m -ge 13 ]; then
     echo "- Installing zlib-devel"
@@ -68,12 +68,17 @@ if [ $M -ge 4 ] && [ $m -ge 13 ]; then
     fi
 fi
 if [ $M -ge 4 ] && [ $m -ge 15 ]; then
-    echo "- Installing com_err & heimdal-devel"
     if command -v apt-get >/dev/null; then
+        echo "- Installing com_err & heimdal-devel"
         apt-get -y install comerr-dev heimdal-multidev || true
     fi
     if command -v yum >/dev/null; then
+        echo "- Installing e2fsprogs-devel & heimdal-devel"
         yum -y install e2fsprogs-devel heimdal-devel || true
+    fi
+    if command -v /sbin/apk >/dev/null; then
+        echo "- Installing bison & flex"
+        apk add bison flex || true
     fi
 fi
 
@@ -195,7 +200,7 @@ echo "  Applying patches (if any)..."
 shopt -s nullglob
 for f in "${GREYHOLE_INSTALL_DIR}/"*.patch; do
     echo -n "  - "
-    patch -p1 -i "$f"
+    patch -p1 -i "$f" || true
 done
 echo '#include <sys/types.h>' > file.txt
 sed -i '/#include <stdbool.h>/r file.txt' -- lib/tevent/tevent.h

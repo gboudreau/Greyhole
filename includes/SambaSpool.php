@@ -209,7 +209,7 @@ final class SambaSpool {
                         array_shift($line); // 'for writing'
                     }
                     if (!empty($line[0])) {
-                        // 1st line above is just basename - not really useful; this line here is the full real path, i.e. what we need (minute the LZ prefix)
+                        // 1st line above is just basename - not really useful; this line here is the full real path, i.e. what we need (minus the LZ prefix)
                         $fullpath = str_replace(get_share_landing_zone($share) . '/', '', array_shift($line));
                     }
                     $act = 'write';
