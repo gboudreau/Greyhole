@@ -67,6 +67,12 @@ if [ $M -ge 4 ] && [ $m -ge 13 ]; then
         yum -y install zlib-devel || true
     fi
 fi
+if [ $M -ge 4 ] && [ $m -ge 14 ]; then
+    if command -v /sbin/apk >/dev/null; then
+        echo "- Installing bison & flex"
+        apk add bison flex || true
+    fi
+fi
 if [ $M -ge 4 ] && [ $m -ge 15 ]; then
     if command -v apt-get >/dev/null; then
         echo "- Installing com_err & heimdal-devel"
@@ -75,10 +81,6 @@ if [ $M -ge 4 ] && [ $m -ge 15 ]; then
     if command -v yum >/dev/null; then
         echo "- Installing e2fsprogs-devel & heimdal-devel"
         yum -y install e2fsprogs-devel heimdal-devel || true
-    fi
-    if command -v /sbin/apk >/dev/null; then
-        echo "- Installing bison & flex"
-        apk add bison flex || true
     fi
 fi
 
