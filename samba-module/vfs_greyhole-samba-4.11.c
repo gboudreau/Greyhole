@@ -26,6 +26,7 @@ along with Greyhole.  If not, see <http://www.gnu.org/licenses/>.
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
 #include "../lib/crypto/gnutls_helpers.h"
+#include "../lib/util/tevent_unix.h"
 
 /* Those macros are only available in GnuTLS >= 3.6.4 */
 #ifndef GNUTLS_FIPS140_SET_LAX_MODE
@@ -55,6 +56,71 @@ static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp);
 static int greyhole_rename(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
 static int greyhole_link(vfs_handle_struct *handle, const struct smb_filename *oldname, const struct smb_filename *newname);
 static int greyhole_unlink(vfs_handle_struct *handle, const struct smb_filename *path);
+
+static TALLOC_CTX *tmp_do_log_ctx;
+/*
+ * Get us a temporary talloc context usable just for DEBUG arguments
+ */
+static TALLOC_CTX *do_log_ctx(void)
+{
+        if (tmp_do_log_ctx == NULL) {
+                tmp_do_log_ctx = talloc_named_const(NULL, 0, "do_log_ctx");
+        }
+        return tmp_do_log_ctx;
+}
+
+/**
+ * Return a string using the do_log_ctx()
+ */
+static const char *smb_fname_str_do_log(const struct smb_filename *cwd,
+				const struct smb_filename *smb_fname)
+{
+	char *fname = NULL;
+	NTSTATUS status;
+
+	if (smb_fname == NULL) {
+		return "";
+	}
+
+	if (smb_fname->base_name[0] != '/') {
+		char *abs_name = NULL;
+		struct smb_filename *fname_copy = cp_smb_filename(
+							do_log_ctx(),
+							smb_fname);
+		if (fname_copy == NULL) {
+			return "";
+		}
+
+		if (!ISDOT(smb_fname->base_name)) {
+			abs_name = talloc_asprintf(do_log_ctx(),
+					"%s/%s",
+					cwd->base_name,
+					smb_fname->base_name);
+		} else {
+			abs_name = talloc_strdup(do_log_ctx(),
+					cwd->base_name);
+		}
+		if (abs_name == NULL) {
+			return "";
+		}
+		fname_copy->base_name = abs_name;
+		smb_fname = fname_copy;
+	}
+
+	status = get_full_smb_filename(do_log_ctx(), smb_fname, &fname);
+	if (!NT_STATUS_IS_OK(status)) {
+		return "";
+	}
+	return fname;
+}
+
+/**
+ * Return an fsp debug string using the do_log_ctx()
+ */
+static const char *fsp_str_do_log(const struct files_struct *fsp)
+{
+	return smb_fname_str_do_log(fsp->conn->cwd_fname, fsp->fsp_name);
+}
 
 /* Save formatted string to Greyhole spool */
 
@@ -212,11 +278,12 @@ static int greyhole_open(vfs_handle_struct *handle, struct smb_filename *fname, 
 
 	if (result >= 0) {
 		if ((flags & O_WRONLY) || (flags & O_RDWR)) {
-			gh_spoolf("open\n%s\n%s\n%d\n%s\n",
+			gh_spoolf("open\n%s\n%s\n%d\n%s\n%s\n",
 				lp_servicename(talloc_tos(), handle->conn->params->service),
 				fname->base_name,
-				result,
-				"for writing ");
+				fsp->fh->fd,
+				"for writing ",
+				fsp_str_do_log(fsp));
 		}
 	}
 
@@ -358,8 +425,15 @@ static ssize_t greyhole_pwrite_recv(struct tevent_req *req, struct vfs_aio_state
 static int greyhole_close(vfs_handle_struct *handle, files_struct *fsp)
 {
 	int result;
+	struct stat s;
 
 	result = SMB_VFS_NEXT_CLOSE(handle, fsp);
+
+	if (stat(fsp_str_do_log(fsp), &s) == 0 && s.st_mode & S_IFDIR)
+	{
+		// Is a dir; no point logging those
+		return result;
+	}
 
 	if (result >= 0) {
 		const char *fname = smb_fname_str(fsp->fsp_name);

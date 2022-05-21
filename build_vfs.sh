@@ -197,6 +197,9 @@ fi
 
 # Patches for compiling Samba on Alpine Linux; from https://git.alpinelinux.org/aports/tree/main/samba?h=3.15-stable
 echo "  Applying patches (if any)..."
+if [[ "${M}.${m}" = "4.11" ]]; then
+    curl -sLo "${GREYHOLE_INSTALL_DIR}/smb411-nsstest.patch" "https://gist.githubusercontent.com/gboudreau/778cc1299362cb15a3ea74686cf77794/raw/d578c0a3599cc27d1fe3bc4da015fb4e5aa4652d/smb411-nsstest.patch"
+fi
 shopt -s nullglob
 for f in "${GREYHOLE_INSTALL_DIR}/"*.patch; do
     echo -n "  - "
