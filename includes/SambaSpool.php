@@ -22,6 +22,15 @@ final class SambaSpool {
 
     public static function create_mem_spool() {
         $mounted_already = exec('mount | grep /var/spool/greyhole/mem | wc -l');
+        if (!$mounted_already && file_exists('/var/spool/greyhole/mem')) {
+            // In Docker, mount doesn't list mounts... need to check using df instead:
+            exec("cat /proc/1/sched | grep supervisord", $output, $result);
+            $is_docker = ($result === 0);
+            if ($is_docker) {
+                $output = exec("df /var/spool/greyhole/mem | tail -1");
+                $mounted_already = preg_match('/^none /', $output);
+            }
+        }
         if (!$mounted_already) {
             if (!file_exists('/var/spool/greyhole/mem')) {
                 mkdir('/var/spool/greyhole/mem', 0777, TRUE);
