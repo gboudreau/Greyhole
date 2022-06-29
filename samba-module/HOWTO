@@ -4,9 +4,9 @@ Samba VFS HOWTO
 How to build the VFS module binaries for a new Samba version.
 (Mostly, notes to self...)
 
-1. Create a new `samba-module/wscript-samba-$VERSION.patch`
+1. Create a new `samba-module/wscript-samba-$VERSION.patch` ; modify as needed.
 
-2. Create a new `samba-module/vfs_greyhole-samba-$VERSION.c`
+2. Create a new `samba-module/vfs_greyhole-samba-$VERSION.c` ; modify as needed.
 
 3. Copy those two new files into `vfs_greyhole-samba-4.x.c` and `wscript-samba-4.x.patch`
 
@@ -18,10 +18,10 @@ How to build the VFS module binaries for a new Samba version.
     - Change latest version of Samba supported in point 3 (near L86, and in the two `cp` lines slightly below).
 
 7. Edit `DEBIAN/Makefile`
-    - Add lines near L114, L144, L164
+    - Add lines near L116, L148, L170
 
 8. Edit `DEBIAN/postinst`
-    - Add an `elif` block near L96, and change the `else` block to use the latest version
+    - Add an `elif` block near L104, and change the `else` block to use the latest version
 
 9. Commit all changes & new binaries
    See [this commit](https://github.com/gboudreau/Greyhole/commit/7d5a46aa35392e524ac8ef8a360a9544219a446a) for an example of what your commit should contain.

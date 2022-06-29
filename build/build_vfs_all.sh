@@ -15,13 +15,14 @@ export DOCKER_BUILDKIT=1
 
 cp "${GREYHOLE_INSTALL_DIR}/build_vfs.sh" .
 
-for version in 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
+for version in 4.16.2 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
     M=$(echo ${version} | awk -F'.' '{print $1}') # major
     m=$(echo ${version} | awk -F'.' '{print $2}') # minor
     # shellcheck disable=SC2034
     B=$(echo ${version} | awk -F'.' '{print $3}') # build
 
     mkdir -p "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/"
+    chown gb "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/"
 
     echo
     echo "********"
@@ -43,9 +44,11 @@ for version in 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
         echo
         echo -n "New VFS module created was copied to "
         ls -1 "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64.so"
+        chown gb "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/"*
 
         rm ./*$M.$m.patch ./*$M.$m.c
-        continue
+        # Replace break with continue to compile all versions, instead of just the latest
+        break # or continue
     fi
 
     echo
@@ -73,6 +76,8 @@ for version in 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
     echo
     echo -n "New VFS module created was copied to "
     ls -1 "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-i386.so"
+
+    chown gb "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/"*
 
     echo
     echo "********"

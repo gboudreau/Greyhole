@@ -87,15 +87,15 @@ If you know what you're doing, you should have no problem installing on any othe
 	- Ubuntu (15+): `/etc/init.d/smbd restart`
 	- Debian: `service samba restart`
 
-3. For Samba 4.16 and later: The greyhole.so files packaged with Greyhole might not work on your system.  
+3. For Samba 4.17 and later: The greyhole.so files packaged with Greyhole might not work on your system.  
    You'll need to compile your own VFS module.
 
 	- Fedora: `sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen zlib-devel e2fsprogs-devel heimdal-devel`
 	- Ubuntu/Debian: `sudo apt -y install build-essential python3-dev libgnutls28-dev pkg-config flex locales comerr-dev heimdal-multidev`
    
 	```bash
-	cp $GREYHOLE_INSTALL_DIR/samba-module/vfs_greyhole-samba-4.x.c $GREYHOLE_INSTALL_DIR/samba-module/vfs_greyhole-samba-4.16.c
-	cp $GREYHOLE_INSTALL_DIR/samba-module/wscript-samba-4.x.patch $GREYHOLE_INSTALL_DIR/samba-module/wscript-samba-4.16.patch
+	cp $GREYHOLE_INSTALL_DIR/samba-module/vfs_greyhole-samba-4.x.c $GREYHOLE_INSTALL_DIR/samba-module/vfs_greyhole-samba-4.17.c
+	cp $GREYHOLE_INSTALL_DIR/samba-module/wscript-samba-4.x.patch $GREYHOLE_INSTALL_DIR/samba-module/wscript-samba-4.17.patch
 	$GREYHOLE_INSTALL_DIR/build_vfs.sh current
  	```
 
