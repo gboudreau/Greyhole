@@ -77,6 +77,7 @@ final class Log {
     const EVENT_CODE_DB_CONNECT_FAILED = 'db_connect_failed';
     const EVENT_CODE_DB_MIGRATION_FAILED = 'db_migration_failed';
     const EVENT_CODE_DB_TABLE_CRASHED = 'db_table_crashed';
+    const EVENT_CODE_DB_TZ_CHANGE_FAILED = 'db_tz_change_failed';
     const EVENT_CODE_FILE_COPY_FAILED = 'file_copy_failed';
     const EVENT_CODE_FILE_INVALID = 'file_invalid_character';
     const EVENT_CODE_FSCK_REPORT = 'fsck_report';

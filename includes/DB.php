@@ -72,7 +72,11 @@ final class DB {
                 $diff_minutes -= $diff_hours*60;
                 $mysql_tz = sprintf("%s%02d:%02d", $symbol, $diff_hours, $diff_minutes);
                 Log::info("Adjusting MySQL Timezone: $diff secs difference between MySQL and PHP => Changing MySQL TZ to '$mysql_tz'");
-                DB::execute("SET time_zone = :tz", ['tz' => $mysql_tz]);
+                try {
+                    DB::execute("SET time_zone = :tz", ['tz' => $mysql_tz]);
+                } catch (Exception $ex) {
+                    Log::error("Tried to change MySQL's timezone to $mysql_tz, since the system's TZ and MySQL's TZ don't match, and that failed. Error: " . $ex->getMessage() . " To fix this issue, change either the system's or MySQL's timezone so that both match.", Log::EVENT_CODE_DB_TZ_CHANGE_FAILED);
+                }
             }
         }
 
