@@ -143,8 +143,8 @@ elif [ "$_OSTYPE" = "apt-get" ]; then
         # Required for apt-key
         apt-get -y install gnupg
     fi
-    echo "deb https://www.greyhole.net/releases/deb stable main previous before-previous" > /etc/apt/sources.list.d/greyhole.list
-    curl -s https://www.greyhole.net/releases/deb/greyhole-debsig.asc | apt-key add -
+    echo "deb [signed-by=/usr/share/keyrings/greyhole-archive-keyring.gpg] https://www.greyhole.net/releases/deb stable main previous before-previous" > /etc/apt/sources.list.d/greyhole.list
+    curl -s https://www.greyhole.net/releases/deb/greyhole-debsig.asc | gpg --dearmor -o /usr/share/keyrings/greyhole-archive-keyring.gpg
     apt-get update
     if ! apt-get -y -o DPkg::options::=--force-confmiss install greyhole; then
         exit 2;
