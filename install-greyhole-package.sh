@@ -126,11 +126,11 @@ if [ "$_OSTYPE" = "yum" ]; then
     if [ ! -f /sbin/chkconfig ] && [ ! -f /usr/sbin/update-rc.d ]; then
         echo "Installing chkconfig..."
 	    sudo yum install -y chkconfig
-	fi
+    fi
     if [ ! -f /sbin/service ]; then
         echo "Installing initscripts..."
 	    sudo yum install -y initscripts
-	fi
+    fi
 
     if ! sudo yum install -y greyhole; then
         exit 2;
@@ -144,6 +144,7 @@ elif [ "$_OSTYPE" = "apt-get" ]; then
         apt-get -y install gnupg
     fi
     echo "deb [signed-by=/usr/share/keyrings/greyhole-archive-keyring.gpg] https://www.greyhole.net/releases/deb stable main previous before-previous" > /etc/apt/sources.list.d/greyhole.list
+    mkdir -p /usr/share/keyrings
     curl -s https://www.greyhole.net/releases/deb/greyhole-debsig.asc | gpg --dearmor -o /usr/share/keyrings/greyhole-archive-keyring.gpg
     apt-get update
     if ! apt-get -y -o DPkg::options::=--force-confmiss install greyhole; then
