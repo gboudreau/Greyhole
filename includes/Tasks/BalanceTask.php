@@ -112,6 +112,18 @@ class BalanceTask extends AbstractTask {
                 $balance_direction_asc[$drive] = $pool_drives_avail_space[$drive] < $target_avail_space;
             }
 
+            if (count($pool_drives_avail_space) > 0) {
+                // Balance the drives that needs the most first
+                $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
+                $sort_fct = function ($drive1, $drive2) use ($pool_drives_avail_space, $target_avail_space) {
+                    $delta_needed1 = $target_avail_space - $pool_drives_avail_space[$drive1];
+                    $delta_needed2 = $target_avail_space - $pool_drives_avail_space[$drive2];
+                    return $delta_needed1 > $delta_needed2 ? -1 : 1;
+                };
+                uksort($pool_drives_avail_space, $sort_fct);
+                Log::debug("│├ Will work on the storage pool drives in the following order: " . implode(", ", array_keys($pool_drives_avail_space)));
+            }
+
             foreach ($pool_drives_avail_space as $source_drive => $current_avail_space) {
                 $this->balance_drive($share, $share_options, $source_drive, $pool_drives_avail_space, $balance_direction_asc);
             }
@@ -137,7 +149,7 @@ class BalanceTask extends AbstractTask {
             $max_file_size = floor($delta_needed / 1024);
             foreach (['100', '10', '5', '1', '0'] as $min_file_size) {
                 $command = "find " . escapeshellarg("$source_drive/$share") . " -type f -size +{$min_file_size}M -size -{$max_file_size}M";
-                Log::debug("│││ Looking for files to move on $share, with file size between {$min_file_size}-{$max_file_size} MB ...");
+                Log::debug("│││ Looking for files to move on $source_drive/$share, with file size between {$min_file_size}-{$max_file_size} MB ...");
                 exec($command, $files);
                 if (count($files) > 0) {
                     break;
@@ -151,8 +163,9 @@ class BalanceTask extends AbstractTask {
         Log::debug("│││ Found ". count($files) ." files that can be moved.");
 
         // Repeat until all drives' available space is balanced
+        $file_too_large_warnings = 0;
         foreach ($files as $file) {
-            if (!$this->balance_file($file, $share, $share_options, $source_drive, $pool_drives_avail_space, $balance_direction_asc)) {
+            if (!$this->balance_file($file, $share, $share_options, $source_drive, $pool_drives_avail_space, $balance_direction_asc, $file_too_large_warnings)) {
                 break;
             }
         }
@@ -163,7 +176,7 @@ class BalanceTask extends AbstractTask {
         }
     }
 
-    private function balance_file($file, $share, $share_options, $source_drive, &$pool_drives_avail_space, $balance_direction_asc) {
+    private function balance_file($file, $share, $share_options, $source_drive, &$pool_drives_avail_space, $balance_direction_asc, &$file_too_large_warnings) {
         $num_total_drives = count($pool_drives_avail_space);
         $current_avail_space = $pool_drives_avail_space[$source_drive];
         $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
@@ -182,9 +195,16 @@ class BalanceTask extends AbstractTask {
         $filesize = gh_filesize($file)/1024; // KB
 
         if ($filesize > $delta_needed) {
+            // 20x "File is too large" in a row = stop trying to balance $source_drive/$share (return FALSE)
+            if (++$file_too_large_warnings >= 20) {
+                Log::debug("││├ $file_too_large_warnings files too large in a row. Stopping balance of $source_drive/$share");
+                return FALSE;
+            }
+
             Log::debug("││├ File is too large (" .  bytes_to_human($filesize*1024, FALSE) . "). Skipping.");
             return TRUE;
         }
+        $file_too_large_warnings = 0;
 
         $full_path = mb_substr($file, mb_strlen("$source_drive/$share/"));
         list($path, ) = explode_full_path($full_path);
