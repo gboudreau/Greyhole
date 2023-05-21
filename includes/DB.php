@@ -236,6 +236,14 @@ final class DB {
             DB::migrate_17_status_action();
             Settings::set('db_version', 17);
         }
+        if ($db_version < 17) {
+            DB::migrate_17_status_action();
+            Settings::set('db_version', 17);
+        }
+        if ($db_version < 18) {
+            DB::migrate_18_full_path_utf8mb4();
+            Settings::set('db_version', 18);
+        }
     }
 
     // Migration #1 (complete = frozen|thawed)
@@ -479,17 +487,17 @@ final class DB {
         DB::execute($q);
         $q = "ALTER TABLE `tasks` DROP INDEX `md5_checker`";
         DB::execute($q);
-        $q = "ALTER TABLE `tasks` CHANGE `full_path` `full_path` TEXT NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
+        $q = "ALTER TABLE `tasks` CHANGE `full_path` `full_path` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
         DB::execute($q);
-        $q = "ALTER TABLE `tasks` ADD INDEX `md5_checker` (`action`, `share`(64), `full_path`(255), `complete`)";
+        $q = "ALTER TABLE `tasks` ADD INDEX `md5_checker` (`action`, `share`(64), `full_path`(180), `complete`)";
         DB::execute($q);
-        $q = "ALTER TABLE `tasks_completed` CHANGE `full_path` `full_path` TEXT NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
+        $q = "ALTER TABLE `tasks_completed` CHANGE `full_path` `full_path` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
         DB::execute($q);
         $q = "ALTER TABLE `du_stats` DROP INDEX `uniqness`";
         DB::execute($q);
-        $q = "ALTER TABLE `du_stats` CHANGE `full_path` `full_path` TEXT NOT NULL";
+        $q = "ALTER TABLE `du_stats` CHANGE `full_path` `full_path` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL";
         DB::execute($q);
-        $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`(255))";
+        $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`(200))";
         DB::execute($q);
     }
 
@@ -518,6 +526,24 @@ final class DB {
     private static function migrate_17_status_action() {
         $query = "ALTER TABLE `status` CHANGE `action` `action` varchar(16) CHARACTER SET latin1 COLLATE latin1_general_ci DEFAULT NULL";
         DB::execute($query);
+    }
+
+    // Migration #18: use utf8mb4 for full_path to handle emoji in file name.
+    private static function migrate_18_full_path_utf8mb4() {
+        $q = "ALTER TABLE `tasks` DROP INDEX `md5_checker`";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` CHANGE `full_path` `full_path` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks` ADD INDEX `md5_checker` (`action`, `share`(64), `full_path`(180), `complete`)";
+        DB::execute($q);
+        $q = "ALTER TABLE `tasks_completed` CHANGE `full_path` `full_path` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` DROP INDEX `uniqness`";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` CHANGE `full_path` `full_path` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL";
+        DB::execute($q);
+        $q = "ALTER TABLE `du_stats` ADD UNIQUE KEY `uniqness` (`share`(64),`full_path`(200))";
+        DB::execute($q);
     }
 
     public static function repairTables() {
