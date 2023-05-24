@@ -236,10 +236,6 @@ final class DB {
             DB::migrate_17_status_action();
             Settings::set('db_version', 17);
         }
-        if ($db_version < 17) {
-            DB::migrate_17_status_action();
-            Settings::set('db_version', 17);
-        }
         if ($db_version < 18) {
             DB::migrate_18_full_path_utf8mb4();
             Settings::set('db_version', 18);
@@ -528,8 +524,25 @@ final class DB {
         DB::execute($query);
     }
 
-    // Migration #18: use utf8mb4 for full_path to handle emoji in file name.
+    // Migration #18: use utf8mb4 for full_path to handle emoji in file name
     private static function migrate_18_full_path_utf8mb4() {
+        $q = "ALTER TABLE `checksums` CHANGE `full_path` `full_path` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL";
+        DB::execute($q);
+
+        $query = "DESCRIBE tasks";
+        $rows = DB::getAll($query);
+        foreach ($rows as $row) {
+            if ($row->Field == 'full_path') {
+                if ($row->Type == 'text') {
+                    // tasks.full_path is using larger columns, TEXT vs VARCHAR(255), so we need to keep using larger columns.
+                    // migrate_large_fullpath() will convert those columns to utf8mb4; the code below will only be used for DB using VARCHAR(255) columns.
+                    DB::migrate_large_fullpath();
+                    return;
+                }
+                break;
+            }
+        }
+
         $q = "ALTER TABLE `tasks` DROP INDEX `md5_checker`";
         DB::execute($q);
         $q = "ALTER TABLE `tasks` CHANGE `full_path` `full_path` VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL, CHANGE `additional_info` `additional_info` TEXT NULL";
