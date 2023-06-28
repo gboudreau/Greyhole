@@ -15,7 +15,7 @@ export DOCKER_BUILDKIT=1
 
 cp "${GREYHOLE_INSTALL_DIR}/build_vfs.sh" .
 
-for version in 4.16.2 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
+for version in 4.17.8 4.16.2 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
     M=$(echo ${version} | awk -F'.' '{print $1}') # major
     m=$(echo ${version} | awk -F'.' '{print $2}') # minor
     # shellcheck disable=SC2034
@@ -37,7 +37,7 @@ for version in 4.16.2 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
         echo "1/3 Compiling VFS for arm64"
 
         # Docker images for IMAGE arg: https://hub.docker.com/_/ubuntu?tab=tags
-        docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "IMAGE=ubuntu@sha256:8364cd6be2e81626a889a541bff7b48262caf49fca6e73b462cf49f45644d390" .
+        docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "IMAGE=ubuntu@kinetic" .
         id=$(docker create greyhole-vfs-builder:arm64)
         docker cp $id:/usr/share/greyhole/vfs-build/samba-$version/greyhole-samba$M$m.so "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64.so"
         docker rm -v $id

@@ -103,10 +103,12 @@ elif [ "${SMB_VERSION}" = "4 15" ]; then
     LIB_FILE="greyhole-samba415.so"
 elif [ "${SMB_VERSION}" = "4 16" ]; then
     LIB_FILE="greyhole-samba416.so"
+elif [ "${SMB_VERSION}" = "4 17" ]; then
+    LIB_FILE="greyhole-samba417.so"
 else
     echo "Warning: Greyhole doesn't include a VFS module for your version of Samba ($SMB_VERSION)."
-    echo "We will try to use the VFS for Samba 4.16, but that might not work."
-    LIB_FILE="greyhole-samba416.so"
+    echo "We will try to use the VFS for Samba 4.17, but that might not work."
+    LIB_FILE="greyhole-samba417.so"
 fi
 
 SOURCE_LIB="${SOURCE_LIBDIR}/greyhole/${LIB_FILE}"
