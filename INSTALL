@@ -87,7 +87,7 @@ If you know what you're doing, you should have no problem installing on any othe
 	- Ubuntu (15+): `/etc/init.d/smbd restart`
 	- Debian: `service samba restart`
 
-3. For Samba 4.18 and later: The greyhole.so files packaged with Greyhole might not work on your system.  
+3. For Samba 4.19 and later: The greyhole.so files packaged with Greyhole might not work on your system.  
    You'll need to compile your own VFS module.
 
 	- Fedora: `sudo yum -y install patch gcc python-devel gnutls-devel make rpcgen zlib-devel e2fsprogs-devel heimdal-devel`
