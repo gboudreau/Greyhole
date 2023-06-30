@@ -125,7 +125,7 @@ else
 fi
 set -e
 
-# Bugfix for Ubuntu / Debian that are missing symlinks in ${TARGET_LIBDIR}/samba/
+# Bugfix for Ubuntu / Debian that are missing symlinks in ${TARGET_LIBDIR}/samba/ and ${TARGET_LIBDIR}
 MAJOR_SMB_VERSION=$(smbd --version | awk '{print $2}' | awk -F'-' '{print $1}' | awk -F'.' '{print $1}')
 if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
     if [ -f ${TARGET_LIBDIR}/samba/libsmbd_base.so.0 ]; then
@@ -134,7 +134,9 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
         fi
     else
         if [ ! -f ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so ]; then
-            if [ -f ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ]; then
+            if [ -f ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so.0 ]; then
+                ln -s ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
+            elif [ -f ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ]; then
                 ln -s ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
             else
                 echo "Error: missing dependent library libsmbd-base.so.0 (libsmbd-base-samba4.so)"
@@ -145,7 +147,9 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
             ln -s ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so ${TARGET_LIBDIR}/libsmbd-base-samba4.so
         fi
         if [ ! -f ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ]; then
-            if [ -f ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ]; then
+            if [ -f ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so.0 ]; then
+                ln -s ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
+            elif [ -f ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ]; then
                 ln -s ${TARGET_LIBDIR}/samba/libsamba-debug.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
             elif [ -f ${TARGET_LIBDIR}/libsamba-util.so.0 ]; then
                 ln -s ${TARGET_LIBDIR}/libsamba-util.so.0 ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so
