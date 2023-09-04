@@ -46,18 +46,24 @@ class BalanceTask extends AbstractTask {
         uasort($sorted_shares_options, $compare_share_balance);
 
         Log::debug("┌ Will balance the shares in the following order: " . implode(", ", array_keys($sorted_shares_options)));
-        foreach ($sorted_shares_options as $share => $share_options) {
-            if ($share_options[CONFIG_NUM_COPIES] == count(Config::storagePoolDrives())) {
-                // Files are everywhere; won't be able to use that share to balance available space!
-                Log::debug("├ Skipping share $share; has num_copies = max");
-                continue;
+
+        // Look for files larger than 100MB first, and balance using those.
+        // If that's not enough, continue balancing by using files 10-100MB, then 5-10MB, then 1-5MB. At that point, give up!
+        foreach ([100, 10, 5, 1] as $min_file_size) {
+            foreach ($sorted_shares_options as $share => $share_options) {
+                if ($share_options[CONFIG_NUM_COPIES] == count(Config::storagePoolDrives())) {
+                    // Files are everywhere; won't be able to use that share to balance available space!
+                    Log::debug("├ Skipping share $share; has num_copies = max");
+                    continue;
+                }
+                if ($this->skip_stickies && static::is_share_sticky($share)) {
+                    Log::debug("├ Skipping share $share; is sticky");
+                    continue;
+                }
+                $this->balance_share($share, $share_options, $min_file_size);
             }
-            if ($this->skip_stickies && static::is_share_sticky($share)) {
-                Log::debug("├ Skipping share $share; is sticky");
-                continue;
-            }
-            $this->balance_share($share, $share_options);
         }
+
         Log::debug("└ Done balancing all shares");
 
         if ($this->skip_stickies) {
@@ -74,8 +80,8 @@ class BalanceTask extends AbstractTask {
         return TRUE;
     }
 
-    private function balance_share($share, $share_options) {
-        Log::debug("├┐ Balancing share: $share");
+    private function balance_share($share, $share_options, $min_file_size) {
+        Log::debug("├┐ Balancing share: $share ({$min_file_size}MB or + files)");
 
         /** @var $drives_selectors PoolDriveSelector[] */
         $drives_selectors = Config::get(CONFIG_DRIVE_SELECTION_ALGORITHM);
@@ -96,7 +102,7 @@ class BalanceTask extends AbstractTask {
         }
 
         foreach ($drives_selectors as $ds) {
-            Log::debug("│├ Drives to balance: " . implode(', ', $ds->drives));
+            //Log::debug("│├ Drives to balance: " . implode(', ', $ds->drives));
 
             // Move files from the drive with the less available space to the drive with the most available space.
             $pool_drives_avail_space = StoragePool::get_drives_available_space();
@@ -125,18 +131,18 @@ class BalanceTask extends AbstractTask {
             }
 
             foreach ($pool_drives_avail_space as $source_drive => $current_avail_space) {
-                $this->balance_drive($share, $share_options, $source_drive, $pool_drives_avail_space, $balance_direction_asc);
+                $this->balance_drive($share, $share_options, $source_drive, $pool_drives_avail_space, $balance_direction_asc, $min_file_size);
             }
         }
 
-        Log::debug("├┘ Done balancing share: $share");
+        Log::debug("├┘ Done balancing share: $share ({$min_file_size}MB or + files)");
     }
 
-    private function balance_drive($share, $share_options, $source_drive, &$pool_drives_avail_space, $balance_direction_asc) {
+    private function balance_drive($share, $share_options, $source_drive, &$pool_drives_avail_space, $balance_direction_asc, $min_file_size) {
         $current_avail_space = $pool_drives_avail_space[$source_drive];
         $target_avail_space = array_sum($pool_drives_avail_space) / count($pool_drives_avail_space);
         $delta_needed = $target_avail_space - $current_avail_space;
-        if ($delta_needed <= 10*1024) {
+        if ($delta_needed <= 10*1024 || $delta_needed < $min_file_size*1024) {
             Log::debug("│├ Skipping balancing storage pool drive: $source_drive; it has enough available space: (". bytes_to_human($current_avail_space*1024, FALSE) ." available, target: ". bytes_to_human($target_avail_space*1024, FALSE) .")");
             return;
         }
@@ -147,14 +153,9 @@ class BalanceTask extends AbstractTask {
         $files = array();
         if (is_dir("$source_drive/$share")) {
             $max_file_size = floor($delta_needed / 1024);
-            foreach (['100', '10', '5', '1', '0'] as $min_file_size) {
-                $command = "find " . escapeshellarg("$source_drive/$share") . " -type f -size +{$min_file_size}M -size -{$max_file_size}M";
-                Log::debug("│││ Looking for files to move on $source_drive/$share, with file size between {$min_file_size}-{$max_file_size} MB ...");
-                exec($command, $files);
-                if (count($files) > 0) {
-                    break;
-                }
-            }
+            $command = "find " . escapeshellarg("$source_drive/$share") . " -type f -size +{$min_file_size}M -size -{$max_file_size}M";
+            //Log::debug("│││ Looking for files to move on $source_drive/$share, with file size between {$min_file_size}-{$max_file_size} MB ...");
+            exec($command, $files);
         }
         if (count($files) == 0) {
             Log::debug("│├┘ Found no files that could be moved.");
