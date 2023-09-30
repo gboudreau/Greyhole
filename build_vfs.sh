@@ -48,51 +48,58 @@ B=$(echo "${version}" | awk -F'.' '{print $3}') # build
 
 echo
 echo "Installing build dependencies..."
+echo "- Installing build-essential / gcc (etc.)"
 if command -v apt-get >/dev/null; then
-    apt-get -y install build-essential python3-dev libgnutls28-dev pkg-config || true
+    apt-get -y install build-essential python3-dev libgnutls28-dev pkg-config >/dev/null || true
 fi
 if command -v yum >/dev/null; then
-    yum -y install patch gcc python-devel gnutls-devel make rpcgen || true
+    yum -y install patch gcc python-devel gnutls-devel make rpcgen >/dev/null || true
 fi
-if [ $M -ge 4 ]; then
-    if [ $m -ge 12 ]; then
+if [[ ${M} -ge 4 ]]; then
+    if [[ ${m} -ge 12 ]]; then
         if command -v yum >/dev/null; then
-            yum -y install perl-CPAN || true
+            yum -y install perl-CPAN >/dev/null || true
         fi
         echo "- Installing Parse::Yapp::Driver perl module"
         # shellcheck disable=SC2034
         PERL_MM_USE_DEFAULT=1
         echo | perl -MCPAN -e 'install Parse::Yapp::Driver' >/dev/null
     fi
-    if [ $m -ge 13 ]; then
+    if [[ ${m} -ge 13 ]]; then
         echo "- Installing zlib-devel"
         if command -v apt-get >/dev/null; then
-            apt-get -y install zlib1g-dev flex locales || true
+            apt-get -y install zlib1g-dev flex locales >/dev/null || true
         fi
         if command -v yum >/dev/null; then
-            yum -y install zlib-devel || true
+            yum -y install zlib-devel >/dev/null || true
         fi
     fi
-    if [ $m -ge 14 ]; then
+    if [[ ${m} -ge 14 ]]; then
         if command -v /sbin/apk >/dev/null; then
             echo "- Installing bison & flex"
-            apk add bison flex || true
+            apk add bison flex >/dev/null || true
+        fi
+        if command -v yum >/dev/null; then
+            echo "- Installing bison & flex"
+            yum -y install bison flex >/dev/null || true
+            echo "- Installing JSON perl module"
+            cpan install JSON >/dev/null 2>&1
         fi
     fi
-    if [ $m -ge 15 ]; then
+    if [[ ${m} -ge 15 ]]; then
         if command -v apt-get >/dev/null; then
             echo "- Installing com_err & heimdal-devel"
-            apt-get -y install comerr-dev heimdal-multidev || true
+            apt-get -y install comerr-dev heimdal-multidev >/dev/null || true
         fi
         if command -v yum >/dev/null; then
             echo "- Installing e2fsprogs-devel & heimdal-devel"
-            yum -y install e2fsprogs-devel heimdal-devel || true
+            yum -y install e2fsprogs-devel heimdal-devel >/dev/null || true
         fi
     fi
     if [[ ${m} -ge 17 && ${for_debian_ubuntu} -eq 1 ]]; then
       # Ref: https://github.com/gboudreau/Greyhole/issues/312#issuecomment-1613206381
       echo "- Installing libtdb-dev, libldb-dev, libtalloc-dev & libtevent-dev (to unbundle those from Samba)"
-      apt-get -y install libtdb-dev libldb-dev libtalloc-dev libtevent-dev
+      apt-get -y install libtdb-dev libldb-dev libtalloc-dev libtevent-dev >/dev/null
     fi
 fi
 
@@ -165,22 +172,22 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     fi
     CONF_OPTIONS="--enable-debug --disable-symbol-versions --without-acl-support --without-ldap --without-ads --without-pam --without-ad-dc"
     if [[ ${m} -ge 7 ]]; then
-      CONF_OPTIONS="${CONF_OPTIONS} --disable-python"
+      CONF_OPTIONS=${CONF_OPTIONS}' --disable-python'
     fi
     if [[ ${m} -ge 13 ]]; then
-      CONF_OPTIONS="${CONF_OPTIONS} --with-shared-modules=!vfs_snapper"
+      CONF_OPTIONS=${CONF_OPTIONS}' --with-shared-modules=!vfs_snapper'
     fi
     if [[ ${m} -ge 10 ]]; then
-      CONF_OPTIONS="${CONF_OPTIONS} --without-json --without-libarchive"
+      CONF_OPTIONS=${CONF_OPTIONS}' --without-json --without-libarchive'
     elif [[ ${m} -ge 9 ]]; then
-      CONF_OPTIONS="${CONF_OPTIONS} --without-json-audit --without-libarchive"
+      CONF_OPTIONS=${CONF_OPTIONS}' --without-json-audit --without-libarchive'
     fi
-    if [[ ${m} -ge 15 && ! -f /sbin/apk ]]; then
-      CONF_OPTIONS="${CONF_OPTIONS} --with-system-heimdalkrb5"
+    if [[ ${m} -ge 15 && ! -f /sbin/apk && ! -f /bin/yum ]]; then
+      CONF_OPTIONS=${CONF_OPTIONS}' --with-system-heimdalkrb5'
     fi
     if [[ ${m} -ge 17 && ${for_debian_ubuntu} -eq 1 ]]; then
       # Ref: https://github.com/gboudreau/Greyhole/issues/312#issuecomment-1613206381
-      CONF_OPTIONS="${CONF_OPTIONS} --bundled-libraries=!ldb,!pyldb-util,!talloc,!pytalloc-util,!tevent,!tdb,!pytdb"
+      CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!ldb,!pyldb-util,!talloc,!pytalloc-util,!tevent,!tdb,!pytdb'
     fi
     echo "./configure ${CONF_OPTIONS}" > gh_vfs_build.log
     # shellcheck disable=SC2086
@@ -225,7 +232,7 @@ for f in "${GREYHOLE_INSTALL_DIR}/"*.patch; do
 done
 echo '#include <sys/types.h>' > file.txt
 sed -i '/#include <stdbool.h>/r file.txt' -- lib/tevent/tevent.h
-rm file.txt
+rm -f file.txt
 
 echo "  Compiling Samba"
 set +e
