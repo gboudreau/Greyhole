@@ -83,10 +83,15 @@ function gh_symlink($target, $link) {
 }
 
 function gh_mkdir($directory, $original_directory, $dir_permissions = NULL) {
-    if (empty($dir_permissions) && !empty($original_directory)) {
-        $dir_permissions = StorageFile::get_file_permissions($original_directory);
-    }
+    $directory = clean_dir($directory);
+    $original_directory = clean_dir($original_directory);
     if (is_dir($directory)) {
+        if (empty($dir_permissions)) {
+            $dir_permissions = StorageFile::get_file_permissions($original_directory);
+            //Log::debug("Folder '$directory' already exists; copying ownership + permission from '$original_directory': $dir_permissions->fileowner:$dir_permissions->filegroup $dir_permissions->fileperms");
+        } else {
+            //Log::debug("Folder '$directory' already exists; applying ownership $dir_permissions->fileowner:$dir_permissions->filegroup + permission $dir_permissions->fileperms");
+        }
         if (!chown($directory, $dir_permissions->fileowner)) {
             Log::warn("  Failed to chown directory '$directory'", Log::EVENT_CODE_MKDIR_CHOWN_FAILED);
         }
@@ -97,20 +102,37 @@ function gh_mkdir($directory, $original_directory, $dir_permissions = NULL) {
             Log::warn("  Failed to chmod directory '$directory'", Log::EVENT_CODE_MKDIR_CHMOD_FAILED);
         }
     } else {
-        // Need to mkdir & chown/chgrp all dirs that don't exists, up to the full path ($directory)
+        // Need to mkdir & chown/chgrp all dirs that don't exist, up to the full path ($directory)
         $dir_parts = explode('/', $directory);
+        $dir_parts_orig = explode('/', $original_directory);
 
         $i = 0;
         $parent_directory = clean_dir('/' . $dir_parts[$i++]);
         while (is_dir($parent_directory) && $i < count($dir_parts)) {
+            //Log::debug("Parent folder already exists: '$parent_directory'. Skipping.");
             $parent_directory = clean_dir($parent_directory . '/' . $dir_parts[$i++]);
         }
         while ($i <= count($dir_parts)) {
-            if (!is_dir($parent_directory) && !@mkdir($parent_directory, $dir_permissions->fileperms)) {
+            if (!empty($dir_permissions)) {
+                $new_dir_permissions = $dir_permissions;
+            } else {
+                // Need to find the corresponding folder in $original_directory, to copy the ownership/permissions from
+                // eg. for mkdir /mnt/hdd1/gh/ShareName/Dir1/Dir2, with original directory /opt/ShareName/Dir1/Dir2
+                //    - mkdir /mnt/hdd1/gh/ShareName and copy permission from /opt/ShareName
+                //    - mkdir /mnt/hdd1/gh/ShareName/Dir1 and copy permission from /opt/ShareName/Dir1
+                //    - mkdir /mnt/hdd1/gh/ShareName/Dir1/Dir2 and copy permission from /opt/ShareName/Dir1/Dir2
+                $new_original_directory = '';
+                for ($j=0; $j<count($dir_parts_orig) - (count($dir_parts) - $i); $j++) {
+                    $new_original_directory = clean_dir($new_original_directory . '/' . $dir_parts_orig[$j]);
+                }
+                $new_dir_permissions = StorageFile::get_file_permissions($new_original_directory);
+            }
+
+            if (!is_dir($parent_directory) && !@mkdir($parent_directory, $new_dir_permissions->fileperms)) {
                 if (gh_is_file($parent_directory)) {
                     gh_rename($parent_directory, "$parent_directory (file copy)");
                 }
-                if (!@mkdir($parent_directory, $dir_permissions->fileperms)) {
+                if (!@mkdir($parent_directory, $new_dir_permissions->fileperms)) {
                     // Even if mkdir return false, the folder might have been correctly created... who would think...
                     if (!is_dir($parent_directory)) {
                         // Try NFC form [http://en.wikipedia.org/wiki/Unicode_equivalence#Normalization]
@@ -124,10 +146,11 @@ function gh_mkdir($directory, $original_directory, $dir_permissions = NULL) {
                     }
                 }
             }
-            if (!chown($parent_directory, $dir_permissions->fileowner)) {
+            //Log::debug("Folder '$parent_directory' created with permissions $new_dir_permissions->fileperms; " . (isset($new_original_directory) ? "copying ownership from '$new_original_directory': " : "ownership ") . "$new_dir_permissions->fileowner:$new_dir_permissions->filegroup");
+            if (!chown($parent_directory, $new_dir_permissions->fileowner)) {
                 Log::warn("  Failed to chown directory '$parent_directory'", Log::EVENT_CODE_MKDIR_CHOWN_FAILED);
             }
-            if (!chgrp($parent_directory, $dir_permissions->filegroup)) {
+            if (!chgrp($parent_directory, $new_dir_permissions->filegroup)) {
                 Log::warn("  Failed to chgrp directory '$parent_directory'", Log::EVENT_CODE_MKDIR_CHGRP_FAILED);
             }
             if (!isset($dir_parts[$i])) {
