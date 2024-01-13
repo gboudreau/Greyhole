@@ -68,21 +68,22 @@ final class StorageFile {
         if ($create_copies_in_parallel) {
             // Create all file copies simultaneously
             $copy_results = static::create_file_copies($source_file, $file_copies_to_create);
+        } else {
+            // Will copy each file one by one below
+            $copy_results = [];
+        }
+
+        foreach ($file_copies_to_create as $key => $metafile) {
+            // Create a file copy, if parallel copying failed (for this file copy), or is disabled
+            $need_create_copy = empty($copy_results[$key]);
+            if ($need_create_copy) {
+                $copy_results[$key] = static::create_file_copy($source_file, $metafile->path);
+            }
         }
 
         $link_next = FALSE;
         foreach ($file_copies_to_create as $key => $metafile) {
-            if ($create_copies_in_parallel) {
-                /** @noinspection PhpUndefinedVariableInspection */
-                $it_worked = (bool) @$copy_results[$key];
-            } else {
-                $it_worked = FALSE;
-            }
-
-            // Create a file copy, if parallel copying failed (for this file copy), or is disabled
-            if (!$it_worked) {
-                $it_worked = static::create_file_copy($source_file, $metafile->path);
-            }
+            $it_worked = !empty($copy_results[$key]);
 
             if (!$it_worked) {
                 if ($metafile->is_linked) {
