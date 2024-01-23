@@ -160,6 +160,7 @@ final class StorageFile {
         $original_file_infos = StorageFile::get_file_permissions($copy_source);
 
         $file_copies_to_create = [];
+        $tmp_file_copies_to_create = [];
         foreach ($metafiles as $key => $metafile) {
             $destination_file = $metafile->path;
             if (gh_is_file($source_file)) {
@@ -180,7 +181,8 @@ final class StorageFile {
 
             $temp_path = static::get_temp_filename($destination_file);
 
-            $file_copies_to_create[] = $temp_path;
+            $file_copies_to_create[] = $destination_file;
+            $tmp_file_copies_to_create[] = $temp_path;
         }
 
         if (isset($source_size)) {
@@ -190,8 +192,8 @@ final class StorageFile {
         }
 
         $start_time = time();
-        if (!empty($file_copies_to_create)) {
-            $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . implode(' ' , array_map('escapeshellarg', $file_copies_to_create));
+        if (!empty($tmp_file_copies_to_create)) {
+            $copy_cmd = "cat " . escapeshellarg($copy_source) . " | tee " . implode(' ' , array_map('escapeshellarg', $tmp_file_copies_to_create));
             if (Config::get(CONFIG_CALCULATE_MD5_DURING_COPY)) {
                 $copy_cmd .= " | md5sum";
             }
@@ -207,7 +209,7 @@ final class StorageFile {
         foreach ($metafiles as $key => $metafile) {
             $destination_file = $metafile->path;
             $temp_path = static::get_temp_filename($destination_file);
-            if (!array_contains($file_copies_to_create, $temp_path)) {
+            if (!array_contains($tmp_file_copies_to_create, $temp_path)) {
                 continue;
             }
 
