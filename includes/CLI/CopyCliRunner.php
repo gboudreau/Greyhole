@@ -75,7 +75,7 @@ class CopyCliRunner extends AbstractCliRunner {
 
         $target = explode('/', $target);
         $share_name = array_shift($target);
-        $target = implode('/', $target) . '/' . basename($source);
+        $target = clean_dir(implode('/', $target) . '/' . basename($source));
         if (is_dir($source)) {
             $target .= '/';
         }
@@ -96,11 +96,16 @@ class CopyCliRunner extends AbstractCliRunner {
         // No need to check for locks, since we copy the files
         Config::set(CONFIG_CHECK_FOR_OPEN_FILES, FALSE);
 
+        // To mimic cp's behaviour, we'll use the current user (UID:GID) when creating file copies, instead of copying the source's owner
+        StorageFile::override_file_permissions();
+
         if (is_dir($source)) {
             static::glob_dir($source);
         } else {
             static::copy_file($source);
         }
+
+        echo "\n";
     }
 
     protected function copy_file($file) {

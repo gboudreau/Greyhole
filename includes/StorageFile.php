@@ -375,10 +375,11 @@ final class StorageFile {
     }
 
     public static function get_file_permissions($real_path) {
+        global $permissions_override;
         if ($real_path == null || !file_exists($real_path)) {
             return (object) array(
-                'fileowner' => 0,
-                'filegroup' => 0,
+                'fileowner' => @$permissions_override['user'] ?: 0,
+                'filegroup' => @$permissions_override['group'] ?: 0,
                 'fileperms' => (int) base_convert("0777", 8, 10),
                 'filemtime' => time()
             );
@@ -387,13 +388,20 @@ final class StorageFile {
             $real_path = readlink($real_path);
         }
         return (object) array(
-            'fileowner' => (int) gh_fileowner($real_path),
-            'filegroup' => (int) gh_filegroup($real_path),
+            'fileowner' => (int) (@$permissions_override['user'] ?: gh_fileowner($real_path)),
+            'filegroup' => (int) (@$permissions_override['group'] ?: gh_filegroup($real_path)),
             'fileperms' => (int) base_convert(gh_fileperms($real_path), 8, 10),
             'filemtime' => filemtime($real_path),
         );
     }
 
+    public static function override_file_permissions() {
+        global $permissions_override;
+        if (@getmyuid() > 0) {
+            $permissions_override['user'] = getmyuid();
+            $permissions_override['group'] = getmygid();
+        }
+    }
 }
 
 ?>

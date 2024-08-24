@@ -31,7 +31,7 @@ class WriteTask extends AbstractTask {
         }
 
         if (string_starts_with($this->additional_info, 'source:')) {
-            $source_file = substr( $this->additional_info, 7 );
+            $source_file = substr($this->additional_info, 7);
         } elseif ($this->should_ignore_file()) {
             return TRUE;
         }
