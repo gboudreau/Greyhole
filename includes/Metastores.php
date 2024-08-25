@@ -413,7 +413,12 @@ final class Metastores {
                 }
             }
             if (!$has_metafile && file_exists("$data_filepath/$filename")) {
-                unlink("$data_filepath/$filename");
+                if (is_dir("$data_filepath/$filename")) {
+                    // Was a folder before, is now a file
+                    rmdir("$data_filepath/$filename");
+                } else {
+                    unlink("$data_filepath/$filename");
+                }
             }
         }
         if (count($paths_used) == 1) {
