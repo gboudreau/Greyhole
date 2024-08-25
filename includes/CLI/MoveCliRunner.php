@@ -61,18 +61,16 @@ class MoveCliRunner extends AbstractCliRunner {
         $paths = explode('/', $source);
         array_shift($paths); // Remove share name
         $full_path = implode('/', $paths);
-        $landing_zone = get_share_landing_zone($source_share);
-        $source_is_file = is_file("$landing_zone/$full_path");
-        //echo "[DEBUG] source_is_file: " . json_encode($source_is_file) . "\n";
+        $source_landing_zone = get_share_landing_zone($source_share);
+        $source_is_file = is_file("$source_landing_zone/$full_path");
         if (!$source_is_file) {
-            $source_is_dir = is_dir("$landing_zone/$full_path");
-            //echo "[DEBUG] source_is_dir: " . json_encode($source_is_dir) . "\n";
+            $source_is_dir = is_dir("$source_landing_zone/$full_path");
             if (!$source_is_dir) {
                 echo "Error: source does not exist.\n";
                 exit(2);
             }
             // Will work from source dir
-            chdir("$landing_zone/$full_path");
+            chdir("$source_landing_zone/$full_path");
         }
 
         $paths = explode('/', $destination);
@@ -80,16 +78,13 @@ class MoveCliRunner extends AbstractCliRunner {
         $full_path = implode('/', $paths);
         $landing_zone = get_share_landing_zone($destination_share);
         $destination_folder_exists = is_dir("$landing_zone/$full_path");
-        //echo "[DEBUG] destination_folder_exists: " . json_encode($destination_folder_exists) . "\n";
 
         if ($source_is_file) {
             if ($destination_folder_exists) {
                 // mv Share1/dir1/file1 Share2/dir2/
                 $destination = clean_dir("$destination/" . basename($source));
-                //echo "[DEBUG] destination: $destination" . "\n";
             } else {
                 // mv Share1/dir1/file1 Share2/dir2/file2
-                //echo "[DEBUG] destination: $destination" . "\n";
             }
 
             static::move_file($source, $destination);
@@ -100,10 +95,8 @@ class MoveCliRunner extends AbstractCliRunner {
             if ($destination_folder_exists) {
                 // mv Share1/dir1 Share2/
                 $destination = clean_dir("$destination/" . basename($source));
-                //echo "[DEBUG] destination: $destination" . "\n";
             } else {
                 // mv Share1/dir1 Share2/dir2
-                //echo "[DEBUG] destination: $destination" . "\n";
             }
 
             exec("find . -type f -o -type l", $all_files);
@@ -113,12 +106,29 @@ class MoveCliRunner extends AbstractCliRunner {
                 static::move_file($source_file, $destination_file);
             }
 
-            // Trash empty folders
-            //echo "[DEBUG] delete (empty folders): $source" . "\n";
-            $folder_to_delete = getcwd();
-            exec("find " . escapeshellarg($folder_to_delete) . " -type d -exec rmdir {} \; 2>/dev/null");
-            @rmdir($folder_to_delete);
+            if ($source_is_dir) {
+                // Trash empty folders
+                $folder_to_delete = getcwd();
+                exec("find " . escapeshellarg($folder_to_delete) . " -type d", $folders_to_delete);
+                foreach ($folders_to_delete as $dir) {
+                    if ($dir === $folder_to_delete) continue; // Will be deleted last
+                    static::rmdir($source_share, $source_landing_zone, $dir);
+                }
+                static::rmdir($source_share, $source_landing_zone, $folder_to_delete);
+            }
         }
+    }
+
+    protected static function rmdir($source_share, $source_landing_zone, $full_path_in_lz) {
+        $full_path = trim(str_replace($source_landing_zone, '', $full_path_in_lz), '/');
+        echo "[INFO] Deleting empty folder: $source_share/$full_path\n";
+        rmdir("$source_landing_zone/$full_path");
+        $task = AbstractTask::instantiate([
+            'action'    => 'rmdir',
+            'share'     => $source_share,
+            'full_path' => $full_path,
+        ]);
+        $task->execute();
     }
 
     protected static function move_file($source, $destination) {
@@ -132,7 +142,6 @@ class MoveCliRunner extends AbstractCliRunner {
         $destination_parts = explode('/', $destination);
         $destination_share = array_shift($destination_parts);
         $destination_full_path = implode('/', $destination_parts);
-        //$destination_landing_zone = get_share_landing_zone($destination_share);
 
         $sp_drives_affected = array();
         foreach (Config::storagePoolDrives() as $sp_drive) {
@@ -151,13 +160,11 @@ class MoveCliRunner extends AbstractCliRunner {
         list($path, $filename) = explode_full_path($source_full_path);
         $metafiles = Metastores::get_metafile_data_filenames($source_share, $path, $filename);
         foreach ($metafiles as $metafile) {
-            //echo "[DEBUG] delete: $metafile\n";
             unlink($metafile);
         }
 
         // Remove (possibly) empty folders in metastores
         foreach ($metafiles as $metafile) {
-            //echo "[DEBUG] rmdir: " . dirname($metafile) . "\n";
             @rmdir(dirname($metafile));
         }
 
@@ -167,7 +174,6 @@ class MoveCliRunner extends AbstractCliRunner {
             $full_path = "$sp_drive/$destination_share/$destination_full_path";
             list($path, $filename) = explode_full_path($full_path);
             $fsck_task->initialize_fsck_report($full_path);
-            //echo "[DEBUG] gh_fsck_file: $path, $filename, 'file', 'mv', $destination_share, $sp_drive\n";
             $fsck_task->gh_fsck_file($path, $filename, 'file', 'mv', $destination_share, $sp_drive);
 
             // Running gh_fsck_file() on one file will find all file copies; no need to run it for each $sp_drive
@@ -179,14 +185,12 @@ class MoveCliRunner extends AbstractCliRunner {
         $target_folder = dirname($destination);
         if (!file_exists($target_folder)) {
             $source_folder = dirname($source);
-            //echo "[DEBUG] create folder: $target_folder\n";
             gh_mkdir($target_folder, $source_folder);
         }
         if (file_exists($destination)) {
             echo "[WARN] $destination already exists. Will rename to $destination.bak before continuing.\n";
             rename($destination, "$destination.bak");
         }
-        //echo "[DEBUG] rename: $source > $destination\n";
         rename($source, $destination);
     }
 }
