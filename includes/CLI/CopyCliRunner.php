@@ -112,6 +112,10 @@ class CopyCliRunner extends AbstractCliRunner {
         $file = clean_dir($file);
         $target_full_path = $this->target . str_replace($this->source, '', $file);
         $target_full_path = clean_dir(trim($target_full_path, '/'));
+
+        // Remove unsupported characters
+        $target_full_path = str_replace([':', '?', '*', '<', '>', '|'], '-', $target_full_path);
+
         $t = new WriteTask(
             [
                 'id'              => 0,
