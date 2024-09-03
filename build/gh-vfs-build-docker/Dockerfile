@@ -24,7 +24,7 @@ COPY wscript-samba-* samba-module/
 
 ARG SAMBA_VERSION
 ARG PACKAGE
-RUN cp /usr/include/samba-4.0/* /usr/include/ # Surely there is a way to tell Samba to look in /usr/include/samba-4.0/, to load the ldb*.h files..?
+RUN if [ -d "/usr/include/samba-4.0/" ]; then cp /usr/include/samba-4.0/* /usr/include/ ; fi # Surely there is a way to tell Samba to look in /usr/include/samba-4.0/, to load the ldb*.h files..?
 RUN GREYHOLE_INSTALL_DIR=$(pwd) bash ./build_vfs.sh $SAMBA_VERSION $PACKAGE || (cat vfs-build/samba-*/gh_vfs_build.log && false)
 
 RUN cp -Lr vfs-build/samba-*/bin/shared ./samba-bin-shared \
