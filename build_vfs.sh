@@ -131,7 +131,7 @@ if [[ ! -d samba-${version} ]]; then
 	curl -LOs "http://samba.org/samba/ftp/stable/samba-${version}.tar.gz" && tar zxf "samba-${version}.tar.gz" && rm -f "samba-${version}.tar.gz"
 fi
 
-cd "samba-${version}"
+cd "samba-${version}" || true
 NEEDS_CONFIGURE=
 if [[ ! -f source3/modules/vfs_greyhole.c ]]; then
 	NEEDS_CONFIGURE=1
@@ -188,6 +188,9 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     if [[ ${m} -ge 17 && ${for_debian_ubuntu} -eq 1 ]]; then
       # Ref: https://github.com/gboudreau/Greyhole/issues/312#issuecomment-1613206381
       CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!ldb,!pyldb-util,!talloc,!pytalloc-util,!tevent,!tdb,!pytdb'
+    fi
+    if [[ ${m} -ge 19 && -f /sbin/apk ]]; then
+      CONF_OPTIONS=${CONF_OPTIONS}' --without-libunwind'
     fi
     echo "./configure ${CONF_OPTIONS}" > gh_vfs_build.log
     # shellcheck disable=SC2086
