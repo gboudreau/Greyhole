@@ -228,6 +228,9 @@ echo "  Applying patches (if any)..."
 if [[ "${M}.${m}" = "4.11" ]]; then
     curl -sLo "${GREYHOLE_INSTALL_DIR}/smb411-nsstest.patch" "https://gist.githubusercontent.com/gboudreau/778cc1299362cb15a3ea74686cf77794/raw/d578c0a3599cc27d1fe3bc4da015fb4e5aa4652d/smb411-nsstest.patch"
 fi
+if [[ "${M}.${m}" = "4.19" && -f /sbin/apk && "$(uname -m)" = "aarch64" ]]; then
+    curl -sLo "${GREYHOLE_INSTALL_DIR}/smb419-cmocka.patch" "https://gist.githubusercontent.com/gboudreau/3cf3bb9bbadc3dad12eb0fd8484eb1cb/raw/9880c597ab6854d0d362eb443325c1336a7776b6/smb419-cmocka.patch"
+fi
 shopt -s nullglob
 for f in "${GREYHOLE_INSTALL_DIR}/"*.patch; do
     echo -n "  - "
