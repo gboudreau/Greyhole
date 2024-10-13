@@ -562,11 +562,13 @@ class FSCKLogFile {
 
         $last_mod_date = filemtime($logfile);
         if ($last_mod_date > $this->getLastEmailSentTime()) {
+            $body = $this->getBody(TRUE);
+
             if ($this->shouldSendViaEmail()) {
-                email_sysadmin($this->getSubject(), $this->getBody());
+                email_sysadmin($this->getSubject(), $body);
             }
 
-            LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $this->getSubject() . "\n" . $this->getBody());
+            LogHook::trigger(LogHook::EVENT_TYPE_FSCK, Log::EVENT_CODE_FSCK_REPORT, $this->getSubject() . "\n" . $body);
 
             $this->lastEmailSentTime = $last_mod_date;
             Settings::set("last_email_$this->filename", $this->lastEmailSentTime);
@@ -574,19 +576,20 @@ class FSCKLogFile {
     }
 
     private function shouldSendViaEmail() {
-        $this->getBody();
         $fsck_report = FsckTask::getCurrentTask()->get_fsck_report();
         return (@$fsck_report->send_via_email === TRUE);
     }
 
-    private function getBody() {
+    private function getBody($delete_log = false) {
         $logfile = "$this->path/$this->filename";
         if ($this->filename == 'fsck_checksums.log') {
             return file_get_contents($logfile) . "\nNote: You should manually delete the $logfile file once you're done with it.";
         } else if ($this->filename == 'fsck_files.log' && file_exists($logfile)) {
             $fsck_report = unserialize(file_get_contents($logfile));
             /** @var FSCKReport $fsck_report */
-            unlink($logfile);
+            if ($delete_log) {
+                unlink($logfile);
+            }
             return $fsck_report->get_email_body(FALSE) . "\nNote: This report is a complement to the last report you've received. It details possible errors with files for which the fsck was postponed.";
         } else {
             return '[empty]';
