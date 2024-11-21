@@ -354,6 +354,14 @@ class FsckTask extends AbstractTask {
             }
         } else {
             if ($source == 'metastore') {
+                SambaSpool::parse_samba_spool();
+                $query = "SELECT * FROM tasks WHERE action = 'rename' AND share = :share AND full_path = :full_path";
+                $task = DB::getFirst($query, array('share' => $share, 'full_path' => "$file_path/$filename"));
+                if ($task) {
+                    Log::debug("  Missing symlink in LZ for $share/$file_path/$filename, but is OK because this file was renamed after fsck started.");
+                    return;
+                }
+
                 if ($file_type == 'link' && !file_exists(readlink("$path/$filename"))) {
                     // Link points to now gone copy; let's just remove it, and treat this as if the link was not there in the first place.
                     unlink("$path/$filename");
@@ -589,6 +597,17 @@ class FsckTask extends AbstractTask {
                     unset($file_copies_inodes[$key]);
                     unset($file_metafiles[clean_dir($real_full_path)]);
                 }
+            }
+        }
+
+        if ($num_copies_required > 0 && $storage_path === FALSE && count($file_copies_inodes) == 0 && !isset($original_file_path)) {
+            // This could happen when scanning a file that was renamed after fsck started; the rename task will be executed afterward, so the file copies were not yet renamed, but the file or symlink (on the share's LZ) was already renamed
+            SambaSpool::parse_samba_spool();
+            $query = "SELECT * FROM tasks WHERE action = 'rename' AND share = :share AND additional_info = :full_path";
+            $task = DB::getFirst($query, array('share' => $share, 'full_path' => "$file_path/$filename"));
+            if ($task) {
+                Log::debug("  No file copies found, but is OK because this file was renamed after fsck started.");
+                return;
             }
         }
 
