@@ -361,6 +361,15 @@ class FsckTask extends AbstractTask {
                     Log::debug("  Missing symlink in LZ for $share/$file_path/$filename, but is OK because this file was renamed after fsck started.");
                     return;
                 }
+                $query = "SELECT * FROM tasks WHERE action = 'unlink' AND share = :share AND full_path = :full_path";
+                $task = DB::getFirst($query, array('share' => $share, 'full_path' => "$file_path/$filename"));
+                if (!$task) {
+                    $task = DB::getFirst($query, array('share' => $share, 'full_path' => trim("$file_path/$filename", '/')));
+                }
+                if ($task) {
+                    Log::debug("  Missing symlink in LZ for $share/$file_path/$filename, but is OK because this file was deleted after fsck started.");
+                    return;
+                }
 
                 if ($file_type == 'link' && !file_exists(readlink("$path/$filename"))) {
                     // Link points to now gone copy; let's just remove it, and treat this as if the link was not there in the first place.
