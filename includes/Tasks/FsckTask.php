@@ -357,8 +357,11 @@ class FsckTask extends AbstractTask {
                 SambaSpool::parse_samba_spool();
                 $query = "SELECT * FROM tasks WHERE action = 'rename' AND share = :share AND full_path = :full_path";
                 $task = DB::getFirst($query, array('share' => $share, 'full_path' => "$file_path/$filename"));
+                if (!$task) {
+                    $task = DB::getFirst($query, array('share' => $share, 'full_path' => trim("$file_path/$filename", '/')));
+                }
                 if ($task) {
-                    Log::debug("  Missing symlink in LZ for $share/$file_path/$filename, but is OK because this file was renamed after fsck started.");
+                    Log::debug("  Missing symlink in LZ for " . clean_dir("$share/$file_path/$filename") . ", but is OK because this file was renamed after fsck started.");
                     return;
                 }
                 $query = "SELECT * FROM tasks WHERE action = 'unlink' AND share = :share AND full_path = :full_path";
@@ -367,7 +370,7 @@ class FsckTask extends AbstractTask {
                     $task = DB::getFirst($query, array('share' => $share, 'full_path' => trim("$file_path/$filename", '/')));
                 }
                 if ($task) {
-                    Log::debug("  Missing symlink in LZ for $share/$file_path/$filename, but is OK because this file was deleted after fsck started.");
+                    Log::debug("  Missing symlink in LZ for " . clean_dir("$share/$file_path/$filename") . ", but is OK because this file was deleted after fsck started.");
                     return;
                 }
 
