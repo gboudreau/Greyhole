@@ -349,6 +349,7 @@ class FsckTask extends AbstractTask {
             if($storage_path === FALSE) {
                 // Let's just add a 'write' task for this file; if it's a duplicate of an already pending task, it won't be processed twice, since the simplify function will remove such duplicates.
                 Log::info("$path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
+                SambaSpool::parse_samba_spool();
                 WriteTask::queue($share, clean_dir("$file_path/$filename"));
                 return;
             }
@@ -680,6 +681,7 @@ class FsckTask extends AbstractTask {
                 Trash::trash_file("$landing_zone/$file_path/$filename");
             } else if (gh_is_file("$landing_zone/$file_path/$filename")) {
                 Log::info("$share/$file_path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
+                SambaSpool::parse_samba_spool();
                 WriteTask::queue($share, empty($file_path) ? $filename : clean_dir("$file_path/$filename"));
             }
             if ($this->has_option(OPTION_DEL_ORPHANED_METADATA)) {
