@@ -360,6 +360,18 @@ class FsckTask extends AbstractTask {
                 if (!$task) {
                     $task = DB::getFirst($query, array('share' => $share, 'full_path' => trim("$file_path/$filename", '/')));
                 }
+                if (!$task && !empty($file_path)) {
+                    // A directory that contains this file was renamed after fsck started?
+                    $scanned_dir = dirname(clean_dir("$file_path/$filename"));
+                    $query = "SELECT * FROM tasks WHERE action = 'rename' AND share = :share";
+                    $tasks = DB::getAll($query, array('share' => $share));
+                    foreach ($tasks as $t) {
+                        if (string_starts_with($scanned_dir, $t->full_path)) {
+                            $task = $t;
+                            break;
+                        }
+                    }
+                }
                 if ($task) {
                     Log::debug("  Missing symlink in LZ for " . clean_dir("$share/$file_path/$filename") . ", but is OK because this file was renamed after fsck started.");
                     return;
@@ -645,7 +657,22 @@ class FsckTask extends AbstractTask {
                 Metastores::save_metafiles($share, $file_path, $filename, $file_metafiles);
             }
         } else if (count($file_copies_inodes) == 0 && !isset($original_file_path)) {
-            Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool: "' . clean_dir("$share/$file_path/$filename") . '". ' . (is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '')), Log::EVENT_CODE_FSCK_NO_FILE_COPIES);
+            // This could happen when scanning a file that is in a renamed folder, after fsck started; the rename task will be executed afterward, so the file copies were not yet renamed, but the file or symlink (on the share's LZ) was already renamed
+            if (!empty($file_path)) {
+                $scanned_dir = dirname(clean_dir("$file_path/$filename"));
+                SambaSpool::parse_samba_spool();
+                $query = "SELECT * FROM tasks WHERE action = 'rename' AND share = :share";
+                $tasks = DB::getAll($query, array('share' => $share));
+                foreach ($tasks as $task) {
+                    if (string_starts_with($scanned_dir, $task->additional_info)) {
+                        Log::debug("  No file copies found, but is OK because this file is in a folder that was renamed after fsck started.");
+                        return;
+                    }
+                }
+            }
+
+            $log_suffix = is_link("$landing_zone/$file_path/$filename") ? 'Deleting from share.' : (gh_is_file("$landing_zone/$file_path/$filename") ? 'Did you copy that file there without using your Samba shares? (If you did, don\'t do that in the future.)' : '');
+            Log::warn('  WARNING! No copies of this file are available in the Greyhole storage pool: "' . clean_dir("$share/$file_path/$filename") . '". ' . $log_suffix, Log::EVENT_CODE_FSCK_NO_FILE_COPIES);
             if ($source == 'metastore' || Metastores::get_metafile_data_filename($share, $file_path, $filename) !== FALSE) {
                 $this->fsck_report->found_problem(FSCK_PROBLEM_NO_COPIES_FOUND, clean_dir("$share/$file_path/$filename"));
             }
