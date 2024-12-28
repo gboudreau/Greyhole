@@ -186,7 +186,7 @@ if [ "$BUILD_NUMBER" = "1" ]; then
 		# Update $CHANGELOG_URL
 		{
 		    echo "What's new in $VERSION"
-		    echo "--------------------"
+		    echo "---------------------"
 		    cat /tmp/gh_changelog
 		    echo
 		    curl -s "${CHANGELOG_URL}"
