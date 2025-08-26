@@ -678,7 +678,12 @@ class FsckTask extends AbstractTask {
                 $this->fsck_report->found_problem(FSCK_PROBLEM_NO_COPIES_FOUND, clean_dir("$share/$file_path/$filename"));
             }
             if (is_link("$landing_zone/$file_path/$filename")) {
-                Trash::trash_file("$landing_zone/$file_path/$filename");
+                $target = readlink("$landing_zone/$file_path/$filename");
+                if (string_starts_with($target, '.')) {
+                    Log::info("   Is OK... Is a symlink that starts with '.'. Will leave this alone.");
+                } else {
+                    Trash::trash_file("$landing_zone/$file_path/$filename");
+                }
             } else if (gh_is_file("$landing_zone/$file_path/$filename")) {
                 Log::info("$share/$file_path/$filename is a file (not a symlink). Adding a new 'write' pending task for that file.");
                 SambaSpool::parse_samba_spool();
