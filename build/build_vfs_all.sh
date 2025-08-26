@@ -15,7 +15,7 @@ export DOCKER_BUILDKIT=1
 
 cp "${GREYHOLE_INSTALL_DIR}/build_vfs.sh" .
 
-for version in 4.19.5 4.18.3 4.17.8 4.16.2 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
+for version in 4.22.3 4.19.5 4.18.3 4.17.8 4.16.2 4.15.5 4.14.12 4.13.17 4.12.15 4.11.16; do
     M=$(echo ${version} | awk -F'.' '{print $1}') # major
     m=$(echo ${version} | awk -F'.' '{print $2}') # minor
     # shellcheck disable=SC2034
