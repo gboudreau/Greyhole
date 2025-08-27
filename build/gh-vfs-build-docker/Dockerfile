@@ -1,4 +1,4 @@
-ARG IMAGE=ubuntu@sha256:57df66b9fc9ce2947e434b4aa02dbe16f6685e20db0c170917d4a1962a5fe6a9
+ARG IMAGE=ubuntu@sha256:35f3a8badf2f74c1b320a643b343536f5132f245cbefc40ef802b6203a166d04
 FROM $IMAGE
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -6,8 +6,7 @@ ENV TERM=xterm
 ENV PERL_MM_USE_DEFAULT=1
 ENV PYTHONUTF8=1
 
-RUN apt-get update && apt-get install -y curl unzip samba samba-common samba-common-bin samba-vfs-modules build-essential python3-dev libgnutls28-dev pkg-config flex locales comerr-dev heimdal-multidev libtdb-dev libldb-dev libtalloc-dev libtevent-dev \
-	# Clean apt, /tmp
+RUN apt-get update && apt-get install -y curl unzip samba samba-common samba-common-bin samba-vfs-modules build-essential python3-dev libgnutls28-dev pkg-config flex locales comerr-dev heimdal-multidev libtdb-dev libldb-dev libtalloc-dev libtevent-dev bison \
 	&& rm -rf /var/lib/apt/lists/* /tmp/* \
 	&& perl -MCPAN -e 'install Parse::Yapp::Driver' \
 	&& locale-gen en_US.UTF-8

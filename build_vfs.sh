@@ -56,6 +56,12 @@ if command -v yum >/dev/null; then
     yum -y install patch gcc python-devel gnutls-devel make rpcgen >/dev/null || true
 fi
 if [[ ${M} -ge 4 ]]; then
+    if [[ ${m} -ge 20 ]]; then
+        if command -v apt-get >/dev/null; then
+            echo "- Installing bison"
+            apt-get -y install bison >/dev/null || true
+        fi
+    fi
     if [[ ${m} -ge 12 ]]; then
         if command -v yum >/dev/null; then
             yum -y install perl-CPAN >/dev/null || true
@@ -185,7 +191,16 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     if [[ ${m} -ge 15 && ! -f /sbin/apk && ! -f /bin/yum ]]; then
       CONF_OPTIONS=${CONF_OPTIONS}' --with-system-heimdalkrb5'
     fi
-    if [[ ${m} -ge 17 && ${for_debian_ubuntu} -eq 1 ]]; then
+    if [[ ${m} -ge 21 ]]; then
+      CONF_OPTIONS=${CONF_OPTIONS}' --without-ldb-lmdb'
+    fi
+    if [[ ${m} -ge 22 && ${for_debian_ubuntu} -eq 1 ]]; then
+      CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!pyldb-util,!pytalloc-util,!pytdb'
+    elif [[ ${m} -ge 21 && ${for_debian_ubuntu} -eq 1 ]]; then
+      CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!pyldb-util,!talloc,!pytalloc-util,!tevent,!pytdb'
+    elif [[ ${m} -ge 20 && ${for_debian_ubuntu} -eq 1 ]]; then
+      CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!pyldb-util,!talloc,!pytalloc-util,!tevent,!tdb,!pytdb'
+    elif [[ ${m} -ge 17 && ${for_debian_ubuntu} -eq 1 ]]; then
       # Ref: https://github.com/gboudreau/Greyhole/issues/312#issuecomment-1613206381
       CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!ldb,!pyldb-util,!talloc,!pytalloc-util,!tevent,!tdb,!pytdb'
     fi

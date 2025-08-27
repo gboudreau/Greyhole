@@ -109,6 +109,10 @@ elif [ "${SMB_VERSION}" = "4 18" ]; then
     LIB_FILE="greyhole-samba418.so"
 elif [ "${SMB_VERSION}" = "4 19" ]; then
     LIB_FILE="greyhole-samba419.so"
+elif [ "${SMB_VERSION}" = "4 20" ]; then
+    LIB_FILE="greyhole-samba420.so"
+elif [ "${SMB_VERSION}" = "4 21" ]; then
+    LIB_FILE="greyhole-samba421.so"
 elif [ "${SMB_VERSION}" = "4 22" ]; then
     LIB_FILE="greyhole-samba422.so"
 else
