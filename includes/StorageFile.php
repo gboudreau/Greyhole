@@ -385,7 +385,7 @@ final class StorageFile {
             );
         }
         if (is_link($real_path)) {
-            $real_path = readlink($real_path);
+            $real_path = realpath($real_path);
         }
         return (object) array(
             'fileowner' => (int) (@$permissions_override['user'] ?: gh_fileowner($real_path)),
