@@ -146,8 +146,10 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
                 ln -s ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
             elif [ -f ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ]; then
                 ln -s ${TARGET_LIBDIR}/samba/libsmbd-base.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
+            elif [ -f ${TARGET_LIBDIR}/samba/libsmbd-base-private-samba.so.0 ]; then
+                ln -s ${TARGET_LIBDIR}/samba/libsmbd-base-private-samba.so.0 ${TARGET_LIBDIR}/samba/libsmbd-base-samba4.so
             else
-                echo "Error: missing dependent library libsmbd-base.so.0 (libsmbd-base-samba4.so)"
+                echo "Error: missing dependent library libsmbd-base.so.0 / libsmbd-base-private-samba.so.0 (libsmbd-base-samba4.so)"
                 exit 1
             fi
         fi
@@ -168,6 +170,12 @@ if [ "${MAJOR_SMB_VERSION}" = "4" ]; then
         fi
         if [ ! -f ${TARGET_LIBDIR}/libsamba-debug-samba4.so ]; then
             ln -s ${TARGET_LIBDIR}/samba/libsamba-debug-samba4.so ${TARGET_LIBDIR}/libsamba-debug-samba4.so
+        fi
+        if [ ! -f ${TARGET_LIBDIR}/libsmbd-base-private-samba.so -a -f ${TARGET_LIBDIR}/libsmbd-base-private-samba.so.0 ]; then
+            ln -s ${TARGET_LIBDIR}/libsmbd-base-private-samba.so.0 ${TARGET_LIBDIR}/libsmbd-base-private-samba.so
+        fi
+        if [ ! -f ${TARGET_LIBDIR}/libsamba-debug-private-samba.so -a -f ${TARGET_LIBDIR}/samba/libsamba-debug-private-samba.so.0 ]; then
+            ln -s ${TARGET_LIBDIR}/samba/libsamba-debug-private-samba.so.0 ${TARGET_LIBDIR}/libsamba-debug-private-samba.so
         fi
     fi
 fi
