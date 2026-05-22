@@ -475,14 +475,14 @@ if (!empty($_GET['ajax'])) {
                 if (isset($trash_content[$key])) {
                     // Is a folder
                     $d['path'] = '<a href="#enter" onclick="trashmanEnterFolder(this); return false">' . he($d['path']) . '</a>';
-                    $d['size'] = number_format($d['size']);
+                    $d['size'] = bytes_to_human($d['size'], TRUE, TRUE);
                 } else {
                     // Is a file
                     $d['path'] = $key;
                     if ($d['copies'] > 1) {
-                        $d['size'] = $d['copies'] . ' x ' . bytes_to_human($d['size'] / $d['copies'], TRUE, TRUE) . ' = ' . number_format($d['size']);
+                        $d['size'] = $d['copies'] . ' x ' . bytes_to_human($d['size'] / $d['copies'], TRUE, TRUE) . ' = ' . bytes_to_human($d['size'], TRUE, TRUE);
                     } else {
-                        $d['size'] = number_format($d['size']);
+                        $d['size'] = bytes_to_human($d['size'], TRUE, TRUE);
                     }
                 }
                 $d['actions'] = '<a class="btn btn-danger" href="#delete" onclick="trashmanDelete(this); return false">Delete forever...</a> <a class="btn btn-success" href="restore" onclick="trashmanRestore(this); return false">Restore...</a>';
