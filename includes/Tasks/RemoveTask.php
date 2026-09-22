@@ -98,7 +98,8 @@ class RemoveTask extends AbstractTask {
 
         if ($this->isGoing()) {
             // Schedule fsck for all shares to re-create missing copies on other shares
-            schedule_fsck_all_shares(array('email'));
+            $task_ids = schedule_fsck_all_shares(array('email'));
+            FSCKWorkLog::initiate('all shares', NULL, $task_ids);
             $this->log("All the files that were only on $this->drive have been copied somewhere else.");
             $this->log("A fsck of all shares has been scheduled, to recreate other file copies. It will start after all currently pending tasks have been completed.");
             unlink($this->drive . "/.greyhole_used_this");

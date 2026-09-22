@@ -186,7 +186,8 @@ final class StoragePool {
                 Log::info("Starting fsck for all shares - caused by missing drive. Will just recreate symlinks to existing copies when possible; won't create new copies just yet.");
                 fix_all_symlinks();
             }
-            schedule_fsck_all_shares(array('email'));
+            $task_ids = schedule_fsck_all_shares(array('email'));
+            FSCKWorkLog::initiate('all shares', NULL, $task_ids);
             Log::info("  fsck for all shares scheduled.");
 
             self::reload_gone_ok_drives();
