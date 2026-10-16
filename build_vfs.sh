@@ -180,7 +180,10 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
     if [[ ${m} -ge 7 ]]; then
       CONF_OPTIONS=${CONF_OPTIONS}' --disable-python'
     fi
-    if [[ ${m} -ge 13 ]]; then
+    if [[ ${m} -ge 23 ]]; then
+      # Replaces the patch of source3/wscript we used before 4.23
+      CONF_OPTIONS=${CONF_OPTIONS}' --with-shared-modules=!vfs_snapper,vfs_greyhole'
+    elif [[ ${m} -ge 13 ]]; then
       CONF_OPTIONS=${CONF_OPTIONS}' --with-shared-modules=!vfs_snapper'
     fi
     if [[ ${m} -ge 10 ]]; then
