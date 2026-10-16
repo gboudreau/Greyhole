@@ -24,6 +24,22 @@ for version in 4.25.0 4.24.8 4.23.13 4.22.4 4.21.7 4.20.8 4.19.5 4.18.3 4.17.8 4
     mkdir -p "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/"
     chown gb "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/"
 
+    if [ $m -ge 25 ]; then
+        DOCKER_IMAGE="debian:forky" # Maybe replace with a Debian version later?
+    elif [ $m -ge 24 ]; then
+        DOCKER_IMAGE="ubuntu:stonking"
+    elif [ $m -ge 23 ]; then
+        DOCKER_IMAGE="ubuntu:resolute"
+    elif [ $m -ge 19 ]; then
+        DOCKER_IMAGE="ubuntu:noble"
+    elif [ $m -ge 18 ]; then
+        DOCKER_IMAGE="ubuntu:mantic"
+    elif [ $m -ge 17 ]; then
+        DOCKER_IMAGE="ubuntu:kinetic"
+    else
+        DOCKER_IMAGE="ubuntu@sha256:8364cd6be2e81626a889a541bff7b48262caf49fca6e73b462cf49f45644d390"
+    fi
+
     echo
     echo "********"
     echo "Compiling VFS for Samba $version..."
@@ -37,7 +53,7 @@ for version in 4.25.0 4.24.8 4.23.13 4.22.4 4.21.7 4.20.8 4.19.5 4.18.3 4.17.8 4
         echo "Compiling VFS for arm64"
 
         # Docker images for IMAGE arg: https://hub.docker.com/_/ubuntu?tab=tags
-        docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=deb" --build-arg "IMAGE=ubuntu:noble" .
+        docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=deb" --build-arg "IMAGE=$DOCKER_IMAGE" .
         id=$(docker create greyhole-vfs-builder:arm64)
         docker cp $id:/usr/share/greyhole/vfs-build/samba-$version/greyhole-samba$M$m.so "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64-deb.so"
         docker rm -v $id
@@ -45,7 +61,7 @@ for version in 4.25.0 4.24.8 4.23.13 4.22.4 4.21.7 4.20.8 4.19.5 4.18.3 4.17.8 4
         echo -n "New VFS module created was copied to "
         ls -1 "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64-deb.so"
 
-        docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=rpm" --build-arg "IMAGE=ubuntu:noble" .
+        docker build --pull --platform linux/arm64 -t greyhole-vfs-builder:arm64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=rpm" --build-arg "IMAGE=$DOCKER_IMAGE" .
         id=$(docker create greyhole-vfs-builder:arm64)
         docker cp $id:/usr/share/greyhole/vfs-build/samba-$version/greyhole-samba$M$m.so "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-arm64.so"
         docker rm -v $id
@@ -58,7 +74,7 @@ for version in 4.25.0 4.24.8 4.23.13 4.22.4 4.21.7 4.20.8 4.19.5 4.18.3 4.17.8 4
         echo "Compiling VFS for x86_64"
 
         # Docker images for IMAGE arg: https://hub.docker.com/_/ubuntu?tab=tags
-        docker build --pull --platform linux/amd64 -t greyhole-vfs-builder:amd64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=deb" --build-arg "IMAGE=ubuntu:noble" .
+        docker build --pull --platform linux/amd64 -t greyhole-vfs-builder:amd64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=deb" --build-arg "IMAGE=$DOCKER_IMAGE" .
         id=$(docker create greyhole-vfs-builder:amd64)
         docker cp $id:/usr/share/greyhole/vfs-build/samba-$version/greyhole-samba$M$m.so "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-x86_64-deb.so"
         docker rm -v $id
@@ -66,7 +82,7 @@ for version in 4.25.0 4.24.8 4.23.13 4.22.4 4.21.7 4.20.8 4.19.5 4.18.3 4.17.8 4
         echo -n "New VFS module created was copied to "
         ls -1 "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-x86_64-deb.so"
 
-        docker build --pull --platform linux/amd64 -t greyhole-vfs-builder:amd64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=rpm" --build-arg "IMAGE=ubuntu:noble" .
+        docker build --pull --platform linux/amd64 -t greyhole-vfs-builder:amd64 --build-arg "SAMBA_VERSION=${version}" --build-arg "PACKAGE=rpm" --build-arg "IMAGE=$DOCKER_IMAGE" .
         id=$(docker create greyhole-vfs-builder:amd64)
         docker cp $id:/usr/share/greyhole/vfs-build/samba-$version/greyhole-samba$M$m.so "${GREYHOLE_INSTALL_DIR}/samba-module/bin/${M}.${m}/greyhole-x86_64.so"
         docker rm -v $id

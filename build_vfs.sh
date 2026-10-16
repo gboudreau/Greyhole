@@ -207,6 +207,14 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
       # Ref: https://github.com/gboudreau/Greyhole/issues/312#issuecomment-1613206381
       CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!ldb,!pyldb-util,!talloc,!pytalloc-util,!tevent,!tdb,!pytdb'
     fi
+    if [[ ${m} -ge 23 && ${for_debian_ubuntu} -eq 1 ]]; then
+      # Although this looks like it only affects ldb, it replaces upstream’s default private-library list. That also keeps tevent-util public, producing a dependency on libtevent-util.so.0.
+      CONF_OPTIONS=${CONF_OPTIONS}' --private-libraries=!ldb'
+      # Avoid shipping build-directory RUNPATHs
+      CONF_OPTIONS=${CONF_OPTIONS}' --disable-rpath --disable-rpath-install'
+      # That makes the module request libsmbd-base-private-samba.so.0 directly
+      sed -i "/bundled_name = PRIVATE_NAME(bld, libname.replace('_', '-'))/{n;s/vnum = None/vnum = '0'/;}" buildtools/wafsamba/wafsamba.py
+    fi
     if [[ ${m} -ge 19 && -f /sbin/apk ]]; then
       CONF_OPTIONS=${CONF_OPTIONS}' --without-libunwind'
     fi
