@@ -207,6 +207,9 @@ if [[ "${NEEDS_CONFIGURE}" = "1" ]]; then
       # Ref: https://github.com/gboudreau/Greyhole/issues/312#issuecomment-1613206381
       CONF_OPTIONS=${CONF_OPTIONS}' --bundled-libraries=!ldb,!pyldb-util,!talloc,!pytalloc-util,!tevent,!tdb,!pytdb'
     fi
+    if [[ ${m} -ge 23 && -f /sbin/apk ]]; then
+        CONF_OPTIONS="${CONF_OPTIONS} --bundled-libraries=!cmocka"
+    fi
     if [[ ${m} -ge 23 && ${for_debian_ubuntu} -eq 1 ]]; then
       # Although this looks like it only affects ldb, it replaces upstream’s default private-library list. That also keeps tevent-util public, producing a dependency on libtevent-util.so.0.
       CONF_OPTIONS=${CONF_OPTIONS}' --private-libraries=!ldb'
