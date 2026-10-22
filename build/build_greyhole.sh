@@ -230,4 +230,18 @@ PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
 sudo docker buildx build --platform ${PLATFORMS} --push -t "gboudreau/samba-greyhole:$VERSION" -t "gboudreau/samba-greyhole:latest" --build-arg "GREYHOLE_VERSION=$VERSION" .
 echo
 
+# If the Docker images use a new Samba version, I should upload the .zip created by the above builds to greyhole.net/releases/
+# # Check filename:
+# docker run --platform "linux/amd64 gboudreau/samba-greyhole:latest ls -l
+# # Copy files:
+# id=$(docker create --platform "linux/amd64 gboudreau/samba-greyhole:latest)
+# docker cp $id:/usr/share/greyhole/greyhole-samba423-alpine-x86_64.zip .
+# id=$(docker create --platform "linux/arm64 gboudreau/samba-greyhole:latest)
+# docker cp $id:/usr/share/greyhole/greyhole-samba423-alpine-aarch64.zip .
+# id=$(docker create --platform "linux/arm/v7 gboudreau/samba-greyhole:latest)
+# docker cp $id:/usr/share/greyhole/greyhole-samba423-alpine-armv7l.zip .
+# # Send to web server:
+# scp greyhole-samba*-alpine-*.zip AmazonOne:www/greyhole.net/releases/
+# # CloudFlare: greyhole.net > Caching > Configuration > Purge Everything & Invalidate Everything
+
 ###
