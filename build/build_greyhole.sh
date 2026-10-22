@@ -226,7 +226,7 @@ php -r '$o=json_decode(file_get_contents("/tmp/response.json"));echo $o->html_ur
 echo "Creating new Docker images..."
 cd ~/docker-services/samba-greyhole/docker-build/
 sudo docker buildx use mybuilder
-PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+PLATFORMS="linux/amd64,linux/arm64,linux/arm/v7"
 sudo docker buildx build --platform ${PLATFORMS} --push -t "gboudreau/samba-greyhole:$VERSION" -t "gboudreau/samba-greyhole:latest" --build-arg "GREYHOLE_VERSION=$VERSION" .
 echo
 
